@@ -42,6 +42,15 @@ export const adminApi = {
   getSettings: () => req<{ settings: SiteSettings }>("GET", "/settings"),
   updateSettings: (settings: Partial<SiteSettings>) => req<{ settings: SiteSettings }>("PUT", "/settings", settings),
   uploadLogo: (logoBase64: string) => req<{ settings: SiteSettings }>("POST", "/logo", { logoBase64 }),
+
+  // Ads
+  getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
+  getAd: (id: string) => req<{ ad: Ad }>("GET", `/ads/${id}`),
+  createAd: (data: { name: string; imageBase64: string; link: string; position: "banner" | "sidebar"; active: boolean }) =>
+    req<{ ad: Ad }>("POST", "/ads", data),
+  updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
+  deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),
+  trackAdClick: (id: string) => fetch(`/api/ads/${id}/click`, { method: "POST" }).then((r) => r.json()),
 };
 
 export interface Article {
@@ -73,4 +82,16 @@ export interface SiteSettings {
   logoBase64?: string;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
+}
+
+export interface Ad {
+  id: string;
+  name: string;
+  imageBase64: string;
+  link: string;
+  position: "banner" | "sidebar";
+  active: boolean;
+  clicks: number;
+  createdAt: string;
+  updatedAt: string;
 }

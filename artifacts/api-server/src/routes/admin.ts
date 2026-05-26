@@ -136,4 +136,48 @@ router.post("/logo", (req, res) => {
   res.json({ settings, message: "Logo updated successfully" });
 });
 
+// ─── Ads ───────────────────────────────────────────────────────────────
+
+/** GET /api/admin/ads */
+router.get("/ads", (_req, res) => {
+  res.json({ ads: store.getAds() });
+});
+
+/** GET /api/admin/ads/:id */
+router.get("/ads/:id", (req, res) => {
+  const ad = store.getAd(req.params.id ?? "");
+  if (!ad) { res.status(404).json({ error: "Ad not found" }); return; }
+  res.json({ ad });
+});
+
+/** POST /api/admin/ads — create ad */
+router.post("/ads", (req, res) => {
+  const { name, imageBase64, link, position, active } = req.body as {
+    name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
+  };
+  if (!name || !imageBase64 || !link) {
+    res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
+  }
+  const ad = store.createAd({
+    name, imageBase64, link,
+    position: (position === "banner" || position === "sidebar" ? position : "banner"),
+    active: !!active,
+  });
+  res.status(201).json({ ad });
+});
+
+/** PUT /api/admin/ads/:id */
+router.put("/ads/:id", (req, res) => {
+  const ad = store.updateAd(req.params.id ?? "", req.body as Parameters<typeof store.updateAd>[1]);
+  if (!ad) { res.status(404).json({ error: "Ad not found" }); return; }
+  res.json({ ad });
+});
+
+/** DELETE /api/admin/ads/:id */
+router.delete("/ads/:id", (req, res) => {
+  const deleted = store.deleteAd(req.params.id ?? "");
+  if (!deleted) { res.status(404).json({ error: "Ad not found" }); return; }
+  res.json({ success: true });
+});
+
 export default router;

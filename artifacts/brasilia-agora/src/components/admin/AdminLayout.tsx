@@ -2,17 +2,18 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
-  ChevronLeft, ChevronRight, Globe, Newspaper, Webhook,
+  ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
 } from "lucide-react";
 
 const NAV = [
-  { label: "Dashboard",  icon: LayoutDashboard, path: "/admin" },
-  { label: "Artigos",    icon: FileText,         path: "/admin/artigos" },
-  { label: "Novo Artigo",icon: Newspaper,        path: "/admin/artigos/novo" },
-  { label: "Menu",       icon: Menu,             path: "/admin/menu" },
-  { label: "Logo",       icon: Image,            path: "/admin/logo" },
-  { label: "Webhook",    icon: Webhook,          path: "/admin/webhook" },
-  { label: "Config.",    icon: Settings,         path: "/admin/configuracoes" },
+  { label: "Dashboard",    icon: LayoutDashboard, path: "/admin" },
+  { label: "Artigos",      icon: FileText,         path: "/admin/artigos" },
+  { label: "Novo Artigo",  icon: Newspaper,        path: "/admin/artigos/novo" },
+  { label: "Menu",         icon: Menu,             path: "/admin/menu" },
+  { label: "Propagandas",  icon: Megaphone,        path: "/admin/propagandas" },
+  { label: "Logo",         icon: Image,            path: "/admin/logo" },
+  { label: "Webhook",      icon: Webhook,          path: "/admin/webhook" },
+  { label: "Config.",      icon: Settings,         path: "/admin/configuracoes" },
 ];
 
 interface AdminLayoutProps {

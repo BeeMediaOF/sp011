@@ -8,6 +8,7 @@ import MenuManager from "./admin/MenuManager";
 import LogoUpload from "./admin/LogoUpload";
 import Settings from "./admin/Settings";
 import Webhook from "./admin/Webhook";
+import AdsManager from "./admin/AdsManager";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
@@ -45,6 +46,9 @@ export default function Admin() {
       </Route>
       <Route path="/admin/webhook">
         <RequireAuth><Webhook /></RequireAuth>
+      </Route>
+      <Route path="/admin/propagandas">
+        <RequireAuth><AdsManager /></RequireAuth>
       </Route>
       <Route path="/admin">
         <RequireAuth><Dashboard /></RequireAuth>
