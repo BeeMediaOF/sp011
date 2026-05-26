@@ -10,6 +10,8 @@ const navItems = [
   { label: "EDUCAÇÃO", path: "/educacao" },
   { label: "CULTURA", path: "/cultura" },
   { label: "ESPORTES", path: "/esportes" },
+  { label: "BRASIL", path: "/brasil" },
+  { label: "MUNDO", path: "/mundo" },
   { label: "COLUNAS", path: "/colunas" }
 ];
 

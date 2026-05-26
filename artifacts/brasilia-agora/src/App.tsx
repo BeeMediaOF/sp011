@@ -13,6 +13,8 @@ import Educacao from "@/pages/Educacao";
 import Cultura from "@/pages/Cultura";
 import Esportes from "@/pages/Esportes";
 import Colunas from "@/pages/Colunas";
+import Brasil from "@/pages/Brasil";
+import Mundo from "@/pages/Mundo";
 import Artigo from "@/pages/Artigo";
 import Archive from "@/pages/Archive";
 import Contato from "@/pages/Contato";
@@ -36,6 +38,8 @@ function Router() {
       <Route path="/cultura" component={Cultura} />
       <Route path="/esportes" component={Esportes} />
       <Route path="/colunas" component={Colunas} />
+      <Route path="/brasil" component={Brasil} />
+      <Route path="/mundo" component={Mundo} />
       <Route path="/artigo/:slug" component={Artigo} />
       <Route path="/arquivo" component={Archive} />
       <Route path="/contato" component={Contato} />
