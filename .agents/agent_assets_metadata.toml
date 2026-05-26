@@ -120,3 +120,33 @@ id = "YrFq0hA8gEYz937HQUgnS"
 uri = "file://artifacts/brasilia-agora/src/assets/images/health2.png"
 type = "image"
 title = "Doctor with patient modern clinic"
+
+[[generated]]
+id = "We0TiokwKuSQL_jKdERQ4"
+uri = "file://attached_assets/generated_images/aerial_view_of_bras_865e.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "Yla5xvqcVdo_8VO2i5fpq"
+uri = "file://attached_assets/generated_images/brazilian_politicians_debate_in_949b.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "QGuUO6gxCWWhGG0biu44J"
+uri = "file://attached_assets/generated_images/aerial_view_of_brazil_b808.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "8lKcPOv7ytCD5UGxhRuBF"
+uri = "file://attached_assets/generated_images/world_map_globe_with_3e0b.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "awobq22KpfV53M6ziW8jq"
+uri = "file://attached_assets/generated_images/cultural_festival_bras_lia_36fc.png"
+type = "image"
+title = "generated_image"
