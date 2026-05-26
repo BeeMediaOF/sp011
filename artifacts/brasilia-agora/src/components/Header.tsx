@@ -11,7 +11,7 @@ export default function Header() {
           <img
             src={logoImg}
             alt="Brasília Hoje"
-            className="h-40 w-auto object-contain group-hover:opacity-90 transition-opacity"
+            className="h-56 w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
         
