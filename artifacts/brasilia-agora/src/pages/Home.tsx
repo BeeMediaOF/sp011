@@ -5,6 +5,9 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import DestaquesSection from "../components/DestaquesSection";
 import BottomSection from "../components/BottomSection";
+import SegurancaSection from "../components/SegurancaSection";
+import EsportesSection from "../components/EsportesSection";
+import MaisLidasSection from "../components/MaisLidasSection";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 
@@ -18,6 +21,9 @@ export default function Home() {
         <HeroSection />
         <DestaquesSection />
         <BottomSection />
+        <SegurancaSection />
+        <EsportesSection />
+        <MaisLidasSection />
       </main>
       <RedacaoBanner />
       <Footer />
