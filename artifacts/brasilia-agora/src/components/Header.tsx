@@ -1,22 +1,18 @@
 import React from "react";
 import { Search } from "lucide-react";
 import { Link } from "wouter";
+import logoImg from "../assets/images/logo_transparent.png";
 
 export default function Header() {
   return (
     <header className="bg-[#1a2448] py-6">
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-        <Link href="/" className="flex flex-col group cursor-pointer">
-          <div className="flex items-end">
-            <h1 className="text-4xl font-extrabold text-white tracking-tighter mr-2 group-hover:opacity-90 transition-opacity">
-              BRASÍLIA <span className="text-[#F5A623]">AGORA</span>
-            </h1>
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-blue-400 mb-1">
-              <path d="M12 2C12 2 8 8 8 12C8 16 12 22 12 22C12 22 16 16 16 12C16 8 12 2 12 2ZM11 22V12C11 10.5 11.5 9 12 8C12.5 9 13 10.5 13 12V22H11Z" />
-              <path d="M4 14C4 14 6 12 8 12V22H4V14ZM20 14C20 14 18 12 16 12V22H20V14Z" />
-            </svg>
-          </div>
-          <p className="text-white text-xs tracking-widest mt-1 opacity-80 font-medium">A NOTÍCIA QUE MOVE A CAPITAL</p>
+        <Link href="/" className="group cursor-pointer block">
+          <img
+            src={logoImg}
+            alt="Brasília Hoje"
+            className="h-16 w-auto object-contain group-hover:opacity-90 transition-opacity"
+          />
         </Link>
         
         <div className="w-full md:w-auto">
