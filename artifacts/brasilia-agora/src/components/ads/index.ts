@@ -1,4 +1,5 @@
 export { default as AdSlot } from "./AdSlot";
 export { default as AdSidebar } from "./AdSidebar";
-export { default as AdBetween } from "./AdBetween";
-export { default as AdInContent } from "./AdInContent";
+export { default as AdInFeed } from "./AdInFeed";
+export { default as AdNative } from "./AdNative";
+export { default as AdStickyBottom } from "./AdStickyBottom";

@@ -1,56 +1,35 @@
 import React from "react";
 
 interface AdSlotProps {
-  width?: number;
-  height?: number;
-  label?: string;
+  size?: "sm" | "md" | "lg" | "xl";
   className?: string;
-  variant?: "banner" | "square" | "skyscraper" | "rectangle" | "billboard" | "custom";
+  label?: string;
   sticky?: boolean;
   children?: React.ReactNode;
 }
 
-const SIZES = {
-  banner:    { w: 728, h: 90,  label: "728 × 90" },
-  square:    { w: 300, h: 250, label: "300 × 250" },
-  skyscraper:{ w: 160, h: 600, label: "160 × 600" },
-  rectangle: { w: 336, h: 280, label: "336 × 280" },
-  billboard: { w: 970, h: 250, label: "970 × 250" },
-  custom:    { w: 0,   h: 0,   label: "Personalizado" },
+const SIZE_STYLES = {
+  sm:  "w-[300px] h-[250px]",   // Square / Medium Rectangle
+  md:  "w-[728px] h-[90px]",     // Leaderboard
+  lg:  "w-[336px] h-[280px]",    // Large Rectangle
+  xl:  "w-full h-[250px]",       // Billboard / Full width
 };
 
-export default function AdSlot({
-  width,
-  height,
-  label,
-  className = "",
-  variant = "custom",
-  sticky = false,
-  children,
-}: AdSlotProps) {
-  const s = SIZES[variant];
-  const w = width ?? s.w;
-  const h = height ?? s.h;
-  const lbl = label ?? s.label;
-
+export default function AdSlot({ size = "sm", className = "", label, sticky = false, children }: AdSlotProps) {
   return (
-    <div className={`flex flex-col items-center ${sticky ? "sticky top-24" : ""} ${className}`}>
+    <div className={`flex flex-col items-center ${sticky ? "sticky top-28" : ""} ${className}`}>
       <div
-        className="relative flex items-center justify-center border border-dashed border-gray-300 rounded bg-gray-50 text-gray-400 overflow-hidden group hover:border-[#1a2448]/30 transition-colors"
-        style={w && h ? { width: w, height: h } : undefined}
+        className={`relative ${SIZE_STYLES[size]} flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden group hover:border-gray-200 transition-colors`}
       >
         {children || (
-          <div className="text-center space-y-1 px-2">
-            <p className="text-xs font-semibold tracking-wider uppercase text-gray-300">ANÚNCIO</p>
-            {w && h ? (
-              <p className="text-[10px] text-gray-300">{lbl}</p>
-            ) : (
-              <p className="text-[10px] text-gray-300">Adicione seu anúncio aqui</p>
-            )}
+          <div className="text-center space-y-1">
+            <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-300">
+              {label || "ANÚNCIO"}
+            </p>
           </div>
         )}
       </div>
-      <p className="text-[9px] text-gray-300 mt-1 tracking-wider uppercase">Publicidade</p>
+      <p className="text-[8px] text-gray-300 mt-1 tracking-wider uppercase">Publicidade</p>
     </div>
   );
 }

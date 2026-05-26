@@ -4,7 +4,6 @@ import ArticleCard from "./ArticleCard";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
-import { AdSidebar, AdBetween, AdInContent } from "./ads";
 
 export interface Article {
   id: string;
@@ -38,71 +37,51 @@ export default function CategoryPage({
           <div className="text-white/80 text-xs font-medium mb-1">
             <Link href="/" className="hover:text-white transition-colors">Início</Link> &gt; {category}
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight">
-            {category}
-          </h1>
+          <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight">{category}</h1>
         </div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto px-4 mt-8 flex gap-6">
-        <AdSidebar side="left" />
-        <div className="flex-1 min-w-0">
-          <AdBetween variant="banner" />
-
-          {/* Featured Article */}
-          {featuredArticle && (
-            <Link href={`/artigo/${featuredArticle.id}`}>
-              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-8 rounded-sm">
-              <img
-                src={featuredArticle.imageUrl}
-                alt={featuredArticle.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
+      <div className="max-w-[1280px] mx-auto px-4 mt-8">
+        {/* Featured Article */}
+        {featuredArticle && (
+          <Link href={`/artigo/${featuredArticle.id}`}>
+            <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-8 rounded-sm">
+              <img src={featuredArticle.imageUrl} alt={featuredArticle.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                <span
-                  className="text-white text-xs font-bold px-2 py-1 mb-3 inline-block rounded-sm"
-                  style={{ backgroundColor: featuredArticle.tagColor }}
-                >
+                <span className="text-white text-xs font-bold px-2 py-1 mb-3 inline-block rounded-sm" style={{ backgroundColor: featuredArticle.tagColor }}>
                   {featuredArticle.tag}
                 </span>
-                <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight group-hover:text-gray-200 transition-colors">
-                  {featuredArticle.title}
-                </h2>
+                <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight group-hover:text-gray-200 transition-colors">{featuredArticle.title}</h2>
                 {featuredArticle.subtitle && (
-                  <p className="text-gray-300 md:text-lg max-w-3xl line-clamp-2">
-                    {featuredArticle.subtitle}
-                  </p>
+                  <p className="text-gray-300 md:text-lg max-w-3xl line-clamp-2">{featuredArticle.subtitle}</p>
                 )}
-                <div className="text-gray-400 text-sm mt-3 font-medium">
-                  {featuredArticle.time} {featuredArticle.author && `• Por ${featuredArticle.author}`}
-                </div>
+                <div className="text-gray-400 text-sm mt-3 font-medium">{featuredArticle.time} {featuredArticle.author && `• Por ${featuredArticle.author}`}</div>
               </div>
             </div>
           </Link>
         )}
 
+        {/* Ônico anúncio discreto */}
+        <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center mb-8">
+          <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+        </div>
+
         {/* Divider */}
         <div className="flex items-center mb-6">
-          <div className="w-1.5 h-6 mr-3" style={{ backgroundColor: color }}></div>
+          <div className="w-1.5 h-6 mr-3" style={{ backgroundColor: color }} />
           <h2 className="text-xl font-bold text-[#1a2448]">MAIS NOTÍCIAS</h2>
         </div>
 
-          <AdBetween variant="rectangle" />
-
-          {/* 2-Column Grid */}
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Left: Article List */}
-            <div className="w-full lg:w-2/3">
-              <div className="flex flex-col">
-                {articles.map((article, i) => (
-                  <React.Fragment key={article.id}>
-                    {i === 2 && <AdInContent align="right" />}
-                    <ArticleCard {...article} />
-                  </React.Fragment>
-                ))}
-              </div>
-            
+        {/* 2-Column Grid */}
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Left: Article List */}
+          <div className="w-full lg:w-2/3">
+            <div className="flex flex-col">
+              {articles.map((article) => (
+                <ArticleCard key={article.id} {...article} />
+              ))}
+            </div>
             <button className="w-full mt-8 py-3 border border-gray-300 text-[#1a2448] font-bold text-sm hover:bg-[#1a2448] hover:text-white transition-colors">
               CARREGAR MAIS
             </button>
@@ -113,7 +92,7 @@ export default function CategoryPage({
             {/* Mais Lidas */}
             <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
               <h3 className="font-bold text-[#1a2448] text-lg mb-4 flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-600"></div>
+                <div className="w-2 h-2 rounded-full bg-red-600" />
                 MAIS LIDAS
               </h3>
               <div className="flex flex-col space-y-4">
@@ -126,24 +105,18 @@ export default function CategoryPage({
                 ].map((title, idx) => (
                   <Link key={idx} href={`/artigo/mais-lidas-${idx+1}`}>
                     <div className="flex gap-3 group cursor-pointer">
-                      <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">
-                        {idx + 1}
-                      </span>
-                      <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#1d4ed8] transition-colors leading-snug pt-1">
-                        {title}
-                      </p>
+                      <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">{idx + 1}</span>
+                      <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#1d4ed8] transition-colors leading-snug pt-1">{title}</p>
                     </div>
                   </Link>
                 ))}
               </div>
             </div>
 
-            <AdSlot variant="square" />
-
             {/* Editoriais */}
             <div>
               <div className="flex items-center mb-6">
-                <div className="w-1.5 h-5 bg-[#1a2448] mr-3"></div>
+                <div className="w-1.5 h-5 bg-[#1a2448] mr-3" />
                 <h3 className="text-lg font-bold text-[#1a2448]">EDITORIAIS</h3>
               </div>
               <div className="flex flex-col space-y-5">
@@ -170,10 +143,7 @@ export default function CategoryPage({
               </Link>
             </div>
           </div>
-            <AdSlot variant="skyscraper" />
-          </div>
         </div>
-        <AdSidebar side="right" />
       </div>
     </div>
   );
