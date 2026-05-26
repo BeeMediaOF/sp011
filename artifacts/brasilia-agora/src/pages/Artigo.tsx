@@ -1,3 +1,4 @@
+import React from "react";
 import { useParams, Link } from "wouter";
 import { FaFacebook, FaTwitter, FaWhatsapp } from "react-icons/fa";
 import TopBar from "../components/TopBar";
@@ -6,6 +7,7 @@ import NavBar from "../components/NavBar";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import ArticleCard from "../components/ArticleCard";
+import { AdSlot, AdBetween } from "../components/ads";
 
 import heroImg from "../assets/images/hero.png";
 import politics2Img from "../assets/images/politics2.png";
@@ -58,8 +60,9 @@ export default function Artigo() {
       
       <main className="flex-1 bg-white pb-16">
         <div className="max-w-[1280px] mx-auto px-4 mt-6">
-          <div className="flex flex-col lg:flex-row gap-10">
-            
+          <AdBetween variant="banner" />
+          <div className="flex flex-col lg:flex-row gap-10 mt-4">
+
             {/* Main Article Content */}
             <article className="w-full lg:w-2/3">
               {/* Breadcrumb */}
@@ -116,12 +119,23 @@ export default function Artigo() {
                 <div className="text-right text-[10px] text-gray-400 mt-1">Foto: Divulgação / Brasília Agora</div>
               </div>
 
+              {/* Ad in content */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                <AdSlot variant="square" />
+                <AdSlot variant="square" />
+              </div>
+
               {/* Body Text */}
               <div className="prose prose-lg max-w-none text-gray-800">
                 {article.content.map((paragraph, index) => (
-                  <p key={index} className="mb-6 leading-relaxed">
-                    {paragraph}
-                  </p>
+                  <React.Fragment key={index}>
+                    {index === 2 && (
+                      <div className="float-right ml-4 mb-4">
+                        <AdSlot variant="square" />
+                      </div>
+                    )}
+                    <p className="mb-6 leading-relaxed">{paragraph}</p>
+                  </React.Fragment>
                 ))}
               </div>
             </article>
@@ -150,7 +164,9 @@ export default function Artigo() {
                   </div>
                 </div>
 
-                <div>
+                <div className="space-y-6">
+                  <AdSlot variant="rectangle" />
+
                   <h3 className="font-bold text-[#1a2448] text-lg mb-5 flex items-center gap-2">
                     <div className="w-1.5 h-5 bg-[#F5A623]"></div>
                     LEIA TAMBÉM
@@ -177,6 +193,8 @@ export default function Artigo() {
             </aside>
           </div>
         </div>
+
+        <AdBetween variant="billboard" />
 
         {/* Bottom Grid */}
         <div className="max-w-[1280px] mx-auto px-4 mt-16 pt-10 border-t border-gray-200">

@@ -1,8 +1,10 @@
+import React from "react";
 import { Link } from "wouter";
 import ArticleCard from "./ArticleCard";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
+import { AdSidebar, AdBetween, AdInContent } from "./ads";
 
 export interface Article {
   id: string;
@@ -42,11 +44,15 @@ export default function CategoryPage({
         </div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto px-4 mt-8">
-        {/* Featured Article */}
-        {featuredArticle && (
-          <Link href={`/artigo/${featuredArticle.id}`}>
-            <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-12 rounded-sm">
+      <div className="max-w-[1280px] mx-auto px-4 mt-8 flex gap-6">
+        <AdSidebar side="left" />
+        <div className="flex-1 min-w-0">
+          <AdBetween variant="banner" />
+
+          {/* Featured Article */}
+          {featuredArticle && (
+            <Link href={`/artigo/${featuredArticle.id}`}>
+              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-8 rounded-sm">
               <img
                 src={featuredArticle.imageUrl}
                 alt={featuredArticle.title}
@@ -82,15 +88,20 @@ export default function CategoryPage({
           <h2 className="text-xl font-bold text-[#1a2448]">MAIS NOTÍCIAS</h2>
         </div>
 
-        {/* 2-Column Grid */}
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Left: Article List */}
-          <div className="w-full lg:w-2/3">
-            <div className="flex flex-col">
-              {articles.map((article) => (
-                <ArticleCard key={article.id} {...article} />
-              ))}
-            </div>
+          <AdBetween variant="rectangle" />
+
+          {/* 2-Column Grid */}
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Left: Article List */}
+            <div className="w-full lg:w-2/3">
+              <div className="flex flex-col">
+                {articles.map((article, i) => (
+                  <React.Fragment key={article.id}>
+                    {i === 2 && <AdInContent align="right" />}
+                    <ArticleCard {...article} />
+                  </React.Fragment>
+                ))}
+              </div>
             
             <button className="w-full mt-8 py-3 border border-gray-300 text-[#1a2448] font-bold text-sm hover:bg-[#1a2448] hover:text-white transition-colors">
               CARREGAR MAIS
@@ -127,6 +138,8 @@ export default function CategoryPage({
               </div>
             </div>
 
+            <AdSlot variant="square" />
+
             {/* Editoriais */}
             <div>
               <div className="flex items-center mb-6">
@@ -157,7 +170,10 @@ export default function CategoryPage({
               </Link>
             </div>
           </div>
+            <AdSlot variant="skyscraper" />
+          </div>
         </div>
+        <AdSidebar side="right" />
       </div>
     </div>
   );

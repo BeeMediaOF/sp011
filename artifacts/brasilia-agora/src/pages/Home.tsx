@@ -9,6 +9,7 @@ import MaisLidasSection from "../components/MaisLidasSection";
 import NewsSection from "../components/NewsSection";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
+import { AdSidebar, AdBetween } from "../components/ads";
 
 import policeImg from "../assets/images/police.png";
 import security2Img from "../assets/images/security2.png";
@@ -33,12 +34,22 @@ export default function Home() {
       <Header />
       <NavBar />
       <main className="flex-1 bg-white">
-        <HeroSection />
-        <DestaquesSection />
-        <BottomSection />
+        {/* Full-width billboard ad */}
+        <div className="max-w-[1280px] mx-auto px-4 pt-4">
+          <AdBetween variant="billboard" />
+        </div>
 
-        <NewsSection
-          label="SEGURANÇA"
+        <div className="max-w-[1280px] mx-auto px-4 flex">
+          <AdSidebar side="left" />
+          <div className="flex-1 min-w-0">
+            <HeroSection />
+            <DestaquesSection />
+            <BottomSection />
+
+            <AdBetween variant="banner" />
+
+            <NewsSection
+              label="SEGURANÇA"
           color="#dc2626"
           href="/seguranca"
           featuredArticle={{
@@ -144,7 +155,11 @@ export default function Home() {
           ]}
         />
 
-        <MaisLidasSection />
+            <AdBetween variant="rectangle" />
+            <MaisLidasSection />
+          </div>
+          <AdSidebar side="right" />
+        </div>
       </main>
       <RedacaoBanner />
       <Footer />
