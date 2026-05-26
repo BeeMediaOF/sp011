@@ -58,6 +58,7 @@ export default function Home() {
           label="ESPORTES"
           color="#b45309"
           href="/esportes"
+          variant="grid"
           bgGray
           featuredArticle={{
             id: "esp-destaque",
@@ -93,6 +94,7 @@ export default function Home() {
           label="POLÍTICA"
           color="#1d4ed8"
           href="/politica"
+          variant="grid"
           bgGray
           featuredArticle={{
             id: "pol-destaque",
