@@ -5,6 +5,7 @@ import heroImg from "../assets/images/hero.png";
 import trafficImg from "../assets/images/traffic.png";
 import policeImg from "../assets/images/police.png";
 import hospitalImg from "../assets/images/hospital.png";
+import studentsImg from "../assets/images/students.png";
 
 export default function HeroSection() {
   return (
@@ -40,58 +41,34 @@ export default function HeroSection() {
           </Link>
         </div>
 
-        {/* Right Column - Stacked News */}
-        <div className="w-full lg:w-2/5 flex flex-col justify-between space-y-4">
-          
-          <Link href="/artigo/hero-2">
-            <div className="flex gap-4 group cursor-pointer bg-white">
-              <div className="w-1/3 shrink-0 overflow-hidden">
-                <img src={trafficImg} alt="Trânsito" className="w-full h-full object-cover aspect-[4/3] group-hover:scale-105 transition-transform duration-500" />
+        {/* Right Column - 4 Stacked News (symmetric) */}
+        <div className="w-full lg:w-2/5 flex flex-col divide-y divide-gray-200">
+          {[
+            { id: "hero-2", img: trafficImg, alt: "Trânsito", tagColor: "#ea580c", tag: "TRÂNSITO", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", time: "1 hora atrás" },
+            { id: "hero-3", img: policeImg,  alt: "Segurança", tagColor: "#dc2626", tag: "SEGURANÇA", title: "Polícia Civil prende grupo suspeito de furtos em comércios do Plano Piloto", time: "3 horas atrás" },
+            { id: "hero-4", img: hospitalImg, alt: "Saúde",    tagColor: "#16a34a", tag: "SAÚDE",    title: "Hospitais do DF registram queda nos casos de dengue em maio", time: "4 horas atrás" },
+            { id: "hero-5", img: studentsImg, alt: "Educação", tagColor: "#7c3aed", tag: "EDUCAÇÃO", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", time: "5 horas atrás" },
+          ].map((item) => (
+            <Link key={item.id} href={`/artigo/${item.id}`} className="block">
+              <div className="flex gap-4 group cursor-pointer py-[14px] first:pt-0 last:pb-0">
+                <div className="w-[110px] shrink-0 overflow-hidden self-stretch">
+                  <img
+                    src={item.img}
+                    alt={item.alt}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    style={{ minHeight: "72px" }}
+                  />
+                </div>
+                <div className="flex flex-col justify-center min-w-0">
+                  <span className="text-xs font-bold mb-1 block" style={{ color: item.tagColor }}>{item.tag}</span>
+                  <h3 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#1d4ed8] transition-colors mb-1 line-clamp-2">
+                    {item.title}
+                  </h3>
+                  <span className="text-gray-500 text-xs">{item.time}</span>
+                </div>
               </div>
-              <div className="flex flex-col justify-center py-1">
-                <div><span className="text-[#ea580c] text-xs font-bold mb-1 block">TRÂNSITO</span></div>
-                <h3 className="font-bold text-[#1a2448] leading-snug group-hover:text-[#1d4ed8] transition-colors mb-2">
-                  Obras no Eixão alteram trânsito neste fim de semana em Brasília
-                </h3>
-                <span className="text-gray-500 text-xs">1 hora atrás</span>
-              </div>
-            </div>
-          </Link>
-          
-          <div className="h-px bg-gray-200 w-full"></div>
-
-          <Link href="/artigo/hero-3">
-            <div className="flex gap-4 group cursor-pointer bg-white">
-              <div className="w-1/3 shrink-0 overflow-hidden">
-                <img src={policeImg} alt="Segurança" className="w-full h-full object-cover aspect-[4/3] group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="flex flex-col justify-center py-1">
-                <div><span className="text-[#dc2626] text-xs font-bold mb-1 block">SEGURANÇA</span></div>
-                <h3 className="font-bold text-[#1a2448] leading-snug group-hover:text-[#1d4ed8] transition-colors mb-2">
-                  Polícia Civil prende grupo suspeito de furtos em comércios do Plano Piloto
-                </h3>
-                <span className="text-gray-500 text-xs">3 horas atrás</span>
-              </div>
-            </div>
-          </Link>
-
-          <div className="h-px bg-gray-200 w-full"></div>
-
-          <Link href="/artigo/hero-4">
-            <div className="flex gap-4 group cursor-pointer bg-white">
-              <div className="w-1/3 shrink-0 overflow-hidden">
-                <img src={hospitalImg} alt="Saúde" className="w-full h-full object-cover aspect-[4/3] group-hover:scale-105 transition-transform duration-500" />
-              </div>
-              <div className="flex flex-col justify-center py-1">
-                <div><span className="text-[#16a34a] text-xs font-bold mb-1 block">SAÚDE</span></div>
-                <h3 className="font-bold text-[#1a2448] leading-snug group-hover:text-[#1d4ed8] transition-colors mb-2">
-                  Hospitais do DF registram queda nos casos de dengue em maio
-                </h3>
-                <span className="text-gray-500 text-xs">4 horas atrás</span>
-              </div>
-            </div>
-          </Link>
-
+            </Link>
+          ))}
         </div>
       </div>
     </section>
