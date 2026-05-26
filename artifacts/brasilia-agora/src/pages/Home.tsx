@@ -42,16 +42,18 @@ export default function Home() {
           <BottomSection />
         </div>
 
+          {/* Banner abaixo da seção principal */}
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+          </div>
+        </div>
+
         {/* Conteúdo com sidebar lateral */}
         <div className="max-w-[1280px] mx-auto px-4 flex gap-6">
           <AdSidebar />
 
           <div className="flex-1 min-w-0">
-            {/* Banner entre destaques e notícias */}
-            <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center my-6">
-              <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
-            </div>
-
             <NewsSection
             label="SEGURANÇA"
             color="#dc2626"
