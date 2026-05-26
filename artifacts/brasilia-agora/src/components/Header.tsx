@@ -1,13 +1,14 @@
 import React from "react";
 import { Search } from "lucide-react";
+import { Link } from "wouter";
 
 export default function Header() {
   return (
     <header className="bg-[#1a2448] py-6">
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-        <div className="flex flex-col">
+        <Link href="/" className="flex flex-col group cursor-pointer">
           <div className="flex items-end">
-            <h1 className="text-4xl font-extrabold text-white tracking-tighter mr-2">
+            <h1 className="text-4xl font-extrabold text-white tracking-tighter mr-2 group-hover:opacity-90 transition-opacity">
               BRASÍLIA <span className="text-[#F5A623]">AGORA</span>
             </h1>
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8 text-blue-400 mb-1">
@@ -16,7 +17,7 @@ export default function Header() {
             </svg>
           </div>
           <p className="text-white text-xs tracking-widest mt-1 opacity-80 font-medium">A NOTÍCIA QUE MOVE A CAPITAL</p>
-        </div>
+        </Link>
         
         <div className="w-full md:w-auto">
           <div className="relative relative w-full md:w-80">

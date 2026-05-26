@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 
 const navItems = [
+  { label: "HOME", path: "/" },
   { label: "POLÍTICA", path: "/politica" },
   { label: "CIDADE", path: "/cidade" },
   { label: "SEGURANÇA", path: "/seguranca" },
