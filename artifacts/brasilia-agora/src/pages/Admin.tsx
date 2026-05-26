@@ -7,6 +7,7 @@ import ArticleEdit from "./admin/ArticleEdit";
 import MenuManager from "./admin/MenuManager";
 import LogoUpload from "./admin/LogoUpload";
 import Settings from "./admin/Settings";
+import Webhook from "./admin/Webhook";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
@@ -41,6 +42,9 @@ export default function Admin() {
       </Route>
       <Route path="/admin/configuracoes">
         <RequireAuth><Settings /></RequireAuth>
+      </Route>
+      <Route path="/admin/webhook">
+        <RequireAuth><Webhook /></RequireAuth>
       </Route>
       <Route path="/admin">
         <RequireAuth><Dashboard /></RequireAuth>

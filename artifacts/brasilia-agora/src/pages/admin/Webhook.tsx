@@ -1,0 +1,230 @@
+import React, { useEffect, useState } from "react";
+import AdminLayout from "../../components/admin/AdminLayout";
+import { Copy, CheckCheck, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { adminApi } from "../../lib/adminApi";
+
+function useCopy(text: string) {
+  const [copied, setCopied] = useState(false);
+  function copy() {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return { copied, copy };
+}
+
+function CopyButton({ text, label = "Copiar" }: { text: string; label?: string }) {
+  const { copied, copy } = useCopy(text);
+  return (
+    <button
+      onClick={copy}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+        ${copied ? "bg-green-500 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+    >
+      {copied ? <CheckCheck size={13} /> : <Copy size={13} />}
+      {copied ? "Copiado!" : label}
+    </button>
+  );
+}
+
+function CodeBlock({ code, label }: { code: string; label?: string }) {
+  return (
+    <div className="relative">
+      {label && <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{label}</p>}
+      <div className="bg-gray-900 rounded-xl p-4 pr-16 font-mono text-xs text-gray-100 whitespace-pre-wrap leading-relaxed overflow-x-auto">
+        {code}
+      </div>
+      <div className="absolute top-8 right-3">
+        <CopyButton text={code} />
+      </div>
+    </div>
+  );
+}
+
+export default function Webhook() {
+  const [token, setToken] = useState<string | null>(localStorage.getItem("admin_token"));
+  const [showToken, setShowToken] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [password, setPassword] = useState("brasilia@2024");
+  const [genError, setGenError] = useState("");
+
+  const baseUrl = window.location.origin;
+  const publishUrl = `${baseUrl}/api/publish`;
+  const loginUrl = `${baseUrl}/api/admin/login`;
+
+  async function handleGenerate() {
+    setGenerating(true); setGenError("");
+    try {
+      const { token: t } = await adminApi.login("admin", password);
+      localStorage.setItem("admin_token", t);
+      setToken(t);
+    } catch {
+      setGenError("Senha incorreta");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  const curlCreate = `curl -X POST "${publishUrl}" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${token ?? "<seu-token>"}" \\
+  -d '{
+    "title": "Título do artigo",
+    "subtitle": "Subtítulo ou lide do artigo",
+    "content": "Texto completo do artigo aqui...",
+    "category": "politica",
+    "tag": "POLÍTICA",
+    "imageUrl": "https://exemplo.com/imagem.jpg",
+    "author": "Redação Brasília Hoje"
+  }'`;
+
+  const curlPublishId = `curl -X POST "${publishUrl}/<id-do-artigo>" \\
+  -H "Authorization: Bearer ${token ?? "<seu-token>"}"`;
+
+  const curlLogin = `curl -X POST "${loginUrl}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"username": "admin", "password": "brasilia@2024"}'`;
+
+  const bodySchema = `{
+  "title":    string  // OBRIGATÓRIO — Título do artigo
+  "subtitle": string  // opcional  — Subtítulo / lide
+  "content":  string  // opcional  — Corpo do artigo
+  "category": string  // opcional  — politica | cidade | seguranca |
+                      //             transporte | saude | educacao |
+                      //             cultura | esportes | colunas |
+                      //             brasil | mundo | geral
+  "tag":      string  // opcional  — Label exibida (ex: "POLÍTICA")
+  "imageUrl": string  // opcional  — URL da imagem de capa
+  "author":   string  // opcional  — Nome do autor
+}`;
+
+  const responseExample = `{
+  "ok": true,
+  "message": "Artigo criado e publicado com sucesso",
+  "article": {
+    "id": "uuid-gerado",
+    "title": "Título do artigo",
+    "status": "published",
+    "publishedAt": "2026-05-26T14:00:00.000Z",
+    ...
+  }
+}`;
+
+  return (
+    <AdminLayout title="Webhook de Publicação">
+      <div className="max-w-3xl mx-auto space-y-6">
+
+        {/* Overview */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <h2 className="font-bold text-gray-800 text-base">Endpoint Principal</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Cria e publica um artigo em uma única requisição</p>
+            </div>
+            <span className="bg-green-100 text-green-700 text-xs font-bold px-2.5 py-1 rounded-full">POST</span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 font-mono text-sm text-gray-800">
+            <span className="text-green-600 font-bold text-xs">POST</span>
+            <span className="flex-1 truncate">{publishUrl}</span>
+            <CopyButton text={publishUrl} />
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 font-mono text-sm text-gray-800">
+            <span className="text-blue-600 font-bold text-xs">POST</span>
+            <span className="flex-1 truncate">{publishUrl}/:id</span>
+            <CopyButton text={`${publishUrl}/:id`} />
+          </div>
+          <p className="text-xs text-gray-400 mt-1.5 ml-1">Segundo endpoint: publica um rascunho existente pelo ID</p>
+        </div>
+
+        {/* Auth header */}
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <h2 className="font-bold text-gray-800 text-base">Header de Autenticação</h2>
+
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 font-mono text-sm">
+            <span className="text-gray-500">Authorization:</span>
+            <span className="text-amber-700 font-semibold">Bearer</span>
+            <span className="text-gray-700 truncate flex-1">{token ? (showToken ? token : "••••••••••••••••••••••••") : "<token>"}</span>
+            <button onClick={() => setShowToken(s => !s)} className="text-gray-400 hover:text-gray-600">
+              {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
+            </button>
+            {token && <CopyButton text={`Bearer ${token}`} label="Copiar header" />}
+          </div>
+
+          {/* Generate token */}
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gerar novo token</p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="Senha do admin"
+                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+              />
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="flex items-center gap-1.5 bg-[#1a2448] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#243060] transition-colors disabled:opacity-60"
+              >
+                <RefreshCw size={14} className={generating ? "animate-spin" : ""} />
+                {generating ? "Gerando..." : "Gerar"}
+              </button>
+            </div>
+            {genError && <p className="text-xs text-red-500">{genError}</p>}
+            {token && <p className="text-xs text-green-600">Token ativo — válido por 24 horas</p>}
+          </div>
+        </div>
+
+        {/* Schema */}
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <h2 className="font-bold text-gray-800 text-base">Body da Requisição (JSON)</h2>
+          <CodeBlock code={bodySchema} />
+        </div>
+
+        {/* Examples */}
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
+          <h2 className="font-bold text-gray-800 text-base">Exemplos cURL</h2>
+
+          <CodeBlock code={curlCreate} label="1. Criar e publicar artigo" />
+          <CodeBlock code={curlPublishId} label="2. Publicar rascunho existente por ID" />
+          <CodeBlock code={curlLogin} label="3. Obter token via login" />
+        </div>
+
+        {/* Response */}
+        <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+          <h2 className="font-bold text-gray-800 text-base">Resposta de Sucesso (201)</h2>
+          <CodeBlock code={responseExample} />
+
+          <div className="grid grid-cols-3 gap-3 pt-2">
+            {[
+              { code: "201", label: "Artigo criado e publicado", color: "bg-green-100 text-green-700" },
+              { code: "400", label: "Campo obrigatório ausente", color: "bg-yellow-100 text-yellow-700" },
+              { code: "401", label: "Token ausente ou inválido", color: "bg-red-100 text-red-700" },
+            ].map(({ code, label, color }) => (
+              <div key={code} className={`${color} rounded-lg px-3 py-2.5 text-center`}>
+                <p className="font-bold text-lg">{code}</p>
+                <p className="text-xs leading-tight">{label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Make / Zapier / n8n */}
+        <div className="bg-[#1a2448] text-white rounded-xl p-6 space-y-3">
+          <h2 className="font-bold text-base">Integração com Make, Zapier, n8n</h2>
+          <p className="text-sm text-white/70">Use o módulo <strong className="text-white">HTTP / Webhook</strong> da plataforma de automação:</p>
+          <ol className="text-sm text-white/80 space-y-1 list-decimal list-inside">
+            <li>URL: <code className="bg-white/10 px-1.5 rounded font-mono">{publishUrl}</code></li>
+            <li>Método: <strong className="text-white">POST</strong></li>
+            <li>Header: <code className="bg-white/10 px-1.5 rounded font-mono">Authorization: Bearer {"{"}token{"}"}</code></li>
+            <li>Body: JSON com os campos acima</li>
+          </ol>
+        </div>
+
+      </div>
+    </AdminLayout>
+  );
+}

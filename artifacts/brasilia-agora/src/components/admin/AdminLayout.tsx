@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
-  ChevronLeft, ChevronRight, Globe, Newspaper,
+  ChevronLeft, ChevronRight, Globe, Newspaper, Webhook,
 } from "lucide-react";
 
 const NAV = [
@@ -11,6 +11,7 @@ const NAV = [
   { label: "Novo Artigo",icon: Newspaper,        path: "/admin/artigos/novo" },
   { label: "Menu",       icon: Menu,             path: "/admin/menu" },
   { label: "Logo",       icon: Image,            path: "/admin/logo" },
+  { label: "Webhook",    icon: Webhook,          path: "/admin/webhook" },
   { label: "Config.",    icon: Settings,         path: "/admin/configuracoes" },
 ];
 
