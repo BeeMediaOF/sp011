@@ -11,6 +11,7 @@ import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import AdSidebar from "../components/ads/AdSidebar";
 import AdBanner from "../components/ads/AdBanner";
+import AdCentral from "../components/ads/AdCentral";
 
 import policeImg from "../assets/images/police.png";
 import security2Img from "../assets/images/security2.png";
@@ -45,7 +46,7 @@ export default function Home() {
 
         {/* Banner abaixo da seção principal */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <AdBanner />
+          <AdCentral />
         </div>
 
         {/* Conteúdo com sidebar lateral */}

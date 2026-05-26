@@ -115,7 +115,7 @@ export default function AdsManager() {
               <div className="flex gap-3">
                 <button type="button" onClick={() => setPosition("banner")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "banner" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Banner (728×90)</button>
                 <button type="button" onClick={() => setPosition("sidebar")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "sidebar" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Sidebar (160×600)</button>
-                <button type="button" onClick={() => setPosition("central")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "central" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Central (728×90)</button>
+                <button type="button" onClick={() => setPosition("central")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "central" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Central (1190×330)</button>
               </div>
             </div>
             <div>

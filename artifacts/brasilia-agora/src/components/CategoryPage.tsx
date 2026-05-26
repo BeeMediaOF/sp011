@@ -6,6 +6,7 @@ import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
 import AdSidebar from "./ads/AdSidebar";
 import AdBanner from "./ads/AdBanner";
+import AdCentral from "./ads/AdCentral";
 
 export interface Article {
   id: string;
@@ -68,7 +69,7 @@ export default function CategoryPage({
           )}
 
           <div className="mb-8">
-            <AdBanner />
+            <AdCentral />
           </div>
 
           {/* Divider */}
