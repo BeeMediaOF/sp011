@@ -1,0 +1,76 @@
+const BASE = "/api/admin";
+
+function getToken(): string | null {
+  return localStorage.getItem("admin_token");
+}
+
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+}
+
+async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers: authHeaders(),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? res.statusText);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const adminApi = {
+  login: (username: string, password: string) =>
+    req<{ token: string; username: string }>("POST", "/login", { username, password }),
+
+  // Articles
+  getArticles: () => req<{ articles: Article[] }>("GET", "/articles"),
+  getArticle: (id: string) => req<{ article: Article }>("GET", `/articles/${id}`),
+  createArticle: (data: Partial<Article>) => req<{ article: Article }>("POST", "/articles", data),
+  updateArticle: (id: string, data: Partial<Article>) => req<{ article: Article }>("PUT", `/articles/${id}`, data),
+  deleteArticle: (id: string) => req<{ success: boolean }>("DELETE", `/articles/${id}`),
+  publishArticle: (id: string) => req<{ article: Article }>("POST", `/publish/${id}`, {}),
+
+  // Menu
+  getMenu: () => req<{ menuItems: MenuItem[] }>("GET", "/menu"),
+  updateMenu: (menuItems: MenuItem[]) => req<{ menuItems: MenuItem[] }>("PUT", "/menu", { menuItems }),
+
+  // Settings + Logo
+  getSettings: () => req<{ settings: SiteSettings }>("GET", "/settings"),
+  updateSettings: (settings: Partial<SiteSettings>) => req<{ settings: SiteSettings }>("PUT", "/settings", settings),
+  uploadLogo: (logoBase64: string) => req<{ settings: SiteSettings }>("POST", "/logo", { logoBase64 }),
+};
+
+export interface Article {
+  id: string;
+  title: string;
+  subtitle: string;
+  content: string;
+  category: string;
+  tag: string;
+  imageUrl: string;
+  author: string;
+  publishedAt: string;
+  status: "draft" | "published";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  path: string;
+  order: number;
+  visible: boolean;
+}
+
+export interface SiteSettings {
+  siteName: string;
+  tagline: string;
+  logoBase64?: string;
+  mobileEnabled: boolean;
+  desktopEnabled: boolean;
+}

@@ -1,7 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 import { Link } from "wouter";
-import logoImg from "../assets/images/logo_final.png";
+import logoImg from "../assets/images/logo_brasilia_hoje.png";
 
 export default function Header() {
   return (
@@ -11,7 +11,7 @@ export default function Header() {
           <img
             src={logoImg}
             alt="Brasília Hoje"
-            className="h-24 w-auto object-contain group-hover:opacity-90 transition-opacity"
+            className="h-40 w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
         

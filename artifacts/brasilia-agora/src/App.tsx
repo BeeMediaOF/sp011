@@ -14,12 +14,16 @@ import Cultura from "@/pages/Cultura";
 import Esportes from "@/pages/Esportes";
 import Colunas from "@/pages/Colunas";
 import Artigo from "@/pages/Artigo";
+import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient();
 
 function Router() {
   return (
     <Switch>
+      <Route path="/admin/login" component={Admin} />
+      <Route path="/admin/:rest*" component={Admin} />
+      <Route path="/admin" component={Admin} />
       <Route path="/" component={Home} />
       <Route path="/politica" component={Politica} />
       <Route path="/cidade" component={Cidade} />
