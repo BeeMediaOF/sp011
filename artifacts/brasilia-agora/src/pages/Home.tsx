@@ -165,12 +165,6 @@ export default function Home() {
           <AdSidebar />
         </div>
 
-        {/* Banner acima do rodapé */}
-        <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
-          </div>
-        </div>
       </main>
       <RedacaoBanner />
       <Footer />
