@@ -49,11 +49,8 @@ export default function Home() {
           <AdCentral />
         </div>
 
-        {/* Conteúdo com sidebar lateral */}
-        <div className="max-w-[1280px] mx-auto px-4 flex gap-6">
-          <AdSidebar />
-
-          <div className="flex-1 min-w-0">
+        {/* Conteúdo */}
+        <div className="max-w-[1280px] mx-auto px-4">
             <NewsSection
               label="SEGURANÇA"
               color="#dc2626"
@@ -163,9 +160,6 @@ export default function Home() {
 
             <MaisLidasSection />
           </div>
-
-          <AdSidebar />
-        </div>
       </main>
       <RedacaoBanner />
       <Footer />

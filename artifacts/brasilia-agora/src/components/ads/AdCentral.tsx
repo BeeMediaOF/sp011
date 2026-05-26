@@ -2,12 +2,12 @@ import React from "react";
 import { useAds, trackClick } from "./useAds";
 
 export default function AdCentral() {
-  const { centrals, loading } = useAds();
-  const ad = centrals[0] ?? null;
+  const { ads, centrals, loading } = useAds();
+  const ad = centrals[0] ?? ads[0] ?? null;
 
   if (loading) {
     return (
-      <div className="w-full h-[330px] max-w-[1190px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center animate-pulse">
+      <div className="w-full h-[264px] max-w-[952px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center animate-pulse">
         <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade</p>
       </div>
     );
@@ -15,8 +15,8 @@ export default function AdCentral() {
 
   if (!ad) {
     return (
-      <div className="w-full h-[330px] max-w-[1190px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 1190 × 330</p>
+      <div className="w-full h-[264px] max-w-[952px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 952 × 264</p>
       </div>
     );
   }
@@ -28,7 +28,7 @@ export default function AdCentral() {
         target="_blank"
         rel="noreferrer"
         onClick={() => trackClick(ad.id)}
-        className="block w-full max-w-[1190px] h-[330px] rounded-lg border border-gray-100 overflow-hidden group relative"
+        className="block w-full max-w-[952px] h-[264px] rounded-lg border border-gray-100 overflow-hidden group relative"
       >
         <img
           src={ad.imageBase64}

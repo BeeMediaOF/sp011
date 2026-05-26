@@ -44,9 +44,7 @@ export default function CategoryPage({
         </div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto px-4 mt-8 flex gap-6">
-        <AdSidebar />
-
+      <div className="max-w-[1280px] mx-auto px-4 mt-8">
         <div className="flex-1 min-w-0">
           {/* Featured Article */}
           {featuredArticle && (
@@ -151,7 +149,6 @@ export default function CategoryPage({
           </div>
         </div>
 
-        <AdSidebar />
       </div>
 
       {/* Banner acima do rodapé */}
