@@ -1,6 +1,6 @@
 import React from "react";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
-import logoImg from "../assets/images/logo_transparent.png";
+import logoImg from "../assets/images/logo_final.png";
 import { FaXTwitter } from "react-icons/fa6";
 
 export default function Footer() {
@@ -12,7 +12,7 @@ export default function Footer() {
           <img
             src={logoImg}
             alt="Brasília Hoje"
-            className="h-14 w-auto object-contain mb-4 brightness-0 invert"
+            className="h-20 w-auto object-contain mb-4"
           />
           <p className="text-gray-400 text-sm leading-relaxed pr-4">
             O portal de notícias 100% focado em Brasília. Informação com credibilidade e compromisso com a verdade.
