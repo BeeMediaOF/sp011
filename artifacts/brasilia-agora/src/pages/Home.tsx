@@ -9,6 +9,7 @@ import MaisLidasSection from "../components/MaisLidasSection";
 import NewsSection from "../components/NewsSection";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
+import AdSidebar from "../components/ads/AdSidebar";
 
 import policeImg from "../assets/images/police.png";
 import security2Img from "../assets/images/security2.png";
@@ -34,17 +35,24 @@ export default function Home() {
       <NavBar />
 
       <main className="flex-1 bg-white">
+        {/* Destaques sem sidebar */}
         <div className="max-w-[1280px] mx-auto px-4">
           <HeroSection />
           <DestaquesSection />
           <BottomSection />
+        </div>
 
-          {/* Únicos 2 anúncios discretos na página */}
-          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center my-6">
-            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
-          </div>
+        {/* Conteúdo com sidebar lateral */}
+        <div className="max-w-[1280px] mx-auto px-4 flex gap-6">
+          <AdSidebar />
 
-          <NewsSection
+          <div className="flex-1 min-w-0">
+            {/* Banner entre destaques e notícias */}
+            <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center my-6">
+              <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+            </div>
+
+            <NewsSection
             label="SEGURANÇA"
             color="#dc2626"
             href="/seguranca"
@@ -151,7 +159,17 @@ export default function Home() {
             ]}
           />
 
-          <MaisLidasSection />
+            <MaisLidasSection />
+          </div>
+
+          <AdSidebar />
+        </div>
+
+        {/* Banner acima do rodapé */}
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+          </div>
         </div>
       </main>
       <RedacaoBanner />

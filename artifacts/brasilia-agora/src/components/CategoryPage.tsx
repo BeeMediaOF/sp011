@@ -4,6 +4,7 @@ import ArticleCard from "./ArticleCard";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
+import AdSidebar from "./ads/AdSidebar";
 
 export interface Article {
   id: string;
@@ -41,8 +42,11 @@ export default function CategoryPage({
         </div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto px-4 mt-8">
-        {/* Featured Article */}
+      <div className="max-w-[1280px] mx-auto px-4 mt-8 flex gap-6">
+        <AdSidebar />
+
+        <div className="flex-1 min-w-0">
+          {/* Featured Article */}
         {featuredArticle && (
           <Link href={`/artigo/${featuredArticle.id}`}>
             <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-8 rounded-sm">
@@ -143,6 +147,16 @@ export default function CategoryPage({
               </Link>
             </div>
           </div>
+          </div>
+
+          <AdSidebar />
+        </div>
+      </div>
+
+      {/* Banner acima do rodapé */}
+      <div className="max-w-[1280px] mx-auto px-4 py-6">
+        <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+          <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
         </div>
       </div>
     </div>

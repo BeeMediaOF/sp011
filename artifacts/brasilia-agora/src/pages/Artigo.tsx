@@ -7,6 +7,7 @@ import NavBar from "../components/NavBar";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import ArticleCard from "../components/ArticleCard";
+import AdSidebar from "../components/ads/AdSidebar";
 
 import heroImg from "../assets/images/hero.png";
 import politics2Img from "../assets/images/politics2.png";
@@ -57,9 +58,12 @@ export default function Artigo() {
       <NavBar />
 
       <main className="flex-1 bg-white pb-16">
-        <div className="max-w-[1280px] mx-auto px-4 mt-6">
-          <div className="flex flex-col lg:flex-row gap-10">
-            <article className="w-full lg:w-2/3">
+        <div className="max-w-[1280px] mx-auto px-4 mt-6 flex gap-6">
+          <AdSidebar />
+
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-col lg:flex-row gap-10">
+              <article className="w-full lg:w-2/3">
               {/* Breadcrumb */}
               <div className="text-gray-500 text-xs font-medium mb-4 flex items-center gap-1">
                 <Link href="/" className="hover:text-[#1d4ed8]">Início</Link> &gt;
@@ -150,8 +154,18 @@ export default function Artigo() {
                     ))}
                   </div>
                 </div>
-              </div>
-            </aside>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <AdSidebar />
+        </div>
+
+        {/* Banner acima do rodapé */}
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
           </div>
         </div>
 
