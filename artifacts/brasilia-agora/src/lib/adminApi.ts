@@ -46,7 +46,7 @@ export const adminApi = {
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
   getAd: (id: string) => req<{ ad: Ad }>("GET", `/ads/${id}`),
-  createAd: (data: { name: string; imageBase64: string; link: string; position: "banner" | "sidebar"; active: boolean }) =>
+  createAd: (data: { name: string; imageBase64: string; link: string; position: "banner" | "sidebar" | "central"; active: boolean }) =>
     req<{ ad: Ad }>("POST", "/ads", data),
   updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
   deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),
@@ -101,7 +101,7 @@ export interface Ad {
   name: string;
   imageBase64: string;
   link: string;
-  position: "banner" | "sidebar";
+  position: "banner" | "sidebar" | "central";
   active: boolean;
   clicks: number;
   createdAt: string;

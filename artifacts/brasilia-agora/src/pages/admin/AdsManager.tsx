@@ -18,7 +18,7 @@ export default function AdsManager() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [link, setLink] = useState("");
-  const [position, setPosition] = useState<"banner" | "sidebar">("banner");
+  const [position, setPosition] = useState<"banner" | "sidebar" | "central">("banner");
   const [preview, setPreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -115,6 +115,7 @@ export default function AdsManager() {
               <div className="flex gap-3">
                 <button type="button" onClick={() => setPosition("banner")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "banner" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Banner (728×90)</button>
                 <button type="button" onClick={() => setPosition("sidebar")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "sidebar" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Sidebar (160×600)</button>
+                <button type="button" onClick={() => setPosition("central")} className={`px-4 py-2 rounded-lg text-sm font-semibold border ${position === "central" ? "bg-[#F5A623] text-white border-[#F5A623]" : "bg-white text-gray-600 border-gray-300"}`}>Central (728×90)</button>
               </div>
             </div>
             <div>
@@ -126,7 +127,7 @@ export default function AdsManager() {
                 </button>
                 {preview && (
                   <div className="relative">
-                    <img src={preview} alt="Preview" className={`rounded-lg border border-gray-200 object-contain ${position === "banner" ? "h-20" : "h-40"}`} />
+                    <img src={preview} alt="Preview" className={`rounded-lg border border-gray-200 object-contain ${position === "sidebar" ? "h-40" : "h-20"}`} />
                     <button type="button" onClick={() => { setPreview(""); if (fileRef.current) fileRef.current.value = ""; }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">&times;</button>
                   </div>
                 )}
@@ -152,11 +153,11 @@ export default function AdsManager() {
           <div className="grid grid-cols-1 gap-4">
             {ads.map((ad) => (
               <div key={ad.id} className={`bg-white rounded-xl border border-gray-200 p-4 flex gap-4 items-center shadow-sm ${!ad.active ? "opacity-60" : ""}`}>
-                <img src={ad.imageBase64} alt={ad.name} className={`rounded-lg border border-gray-100 object-cover shrink-0 ${ad.position === "banner" ? "w-48 h-16" : "w-16 h-24"}`} />
+                <img src={ad.imageBase64} alt={ad.name} className={`rounded-lg border border-gray-100 object-cover shrink-0 ${ad.position === "sidebar" ? "w-16 h-24" : "w-48 h-16"}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <h4 className="font-bold text-[#1a2448] truncate">{ad.name}</h4>
-                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${ad.position === "banner" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{ad.position}</span>
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${ad.position === "banner" || ad.position === "central" ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"}`}>{ad.position}</span>
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${ad.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{ad.active ? "Ativo" : "Inativo"}</span>
                   </div>
                   <a href={ad.link} target="_blank" rel="noreferrer" className="text-xs text-[#1d4ed8] hover:underline flex items-center gap-1">

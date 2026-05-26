@@ -37,7 +37,7 @@ export interface Ad {
   name: string;
   imageBase64: string;
   link: string;
-  position: "banner" | "sidebar";
+  position: "banner" | "sidebar" | "central";
   active: boolean;
   clicks: number;
   createdAt: string;

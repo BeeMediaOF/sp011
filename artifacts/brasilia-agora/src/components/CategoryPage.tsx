@@ -5,6 +5,7 @@ import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
 import AdSidebar from "./ads/AdSidebar";
+import AdBanner from "./ads/AdBanner";
 
 export interface Article {
   id: string;
@@ -66,9 +67,8 @@ export default function CategoryPage({
             </Link>
           )}
 
-          {/* Ônico anúncio discreto */}
-          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center mb-8">
-            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+          <div className="mb-8">
+            <AdBanner />
           </div>
 
           {/* Divider */}
@@ -155,9 +155,7 @@ export default function CategoryPage({
 
       {/* Banner acima do rodapé */}
       <div className="max-w-[1280px] mx-auto px-4 py-6">
-        <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-          <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
-        </div>
+        <AdBanner />
       </div>
     </div>
   );

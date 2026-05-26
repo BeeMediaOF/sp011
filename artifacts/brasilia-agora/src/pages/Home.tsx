@@ -10,6 +10,7 @@ import NewsSection from "../components/NewsSection";
 import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import AdSidebar from "../components/ads/AdSidebar";
+import AdBanner from "../components/ads/AdBanner";
 
 import policeImg from "../assets/images/police.png";
 import security2Img from "../assets/images/security2.png";
@@ -44,9 +45,7 @@ export default function Home() {
 
         {/* Banner abaixo da seção principal */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
-          </div>
+          <AdBanner />
         </div>
 
         {/* Conteúdo com sidebar lateral */}
