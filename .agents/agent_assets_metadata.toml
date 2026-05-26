@@ -72,3 +72,51 @@ id = "sBGE1Dojkn3IFMwSiNcvs"
 uri = "file://artifacts/brasilia-agora/src/assets/images/avatar3.png"
 type = "image"
 title = "Professional male columnist"
+
+[[generated]]
+id = "2rHdrOzN2PuoHKS2VY9-L"
+uri = "file://artifacts/brasilia-agora/src/assets/images/sports.png"
+type = "image"
+title = "Estádio Mané Garrincha football match"
+
+[[generated]]
+id = "UFbq8AxEboRCgRwJ7T1aK"
+uri = "file://artifacts/brasilia-agora/src/assets/images/politics2.png"
+type = "image"
+title = "Brazilian congress chamber interior"
+
+[[generated]]
+id = "mM3x_y2NcuPiFyPwuqoYY"
+uri = "file://artifacts/brasilia-agora/src/assets/images/city.png"
+type = "image"
+title = "Modern Brasília urban landscape"
+
+[[generated]]
+id = "620pZFFqWG9EPn41Z9Pdv"
+uri = "file://artifacts/brasilia-agora/src/assets/images/education2.png"
+type = "image"
+title = "University library with students studying"
+
+[[generated]]
+id = "w7mVkaqEsIPTAR-o1a5ID"
+uri = "file://artifacts/brasilia-agora/src/assets/images/culture2.png"
+type = "image"
+title = "Art exhibition at modern museum"
+
+[[generated]]
+id = "tzeCJSQMiri-LhOHsiMty"
+uri = "file://artifacts/brasilia-agora/src/assets/images/security2.png"
+type = "image"
+title = "Firefighters in action DF emergency"
+
+[[generated]]
+id = "aeufFhcXNGtrRP8F0MvAW"
+uri = "file://artifacts/brasilia-agora/src/assets/images/transport2.png"
+type = "image"
+title = "BRT Expresso DF bus at station"
+
+[[generated]]
+id = "YrFq0hA8gEYz937HQUgnS"
+uri = "file://artifacts/brasilia-agora/src/assets/images/health2.png"
+type = "image"
+title = "Doctor with patient modern clinic"

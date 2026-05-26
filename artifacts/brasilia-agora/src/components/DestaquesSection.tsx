@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "wouter";
 
 import parkImg from "../assets/images/park.png";
 import busImg from "../assets/images/bus.png";
@@ -8,6 +9,7 @@ import festivalImg from "../assets/images/festival.png";
 export default function DestaquesSection() {
   const destaques = [
     {
+      id: "dest-1",
       img: parkImg,
       tag: "CIDADE",
       color: "bg-[#2563eb]",
@@ -15,6 +17,7 @@ export default function DestaquesSection() {
       time: "5 horas atrás"
     },
     {
+      id: "dest-2",
       img: busImg,
       tag: "TRANSPORTE",
       color: "bg-[#0284c7]",
@@ -22,6 +25,7 @@ export default function DestaquesSection() {
       time: "6 horas atrás"
     },
     {
+      id: "dest-3",
       img: studentsImg,
       tag: "EDUCAÇÃO",
       color: "bg-[#7c3aed]",
@@ -29,6 +33,7 @@ export default function DestaquesSection() {
       time: "7 horas atrás"
     },
     {
+      id: "dest-4",
       img: festivalImg,
       tag: "CULTURA",
       color: "bg-[#0d9488]",
@@ -46,18 +51,20 @@ export default function DestaquesSection() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {destaques.map((item, index) => (
-          <div key={index} className="group cursor-pointer flex flex-col bg-white">
-            <div className="relative overflow-hidden aspect-[16/10] mb-3">
-              <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-              <div className={`absolute top-0 left-0 ${item.color} text-white text-[10px] font-bold px-2 py-1`}>
-                {item.tag}
+          <Link key={index} href={`/artigo/${item.id}`} className="block">
+            <div className="group cursor-pointer flex flex-col bg-white h-full">
+              <div className="relative overflow-hidden aspect-[16/10] mb-3">
+                <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <div className={`absolute top-0 left-0 ${item.color} text-white text-[10px] font-bold px-2 py-1`}>
+                  {item.tag}
+                </div>
               </div>
+              <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#1d4ed8] transition-colors flex-grow">
+                {item.title}
+              </h3>
+              <span className="text-gray-500 text-xs">{item.time}</span>
             </div>
-            <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#1d4ed8] transition-colors flex-grow">
-              {item.title}
-            </h3>
-            <span className="text-gray-500 text-xs">{item.time}</span>
-          </div>
+          </Link>
         ))}
       </div>
     </section>
