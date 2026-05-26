@@ -1,0 +1,74 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "yj8jkA3GIpA8ey-Lb4nXh"
+uri = "file://artifacts/brasilia-agora/src/assets/images/hero.png"
+type = "image"
+title = "Aerial view Congresso Nacional"
+
+[[generated]]
+id = "kb-DjTN_-WwbcWyGE92hs"
+uri = "file://artifacts/brasilia-agora/src/assets/images/traffic.png"
+type = "image"
+title = "Traffic in Brasilia Eixao"
+
+[[generated]]
+id = "3pI8nrgSQpab62_2fCFbH"
+uri = "file://artifacts/brasilia-agora/src/assets/images/police.png"
+type = "image"
+title = "Police car street scene"
+
+[[generated]]
+id = "jEe0FBNaTqA3ZGRYmXefJ"
+uri = "file://artifacts/brasilia-agora/src/assets/images/hospital.png"
+type = "image"
+title = "Hospital exterior health"
+
+[[generated]]
+id = "xjQLuw_cGPr1_HCX8nadV"
+uri = "file://artifacts/brasilia-agora/src/assets/images/park.png"
+type = "image"
+title = "Parque da Cidade Brasilia"
+
+[[generated]]
+id = "bw_Eastgldf64UQCHgdjC"
+uri = "file://artifacts/brasilia-agora/src/assets/images/bus.png"
+type = "image"
+title = "Bus fleet transit"
+
+[[generated]]
+id = "lDZtdcDnDHtD4p-v7o0Yr"
+uri = "file://artifacts/brasilia-agora/src/assets/images/students.png"
+type = "image"
+title = "Students in classroom"
+
+[[generated]]
+id = "XWjMuM_-y8TfDXCSUACIT"
+uri = "file://artifacts/brasilia-agora/src/assets/images/festival.png"
+type = "image"
+title = "Cultural event night"
+
+[[generated]]
+id = "dzO1HUTeSIjMACVk_ChXG"
+uri = "file://artifacts/brasilia-agora/src/assets/images/especial.png"
+type = "image"
+title = "Aerial panoramic Brasilia"
+
+[[generated]]
+id = "fKGNNYPVLvjs51Rzmprvt"
+uri = "file://artifacts/brasilia-agora/src/assets/images/avatar1.png"
+type = "image"
+title = "Professional female journalist"
+
+[[generated]]
+id = "Ecz4PBLmItkt-o2UobFb3"
+uri = "file://artifacts/brasilia-agora/src/assets/images/avatar2.png"
+type = "image"
+title = "Professional female columnist"
+
+[[generated]]
+id = "sBGE1Dojkn3IFMwSiNcvs"
+uri = "file://artifacts/brasilia-agora/src/assets/images/avatar3.png"
+type = "image"
+title = "Professional male columnist"
