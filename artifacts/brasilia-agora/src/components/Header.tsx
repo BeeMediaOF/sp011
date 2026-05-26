@@ -1,7 +1,7 @@
 import React from "react";
 import { Search } from "lucide-react";
 import { Link } from "wouter";
-import logoImg from "../assets/images/logo_brasilia_hoje.png";
+import logoImg from "../assets/images/logo_v2.png";
 
 export default function Header() {
   return (

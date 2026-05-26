@@ -1,6 +1,6 @@
 import React from "react";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
-import logoImg from "../assets/images/logo_brasilia_hoje.png";
+import logoImg from "../assets/images/logo_v2.png";
 import { FaXTwitter } from "react-icons/fa6";
 
 export default function Footer() {
