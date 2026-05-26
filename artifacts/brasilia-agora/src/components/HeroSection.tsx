@@ -41,33 +41,35 @@ export default function HeroSection() {
           </Link>
         </div>
 
-        {/* Right Column - 4 Stacked News (symmetric) */}
-        <div className="w-full lg:w-2/5 flex flex-col divide-y divide-gray-200">
+        {/* Right Column - 4 Stacked News (symmetric, full height) */}
+        <div className="w-full lg:w-2/5 flex flex-col justify-between lg:h-[500px]">
           {[
-            { id: "hero-2", img: trafficImg, alt: "Trânsito", tagColor: "#ea580c", tag: "TRÂNSITO", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", time: "1 hora atrás" },
-            { id: "hero-3", img: policeImg,  alt: "Segurança", tagColor: "#dc2626", tag: "SEGURANÇA", title: "Polícia Civil prende grupo suspeito de furtos em comércios do Plano Piloto", time: "3 horas atrás" },
-            { id: "hero-4", img: hospitalImg, alt: "Saúde",    tagColor: "#16a34a", tag: "SAÚDE",    title: "Hospitais do DF registram queda nos casos de dengue em maio", time: "4 horas atrás" },
-            { id: "hero-5", img: studentsImg, alt: "Educação", tagColor: "#7c3aed", tag: "EDUCAÇÃO", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", time: "5 horas atrás" },
-          ].map((item) => (
-            <Link key={item.id} href={`/artigo/${item.id}`} className="block">
-              <div className="flex gap-4 group cursor-pointer py-[14px] first:pt-0 last:pb-0">
-                <div className="w-[110px] shrink-0 overflow-hidden self-stretch">
-                  <img
-                    src={item.img}
-                    alt={item.alt}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    style={{ minHeight: "72px" }}
-                  />
+            { id: "hero-2", img: trafficImg,  alt: "Trânsito", tagColor: "#ea580c", tag: "TRÂNSITO", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", time: "1 hora atrás" },
+            { id: "hero-3", img: policeImg,   alt: "Segurança", tagColor: "#dc2626", tag: "SEGURANÇA", title: "Polícia Civil prende grupo suspeito de furtos em comércios do Plano Piloto", time: "3 horas atrás" },
+            { id: "hero-4", img: hospitalImg, alt: "Saúde",     tagColor: "#16a34a", tag: "SAÚDE",    title: "Hospitais do DF registram queda nos casos de dengue em maio", time: "4 horas atrás" },
+            { id: "hero-5", img: studentsImg, alt: "Educação",  tagColor: "#7c3aed", tag: "EDUCAÇÃO", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", time: "5 horas atrás" },
+          ].map((item, i, arr) => (
+            <React.Fragment key={item.id}>
+              <Link href={`/artigo/${item.id}`} className="block flex-1">
+                <div className="flex gap-4 group cursor-pointer h-full items-center">
+                  <div className="w-[110px] h-[90px] shrink-0 overflow-hidden">
+                    <img
+                      src={item.img}
+                      alt={item.alt}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-center min-w-0">
+                    <span className="text-xs font-bold mb-1 block" style={{ color: item.tagColor }}>{item.tag}</span>
+                    <h3 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#1d4ed8] transition-colors mb-1 line-clamp-2">
+                      {item.title}
+                    </h3>
+                    <span className="text-gray-500 text-xs">{item.time}</span>
+                  </div>
                 </div>
-                <div className="flex flex-col justify-center min-w-0">
-                  <span className="text-xs font-bold mb-1 block" style={{ color: item.tagColor }}>{item.tag}</span>
-                  <h3 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#1d4ed8] transition-colors mb-1 line-clamp-2">
-                    {item.title}
-                  </h3>
-                  <span className="text-gray-500 text-xs">{item.time}</span>
-                </div>
-              </div>
-            </Link>
+              </Link>
+              {i < arr.length - 1 && <div className="h-px bg-gray-200 w-full shrink-0"></div>}
+            </React.Fragment>
           ))}
         </div>
       </div>
