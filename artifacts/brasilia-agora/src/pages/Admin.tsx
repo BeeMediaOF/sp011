@@ -9,6 +9,8 @@ import LogoUpload from "./admin/LogoUpload";
 import Settings from "./admin/Settings";
 import Webhook from "./admin/Webhook";
 import AdsManager from "./admin/AdsManager";
+import ColumnistsManager from "./admin/ColumnistsManager";
+import ContactSettings from "./admin/ContactSettings";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
@@ -49,6 +51,12 @@ export default function Admin() {
       </Route>
       <Route path="/admin/propagandas">
         <RequireAuth><AdsManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/colunistas">
+        <RequireAuth><ColumnistsManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/contato">
+        <RequireAuth><ContactSettings /></RequireAuth>
       </Route>
       <Route path="/admin">
         <RequireAuth><Dashboard /></RequireAuth>

@@ -51,6 +51,18 @@ export const adminApi = {
   updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
   deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),
   trackAdClick: (id: string) => fetch(`/api/ads/${id}/click`, { method: "POST" }).then((r) => r.json()),
+
+  // Columnists
+  getColumnists: () => req<{ columnists: Columnist[] }>("GET", "/columnists"),
+  getColumnist: (id: string) => req<{ columnist: Columnist }>("GET", `/columnists/${id}`),
+  createColumnist: (data: { name: string; bio: string; avatarBase64: string; active: boolean }) =>
+    req<{ columnist: Columnist }>("POST", "/columnists", data),
+  updateColumnist: (id: string, data: Partial<Columnist>) => req<{ columnist: Columnist }>("PUT", `/columnists/${id}`, data),
+  deleteColumnist: (id: string) => req<{ success: boolean }>("DELETE", `/columnists/${id}`),
+
+  // Contact Info
+  getContactInfo: () => req<{ contactInfo: ContactInfo }>("GET", "/contact"),
+  updateContactInfo: (info: Partial<ContactInfo>) => req<{ contactInfo: ContactInfo }>("PUT", "/contact", info),
 };
 
 export interface Article {
@@ -94,4 +106,31 @@ export interface Ad {
   clicks: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface Columnist {
+  id: string;
+  name: string;
+  bio: string;
+  avatarBase64: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactInfo {
+  supportEmail: string;
+  displayEmail: string;
+  phone: string;
+  whatsapp: string;
+  facebook: string;
+  instagram: string;
+  x: string;
+  youtube: string;
+  tiktok: string;
+  address: string;
+  cnpj: string;
+  legalInfo: string;
+  privacyPolicy: string;
+  termsOfUse: string;
 }

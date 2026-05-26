@@ -44,11 +44,40 @@ export interface Ad {
   updatedAt: string;
 }
 
+export interface Columnist {
+  id: string;
+  name: string;
+  bio: string;
+  avatarBase64: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContactInfo {
+  supportEmail: string;
+  displayEmail: string;
+  phone: string;
+  whatsapp: string;
+  facebook: string;
+  instagram: string;
+  x: string;
+  youtube: string;
+  tiktok: string;
+  address: string;
+  cnpj: string;
+  legalInfo: string;
+  privacyPolicy: string;
+  termsOfUse: string;
+}
+
 interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
   settings: SiteSettings;
   ads: Ad[];
+  columnists: Columnist[];
+  contactInfo: ContactInfo;
 }
 
 const STORE_FILE = "/tmp/brasilia-store.json";
@@ -103,6 +132,23 @@ const defaultStore: StoreData = {
     desktopEnabled: true,
   },
   ads: [],
+  columnists: [],
+  contactInfo: {
+    supportEmail: "suporte@beemedia.ai",
+    displayEmail: "redacao@brasiliaagora.com.br",
+    phone: "(61) 99888-0000",
+    whatsapp: "(61) 99888-0000",
+    facebook: "",
+    instagram: "",
+    x: "",
+    youtube: "",
+    tiktok: "",
+    address: "Brasília, Distrito Federal",
+    cnpj: "",
+    legalInfo: "",
+    privacyPolicy: "",
+    termsOfUse: "",
+  },
 };
 
 function loadStore(): StoreData {
@@ -203,5 +249,42 @@ export const store = {
     _store.ads[idx]!.clicks += 1;
     saveStore(_store);
     return true;
+  },
+
+  // Columnists
+  getColumnists: () => [..._store.columnists],
+  getColumnist: (id: string) => _store.columnists.find((c) => c.id === id) ?? null,
+  createColumnist: (data: Omit<Columnist, "id" | "createdAt" | "updatedAt">): Columnist => {
+    const col: Columnist = {
+      ...data,
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    _store.columnists.push(col);
+    saveStore(_store);
+    return col;
+  },
+  updateColumnist: (id: string, data: Partial<Omit<Columnist, "id" | "createdAt">>): Columnist | null => {
+    const idx = _store.columnists.findIndex((c) => c.id === id);
+    if (idx === -1) return null;
+    _store.columnists[idx] = { ..._store.columnists[idx]!, ...data, updatedAt: new Date().toISOString() };
+    saveStore(_store);
+    return _store.columnists[idx]!;
+  },
+  deleteColumnist: (id: string): boolean => {
+    const before = _store.columnists.length;
+    _store.columnists = _store.columnists.filter((c) => c.id !== id);
+    const deleted = _store.columnists.length < before;
+    if (deleted) saveStore(_store);
+    return deleted;
+  },
+
+  // Contact Info
+  getContactInfo: () => ({ ..._store.contactInfo }),
+  updateContactInfo: (data: Partial<ContactInfo>): ContactInfo => {
+    _store.contactInfo = { ..._store.contactInfo, ...data };
+    saveStore(_store);
+    return { ..._store.contactInfo };
   },
 };

@@ -9,7 +9,7 @@ export default function AdInContent({ align = "right" }: AdInContentProps) {
   const alignClass = align === "left" ? "float-left mr-4" : align === "right" ? "float-right ml-4" : "mx-auto";
   return (
     <div className={`${alignClass} my-2 clear-none`}>
-      <AdSlot variant="square" />
+      <AdSlot size="sm" />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
+  Users, Mail,
 } from "lucide-react";
 
 const NAV = [
@@ -10,8 +11,10 @@ const NAV = [
   { label: "Artigos",      icon: FileText,         path: "/admin/artigos" },
   { label: "Novo Artigo",  icon: Newspaper,        path: "/admin/artigos/novo" },
   { label: "Menu",         icon: Menu,             path: "/admin/menu" },
+  { label: "Colunistas",   icon: Users,            path: "/admin/colunistas" },
   { label: "Propagandas",  icon: Megaphone,        path: "/admin/propagandas" },
   { label: "Logo",         icon: Image,            path: "/admin/logo" },
+  { label: "Contato",      icon: Mail,             path: "/admin/contato" },
   { label: "Webhook",      icon: Webhook,          path: "/admin/webhook" },
   { label: "Config.",      icon: Settings,         path: "/admin/configuracoes" },
 ];

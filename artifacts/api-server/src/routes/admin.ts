@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware, generateToken, validateCredentials } from "../middlewares/auth.js";
-import { store } from "../lib/store.js";
+import { store, type ContactInfo } from "../lib/store.js";
 
 const router = Router();
 
@@ -178,6 +178,48 @@ router.delete("/ads/:id", (req, res) => {
   const deleted = store.deleteAd(req.params.id ?? "");
   if (!deleted) { res.status(404).json({ error: "Ad not found" }); return; }
   res.json({ success: true });
+});
+
+// ─── Columnists ────────────────────────────────────────────────────────────────────
+
+router.get("/columnists", (_req, res) => {
+  res.json({ columnists: store.getColumnists() });
+});
+
+router.get("/columnists/:id", (req, res) => {
+  const c = store.getColumnist(req.params.id ?? "");
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ columnist: c });
+});
+
+router.post("/columnists", (req, res) => {
+  const { name, bio, avatarBase64, active } = req.body as { name?: string; bio?: string; avatarBase64?: string; active?: boolean };
+  if (!name) { res.status(400).json({ error: "name is required" }); return; }
+  const c = store.createColumnist({ name, bio: bio ?? "", avatarBase64: avatarBase64 ?? "", active: !!active });
+  res.status(201).json({ columnist: c });
+});
+
+router.put("/columnists/:id", (req, res) => {
+  const c = store.updateColumnist(req.params.id ?? "", req.body as Parameters<typeof store.updateColumnist>[1]);
+  if (!c) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ columnist: c });
+});
+
+router.delete("/columnists/:id", (req, res) => {
+  const ok = store.deleteColumnist(req.params.id ?? "");
+  if (!ok) { res.status(404).json({ error: "Not found" }); return; }
+  res.json({ success: true });
+});
+
+// ─── Contact Info ────────────────────────────────────────────────────────────────────
+
+router.get("/contact", (_req, res) => {
+  res.json({ contactInfo: store.getContactInfo() });
+});
+
+router.put("/contact", (req, res) => {
+  const info = store.updateContactInfo(req.body as Partial<ContactInfo>);
+  res.json({ contactInfo: info });
 });
 
 export default router;

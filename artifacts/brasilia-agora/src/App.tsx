@@ -14,6 +14,8 @@ import Cultura from "@/pages/Cultura";
 import Esportes from "@/pages/Esportes";
 import Colunas from "@/pages/Colunas";
 import Artigo from "@/pages/Artigo";
+import Archive from "@/pages/Archive";
+import Contato from "@/pages/Contato";
 import Admin from "@/pages/Admin";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ function Router() {
       <Route path="/esportes" component={Esportes} />
       <Route path="/colunas" component={Colunas} />
       <Route path="/artigo/:slug" component={Artigo} />
+      <Route path="/arquivo" component={Archive} />
+      <Route path="/contato" component={Contato} />
       <Route component={NotFound} />
     </Switch>
   );
