@@ -105,10 +105,6 @@ export default function Artigo() {
 
             <aside className="w-full lg:w-1/3">
               <div className="sticky top-24 space-y-6">
-                <div className="w-full h-[250px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-                  <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 336 × 280</p>
-                </div>
-
                 <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
                   <h3 className="font-bold text-[#1a2448] text-lg mb-5 flex items-center gap-2 uppercase">MAIS EM {article.category}</h3>
                   <div className="flex flex-col space-y-4">
@@ -144,12 +140,6 @@ export default function Artigo() {
                 </div>
               </div>
             </aside>
-          </div>
-        </div>
-
-        <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <div className="w-full h-[90px] bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-            <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
           </div>
         </div>
 
