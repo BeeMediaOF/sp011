@@ -1,7 +1,7 @@
 import React from "react";
 import { Search, Menu } from "lucide-react";
 import { Link } from "wouter";
-import logoImg from "../assets/images/logo_correio_azul.png";
+import logoImg from "../assets/images/logo_correio_v2.png";
 
 export default function Header() {
   return (
@@ -13,7 +13,7 @@ export default function Header() {
           <img
             src={logoImg}
             alt="Correio da Capital"
-            className="h-32 w-auto object-contain group-hover:opacity-90 transition-opacity"
+            className="h-36 w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
 
