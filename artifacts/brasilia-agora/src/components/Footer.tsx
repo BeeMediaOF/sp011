@@ -6,13 +6,13 @@ import logoImg from "../assets/images/logo_correio.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-[#0d1633] text-white pt-10 pb-6 border-t-[6px] border-[#c8102e]">
+    <footer className="bg-[#1a1a1a] text-white pt-10 pb-6 border-t-[4px] border-[#c8102e]">
       <div className="max-w-[1280px] mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
 
         {/* Logo + Sobre */}
-        <div className="lg:col-span-1">
-          <img src={logoImg} alt="Correio da Capital" className="h-14 w-auto object-contain mb-4" />
-          <p className="text-gray-400 text-sm leading-relaxed pr-4">
+        <div>
+          <img src={logoImg} alt="Correio da Capital" className="h-12 w-auto object-contain mb-4" />
+          <p className="text-gray-500 text-sm leading-relaxed pr-4">
             Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
           </p>
           <div className="flex gap-3 mt-4">
@@ -31,10 +31,11 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Navegação */}
+        {/* Seções */}
         <div>
           <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Seções</h3>
-          <ul className="flex flex-col gap-2 text-sm text-gray-300">
+          <ul className="flex flex-col gap-2 text-sm text-gray-400">
+            <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Início</Link></li>
             <li><Link href="/politica" className="hover:text-white hover:pl-1 transition-all">Política</Link></li>
             <li><Link href="/cidade" className="hover:text-white hover:pl-1 transition-all">Cidade</Link></li>
             <li><Link href="/seguranca" className="hover:text-white hover:pl-1 transition-all">Segurança</Link></li>
@@ -42,14 +43,14 @@ export default function Footer() {
             <li><Link href="/saude" className="hover:text-white hover:pl-1 transition-all">Saúde</Link></li>
             <li><Link href="/educacao" className="hover:text-white hover:pl-1 transition-all">Educação</Link></li>
             <li><Link href="/cultura" className="hover:text-white hover:pl-1 transition-all">Cultura</Link></li>
-            <li><Link href="/esportes" className="hover:text-white hover:pl-1 transition-all">Esportes</Link></li>
+            <li><Link href="/esporte" className="hover:text-white hover:pl-1 transition-all">Esporte</Link></li>
           </ul>
         </div>
 
-        {/* Links úteis */}
+        {/* Institucional */}
         <div>
           <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Institucional</h3>
-          <ul className="flex flex-col gap-2 text-sm text-gray-300">
+          <ul className="flex flex-col gap-2 text-sm text-gray-400">
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Sobre o Correio</Link></li>
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Fale Conosco</Link></li>
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Anuncie</Link></li>
@@ -62,7 +63,7 @@ export default function Footer() {
         {/* Contato + Newsletter */}
         <div>
           <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Contato</h3>
-          <div className="text-gray-300 text-sm space-y-1.5 mb-5">
+          <div className="text-gray-400 text-sm space-y-1.5 mb-5">
             <p className="text-white font-bold">(61) 99888-0000</p>
             <p>redacao@correiodacapital.com.br</p>
           </div>
@@ -88,7 +89,7 @@ export default function Footer() {
           <span>|</span>
           <Link href="/" className="hover:text-white transition-colors">Termos de Uso</Link>
           <span>|</span>
-          <Link href="/contato" className="hover:text-white transition-colors">Contato</Link>
+          <Link href="/" className="hover:text-white transition-colors">Contato</Link>
         </div>
       </div>
     </footer>

@@ -1,0 +1,5 @@
+- [Tipografia editorial do portal](typography.md) — Fonte serif Merriweather para títulos; fonte sans Inter para corpo; paleta #1a1a1a/#c8102e/#0b3d91
+- [Componentes de notícia](news-components.md) — NewsCard, SectionBlock, HeroSection com padrão de chapéu colorido por editoria
+- [Estrutura de dados mock](mock-data.md) — Dados organizados por editoria em arrays estruturados para consumo nos componentes
+- [Layout responsivo do portal](responsive-layout.md) — Grid de 4 colunas desktop, 2 colunas tablet, 1 coluna mobile; hero 60/38 split
+- [Footer com newsletter](footer-newsletter.md) — Newsletter inline com input + botão OK; 4 colunas de links

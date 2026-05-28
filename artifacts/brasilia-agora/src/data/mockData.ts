@@ -1,0 +1,375 @@
+import heroImg from "../assets/images/hero.png";
+import trafficImg from "../assets/images/traffic.png";
+import policeImg from "../assets/images/police.png";
+import security2Img from "../assets/images/security2.png";
+import sportsImg from "../assets/images/sports.png";
+import parkImg from "../assets/images/park.png";
+import festivalImg from "../assets/images/festival.png";
+import culturaFeatImg from "../assets/images/cultura_feat.png";
+import culture2Img from "../assets/images/culture2.png";
+import politicaFeatImg from "../assets/images/politica_feat.png";
+import politics2Img from "../assets/images/politics2.png";
+import brasilImg from "../assets/images/brasil.png";
+import especialImg from "../assets/images/especial.png";
+import mundoImg from "../assets/images/mundo.png";
+import busImg from "../assets/images/bus.png";
+import hospitalImg from "../assets/images/hospital.png";
+import studentsImg from "../assets/images/students.png";
+import cityImg from "../assets/images/city.png";
+import health2Img from "../assets/images/health2.png";
+import education2Img from "../assets/images/education2.png";
+import transport2Img from "../assets/images/transport2.png";
+
+export const editoriaColors: Record<string, string> = {
+  Brasil: "#16a34a",
+  Mundo: "#6b21a8",
+  Política: "#1d4ed8",
+  Economia: "#b45309",
+  Esporte: "#dc2626",
+  Cultura: "#0d9488",
+  Tecnologia: "#0284c7",
+  Saúde: "#16a34a",
+  DF: "#0b3d91",
+};
+
+export const brasilArticles = [
+  {
+    id: "bra-1",
+    title: "Governo Federal anuncia novo programa habitacional com 1 milhão de moradias",
+    summary: "Minha Casa Minha Vida volta com novo formato e subsídios para famílias de baixa renda.",
+    image: brasilImg,
+    chapeu: "Brasil",
+    author: "Pedro Lima",
+    time: "2 horas atrás",
+  },
+  {
+    id: "bra-2",
+    title: "STF retoma julgamento de casos relacionados ao setor de telecomunicações",
+    summary: "Corte analisa ações sobre regulação de internet e 5G no Brasil.",
+    image: especialImg,
+    chapeu: "Brasil",
+    author: "Mariana Costa",
+    time: "3 horas atrás",
+  },
+  {
+    id: "bra-3",
+    title: "Inflação recua para 3,8% em maio, menor índice desde 2020",
+    summary: "IBGE aponta queda no preço de alimentos e combustíveis como principais fatores.",
+    image: brasilImg,
+    chapeu: "Brasil",
+    author: "Ricardo Souza",
+    time: "5 horas atrás",
+  },
+  {
+    id: "bra-4",
+    title: "Ministério da Saúde lança campanha nacional de vacinação contra influenza",
+    summary: "Meta é vacinar 90% do público-alvo em todas as regiões do país.",
+    image: busImg,
+    chapeu: "Brasil",
+    author: "Ana Paula",
+    time: "7 horas atrás",
+  },
+  {
+    id: "bra-5",
+    title: "Brasil recebe 6 milhões de doses de vacina contra a dengue",
+    summary: "Doses serão distribuídas prioritariamente para regiões Norte e Nordeste.",
+    image: health2Img,
+    chapeu: "Brasil",
+    author: "Bruno Fernandes",
+    time: "8 horas atrás",
+  },
+  {
+    id: "bra-6",
+    title: "Congresso Nacional aprova orçamento de R$ 48 bilhões para o DF",
+    summary: "Investimentos focados em infraestrutura, saúde e educação da capital.",
+    image: heroImg,
+    chapeu: "Brasil",
+    author: "Carlos Mendes",
+    time: "10 horas atrás",
+  },
+];
+
+export const mundoArticles = [
+  {
+    id: "mun-1",
+    title: "Cúpula do G7 debate crise climática e promete corte de 50% nas emissões",
+    summary: "Líderes se comprometem com metas mais ambiciosas para 2035.",
+    image: mundoImg,
+    chapeu: "Mundo",
+    author: "Fernanda Rocha",
+    time: "1 hora atrás",
+  },
+  {
+    id: "mun-2",
+    title: "ONU alerta para avanço dos conflitos armados em três regiões da África",
+    summary: "Secretário-geral pede ação urgente para proteção de civis.",
+    image: trafficImg,
+    chapeu: "Mundo",
+    author: "João Silva",
+    time: "2 horas atrás",
+  },
+  {
+    id: "mun-3",
+    title: "União Europeia aprova pacote de sanções econômicas contra novos países",
+    summary: "Medidas atingem setor energético e financeiro de quatro nações.",
+    image: mundoImg,
+    chapeu: "Mundo",
+    author: "Laura Pinto",
+    time: "4 horas atrás",
+  },
+  {
+    id: "mun-4",
+    title: "NASA confirma lançamento de missão tripulada à Lua para o segundo semestre",
+    summary: "Artemis II levará quatro astronautas em órbita ao redor da Lua.",
+    image: especialImg,
+    chapeu: "Mundo",
+    author: "Marcos Vinícius",
+    time: "6 horas atrás",
+  },
+  {
+    id: "mun-5",
+    title: "China anuncia novo pacote de estímulos econômicos de US$ 200 bilhões",
+    summary: "Medidas visam reativar setor imobiliário e consumo interno.",
+    image: parkImg,
+    chapeu: "Mundo",
+    author: "Wei Zhang",
+    time: "9 horas atrás",
+  },
+  {
+    id: "mun-6",
+    title: "Reino Unido elege novo primeiro-ministro em votação histórica",
+    summary: "Partido Trabalhista conquista maioria absoluta pela primeira vez em 14 anos.",
+    image: studentsImg,
+    chapeu: "Mundo",
+    author: "Emma Thompson",
+    time: "12 horas atrás",
+  },
+];
+
+export const politicaArticles = [
+  {
+    id: "pol-1",
+    title: "Governador do DF lança pacote de obras que vai modernizar 15 RAs",
+    summary: "Investimento de R$ 2 bilhões em infraestrutura urbana e mobilidade.",
+    image: politicaFeatImg,
+    chapeu: "Política",
+    author: "Denise Rothenburg",
+    time: "1 hora atrás",
+  },
+  {
+    id: "pol-2",
+    title: "Câmara Legislativa aprova projeto que cria o programa Morar DF",
+    summary: "Subsídio para famílias de baixa renda adquirirem a casa própria.",
+    image: heroImg,
+    chapeu: "Política",
+    author: "Ana Campos",
+    time: "2 horas atrás",
+  },
+  {
+    id: "pol-3",
+    title: "GDF encaminha à CLDF proposta do orçamento para 2025 com R$ 48 bilhões",
+    summary: "Maior investimento em saúde, educação e infraestrutura da história.",
+    image: politics2Img,
+    chapeu: "Política",
+    author: "Carlos Alexandre",
+    time: "4 horas atrás",
+  },
+  {
+    id: "pol-4",
+    title: "Bancada do DF no Congresso articula emendas para transporte e saúde",
+    summary: "Deputados buscam recursos para ampliação de metrô e hospitais.",
+    image: politicaFeatImg,
+    chapeu: "Política",
+    author: "Pedro Lima",
+    time: "6 horas atrás",
+  },
+  {
+    id: "pol-5",
+    title: "TSE autoriza uso de biometria em todas as seções eleitorais do DF",
+    summary: "Medida visa garantir maior segurança e agilidade no processo eleitoral.",
+    image: busImg,
+    chapeu: "Política",
+    author: "Mariana Costa",
+    time: "8 horas atrás",
+  },
+  {
+    id: "pol-6",
+    title: "CLDF aprova aumento de 12% para servidores públicos do DF",
+    summary: "Reajuste será pago em três parcelas a partir de agosto.",
+    image: brasilImg,
+    chapeu: "Política",
+    author: "Ricardo Souza",
+    time: "10 horas atrás",
+  },
+];
+
+export const economiaArticles = [
+  {
+    id: "eco-1",
+    title: "DF bate recorde de exportações no primeiro semestre de 2025",
+    summary: "Setor de tecnologia lidera crescimento com 30% de aumento.",
+    image: cityImg,
+    chapeu: "Economia",
+    author: "Bruno Fernandes",
+    time: "1 hora atrás",
+  },
+  {
+    id: "eco-2",
+    title: "GDF libera R$ 500 milhões em crédito para micro e pequenas empresas",
+    summary: "Linhas de financiamento com juros reduzidos para impulsionar o setor.",
+    image: busImg,
+    chapeu: "Economia",
+    author: "Ana Paula",
+    time: "3 horas atrás",
+  },
+  {
+    id: "eco-3",
+    title: "Feira de negócios de Brasília reúne mais de 500 empresas",
+    summary: "Evento espera movimentar R$ 1 bilhão em contratos durante a semana.",
+    image: parkImg,
+    chapeu: "Economia",
+    author: "Marcos Vinícius",
+    time: "5 horas atrás",
+  },
+  {
+    id: "eco-4",
+    title: "Setor de tecnologia do DF cria 2 mil novas vagas de emprego",
+    summary: "Empresas de software e startups lideram expansão do mercado.",
+    image: studentsImg,
+    chapeu: "Economia",
+    author: "Wei Zhang",
+    time: "7 horas atrás",
+  },
+  {
+    id: "eco-5",
+    title: "Brasília é eleita melhor cidade para investir no Brasil em 2025",
+    summary: "Ranking considera infraestrutura, qualidade de vida e ambiente de negócios.",
+    image: brasilImg,
+    chapeu: "Economia",
+    author: "Emma Thompson",
+    time: "9 horas atrás",
+  },
+  {
+    id: "eco-6",
+    title: "GDF anuncia incentivos fiscais para empresas de energia solar",
+    summary: "Objetivo é tornar o DF referência nacional em energia renovável.",
+    image: especialImg,
+    chapeu: "Economia",
+    author: "Fernanda Rocha",
+    time: "11 horas atrás",
+  },
+];
+
+export const esporteArticles = [
+  {
+    id: "esp-1",
+    title: "GDF anuncia investimento de R$ 50 milhões na reforma do Estádio Mané Garrincha",
+    summary: "Reforma inclui nova cobertura, iluminação e arquibancadas.",
+    image: sportsImg,
+    chapeu: "Esporte",
+    author: "João Silva",
+    time: "1 hora atrás",
+  },
+  {
+    id: "esp-2",
+    title: "Mané Garrincha recebe jogo da Série B com mais de 40 mil torcedores",
+    summary: "Brasília FC é mandante e espera casa cheia para duelo decisivo.",
+    image: sportsImg,
+    chapeu: "Esporte",
+    author: "Laura Pinto",
+    time: "2 horas atrás",
+  },
+  {
+    id: "esp-3",
+    title: "Brasília FC entra na briga pelo acesso à Série A com vitória por 2 a 0",
+    summary: "Gols de Renato e Lucas garantem a quarta colocação na tabela.",
+    image: parkImg,
+    chapeu: "Esporte",
+    author: "Pedro Lima",
+    time: "4 horas atrás",
+  },
+  {
+    id: "esp-4",
+    title: "Atletas do DF conquistam três medalhas no Brasileiro de Atletismo",
+    summary: "Ouro no salto em distância, prata no 100m e bronze no lançamento de dardo.",
+    image: festivalImg,
+    chapeu: "Esporte",
+    author: "Mariana Costa",
+    time: "6 horas atrás",
+  },
+  {
+    id: "esp-5",
+    title: "Parque da Cidade recebe etapa do Circuito Brasileiro de Vôlei de Praia",
+    summary: "Melhores duplas do país se enfrentam neste fim de semana.",
+    image: cityImg,
+    chapeu: "Esporte",
+    author: "Ricardo Souza",
+    time: "8 horas atrás",
+  },
+  {
+    id: "esp-6",
+    title: "GDF inaugura 15 novos centros de treinamento para atletas amadores",
+    summary: "Estruturas são distribuídas em todas as regiões administrativas.",
+    image: transport2Img,
+    chapeu: "Esporte",
+    author: "Bruno Fernandes",
+    time: "10 horas atrás",
+  },
+];
+
+export const culturaArticles = [
+  {
+    id: "cul-1",
+    title: "Festival de Inverno de Brasília bate recorde de público com 80 mil visitantes",
+    summary: "Mais de 50 atrações entre música, teatro e artes visuais animaram a capital.",
+    image: culturaFeatImg,
+    chapeu: "Cultura",
+    author: "Ana Campos",
+    time: "45 minutos atrás",
+  },
+  {
+    id: "cul-2",
+    title: "Museu Nacional da República inaugura exposição inédita de arte contemporânea",
+    summary: "Mostra reúne 80 obras de artistas brasileiros e internacionais.",
+    image: culture2Img,
+    chapeu: "Cultura",
+    author: "Carlos Alexandre",
+    time: "3 horas atrás",
+  },
+  {
+    id: "cul-3",
+    title: "Cine Brasília celebra 60 anos com programação especial e entrada gratuita",
+    summary: "Cinema exibe clássicos da Mostra de Cinema de Brasília durante uma semana.",
+    image: festivalImg,
+    chapeu: "Cultura",
+    author: "Pedro Lima",
+    time: "5 horas atrás",
+  },
+  {
+    id: "cul-4",
+    title: "Orquestra Sinfônica do Teatro Nacional apresenta concerto ao ar livre no Parque da Cidade",
+    summary: "Apresentação gratuita reúne 5 mil pessoas no gramado central.",
+    image: culturaFeatImg,
+    chapeu: "Cultura",
+    author: "Mariana Costa",
+    time: "7 horas atrás",
+  },
+  {
+    id: "cul-5",
+    title: "Biblioteca Nacional do DF recebe acervo raro de escritores goianos",
+    summary: "Doação inclui manuscritos originais e primeira edição de obras clássicas.",
+    image: education2Img,
+    chapeu: "Cultura",
+    author: "Ricardo Souza",
+    time: "9 horas atrás",
+  },
+  {
+    id: "cul-6",
+    title: "Teatro Cláudio Santoro lança temporada 2026 com 30 espetáculos",
+    summary: "Programação inclui teatro, dança e música de artistas locais e nacionais.",
+    image: health2Img,
+    chapeu: "Cultura",
+    author: "Bruno Fernandes",
+    time: "11 horas atrás",
+  },
+];

@@ -1,0 +1,35 @@
+Crie uma aplicação web de portal de notícias profissional, no estilo dos grandes portais brasileiros (G1, UOL, Folha, Estadão). Use React + Vite + Tailwind CSS no front-end. O foco é uma home page séria, limpa e com boa hierarquia editorial.
+Estrutura da página (de cima para baixo):
+
+Header fixo (sticky): logo do portal à esquerda, barra de navegação horizontal com as editorias (Brasil, Mundo, Política, Economia, Esporte, Cultura, Tecnologia), ícone de busca e botão "Assine". Abaixo, uma faixa fina com data atual e link de "Últimas notícias".
+Bloco de manchetes (hero): uma notícia principal em destaque ocupando ~60% da largura, com imagem grande, chapéu/categoria, título grande em negrito e linha fina (subtítulo). Ao lado, uma coluna com 3–4 manchetes secundárias menores (imagem pequena + título).
+Faixa "Mais lidas": lista numerada (1 a 5) das notícias mais acessadas, em coluna lateral ou bloco horizontal.
+Seções por editoria (Brasil, Mundo, Política, Economia, Esporte, Cultura), cada uma com:
+
+Título da editoria com uma linha/borda colorida de destaque.
+Grade de 3–4 cards de notícia (imagem, chapéu da categoria, título, breve resumo, autor/horário).
+Link "Ver mais" ao final de cada seção.
+
+
+Bloco de vídeos/multimídia: carrossel ou grade horizontal de cards com thumbnail e ícone de play.
+Footer completo: colunas com editorias, institucional, redes sociais, política de privacidade e copyright.
+
+Diretrizes de design:
+
+Tipografia séria: uma serifada para títulos (ex: Georgia, Merriweather ou Playfair) e uma sans-serif limpa para o corpo (ex: Inter ou Roboto).
+Paleta sóbria: fundo branco, texto quase preto (#1a1a1a), e uma cor de marca para acentos e categorias (sugiro um azul-escuro #0b3d91 ou vermelho jornalístico #c8102e).
+Cada editoria pode ter sua própria cor de chapéu/etiqueta.
+Layout responsivo (desktop, tablet e mobile), com grid que colapsa para uma coluna no celular.
+Cards com hover suave (leve sombra ou mudança de cor no título).
+Espaçamento generoso e linhas divisórias finas para separar blocos, transmitindo seriedade.
+
+Dados:
+
+Use dados fictícios (mock data) em um arquivo JSON ou array de objetos, com pelo menos 5–6 notícias por editoria (título, resumo, categoria, imagem placeholder, autor, data/hora).
+Use imagens de placeholder (ex: picsum.photos ou placehold.co).
+
+Técnico:
+
+Componentize: Header, HeroSection, NewsCard, SectionBlock, MostRead, Footer.
+Código limpo e comentado em português.
+Sem back-end por enquanto — apenas front-end estático com dados mockados.
