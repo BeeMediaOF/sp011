@@ -1,7 +1,7 @@
 import React from "react";
 import { Search, Menu } from "lucide-react";
 import { Link } from "wouter";
-import logoImg from "../assets/images/logo_correio.png";
+import logoImg from "../assets/images/logo_correio_azul.png";
 
 export default function Header() {
   return (

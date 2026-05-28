@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import logoImg from "../assets/images/logo_correio.png";
+import logoImg from "../assets/images/logo_correio_azul.png";
 
 export default function Footer() {
   return (
