@@ -13,7 +13,7 @@ export default function Header() {
           <img
             src={logoImg}
             alt="Correio da Capital"
-            className="h-[122px] w-auto object-contain group-hover:opacity-90 transition-opacity"
+            className="h-[85px] w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
 
