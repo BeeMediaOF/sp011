@@ -5,7 +5,7 @@ import logoImg from "../assets/images/logo_correio_azul.png";
 
 export default function Header() {
   return (
-    <header className="bg-white py-5 border-b border-gray-200">
+    <header className="py-5 border-b border-gray-200 bg-[#0f0f4a]">
       <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-6">
 
         {/* Logo */}

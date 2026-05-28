@@ -4,11 +4,15 @@ import heroImg from "../assets/images/hero.png";
 import trafficImg from "../assets/images/traffic.png";
 import policeImg from "../assets/images/police.png";
 import hospitalImg from "../assets/images/hospital.png";
+import busImg from "../assets/images/bus.png";
+import studentsImg from "../assets/images/students.png";
 
 const secondary = [
   { id: "hero-2", img: trafficImg, chapeu: "Trânsito", chapeuColor: "#ea580c", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", summary: "Interdições começam na sexta-feira e afetam a região central da capital." },
   { id: "hero-3", img: policeImg, chapeu: "Segurança", chapeuColor: "#dc2626", title: "Polícia Civil prende grupo suspeito de furtos no Plano Piloto", summary: "Operação conjunta resultou em quatro prisões e apreensão de materiais ilícitos." },
   { id: "hero-4", img: hospitalImg, chapeu: "Saúde", chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio", summary: "Campanha de prevenção e vacinação contribuiu para redução de 12%." },
+  { id: "hero-5", img: busImg, chapeu: "DF", chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público", summary: "Novos veículos começam a operar em junho nas linhas mais demandadas." },
+  { id: "hero-6", img: studentsImg, chapeu: "Educação", chapeuColor: "#0d9488", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", summary: "Rede de ensino registra crescimento de 8% na nota do indicador nacional." },
 ];
 
 export default function HeroSection() {
