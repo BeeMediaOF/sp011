@@ -122,17 +122,20 @@ export default function Home() {
         </section>
 
         {/* ═══════════════════════════════════════════════
-            BARRA ÚLTIMAS — ticker de manchetes
+            BARRA RÁPIDA — manchetes em linha
         ═══════════════════════════════════════════════ */}
-        <div className="bg-[#c8102e]">
-          <div className="max-w-[1280px] mx-auto px-4 flex items-center gap-4 py-2.5">
-            <span className="bg-white text-[#c8102e] text-[11px] font-black px-3 py-1 uppercase tracking-widest shrink-0">AO VIVO</span>
+        <div className="bg-[#0d1633] border-y border-white/10">
+          <div className="max-w-[1280px] mx-auto px-4 flex items-center gap-6 py-2">
+            <span className="bg-[#c8102e] text-white text-[10px] font-black px-2 py-1 uppercase tracking-widest shrink-0">Manchetes</span>
             <div className="overflow-hidden flex-1">
-              <div className="flex gap-8 text-white text-sm font-medium whitespace-nowrap overflow-x-auto no-scrollbar">
-                <span>• GDF entrega 758 unidades habitacionais no Sol Nascente</span>
-                <span>• Mais de 1,2 mil vagas abertas nas agências do trabalhador</span>
-                <span>• DF registra menor índice de homicídios dos últimos 10 anos</span>
-                <span>• Concurso da Educação terá edital publicado em junho</span>
+              <div className="flex gap-6 text-white/70 text-xs font-medium whitespace-nowrap overflow-x-auto no-scrollbar">
+                <span>GDF entrega 758 unidades habitacionais no Sol Nascente</span>
+                <span className="text-white/20">|</span>
+                <span>DF registra menor índice de homicídios dos últimos 10 anos</span>
+                <span className="text-white/20">|</span>
+                <span>Concurso da Educação terá edital publicado em junho</span>
+                <span className="text-white/20">|</span>
+                <span>Metrô do DF anuncia novas grades de horário a partir de junho</span>
               </div>
             </div>
           </div>
