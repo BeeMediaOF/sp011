@@ -6,6 +6,7 @@ import adsRouter from "./ads";
 import contactRouter from "./contact";
 import msgsRouter from "./msgs";
 import articlesRouter from "./articles";
+import siteRouter from "./site";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use("/ads", adsRouter);
 router.use("/columnists", contactRouter);
 router.use("/messages", msgsRouter);
 router.use("/articles", articlesRouter);
+router.use(siteRouter);
 
 export default router;

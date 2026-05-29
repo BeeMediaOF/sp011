@@ -1,18 +1,19 @@
 import React from "react";
 import { Search, Menu } from "lucide-react";
 import { Link } from "wouter";
+import { useSite } from "../hooks/useSite";
 import logoImg from "../assets/images/logo_correio_v2.png";
 
 export default function Header() {
+  const { settings } = useSite();
   return (
     <header className="py-5 border-b border-gray-200 bg-[#0f0f4a]">
       <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-6">
-
         {/* Logo */}
         <Link href="/" className="group cursor-pointer block shrink-0">
           <img
             src={logoImg}
-            alt="Correio da Capital"
+            alt={settings?.siteName ?? "Correio da Capital"}
             className="h-[85px] w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
@@ -36,7 +37,6 @@ export default function Header() {
             Assine
           </button>
         </div>
-
       </div>
     </header>
   );
