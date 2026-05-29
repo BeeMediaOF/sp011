@@ -34,7 +34,7 @@ export default function NavBar() {
           <li>
             <Link
               href="/"
-              className={`block text-[13px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap ${
+              className={`block text-[16px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap ${
                 location === "/" ? "border-[#c8102e] text-[#1a1a1a]" : "border-transparent text-gray-600 hover:text-[#1a1a1a]"
               }`}
             >
@@ -48,7 +48,7 @@ export default function NavBar() {
               <li key={item.label}>
                 <Link
                   href={item.path}
-                  className="block text-[13px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap"
+                  className="block text-[16px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap"
                   style={{
                     borderColor: isActive ? color : "transparent",
                     color: isActive ? color : "#6b7280",

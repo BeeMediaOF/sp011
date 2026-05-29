@@ -5,7 +5,6 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
-import VideoSection from "../components/VideoSection";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
 import { useArticles } from "../hooks/useArticles";
@@ -17,6 +16,9 @@ import {
   economiaArticles,
   esporteArticles,
   culturaArticles,
+  saudeArticles,
+  tecnologiaArticles,
+  dfArticles,
 } from "../data/mockData";
 
 const editoriaColors: Record<string, string> = {
@@ -26,10 +28,13 @@ const editoriaColors: Record<string, string> = {
   economia: "#b45309",
   esporte: "#dc2626",
   cultura: "#0d9488",
+  saude: "#16a34a",
+  tecnologia: "#0284c7",
+  df: "#0b3d91",
 };
 
 export default function Home() {
-  const { articles, loading } = useArticles();
+  const { articles } = useArticles();
 
   // Agrupa artigos reais por categoria (ou usa mock se vazio)
   const getByCategory = (cat: string, fallback: typeof brasilArticles) => {
@@ -66,7 +71,7 @@ export default function Home() {
           <AdCentral />
         </div>
 
-        {/* Seções por Editoria — artigos reais ou mock */}
+        {/* Seções por Editoria — 9 blocos */}
         <SectionBlock
           title="Brasil"
           color={editoriaColors.brasil}
@@ -114,8 +119,26 @@ export default function Home() {
           articles={getByCategory("cultura", culturaArticles)}
         />
 
-        {/* Bloco de Vídeos */}
-        <VideoSection />
+        <SectionBlock
+          title="Saúde"
+          color={editoriaColors.saude}
+          href="/saude"
+          articles={getByCategory("saude", saudeArticles)}
+        />
+
+        <SectionBlock
+          title="Tecnologia"
+          color={editoriaColors.tecnologia}
+          href="/tecnologia"
+          articles={getByCategory("tecnologia", tecnologiaArticles)}
+        />
+
+        <SectionBlock
+          title="DF"
+          color={editoriaColors.df}
+          href="/df"
+          articles={getByCategory("df", dfArticles)}
+        />
       </main>
 
       <Footer />
