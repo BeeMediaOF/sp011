@@ -6,7 +6,6 @@ import policeImg from "../assets/images/police.png";
 import hospitalImg from "../assets/images/hospital.png";
 import busImg from "../assets/images/bus.png";
 import studentsImg from "../assets/images/students.png";
-import parkImg from "../assets/images/park.png";
 
 const secondary = [
   { id: "hero-2", img: trafficImg, chapeu: "Trânsito", chapeuColor: "#ea580c", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", summary: "Interdições começam na sexta-feira e afetam a região central da capital." },
@@ -14,12 +13,6 @@ const secondary = [
   { id: "hero-4", img: hospitalImg, chapeu: "Saúde", chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio", summary: "Campanha de prevenção e vacinação contribuiu para redução de 12%." },
   { id: "hero-5", img: busImg, chapeu: "DF", chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público", summary: "Novos veículos começam a operar em junho nas linhas mais demandadas." },
   { id: "hero-6", img: studentsImg, chapeu: "Educação", chapeuColor: "#0d9488", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", summary: "Rede de ensino registra crescimento de 8% na nota do indicador nacional." },
-  { id: "hero-7", img: parkImg, chapeu: "Meio Ambiente", chapeuColor: "#16a34a", title: "Parque Nacional de Brasília recebe certificação internacional de sustentabilidade", summary: "Reconhecimento da UNESCO valoriza preservação ambiental da capital." },
-  { id: "hero-8", img: heroImg, chapeu: "Urbanismo", chapeuColor: "#1d4ed8", title: "Asa Sul ganha novo centro de convivência com praça e ciclovia", summary: "Espaço revitalizado no Quadra 112 será inaugurado na próxima semana." },
-  { id: "hero-9", img: busImg, chapeu: "Transporte", chapeuColor: "#b45309", title: "Metrô do DF anuncia ampliação para 50 trens nas linhas verde e laranja", summary: "Novas composições vão reduzir tempo de espera em horários de pico." },
-  { id: "hero-10", img: hospitalImg, chapeu: "Saúde", chapeuColor: "#16a34a", title: "Hospital da Asa Norte inaugura nova UTI Neonatal com 20 leitos", summary: "Investimento de R$ 8 milhões vai atender prematuros de toda a região." },
-  { id: "hero-11", img: parkImg, chapeu: "Meio Ambiente", chapeuColor: "#16a34a", title: "DF lidera ranking de cidades com mais áreas verdes por habitante", summary: "Levantamento do IBGE destaca Brasília com 60 m² de verde por pessoa." },
-  { id: "hero-12", img: heroImg, chapeu: "Comércio", chapeuColor: "#b45309", title: "Brasília Shopping inaugura expansão com 30 novas lojas e 8 restaurantes", summary: "Reforma traz novas marcas de luxo e área gastronômica no setor de entretenimento." },
 ];
 
 export default function HeroSection() {
