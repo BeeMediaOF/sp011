@@ -150,7 +150,7 @@ export const politicaArticles = [
   {
     id: "pol-1",
     title: "Governador do DF lança pacote de obras que vai modernizar 15 RAs",
-    summary: "Investimento de R$ 2 bilhões em infraestrutura urbana e mobilidade.",
+    summary: "Investimento de R$ 2 bilhões em infraestrutura urbana e mobilidade. Programa inclui asfaltamento, iluminação LED e construção de praças em todas as regiões administrativas prioritárias.",
     image: politicaFeatImg,
     chapeu: "Política",
     author: "Denise Rothenburg",
@@ -159,7 +159,7 @@ export const politicaArticles = [
   {
     id: "pol-2",
     title: "Câmara Legislativa aprova projeto que cria o programa Morar DF",
-    summary: "Subsídio para famílias de baixa renda adquirirem a casa própria.",
+    summary: "Subsídio para famílias de baixa renda adquirirem a casa própria. Medida deve beneficiar mais de 10 mil famílias com renda de até três salários mínimos.",
     image: heroImg,
     chapeu: "Política",
     author: "Ana Campos",
@@ -168,7 +168,7 @@ export const politicaArticles = [
   {
     id: "pol-3",
     title: "GDF encaminha à CLDF proposta do orçamento para 2025 com R$ 48 bilhões",
-    summary: "Maior investimento em saúde, educação e infraestrutura da história.",
+    summary: "Maior investimento em saúde, educação e infraestrutura da história. Destaque para 12 novos hospitais e 50 escolas de tempo integral na capital federal.",
     image: politics2Img,
     chapeu: "Política",
     author: "Carlos Alexandre",
@@ -177,7 +177,7 @@ export const politicaArticles = [
   {
     id: "pol-4",
     title: "Bancada do DF no Congresso articula emendas para transporte e saúde",
-    summary: "Deputados buscam recursos para ampliação de metrô e hospitais.",
+    summary: "Deputados buscam recursos para ampliação de metrô e hospitais. Meta é garantir R$ 1,2 bilhão em investimentos para o Distrito Federal no próximo exercício.",
     image: politicaFeatImg,
     chapeu: "Política",
     author: "Pedro Lima",
@@ -186,7 +186,7 @@ export const politicaArticles = [
   {
     id: "pol-5",
     title: "TSE autoriza uso de biometria em todas as seções eleitorais do DF",
-    summary: "Medida visa garantir maior segurança e agilidade no processo eleitoral.",
+    summary: "Medida visa garantir maior segurança e agilidade no processo eleitoral. Biometria será obrigatória em 2026 e deve reduzir em 30% o tempo de votação.",
     image: busImg,
     chapeu: "Política",
     author: "Mariana Costa",
@@ -195,7 +195,7 @@ export const politicaArticles = [
   {
     id: "pol-6",
     title: "CLDF aprova aumento de 12% para servidores públicos do DF",
-    summary: "Reajuste será pago em três parcelas a partir de agosto.",
+    summary: "Reajuste será pago em três parcelas a partir de agosto. Benefício alcança mais de 80 mil servidores ativos e inativos do Governo do Distrito Federal.",
     image: brasilImg,
     chapeu: "Política",
     author: "Ricardo Souza",
@@ -207,7 +207,7 @@ export const economiaArticles = [
   {
     id: "eco-1",
     title: "DF bate recorde de exportações no primeiro semestre de 2025",
-    summary: "Setor de tecnologia lidera crescimento com 30% de aumento.",
+    summary: "Setor de tecnologia lidera crescimento com 30% de aumento. Produtos de software e serviços de consultoria respondem por 60% do valor total exportado.",
     image: cityImg,
     chapeu: "Economia",
     author: "Bruno Fernandes",
@@ -216,7 +216,7 @@ export const economiaArticles = [
   {
     id: "eco-2",
     title: "GDF libera R$ 500 milhões em crédito para micro e pequenas empresas",
-    summary: "Linhas de financiamento com juros reduzidos para impulsionar o setor.",
+    summary: "Linhas de financiamento com juros reduzidos para impulsionar o setor. Taxas começam em 0,5% ao mês e podem beneficiar até 8 mil empresas candangas.",
     image: busImg,
     chapeu: "Economia",
     author: "Ana Paula",
@@ -225,7 +225,7 @@ export const economiaArticles = [
   {
     id: "eco-3",
     title: "Feira de negócios de Brasília reúne mais de 500 empresas",
-    summary: "Evento espera movimentar R$ 1 bilhão em contratos durante a semana.",
+    summary: "Evento espera movimentar R$ 1 bilhão em contratos durante a semana. Destaque para o setor de construção civil, tecnologia e agronegócio.",
     image: parkImg,
     chapeu: "Economia",
     author: "Marcos Vinícius",
@@ -234,7 +234,7 @@ export const economiaArticles = [
   {
     id: "eco-4",
     title: "Setor de tecnologia do DF cria 2 mil novas vagas de emprego",
-    summary: "Empresas de software e startups lideram expansão do mercado.",
+    summary: "Empresas de software e startups lideram expansão do mercado. Programação, análise de dados e cibersegurança são as áreas com maior demanda de profissionais.",
     image: studentsImg,
     chapeu: "Economia",
     author: "Wei Zhang",
@@ -243,7 +243,7 @@ export const economiaArticles = [
   {
     id: "eco-5",
     title: "Brasília é eleita melhor cidade para investir no Brasil em 2025",
-    summary: "Ranking considera infraestrutura, qualidade de vida e ambiente de negócios.",
+    summary: "Ranking considera infraestrutura, qualidade de vida e ambiente de negócios. Capital federal supera São Paulo e Rio de Janeiro no índice de competitividade.",
     image: brasilImg,
     chapeu: "Economia",
     author: "Emma Thompson",
@@ -252,7 +252,7 @@ export const economiaArticles = [
   {
     id: "eco-6",
     title: "GDF anuncia incentivos fiscais para empresas de energia solar",
-    summary: "Objetivo é tornar o DF referência nacional em energia renovável.",
+    summary: "Objetivo é tornar o DF referência nacional em energia renovável. Isenção de ISS e redução de IPTU podem gerar economia de até 20% para empresas aderentes.",
     image: especialImg,
     chapeu: "Economia",
     author: "Fernanda Rocha",
@@ -264,7 +264,7 @@ export const esporteArticles = [
   {
     id: "esp-1",
     title: "GDF anuncia investimento de R$ 50 milhões na reforma do Estádio Mané Garrincha",
-    summary: "Reforma inclui nova cobertura, iluminação e arquibancadas.",
+    summary: "Reforma inclui nova cobertura, iluminação e arquibancadas. O projeto prevê a instalação de um sistema de drenagem moderno e acessibilidade total para PCDs.",
     image: sportsImg,
     chapeu: "Esporte",
     author: "João Silva",
@@ -273,7 +273,7 @@ export const esporteArticles = [
   {
     id: "esp-2",
     title: "Mané Garrincha recebe jogo da Série B com mais de 40 mil torcedores",
-    summary: "Brasília FC é mandante e espera casa cheia para duelo decisivo.",
+    summary: "Brasília FC é mandante e espera casa cheia para duelo decisivo. Clube busca a terceira vitória consecutiva para garantir a liderança da competição.",
     image: sportsImg,
     chapeu: "Esporte",
     author: "Laura Pinto",
@@ -282,7 +282,7 @@ export const esporteArticles = [
   {
     id: "esp-3",
     title: "Brasília FC entra na briga pelo acesso à Série A com vitória por 2 a 0",
-    summary: "Gols de Renato e Lucas garantem a quarta colocação na tabela.",
+    summary: "Gols de Renato e Lucas garantem a quarta colocação na tabela. Time mantém invencibilidade de 8 jogos e se aproxima da zona de acesso.",
     image: parkImg,
     chapeu: "Esporte",
     author: "Pedro Lima",
@@ -291,7 +291,7 @@ export const esporteArticles = [
   {
     id: "esp-4",
     title: "Atletas do DF conquistam três medalhas no Brasileiro de Atletismo",
-    summary: "Ouro no salto em distância, prata no 100m e bronze no lançamento de dardo.",
+    summary: "Ouro no salto em distância, prata no 100m e bronze no lançamento de dardo. Delegação candanga supera expectativas e termina em quarto lugar no geral.",
     image: festivalImg,
     chapeu: "Esporte",
     author: "Mariana Costa",
@@ -300,7 +300,7 @@ export const esporteArticles = [
   {
     id: "esp-5",
     title: "Parque da Cidade recebe etapa do Circuito Brasileiro de Vôlei de Praia",
-    summary: "Melhores duplas do país se enfrentam neste fim de semana.",
+    summary: "Melhores duplas do país se enfrentam neste fim de semana. Evento oferece entrada gratuita e atividades recreativas para o público de todas as idades.",
     image: cityImg,
     chapeu: "Esporte",
     author: "Ricardo Souza",
@@ -309,7 +309,7 @@ export const esporteArticles = [
   {
     id: "esp-6",
     title: "GDF inaugura 15 novos centros de treinamento para atletas amadores",
-    summary: "Estruturas são distribuídas em todas as regiões administrativas.",
+    summary: "Estruturas são distribuídas em todas as regiões administrativas. Iniciativa busca democratizar o acesso ao esporte e descobrir novos talentos para o alto rendimento.",
     image: transport2Img,
     chapeu: "Esporte",
     author: "Bruno Fernandes",
