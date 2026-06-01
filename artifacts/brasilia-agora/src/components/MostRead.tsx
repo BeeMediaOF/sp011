@@ -4,6 +4,7 @@ import trafficImg from "../assets/images/traffic.png";
 import hospitalImg from "../assets/images/hospital.png";
 import busImg from "../assets/images/bus.png";
 import studentsImg from "../assets/images/students.png";
+import parkImg from "../assets/images/park.png";
 
 const maisLidas = [
   { id: "ml-1", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", img: heroImg },
@@ -11,6 +12,11 @@ const maisLidas = [
   { id: "ml-3", rank: 3, title: "Hospitais do DF registram queda nos casos de dengue em maio", img: hospitalImg },
   { id: "ml-4", rank: 4, title: "GDF anuncia mais 124 ônibus para reforçar o transporte público", img: busImg },
   { id: "ml-5", rank: 5, title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", img: studentsImg },
+  { id: "ml-6", rank: 6, title: "Parque Nacional de Brasília recebe certificação internacional de sustentabilidade", img: parkImg },
+  { id: "ml-7", rank: 7, title: "Hospital da Asa Norte inaugura nova UTI Neonatal com 20 leitos", img: hospitalImg },
+  { id: "ml-8", rank: 8, title: "Brasília Shopping inaugura expansão com 30 novas lojas e 8 restaurantes", img: heroImg },
+  { id: "ml-9", rank: 9, title: "Metrô do DF anuncia ampliação para 50 trens nas linhas verde e laranja", img: busImg },
+  { id: "ml-10", rank: 10, title: "DF lidera ranking de cidades com mais áreas verdes por habitante", img: parkImg },
 ];
 
 export default function MostRead() {
