@@ -5,7 +5,7 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
-import DestaquesListaGrande from "../components/DestaquesListaGrande";
+
 import DestaquesCardOverlay from "../components/DestaquesCardOverlay";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import ColunistasSection from "../components/ColunistasSection";
@@ -95,9 +95,6 @@ export default function Home() {
           href="/politica"
           articles={getByCategory("politica", politicaArticles)}
         />
-
-        {/* ── MÓDULO DE DESTAQUE — MEIO DA HOME (Lista Grande estilo G1) ── */}
-        <DestaquesListaGrande />
 
         {/* Ad Central */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
