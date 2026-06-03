@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
-import { Share2 } from "lucide-react";
+import { Share2, ChevronLeft, ChevronRight } from "lucide-react";
 import hospitalImg from "../assets/images/hospital.png";
 import cityImg from "../assets/images/city.png";
 import culturaFeatImg from "../assets/images/cultura_feat.png";
@@ -90,19 +90,46 @@ const cards = [
   },
 ];
 
+const PAGE_SIZE = 2;
+
 export default function DestaquesCardOverlay() {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.ceil(cards.length / PAGE_SIZE);
+  const visible = cards.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-1 h-5 bg-[#c8102e]" />
-          <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
-            Em Destaque
-          </h2>
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5 bg-[#c8102e]" />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
+              Em Destaque
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-gray-500 hover:text-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Anterior"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page === totalPages - 1}
+              className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-gray-500 hover:text-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              aria-label="Próximo"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {cards.map((card) => (
+          {visible.map((card) => (
             <div key={card.id} className="group relative">
               <Link href={`/artigo/${card.slug}`} className="block">
                 <div className="relative overflow-hidden aspect-[16/9]">
@@ -127,6 +154,18 @@ export default function DestaquesCardOverlay() {
                 {shareIcons}
               </div>
             </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-center gap-1.5 mt-6">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setPage(i)}
+              className="w-1.5 h-1.5 rounded-full transition-all"
+              style={{ backgroundColor: i === page ? "#c8102e" : "#d1d5db" }}
+              aria-label={`Página ${i + 1}`}
+            />
           ))}
         </div>
       </div>
