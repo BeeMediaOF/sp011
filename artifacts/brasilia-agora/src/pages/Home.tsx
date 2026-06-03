@@ -7,6 +7,7 @@ import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
 
 import DestaquesCardOverlay from "../components/DestaquesCardOverlay";
+import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import ColunistasSection from "../components/ColunistasSection";
 import Footer from "../components/Footer";
@@ -95,6 +96,9 @@ export default function Home() {
           href="/politica"
           articles={getByCategory("politica", politicaArticles)}
         />
+
+        {/* ── BLOCO TRIPLO: Política / Economia / Negócios ── */}
+        <EditoriasTriploBloco />
 
         {/* Ad Central */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
