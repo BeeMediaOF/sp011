@@ -5,6 +5,10 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
+import DestaquesListaGrande from "../components/DestaquesListaGrande";
+import DestaquesCardOverlay from "../components/DestaquesCardOverlay";
+import DestaquesListaBadge from "../components/DestaquesListaBadge";
+import ColunistasSection from "../components/ColunistasSection";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
 import { useArticles } from "../hooks/useArticles";
@@ -36,7 +40,6 @@ const editoriaColors: Record<string, string> = {
 export default function Home() {
   const { articles } = useArticles();
 
-  // Agrupa artigos reais por categoria (ou usa mock se vazio)
   const getByCategory = (cat: string, fallback: typeof brasilArticles) => {
     const real = articles.filter((a) => a.category.toLowerCase().includes(cat.toLowerCase()));
     if (real.length > 0) {
@@ -71,7 +74,7 @@ export default function Home() {
           <AdCentral />
         </div>
 
-        {/* Seções por Editoria — 9 blocos */}
+        {/* Seções por Editoria — bloco 1 */}
         <SectionBlock
           title="Brasil"
           color={editoriaColors.brasil}
@@ -93,6 +96,9 @@ export default function Home() {
           articles={getByCategory("politica", politicaArticles)}
         />
 
+        {/* ── MÓDULO DE DESTAQUE — MEIO DA HOME (Lista Grande estilo G1) ── */}
+        <DestaquesListaGrande />
+
         {/* Ad Central */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
           <AdCentral />
@@ -104,6 +110,9 @@ export default function Home() {
           href="/economia"
           articles={getByCategory("economia", economiaArticles)}
         />
+
+        {/* ── MÓDULO DE DESTAQUE — CARDS COM OVERLAY (2 colunas) ── */}
+        <DestaquesCardOverlay />
 
         <SectionBlock
           title="Esporte"
@@ -118,6 +127,9 @@ export default function Home() {
           href="/cultura"
           articles={getByCategory("cultura", culturaArticles)}
         />
+
+        {/* ── COLUNISTAS ── */}
+        <ColunistasSection />
 
         <SectionBlock
           title="Saúde"
@@ -139,6 +151,9 @@ export default function Home() {
           href="/df"
           articles={getByCategory("df", dfArticles)}
         />
+
+        {/* ── MÓDULO DE DESTAQUE — FIM DA HOME (Lista com badges coloridos) ── */}
+        <DestaquesListaBadge />
       </main>
 
       <Footer />
