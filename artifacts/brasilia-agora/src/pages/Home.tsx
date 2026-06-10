@@ -126,6 +126,24 @@ export default function Home() {
           articles={getByCategory("cultura", culturaArticles)}
         />
 
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
+          <div className="flex justify-center">
+            <a
+              href="https://bileto.sympla.com.br/event/114114?share_id=1-copiarlink"
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full max-w-[952px] overflow-hidden group"
+            >
+              <img
+                src="/ad-percy-jackson.gif"
+                alt="Percy Jackson Musical — Uma aventura épica está para começar"
+                className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform"
+              />
+            </a>
+          </div>
+        </div>
+
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 7 — CIDADE, SAÚDE & TECNOLOGIA
             Três carrosseis locais
