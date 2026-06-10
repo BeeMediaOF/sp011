@@ -24,6 +24,7 @@ interface CategoryPageProps {
   color: string;
   articles: Article[];
   featuredArticle: Article;
+  featuredArticle2?: Article;
 }
 
 export default function CategoryPage({
@@ -31,7 +32,10 @@ export default function CategoryPage({
   color,
   articles,
   featuredArticle,
+  featuredArticle2,
 }: CategoryPageProps) {
+  const second = featuredArticle2 ?? articles[0];
+
   return (
     <div className="w-full pb-12">
       {/* Category Header Bar */}
@@ -46,25 +50,43 @@ export default function CategoryPage({
 
       <div className="max-w-[1280px] mx-auto px-4 mt-8">
         <div className="flex-1 min-w-0">
-          {/* Featured Article */}
-          {featuredArticle && (
-            <Link href={`/artigo/${featuredArticle.id}`}>
-              <div className="relative w-full aspect-[16/9] md:aspect-[21/9] overflow-hidden group cursor-pointer mb-8 rounded-sm">
-                <img src={featuredArticle.imageUrl} alt={featuredArticle.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                  <span className="text-white text-xs font-bold px-2 py-1 mb-3 inline-block rounded-sm" style={{ backgroundColor: featuredArticle.tagColor }}>
-                    {featuredArticle.tag}
-                  </span>
-                  <h2 className="text-2xl md:text-4xl font-bold text-white mb-2 leading-tight group-hover:text-gray-200 transition-colors">{featuredArticle.title}</h2>
-                  {featuredArticle.subtitle && (
-                    <p className="text-gray-300 md:text-lg max-w-3xl line-clamp-2">{featuredArticle.subtitle}</p>
-                  )}
-                  <div className="text-gray-400 text-sm mt-3 font-medium">{featuredArticle.time} {featuredArticle.author && `• Por ${featuredArticle.author}`}</div>
+          {/* 2 Destaques grandes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+            {[featuredArticle, second].filter(Boolean).map((art) => art && (
+              <Link key={art.id} href={`/artigo/${art.id}`} className="group block">
+                <div className="relative overflow-hidden bg-gray-100 h-[380px]">
+                  <img
+                    src={art.imageUrl}
+                    alt={art.title}
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <span
+                      className="inline-block text-white text-[11px] font-bold px-3 py-1 uppercase tracking-wider mb-3"
+                      style={{ backgroundColor: art.tagColor || color }}
+                    >
+                      {art.tag}
+                    </span>
+                    <h2
+                      className="text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
+                      style={{ fontFamily: "'Merriweather', serif" }}
+                    >
+                      {art.title}
+                    </h2>
+                    {art.subtitle && (
+                      <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.subtitle}</p>
+                    )}
+                    <div className="flex items-center gap-2 text-[11px] text-white/50">
+                      {art.author && <span>Por {art.author}</span>}
+                      {art.author && <span className="w-1 h-1 rounded-full bg-white/40" />}
+                      <span>{art.time}</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </Link>
-          )}
+              </Link>
+            ))}
+          </div>
 
           <div className="mb-8">
             <AdCentral />
