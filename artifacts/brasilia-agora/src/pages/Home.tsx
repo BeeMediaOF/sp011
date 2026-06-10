@@ -8,7 +8,6 @@ import SectionBlock from "../components/SectionBlock";
 import SectionBlockFeatured from "../components/SectionBlockFeatured";
 import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
 import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
-import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
@@ -95,13 +94,6 @@ export default function Home() {
           href="/mundo"
           articles={getByCategory("mundo", mundoArticles)}
         />
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ZONA 3 — BLOCO EDITORIAL TRIPLO
-            Política | Economia | Negócios
-            Card destaque + 2 sub-artigos por coluna
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <EditoriasTriploBloco />
 
         <div className="max-w-[1280px] mx-auto px-4 py-4">
           <AdCentral />
