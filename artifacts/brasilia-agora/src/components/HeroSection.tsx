@@ -37,7 +37,7 @@ export default function HeroSection() {
             </div>
           </div>
           <div className="pt-4">
-            <h1 className="font-serif text-[#1a1a1a] text-2xl lg:text-[34px] font-black leading-[1.15] group-hover:text-[#1d4ed8] transition-colors">
+            <h1 className="font-serif text-[#1a1a1a] text-2xl lg:text-[34px] font-black leading-[1.15] group-hover:text-[#1d4ed8] transition-colors mr-[23px]">
               Câmara Legislativa aprova projeto que cria o programa Morar DF
             </h1>
             <p className="text-gray-500 text-sm leading-relaxed mt-2 max-w-xl">
