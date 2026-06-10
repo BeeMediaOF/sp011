@@ -111,7 +111,7 @@ export default function Home() {
             ZONA 5 — ESPORTE & CULTURA
             Dois carrosseis seguidos
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <SectionBlockFeatured
+        <SectionBlockCulturaLayout
           title="Esporte"
           color={editoriaColors.esporte}
           href="/esporte"
