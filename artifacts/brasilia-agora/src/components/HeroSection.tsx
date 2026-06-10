@@ -41,7 +41,6 @@ const secondary = [
 export default function HeroSection() {
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
-
       {/* Dois destaques grandes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         {featured.map((item) => (
@@ -60,7 +59,7 @@ export default function HeroSection() {
                 >
                   {item.chapeu}
                 </span>
-                <h2 className="font-serif text-white font-black text-[26px] leading-tight line-clamp-3 mb-2 group-hover:text-red-300 transition-colors">
+                <h2 className="font-serif font-black text-[26px] leading-tight line-clamp-3 mb-2 group-hover:text-red-300 transition-colors text-[#ffffff]">
                   {item.title}
                 </h2>
                 <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
@@ -74,7 +73,6 @@ export default function HeroSection() {
           </Link>
         ))}
       </div>
-
       {/* Faixa de secundárias */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
         {secondary.map((item) => (
@@ -97,7 +95,6 @@ export default function HeroSection() {
           </Link>
         ))}
       </div>
-
     </section>
   );
 }
