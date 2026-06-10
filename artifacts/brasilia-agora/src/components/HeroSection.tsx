@@ -60,8 +60,8 @@ export default function HeroSection() {
                 >
                   {item.chapeu}
                 </span>
-                <h2 className="text-white font-black text-[26px] leading-tight line-clamp-3 mb-2"
-                    style={{ fontFamily: "'Merriweather', serif" }}>
+                <h2 className="font-serif text-white font-black text-[26px] leading-tight line-clamp-3 mb-2"
+                   >
                   {item.title}
                 </h2>
                 <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
@@ -91,7 +91,7 @@ export default function HeroSection() {
               <span className="text-[11px] font-bold uppercase tracking-wider block mb-1" style={{ color: item.chapeuColor }}>
                 {item.chapeu}
               </span>
-              <h3 className="text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
+              <h3 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
                 {item.title}
               </h3>
             </div>

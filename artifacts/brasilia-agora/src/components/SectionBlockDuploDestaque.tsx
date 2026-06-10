@@ -62,8 +62,8 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
                     {art.chapeu}
                   </span>
                   <h3
-                    className="text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
-                    style={{ fontFamily: "'Merriweather', serif" }}
+                    className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
+                   
                   >
                     {art.title}
                   </h3>
@@ -99,7 +99,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
                   >
                     {art.chapeu}
                   </span>
-                  <h4 className="text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
+                  <h4 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
                     {art.title}
                   </h4>
                 </div>

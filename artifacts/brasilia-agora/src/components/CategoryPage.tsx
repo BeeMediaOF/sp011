@@ -68,8 +68,8 @@ export default function CategoryPage({
                       {art.tag}
                     </span>
                     <h2
-                      className="text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
-                      style={{ fontFamily: "'Merriweather', serif" }}
+                      className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
+                     
                     >
                       {art.title}
                     </h2>

@@ -41,7 +41,7 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
           >
             {article.tag || article.category}
           </span>
-          <h3 className="text-white font-black text-[16px] leading-snug line-clamp-2">
+          <h3 className="font-serif text-white font-black text-[16px] leading-snug line-clamp-2">
             {article.title}
           </h3>
           <p className="text-white/50 text-[11px] mt-1">
@@ -71,7 +71,7 @@ function ListCard({ article, color }: { article: Article; color: string }) {
         >
           {article.tag || article.category}
         </span>
-        <h4 className="text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
+        <h4 className="font-serif text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
           {article.title}
         </h4>
         <p className="text-[11px] text-gray-400 mt-1">
@@ -131,7 +131,7 @@ export default function Archive() {
           <div className="max-w-[1280px] mx-auto px-4">
             <h1
               className="text-[32px] font-black text-white uppercase tracking-tight"
-              style={{ fontFamily: "'Merriweather', serif" }}
+             
             >
               Arquivo de Notícias
             </h1>

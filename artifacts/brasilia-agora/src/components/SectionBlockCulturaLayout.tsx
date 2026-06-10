@@ -65,7 +65,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 >
                   {featured.chapeu}
                 </span>
-                <h3 className="text-white font-black text-[24px] leading-tight line-clamp-3 mb-2">
+                <h3 className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2">
                   {featured.title}
                 </h3>
                 <p className="text-white/70 text-[13px] line-clamp-2">{featured.summary}</p>
@@ -95,7 +95,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                   />
                 </div>
                 <div className="flex-1 min-w-0 py-1">
-                  <h4 className="font-black text-[#1a1a1a] text-[20px] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2" style={{ fontFamily: "'Merriweather', serif" }}>
+                  <h4 className="font-serif font-black text-[#1a1a1a] text-[20px] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 mr-[31px]">
                     {item.title}
                   </h4>
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">
