@@ -116,7 +116,7 @@ export default function DestaquesListaBadge() {
         <div className="flex gap-10 items-start">
 
           {/* ── Coluna principal: lista de noticias ── */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 ml-[0px] mr-[67px]">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1 h-5 bg-[#c8102e]" />
               <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
