@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { Menu, X } from "lucide-react";
 
 const navItems = [
+  { label: "Início", path: "/" },
   { label: "Brasil", path: "/brasil" },
   { label: "Mundo", path: "/mundo" },
   { label: "Política", path: "/politica" },
@@ -13,6 +16,7 @@ const navItems = [
 ];
 
 const editoriaColors: Record<string, string> = {
+  Início: "#c8102e",
   Brasil: "#16a34a",
   Mundo: "#6b21a8",
   Política: "#1d4ed8",
@@ -26,49 +30,92 @@ const editoriaColors: Record<string, string> = {
 
 export default function NavBar() {
   const [location] = useLocation();
+  const [open, setOpen] = useState(false);
+
+  const activeLabel = navItems.find(
+    (item) => item.path === location || (item.path !== "/" && location.startsWith(item.path + "/"))
+  )?.label ?? "Início";
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-[1280px] mx-auto px-4 overflow-x-auto">
-        <ul className="flex flex-row min-w-max">
-          <li>
-            <Link
-              href="/"
-              className={`block text-[16px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap ${
-                location === "/" ? "border-[#c8102e] text-[#1a1a1a]" : "border-transparent text-gray-600 hover:text-[#1a1a1a]"
-              }`}
-            >
-              Início
-            </Link>
-          </li>
-          {navItems.map((item) => {
-            const isActive = location === item.path || location.startsWith(item.path + "/");
-            const color = editoriaColors[item.label] || "#c8102e";
-            return (
-              <li key={item.label}>
-                <Link
-                  href={item.path}
-                  className="block text-[16px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap"
-                  style={{
-                    borderColor: isActive ? color : "transparent",
-                    color: isActive ? color : "#6b7280",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.color = color;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      (e.target as HTMLElement).style.color = "#6b7280";
-                    }
-                  }}
-                >
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-    </nav>
+    <>
+      {/* ── Desktop nav ── */}
+      <nav className="hidden md:block bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="max-w-[1280px] mx-auto px-4 overflow-x-auto no-scrollbar">
+          <ul className="flex flex-row min-w-max">
+            {navItems.map((item) => {
+              const isActive = item.path === "/"
+                ? location === "/"
+                : location === item.path || location.startsWith(item.path + "/");
+              const color = editoriaColors[item.label] || "#c8102e";
+              return (
+                <li key={item.label}>
+                  <Link
+                    href={item.path}
+                    className="block text-[15px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap"
+                    style={{
+                      borderColor: isActive ? color : "transparent",
+                      color: isActive ? color : "#6b7280",
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = color; }}
+                    onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "#6b7280"; }}
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </nav>
+
+      {/* ── Mobile nav bar ── */}
+      <nav className="md:hidden bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+        <div className="flex items-center justify-between px-4 h-12">
+          <span
+            className="text-[13px] font-bold uppercase tracking-widest"
+            style={{ color: editoriaColors[activeLabel] || "#c8102e" }}
+          >
+            {activeLabel}
+          </span>
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="p-2 text-[#1a1a1a]"
+            aria-label={open ? "Fechar menu" : "Abrir menu"}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
+
+        {/* Drawer */}
+        {open && (
+          <div className="absolute left-0 right-0 bg-white border-b border-gray-200 shadow-lg z-50">
+            <ul className="flex flex-col divide-y divide-gray-100">
+              {navItems.map((item) => {
+                const isActive = item.path === "/"
+                  ? location === "/"
+                  : location === item.path || location.startsWith(item.path + "/");
+                const color = editoriaColors[item.label] || "#c8102e";
+                return (
+                  <li key={item.label}>
+                    <Link
+                      href={item.path}
+                      onClick={() => setOpen(false)}
+                      className="flex items-center gap-3 px-5 py-3.5 text-[15px] font-bold transition-colors"
+                      style={{ color: isActive ? color : "#1a1a1a" }}
+                    >
+                      <span
+                        className="w-1 h-5 rounded-full shrink-0"
+                        style={{ backgroundColor: color }}
+                      />
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </nav>
+    </>
   );
 }
