@@ -1,12 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-import AdCentral from "../components/ads/AdCentral";
-import { useArticle, useArticles } from "../hooks/useArticles";
+import { useArticle } from "../hooks/useArticles";
 import {
   brasilArticles,
   mundoArticles,
@@ -32,6 +31,71 @@ const ALL_MOCK = [
 ];
 
 const MAIS_LIDAS = ALL_MOCK.slice(0, 8);
+
+const AD_SLOTS = [
+  { label: "Anuncie aqui", size: "300 \u00d7 250", bg: "#f0f4ff", accent: "#0b3d91" },
+  { label: "Publicidade", size: "300 \u00d7 250", bg: "#fff4f4", accent: "#c8102e" },
+  { label: "Espa\u00e7o publicit\u00e1rio", size: "300 \u00d7 250", bg: "#f0fff8", accent: "#16a34a" },
+];
+
+const AD_FOOTER = [
+  { label: "Anuncie aqui", size: "970 \u00d7 90", bg: "#f0f4ff", accent: "#0b3d91" },
+  { label: "Publicidade", size: "970 \u00d7 90", bg: "#fff4f4", accent: "#c8102e" },
+  { label: "Espa\u00e7o publicit\u00e1rio", size: "970 \u00d7 90", bg: "#f0fff8", accent: "#16a34a" },
+];
+
+function RotatingAd({
+  slots,
+  height,
+  intervalMs = 5000,
+}: {
+  slots: typeof AD_SLOTS;
+  height: string;
+  intervalMs?: number;
+}) {
+  const [idx, setIdx] = useState(0);
+  const [fade, setFade] = useState(true);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % slots.length);
+        setFade(true);
+      }, 300);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [slots.length, intervalMs]);
+
+  const slot = slots[idx];
+
+  return (
+    <div
+      className="w-full rounded-sm border border-gray-100 flex flex-col items-center justify-center gap-2 transition-opacity duration-300"
+      style={{ height, backgroundColor: slot.bg, opacity: fade ? 1 : 0 }}
+    >
+      <div
+        className="w-10 h-10 rounded-full flex items-center justify-center"
+        style={{ backgroundColor: slot.accent + "22" }}
+      >
+        <span className="text-xs font-black" style={{ color: slot.accent }}>AD</span>
+      </div>
+      <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: slot.accent }}>
+        {slot.label}
+      </p>
+      <p className="text-[9px] text-gray-400">{slot.size}</p>
+      <div className="flex gap-1 mt-1">
+        {slots.map((_, i) => (
+          <div
+            key={i}
+            className="w-1.5 h-1.5 rounded-full transition-colors"
+            style={{ backgroundColor: i === idx ? slot.accent : "#d1d5db" }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const editoriaColor: Record<string, string> = {
   brasil: "#16a34a",
@@ -79,27 +143,9 @@ function ArticleSidebar() {
         </div>
       </div>
 
-      {/* Propaganda */}
-      <div className="sticky top-24 space-y-4">
-        <div className="w-full h-[250px] bg-gray-50 border border-gray-100 rounded-sm flex flex-col items-center justify-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-400 text-xs font-bold">AD</span>
-          </div>
-          <p className="text-[10px] font-semibold tracking-widest text-gray-300 uppercase">
-            Publicidade
-          </p>
-          <p className="text-[9px] text-gray-300">300 \u00d7 250</p>
-        </div>
-
-        <div className="w-full h-[600px] bg-gray-50 border border-gray-100 rounded-sm flex flex-col items-center justify-center gap-2">
-          <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="text-gray-400 text-xs font-bold">AD</span>
-          </div>
-          <p className="text-[10px] font-semibold tracking-widest text-gray-300 uppercase">
-            Publicidade
-          </p>
-          <p className="text-[9px] text-gray-300">300 \u00d7 600</p>
-        </div>
+      {/* Propaganda rotativa */}
+      <div className="sticky top-24">
+        <RotatingAd slots={AD_SLOTS} height="260px" intervalMs={5000} />
       </div>
     </aside>
   );
@@ -287,15 +333,7 @@ export default function Artigo() {
                   <div className="prose prose-lg max-w-none text-[#1a1a1a]">
                     {paragraphs.length > 0
                       ? paragraphs.map((p, i) => (
-                          <React.Fragment key={i}>
-                            <p className="mb-5 leading-relaxed text-[16px]">{p}</p>
-                            {/* Ad in-content após o 3º parágrafo */}
-                            {i === 2 && (
-                              <div className="my-6 not-prose">
-                                <AdCentral />
-                              </div>
-                            )}
-                          </React.Fragment>
+                          <p key={i} className="mb-5 leading-relaxed text-[16px]">{p}</p>
                         ))
                       : (
                         <p className="mb-5 leading-relaxed text-[16px]">
@@ -330,6 +368,14 @@ export default function Artigo() {
                         <FaWhatsapp size={13} />
                       </button>
                     </div>
+                  </div>
+
+                  {/* Propaganda rotativa — rodapé do artigo */}
+                  <div className="mt-8">
+                    <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">
+                      Publicidade
+                    </p>
+                    <RotatingAd slots={AD_FOOTER} height="90px" intervalMs={7000} />
                   </div>
                 </>
               )}
