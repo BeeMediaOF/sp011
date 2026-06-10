@@ -7,13 +7,18 @@ interface AdInFeedProps {
 
 function Placeholder() {
   return (
-    <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-100 rounded-xl p-4 h-full min-h-[200px] flex flex-col items-center justify-center text-center gap-2">
-      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-        <span className="text-gray-400 text-xs font-bold">AD</span>
-      </div>
-      <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade</p>
-      <p className="text-[9px] text-gray-300">300 × 250</p>
-    </div>
+    <a
+      href="https://www.toyota.com.br/modelos/rav4"
+      target="_blank"
+      rel="noreferrer"
+      className="block h-full min-h-[200px] rounded-xl overflow-hidden group"
+    >
+      <img
+        src="/ad-toyota-rav4.jpg"
+        alt="Toyota RAV4 — A Vida É Uma Aventura"
+        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+      />
+    </a>
   );
 }
 

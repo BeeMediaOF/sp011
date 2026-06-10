@@ -39,7 +39,7 @@ export const brasilArticles = [
     summary: "Minha Casa Minha Vida volta com novo formato e subsídios para famílias de baixa renda.",
     image: brasilImg,
     chapeu: "Brasil",
-    author: "Pedro Lima",
+    author: "Bee News",
     time: "2 horas atrás",
   },
   {
@@ -48,7 +48,7 @@ export const brasilArticles = [
     summary: "Corte analisa ações sobre regulação de internet e 5G no Brasil.",
     image: especialImg,
     chapeu: "Brasil",
-    author: "Mariana Costa",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -57,7 +57,7 @@ export const brasilArticles = [
     summary: "IBGE aponta queda no preço de alimentos e combustíveis como principais fatores.",
     image: brasilImg,
     chapeu: "Brasil",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -66,7 +66,7 @@ export const brasilArticles = [
     summary: "Meta é vacinar 90% do público-alvo em todas as regiões do país.",
     image: busImg,
     chapeu: "Brasil",
-    author: "Ana Paula",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -75,7 +75,7 @@ export const brasilArticles = [
     summary: "Doses serão distribuídas prioritariamente para regiões Norte e Nordeste.",
     image: health2Img,
     chapeu: "Brasil",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "8 horas atrás",
   },
   {
@@ -84,7 +84,7 @@ export const brasilArticles = [
     summary: "Investimentos focados em infraestrutura, saúde e educação da capital.",
     image: heroImg,
     chapeu: "Brasil",
-    author: "Carlos Mendes",
+    author: "Bee News",
     time: "10 horas atrás",
   },
 ];
@@ -96,7 +96,7 @@ export const mundoArticles = [
     summary: "Líderes se comprometem com metas mais ambiciosas para 2035.",
     image: mundoImg,
     chapeu: "Mundo",
-    author: "Fernanda Rocha",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -105,7 +105,7 @@ export const mundoArticles = [
     summary: "Secretário-geral pede ação urgente para proteção de civis.",
     image: trafficImg,
     chapeu: "Mundo",
-    author: "João Silva",
+    author: "Bee News",
     time: "2 horas atrás",
   },
   {
@@ -114,7 +114,7 @@ export const mundoArticles = [
     summary: "Medidas atingem setor energético e financeiro de quatro nações.",
     image: mundoImg,
     chapeu: "Mundo",
-    author: "Laura Pinto",
+    author: "Bee News",
     time: "4 horas atrás",
   },
   {
@@ -123,7 +123,7 @@ export const mundoArticles = [
     summary: "Artemis II levará quatro astronautas em órbita ao redor da Lua.",
     image: especialImg,
     chapeu: "Mundo",
-    author: "Marcos Vinícius",
+    author: "Bee News",
     time: "6 horas atrás",
   },
   {
@@ -132,7 +132,7 @@ export const mundoArticles = [
     summary: "Medidas visam reativar setor imobiliário e consumo interno.",
     image: parkImg,
     chapeu: "Mundo",
-    author: "Wei Zhang",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -141,7 +141,7 @@ export const mundoArticles = [
     summary: "Partido Trabalhista conquista maioria absoluta pela primeira vez em 14 anos.",
     image: studentsImg,
     chapeu: "Mundo",
-    author: "Emma Thompson",
+    author: "Bee News",
     time: "12 horas atrás",
   },
 ];
@@ -153,7 +153,7 @@ export const politicaArticles = [
     summary: "Investimento de R$ 2 bilhões em infraestrutura urbana e mobilidade. Programa inclui asfaltamento, iluminação LED e construção de praças em todas as regiões administrativas prioritárias.",
     image: politicaFeatImg,
     chapeu: "Política",
-    author: "Denise Rothenburg",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -162,7 +162,7 @@ export const politicaArticles = [
     summary: "Subsídio para famílias de baixa renda adquirirem a casa própria. Medida deve beneficiar mais de 10 mil famílias com renda de até três salários mínimos.",
     image: heroImg,
     chapeu: "Política",
-    author: "Ana Campos",
+    author: "Bee News",
     time: "2 horas atrás",
   },
   {
@@ -171,7 +171,7 @@ export const politicaArticles = [
     summary: "Maior investimento em saúde, educação e infraestrutura da história. Destaque para 12 novos hospitais e 50 escolas de tempo integral na capital federal.",
     image: politics2Img,
     chapeu: "Política",
-    author: "Carlos Alexandre",
+    author: "Bee News",
     time: "4 horas atrás",
   },
   {
@@ -180,7 +180,7 @@ export const politicaArticles = [
     summary: "Deputados buscam recursos para ampliação de metrô e hospitais. Meta é garantir R$ 1,2 bilhão em investimentos para o Distrito Federal no próximo exercício.",
     image: politicaFeatImg,
     chapeu: "Política",
-    author: "Pedro Lima",
+    author: "Bee News",
     time: "6 horas atrás",
   },
   {
@@ -189,7 +189,7 @@ export const politicaArticles = [
     summary: "Medida visa garantir maior segurança e agilidade no processo eleitoral. Biometria será obrigatória em 2026 e deve reduzir em 30% o tempo de votação.",
     image: busImg,
     chapeu: "Política",
-    author: "Mariana Costa",
+    author: "Bee News",
     time: "8 horas atrás",
   },
   {
@@ -198,7 +198,7 @@ export const politicaArticles = [
     summary: "Reajuste será pago em três parcelas a partir de agosto. Benefício alcança mais de 80 mil servidores ativos e inativos do Governo do Distrito Federal.",
     image: brasilImg,
     chapeu: "Política",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "10 horas atrás",
   },
 ];
@@ -210,7 +210,7 @@ export const economiaArticles = [
     summary: "Setor de tecnologia lidera crescimento com 30% de aumento. Produtos de software e serviços de consultoria respondem por 60% do valor total exportado.",
     image: cityImg,
     chapeu: "Economia",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -219,7 +219,7 @@ export const economiaArticles = [
     summary: "Linhas de financiamento com juros reduzidos para impulsionar o setor. Taxas começam em 0,5% ao mês e podem beneficiar até 8 mil empresas candangas.",
     image: busImg,
     chapeu: "Economia",
-    author: "Ana Paula",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -228,7 +228,7 @@ export const economiaArticles = [
     summary: "Evento espera movimentar R$ 1 bilhão em contratos durante a semana. Destaque para o setor de construção civil, tecnologia e agronegócio.",
     image: parkImg,
     chapeu: "Economia",
-    author: "Marcos Vinícius",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -237,7 +237,7 @@ export const economiaArticles = [
     summary: "Empresas de software e startups lideram expansão do mercado. Programação, análise de dados e cibersegurança são as áreas com maior demanda de profissionais.",
     image: studentsImg,
     chapeu: "Economia",
-    author: "Wei Zhang",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -246,7 +246,7 @@ export const economiaArticles = [
     summary: "Ranking considera infraestrutura, qualidade de vida e ambiente de negócios. Capital federal supera São Paulo e Rio de Janeiro no índice de competitividade.",
     image: brasilImg,
     chapeu: "Economia",
-    author: "Emma Thompson",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -255,7 +255,7 @@ export const economiaArticles = [
     summary: "Objetivo é tornar o DF referência nacional em energia renovável. Isenção de ISS e redução de IPTU podem gerar economia de até 20% para empresas aderentes.",
     image: especialImg,
     chapeu: "Economia",
-    author: "Fernanda Rocha",
+    author: "Bee News",
     time: "11 horas atrás",
   },
 ];
@@ -267,7 +267,7 @@ export const esporteArticles = [
     summary: "Reforma inclui nova cobertura, iluminação e arquibancadas. O projeto prevê a instalação de um sistema de drenagem moderno e acessibilidade total para PCDs.",
     image: sportsImg,
     chapeu: "Esporte",
-    author: "João Silva",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -276,7 +276,7 @@ export const esporteArticles = [
     summary: "Brasília FC é mandante e espera casa cheia para duelo decisivo. Clube busca a terceira vitória consecutiva para garantir a liderança da competição.",
     image: sportsImg,
     chapeu: "Esporte",
-    author: "Laura Pinto",
+    author: "Bee News",
     time: "2 horas atrás",
   },
   {
@@ -285,7 +285,7 @@ export const esporteArticles = [
     summary: "Gols de Renato e Lucas garantem a quarta colocação na tabela. Time mantém invencibilidade de 8 jogos e se aproxima da zona de acesso.",
     image: parkImg,
     chapeu: "Esporte",
-    author: "Pedro Lima",
+    author: "Bee News",
     time: "4 horas atrás",
   },
   {
@@ -294,7 +294,7 @@ export const esporteArticles = [
     summary: "Ouro no salto em distância, prata no 100m e bronze no lançamento de dardo. Delegação candanga supera expectativas e termina em quarto lugar no geral.",
     image: festivalImg,
     chapeu: "Esporte",
-    author: "Mariana Costa",
+    author: "Bee News",
     time: "6 horas atrás",
   },
   {
@@ -303,7 +303,7 @@ export const esporteArticles = [
     summary: "Melhores duplas do país se enfrentam neste fim de semana. Evento oferece entrada gratuita e atividades recreativas para o público de todas as idades.",
     image: cityImg,
     chapeu: "Esporte",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "8 horas atrás",
   },
   {
@@ -312,7 +312,7 @@ export const esporteArticles = [
     summary: "Estruturas são distribuídas em todas as regiões administrativas. Iniciativa busca democratizar o acesso ao esporte e descobrir novos talentos para o alto rendimento.",
     image: transport2Img,
     chapeu: "Esporte",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "10 horas atrás",
   },
 ];
@@ -324,7 +324,7 @@ export const culturaArticles = [
     summary: "Mais de 50 atrações entre música, teatro e artes visuais animaram a capital.",
     image: culturaFeatImg,
     chapeu: "Cultura",
-    author: "Ana Campos",
+    author: "Bee News",
     time: "45 minutos atrás",
   },
   {
@@ -333,7 +333,7 @@ export const culturaArticles = [
     summary: "Mostra reúne 80 obras de artistas brasileiros e internacionais.",
     image: culture2Img,
     chapeu: "Cultura",
-    author: "Carlos Alexandre",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -342,7 +342,7 @@ export const culturaArticles = [
     summary: "Cinema exibe clássicos da Mostra de Cinema de Brasília durante uma semana.",
     image: festivalImg,
     chapeu: "Cultura",
-    author: "Pedro Lima",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -351,7 +351,7 @@ export const culturaArticles = [
     summary: "Apresentação gratuita reúne 5 mil pessoas no gramado central.",
     image: culturaFeatImg,
     chapeu: "Cultura",
-    author: "Mariana Costa",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -360,7 +360,7 @@ export const culturaArticles = [
     summary: "Doação inclui manuscritos originais e primeira edição de obras clássicas.",
     image: education2Img,
     chapeu: "Cultura",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -369,7 +369,7 @@ export const culturaArticles = [
     summary: "Programação inclui teatro, dança e música de artistas locais e nacionais.",
     image: health2Img,
     chapeu: "Cultura",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "11 horas atrás",
   },
 ];
@@ -381,7 +381,7 @@ export const saudeArticles = [
     summary: "Campanha de prevenção e vacinação mostra resultados positivos na capital.",
     image: hospitalImg,
     chapeu: "Saúde",
-    author: "Dra. Fernanda Lima",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -390,7 +390,7 @@ export const saudeArticles = [
     summary: "Estrutura moderna vai atender 500 pacientes por dia na região sul.",
     image: health2Img,
     chapeu: "Saúde",
-    author: "Pedro Rocha",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -399,7 +399,7 @@ export const saudeArticles = [
     summary: "Doses serão distribuídas para grupos prioritários em todas as RAs.",
     image: hospitalImg,
     chapeu: "Saúde",
-    author: "Ana Carolina",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -408,7 +408,7 @@ export const saudeArticles = [
     summary: "Estudo preliminar mostra resultados promissores com nova terapia.",
     image: health2Img,
     chapeu: "Saúde",
-    author: "Dr. Marcos Silva",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -417,7 +417,7 @@ export const saudeArticles = [
     summary: "Iniciativa oferece atendimento psicológico gratuito em centros comunitários.",
     image: hospitalImg,
     chapeu: "Saúde",
-    author: "Juliana Costa",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -426,7 +426,7 @@ export const saudeArticles = [
     summary: "Meta é arrecadar 5 mil bolsas de sangue durante o mês de julho.",
     image: hospitalImg,
     chapeu: "Saúde",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "11 horas atrás",
   },
 ];
@@ -438,7 +438,7 @@ export const tecnologiaArticles = [
     summary: "Hub tecnológico vai acelerar 50 startups de IA até o final de 2026.",
     image: especialImg,
     chapeu: "Tecnologia",
-    author: "Felipe Andrade",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -447,7 +447,7 @@ export const tecnologiaArticles = [
     summary: "Todas as regiões administrativas agora contam com sinal de quinta geração.",
     image: brasilImg,
     chapeu: "Tecnologia",
-    author: "Marina Duarte",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -456,7 +456,7 @@ export const tecnologiaArticles = [
     summary: "Plataforma unificada permite planejar rotas multimodais em tempo real.",
     image: busImg,
     chapeu: "Tecnologia",
-    author: "Gabriel Torres",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -465,7 +465,7 @@ export const tecnologiaArticles = [
     summary: "Componente nacional reduz custo de sensores inteligentes em 40%.",
     image: studentsImg,
     chapeu: "Tecnologia",
-    author: "Prof. Ana Beatriz",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -474,7 +474,7 @@ export const tecnologiaArticles = [
     summary: "Sistema elimina filas e permite marcação online em toda a rede de saúde.",
     image: health2Img,
     chapeu: "Tecnologia",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -483,7 +483,7 @@ export const tecnologiaArticles = [
     summary: "Infraestrutura de proteção digital foi reforçada após investimento de R$ 10 milhões.",
     image: security2Img,
     chapeu: "Tecnologia",
-    author: "Carlos Mendes",
+    author: "Bee News",
     time: "11 horas atrás",
   },
 ];
@@ -495,7 +495,7 @@ export const dfArticles = [
     summary: "Recursos serão aplicados em estradas, saneamento e iluminação pública.",
     image: cityImg,
     chapeu: "DF",
-    author: "João Pedro",
+    author: "Bee News",
     time: "1 hora atrás",
   },
   {
@@ -504,7 +504,7 @@ export const dfArticles = [
     summary: "Reconhecimento da UNESCO valoriza preservação ambiental da capital.",
     image: parkImg,
     chapeu: "DF",
-    author: "Larissa Menezes",
+    author: "Bee News",
     time: "3 horas atrás",
   },
   {
@@ -513,7 +513,7 @@ export const dfArticles = [
     summary: "Plano inclui ciclovias, praças e mobiliário moderno na via principal.",
     image: trafficImg,
     chapeu: "DF",
-    author: "Pedro Lima",
+    author: "Bee News",
     time: "5 horas atrás",
   },
   {
@@ -522,7 +522,7 @@ export const dfArticles = [
     summary: "Programa de reciclagem vai atender 100% da população até dezembro.",
     image: busImg,
     chapeu: "DF",
-    author: "Mariana Costa",
+    author: "Bee News",
     time: "7 horas atrás",
   },
   {
@@ -531,7 +531,7 @@ export const dfArticles = [
     summary: "Concertos, exposições e eventos culturais marcam a data em toda a cidade.",
     image: festivalImg,
     chapeu: "DF",
-    author: "Ricardo Souza",
+    author: "Bee News",
     time: "9 horas atrás",
   },
   {
@@ -540,7 +540,7 @@ export const dfArticles = [
     summary: "Substituição de 200 mil luminárias reduz consumo de energia em 60%.",
     image: cityImg,
     chapeu: "DF",
-    author: "Bruno Fernandes",
+    author: "Bee News",
     time: "11 horas atrás",
   },
   {
@@ -549,7 +549,7 @@ export const dfArticles = [
     summary: "Projeto prevê 8 novas estações e capacidade para 120 mil passageiros por dia.",
     image: transport2Img,
     chapeu: "DF",
-    author: "Carla Santos",
+    author: "Bee News",
     time: "13 horas atrás",
   },
 ];

@@ -31,7 +31,8 @@ export default function NewsCard({ id, title, summary, image, chapeu, chapeuColo
         {summary}
       </p>
       <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-2">
-        <span className="font-medium text-gray-500">{author}</span>
+        <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0" />
+        <span className="font-medium text-gray-600">Bee News</span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span>{time}</span>
       </div>

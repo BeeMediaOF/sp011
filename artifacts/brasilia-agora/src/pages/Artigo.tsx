@@ -143,9 +143,12 @@ function ArticleSidebar() {
         </div>
       </div>
 
-      {/* Propaganda rotativa */}
+      {/* Propaganda Toyota */}
       <div className="sticky top-24">
-        <RotatingAd slots={AD_SLOTS} height="260px" intervalMs={5000} />
+        <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
+        <a href="https://www.toyota.com.br/modelos/rav4" target="_blank" rel="noreferrer" className="block overflow-hidden rounded group">
+          <img src="/ad-toyota-rav4.jpg" alt="Toyota RAV4 — A Vida É Uma Aventura" className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-300" />
+        </a>
       </div>
     </aside>
   );
@@ -277,14 +280,14 @@ export default function Artigo() {
                   {/* Autor + compartilhamento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-y border-gray-100 mb-6 gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-[#0b3d91] flex items-center justify-center shrink-0">
-                        <span className="text-white text-xs font-bold">
-                          {article.author.slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
+                      <img
+                        src="/favicon.jpg"
+                        alt="Bee News"
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                      />
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          Por {article.author}
+                          Por Bee News
                         </div>
                         <div className="text-xs text-gray-400">
                           {new Date(article.publishedAt).toLocaleDateString("pt-BR", {
@@ -369,12 +372,14 @@ export default function Artigo() {
                     </div>
                   </div>
 
-                  {/* Propaganda rotativa — rodapé do artigo */}
+                  {/* Propaganda Zé Delivery — rodapé do artigo */}
                   <div className="mt-8">
                     <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">
                       Publicidade
                     </p>
-                    <RotatingAd slots={AD_FOOTER} height="90px" intervalMs={7000} />
+                    <a href="https://www.zedelivery.com.br" target="_blank" rel="noreferrer" className="block w-full overflow-hidden rounded group">
+                      <img src="/ad-ze-delivery.jpg" alt="Zé Delivery — Entrega Grátis de Segunda a Sexta" className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform duration-300" />
+                    </a>
                   </div>
                 </>
               )}

@@ -16,13 +16,20 @@ const SIZE_STYLES = {
   xl:  "w-full h-[250px]",
 };
 
-function Placeholder({ size, label }: { size: string; label?: string }) {
+function Placeholder({ size }: { size: string; label?: string }) {
   return (
-    <div className={`relative ${SIZE_STYLES[size as keyof typeof SIZE_STYLES]} flex items-center justify-center bg-gray-50 rounded-lg border border-gray-100 overflow-hidden`}>
-      <div className="text-center space-y-1">
-        <p className="text-[10px] font-semibold tracking-widest uppercase text-gray-300">{label || "ANÚNCIO"}</p>
-      </div>
-    </div>
+    <a
+      href="https://www.toyota.com.br/modelos/rav4"
+      target="_blank"
+      rel="noreferrer"
+      className={`relative block ${SIZE_STYLES[size as keyof typeof SIZE_STYLES]} overflow-hidden rounded-lg group`}
+    >
+      <img
+        src="/ad-toyota-rav4.jpg"
+        alt="Toyota RAV4 — A Vida É Uma Aventura"
+        className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+      />
+    </a>
   );
 }
 

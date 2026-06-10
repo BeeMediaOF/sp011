@@ -63,8 +63,9 @@ export default function HeroSection() {
                   {item.title}
                 </h2>
                 <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
-                <div className="flex items-center gap-2 text-[11px] text-white/50">
-                  <span>{item.author}</span>
+                <div className="flex items-center gap-2 text-[11px] text-white/70">
+                  <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-90" />
+                  <span className="font-medium">Bee News</span>
                   <span className="w-1 h-1 rounded-full bg-white/40" />
                   <span>{item.time}</span>
                 </div>
