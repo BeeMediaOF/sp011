@@ -12,6 +12,7 @@ import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
+import AdSidebar from "../components/ads/AdSidebar";
 import { useArticles } from "../hooks/useArticles";
 
 import {
@@ -74,6 +75,19 @@ export default function Home() {
         <div className="max-w-[1280px] mx-auto px-4 py-4">
           <AdCentral />
         </div>
+
+        {/* ━ WRAPPER COM SIDEBARS ━━━━━━━━━━━━━━━
+            Colunas 300px visíveis apenas em telas
+            muito largas (≥1880px)
+        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div className="flex justify-center gap-0">
+          {/* SIDEBAR ESQUERDA */}
+          <aside className="hidden [@media(min-width:1880px)]:block w-[300px] shrink-0 pt-8 pl-4">
+            <AdSidebar />
+          </aside>
+
+          {/* CONTEÚDO CENTRAL */}
+          <div className="flex-1 min-w-0 max-w-[1280px]">
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 2 — NACIONAIS & INTERNACIONAIS
@@ -157,6 +171,14 @@ export default function Home() {
             sidebar com Mais Lidas e propaganda
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <DestaquesListaBadge />
+
+          </div>{/* fim CONTEÚDO CENTRAL */}
+
+          {/* SIDEBAR DIREITA */}
+          <aside className="hidden [@media(min-width:1880px)]:block w-[300px] shrink-0 pt-8 pr-4">
+            <AdSidebar />
+          </aside>
+        </div>{/* fim WRAPPER COM SIDEBARS */}
 
       </main>
 

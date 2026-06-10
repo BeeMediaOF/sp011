@@ -48,29 +48,6 @@ function Router() {
   );
 }
 
-function SideAds() {
-  return (
-    <>
-      <a
-        href="https://www.toyota.com.br/modelos/rav4"
-        target="_blank"
-        rel="noreferrer"
-        className="hidden 2xl:block fixed left-4 top-1/2 -translate-y-1/2 z-40 w-[160px] shadow-lg hover:opacity-90 transition-opacity"
-      >
-        <img src="/ad-toyota-rav4.jpg" alt="Toyota RAV4 — A vida é uma aventura" className="w-full h-auto" />
-      </a>
-      <a
-        href="https://www.toyota.com.br/modelos/rav4"
-        target="_blank"
-        rel="noreferrer"
-        className="hidden 2xl:block fixed right-4 top-1/2 -translate-y-1/2 z-40 w-[160px] shadow-lg hover:opacity-90 transition-opacity"
-      >
-        <img src="/ad-toyota-rav4.jpg" alt="Toyota RAV4 — A vida é uma aventura" className="w-full h-auto" />
-      </a>
-    </>
-  );
-}
-
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -78,7 +55,6 @@ function App() {
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
         </WouterRouter>
-        <SideAds />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
