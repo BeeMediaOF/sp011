@@ -73,13 +73,13 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                 >
                   {featured.chapeu}
                 </span>
-                <h3 className="text-white font-black text-[18px] leading-snug line-clamp-3">
+                <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px]">
                   {featured.title}
                 </h3>
               </div>
             </div>
             <div className="pt-3">
-              <p className="text-gray-500 text-[13px] leading-relaxed line-clamp-2">
+              <p className="text-gray-500 line-clamp-2 text-[18px]">
                 {featured.summary}
               </p>
               <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400">
