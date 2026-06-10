@@ -74,6 +74,10 @@ export default function Home() {
             ZONA 2 — NACIONAIS & INTERNACIONAIS
             Carrosseis de 3 cards por página
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <div className="max-w-[1280px] mx-auto px-4 py-4">
+          <AdCentral />
+        </div>
+
         <SectionBlock
           title="Brasil"
           color={editoriaColors.brasil}
