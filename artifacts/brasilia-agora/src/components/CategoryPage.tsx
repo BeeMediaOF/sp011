@@ -39,12 +39,11 @@ export default function CategoryPage({
   return (
     <div className="w-full pb-12">
       {/* Category Header Bar */}
-      <div style={{ backgroundColor: color }} className="w-full py-6">
+      <div style={{ backgroundColor: color }} className="w-full py-4">
         <div className="max-w-[1280px] mx-auto px-4">
-          <div className="text-white/80 text-xs font-medium mb-1">
+          <div className="text-white/80 text-xs font-medium">
             <Link href="/" className="hover:text-white transition-colors">Início</Link> &gt; {category}
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight">{category}</h1>
         </div>
       </div>
 
