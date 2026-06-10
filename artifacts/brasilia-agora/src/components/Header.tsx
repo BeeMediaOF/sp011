@@ -1,41 +1,64 @@
 import React from "react";
-import { Search, Menu } from "lucide-react";
+import { Search } from "lucide-react";
 import { Link } from "wouter";
+import { FaFacebook, FaInstagram, FaTwitter, FaYoutube, FaWhatsapp } from "react-icons/fa";
 import { useSite } from "../hooks/useSite";
 import logoImg from "../assets/images/logo_correio_v2.png";
 
 export default function Header() {
   const { settings } = useSite();
   return (
-    <header className="py-5 border-b border-gray-200 bg-[#0f0f4a]">
+    <header className="py-4 border-b border-white/10 bg-[#0f0f4a]">
       <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-6">
         {/* Logo */}
         <Link href="/" className="group cursor-pointer block shrink-0">
           <img
             src={logoImg}
             alt={settings?.siteName ?? "Correio da Capital"}
-            className="h-[85px] w-auto object-contain group-hover:opacity-90 transition-opacity"
+            className="h-[72px] w-auto object-contain group-hover:opacity-90 transition-opacity"
           />
         </Link>
 
-        {/* Busca + Ações */}
-        <div className="flex items-center gap-3 w-full max-w-xl">
-          <div className="relative flex-1">
+        {/* Redes sociais + busca */}
+        <div className="flex items-center gap-5 ml-auto">
+          {/* Redes sociais */}
+          <div className="hidden sm:flex items-center gap-3">
+            <a href="https://facebook.com" target="_blank" rel="noreferrer"
+              className="text-white/60 hover:text-white transition-colors" aria-label="Facebook">
+              <FaFacebook size={18} />
+            </a>
+            <a href="https://instagram.com" target="_blank" rel="noreferrer"
+              className="text-white/60 hover:text-white transition-colors" aria-label="Instagram">
+              <FaInstagram size={18} />
+            </a>
+            <a href="https://twitter.com" target="_blank" rel="noreferrer"
+              className="text-white/60 hover:text-white transition-colors" aria-label="Twitter / X">
+              <FaTwitter size={18} />
+            </a>
+            <a href="https://youtube.com" target="_blank" rel="noreferrer"
+              className="text-white/60 hover:text-white transition-colors" aria-label="YouTube">
+              <FaYoutube size={19} />
+            </a>
+            <a href="https://wa.me" target="_blank" rel="noreferrer"
+              className="text-white/60 hover:text-white transition-colors" aria-label="WhatsApp">
+              <FaWhatsapp size={18} />
+            </a>
+          </div>
+
+          {/* Divisor */}
+          <div className="hidden sm:block w-px h-5 bg-white/20" />
+
+          {/* Busca compacta */}
+          <div className="relative">
             <input
               type="text"
-              placeholder="Buscar notícias..."
-              className="w-full bg-gray-100 border border-gray-300 text-[#1a1a1a] placeholder-gray-500 px-4 py-2.5 pr-10 text-sm focus:outline-none focus:border-[#c8102e] focus:ring-1 focus:ring-[#c8102e]"
+              placeholder="Pesquisar..."
+              className="w-[180px] bg-white/10 border border-white/20 text-white placeholder-white/40 px-3 py-1.5 pr-8 text-[13px] rounded-sm focus:outline-none focus:border-white/50 focus:w-[240px] transition-all duration-300"
             />
-            <button className="absolute right-0 top-0 bottom-0 px-3 flex items-center justify-center text-gray-500 hover:text-[#c8102e]">
-              <Search className="w-4 h-4" />
+            <button className="absolute right-0 top-0 bottom-0 px-2.5 flex items-center justify-center text-white/50 hover:text-white transition-colors">
+              <Search className="w-3.5 h-3.5" />
             </button>
           </div>
-          <button className="hidden md:flex items-center gap-2 text-gray-600 hover:text-[#1a1a1a] transition-colors">
-            <Menu className="w-5 h-5" />
-          </button>
-          <button className="bg-[#0b3d91] text-white text-[13px] font-bold px-5 py-2.5 hover:bg-[#0a2e6d] transition-colors uppercase tracking-wider">
-            Assine
-          </button>
         </div>
       </div>
     </header>
