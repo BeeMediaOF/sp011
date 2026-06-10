@@ -75,7 +75,21 @@ export default function Home() {
             Carrosseis de 3 cards por página
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <div className="max-w-[1280px] mx-auto px-4 py-4">
-          <AdCentral />
+          <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
+          <div className="flex justify-center">
+            <a
+              href="https://www.metro.sp.gov.br"
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full max-w-[952px] overflow-hidden group"
+            >
+              <img
+                src="/ad-metro-sp.gif"
+                alt="Metrô SP — Linha 15-Prata Expandida"
+                className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform"
+              />
+            </a>
+          </div>
         </div>
 
         <SectionBlock
