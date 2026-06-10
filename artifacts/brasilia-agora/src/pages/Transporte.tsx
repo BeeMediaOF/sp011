@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import busImg from "../assets/images/bus.png";
 import transport2Img from "../assets/images/transport2.png";
@@ -27,7 +26,6 @@ export default function Transporte() {
       <main className="flex-1 bg-white">
         <CategoryPage category="TRANSPORTE" color="#0284c7" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );

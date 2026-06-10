@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import festivalImg from "../assets/images/festival.png";
 import culture2Img from "../assets/images/culture2.png";
@@ -27,7 +26,6 @@ export default function Cultura() {
       <main className="flex-1 bg-white">
         <CategoryPage category="CULTURA" color="#0d9488" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );

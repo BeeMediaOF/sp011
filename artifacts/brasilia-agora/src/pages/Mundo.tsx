@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import mundoImg from "../assets/images/mundo.png";
 import trafficImg from "../assets/images/traffic.png";
@@ -27,7 +26,6 @@ export default function Mundo() {
       <main className="flex-1 bg-white">
         <CategoryPage category="MUNDO" color="#9333ea" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );

@@ -2,7 +2,6 @@ import { Link } from "wouter";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
@@ -148,7 +147,6 @@ export default function Colunas() {
         </div>
       </main>
       
-      <RedacaoBanner />
       <Footer />
     </div>
   );

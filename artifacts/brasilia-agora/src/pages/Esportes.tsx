@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import sportsImg from "../assets/images/sports.png";
 
@@ -26,7 +25,6 @@ export default function Esportes() {
       <main className="flex-1 bg-white">
         <CategoryPage category="ESPORTES" color="#b45309" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );

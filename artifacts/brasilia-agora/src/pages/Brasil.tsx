@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import brasilImg from "../assets/images/brasil.png";
 import politics2Img from "../assets/images/politics2.png";
@@ -27,7 +26,6 @@ export default function Brasil() {
       <main className="flex-1 bg-white">
         <CategoryPage category="BRASIL" color="#16a34a" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );

@@ -2,7 +2,6 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
-import RedacaoBanner from "../components/RedacaoBanner";
 import Footer from "../components/Footer";
 import policeImg from "../assets/images/police.png";
 import security2Img from "../assets/images/security2.png";
@@ -27,7 +26,6 @@ export default function Seguranca() {
       <main className="flex-1 bg-white">
         <CategoryPage category="SEGURANÇA" color="#dc2626" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
-      <RedacaoBanner />
       <Footer />
     </div>
   );
