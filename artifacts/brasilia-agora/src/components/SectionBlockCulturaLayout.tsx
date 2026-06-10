@@ -95,7 +95,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                   />
                 </div>
                 <div className="flex-1 min-w-0 py-1">
-                  <h4 className="font-serif font-black text-[#1a1a1a] text-[20px] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 mr-[18px]">
+                  <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 mr-[18px] text-[19px]">
                     {item.title}
                   </h4>
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">
