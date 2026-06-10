@@ -8,7 +8,6 @@ import SectionBlock from "../components/SectionBlock";
 import DestaquesCardOverlay from "../components/DestaquesCardOverlay";
 import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
-import ColunistasSection from "../components/ColunistasSection";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
 import { useArticles } from "../hooks/useArticles";
@@ -127,12 +126,6 @@ export default function Home() {
           href="/cultura"
           articles={getByCategory("cultura", culturaArticles)}
         />
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ZONA 6 — COLUNISTAS
-            Bloco lateral com fotos e títulos
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <ColunistasSection />
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 7 — CIDADE, SAÚDE & TECNOLOGIA

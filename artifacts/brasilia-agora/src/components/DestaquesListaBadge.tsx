@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
+import CotacaoWidget from "./CotacaoWidget";
 import trafficImg from "../assets/images/traffic.png";
 import festivalImg from "../assets/images/festival.png";
 import busImg from "../assets/images/bus.png";
@@ -156,8 +157,11 @@ export default function DestaquesListaBadge() {
             </div>
           </div>
 
-          {/* ── Sidebar: Mais Lidas + Propaganda ── */}
+          {/* ── Sidebar: Cotações + Mais Lidas + Propaganda ── */}
           <aside className="hidden lg:block w-[300px] shrink-0">
+            {/* Cotações em tempo real */}
+            <CotacaoWidget />
+
             {/* Mais Lidas */}
             <div className="flex items-center gap-3 mb-5">
               <div className="w-1 h-5 bg-[#c8102e]" />
