@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import logoImg from "../assets/images/logo_correio_v2.png";
+import logoImg from "../assets/images/logo_footer.png";
 
 export default function Footer() {
   return (
@@ -33,7 +33,7 @@ export default function Footer() {
 
         {/* Seções */}
         <div>
-          <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Seções</h3>
+          <h3 className="font-bold mb-4 uppercase text-sm tracking-wider text-[#ffe80a]">Seções</h3>
           <ul className="flex flex-col gap-2 text-sm text-gray-400">
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Início</Link></li>
             <li><Link href="/politica" className="hover:text-white hover:pl-1 transition-all">Política</Link></li>
@@ -49,7 +49,7 @@ export default function Footer() {
 
         {/* Institucional */}
         <div>
-          <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Institucional</h3>
+          <h3 className="font-bold mb-4 uppercase text-sm tracking-wider text-[#ffe80a]">Institucional</h3>
           <ul className="flex flex-col gap-2 text-sm text-gray-400">
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Sobre o Correio</Link></li>
             <li><Link href="/" className="hover:text-white hover:pl-1 transition-all">Fale Conosco</Link></li>
@@ -62,12 +62,12 @@ export default function Footer() {
 
         {/* Contato + Newsletter */}
         <div>
-          <h3 className="text-[#c8102e] font-bold mb-4 uppercase text-sm tracking-wider">Contato</h3>
+          <h3 className="font-bold mb-4 uppercase text-sm tracking-wider text-[#ffe80a]">Contato</h3>
           <div className="text-gray-400 text-sm space-y-1.5 mb-5">
             <p className="text-white font-bold">(61) 99888-0000</p>
             <p>redacao@correiodacapital.com.br</p>
           </div>
-          <p className="text-[#c8102e] text-[11px] font-bold uppercase tracking-wider mb-2">Newsletter</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-[#ffe80a]">Newsletter</p>
           <div className="flex">
             <input
               type="email"
