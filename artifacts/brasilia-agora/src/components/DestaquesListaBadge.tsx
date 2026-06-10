@@ -91,10 +91,18 @@ function AdSidebarInline() {
     <div className="mt-6">
       <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
       {loading || !ad ? (
-        <div className="w-full h-[280px] bg-gray-50 border border-gray-100 rounded flex flex-col items-center justify-center gap-2">
-          <span className="text-gray-300 text-xs font-bold uppercase tracking-wider">Anuncio</span>
-          <span className="text-[10px] text-gray-300">300 x 280</span>
-        </div>
+        <a
+          href="https://www.itau.com.br/personnalite"
+          target="_blank"
+          rel="noreferrer"
+          className="block w-full overflow-hidden rounded"
+        >
+          <img
+            src="/ad-itau-personnalite.png"
+            alt="Itau Personnalite — Chegou a conta para seus filhos"
+            className="w-full h-auto object-cover"
+          />
+        </a>
       ) : (
         <a
           href={ad.link}
