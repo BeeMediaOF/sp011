@@ -20,7 +20,7 @@ interface Props {
 
 export default function SectionBlockFeatured({ title, color, href, articles }: Props) {
   const [featured, ...rest] = articles;
-  const sideItems = rest.slice(0, 3);
+  const sideItems = rest.slice(0, 4);
 
   if (!featured) return null;
 
@@ -118,7 +118,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                     >
                       {item.chapeu}
                     </span>
-                    <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
+                    <h4 className="text-[16px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
                       {item.title}
                     </h4>
                     <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
