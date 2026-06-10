@@ -70,10 +70,6 @@ export default function Home() {
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <HeroSection />
 
-        <div className="max-w-[1280px] mx-auto px-4 py-4">
-          <AdCentral />
-        </div>
-
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 2 — NACIONAIS & INTERNACIONAIS
             Carrosseis de 3 cards por página
