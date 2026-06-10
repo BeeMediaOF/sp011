@@ -65,7 +65,7 @@ export default function Footer() {
           <h3 className="font-bold mb-4 uppercase text-sm tracking-wider text-[#ffd300]">Contato</h3>
           <div className="text-gray-400 text-sm space-y-1.5 mb-5">
             <p className="text-white font-bold">(61) 99888-0000</p>
-            <p>redacao@correiodacapital.com.br</p>
+            <p>contato@beenews.ai</p>
           </div>
           <p className="text-[11px] font-bold uppercase tracking-wider mb-2 text-[#ffd300]">Newsletter</p>
           <div className="flex">
