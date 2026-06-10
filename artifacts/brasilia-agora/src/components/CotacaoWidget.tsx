@@ -1,47 +1,51 @@
 import React, { useState, useEffect } from "react";
 
-interface Quote {
-  code: string;
-  bid: string;
-  pctChange: string;
-  high: string;
-  low: string;
+interface FxQuote { bid: string; ask: string; pctChange: string; }
+interface CryptoQuote { bid: string; pctChange: string; }
+
+interface QuotesData {
+  fx: {
+    USDBRL?: FxQuote;
+    EURBRL?: FxQuote;
+    GBPBRL?: FxQuote;
+  };
+  crypto: {
+    BTCBRL?: CryptoQuote;
+    ETHBRL?: CryptoQuote;
+  };
+  ts?: number;
 }
 
-interface QuoteData {
-  usd: Quote | null;
-  eur: Quote | null;
-  lastUpdate: Date | null;
-}
+const fmt2 = (v: string) =>
+  parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-const CURRENCIES = [
-  { key: "USDBRL", label: "Dólar", symbol: "US$", flag: "🇺🇸" },
-  { key: "EURBRL", label: "Euro",  symbol: "€",   flag: "🇪🇺" },
-];
+const fmtCrypto = (v: string) =>
+  parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-function Arrow({ pct }: { pct: string }) {
+function PctBadge({ pct }: { pct: string }) {
   const val = parseFloat(pct);
-  if (val > 0)
-    return <span className="text-[#16a34a] text-[11px] font-bold">▲ {Math.abs(val).toFixed(2)}%</span>;
-  if (val < 0)
-    return <span className="text-[#c8102e] text-[11px] font-bold">▼ {Math.abs(val).toFixed(2)}%</span>;
-  return <span className="text-gray-400 text-[11px] font-bold">— 0.00%</span>;
+  const up = val >= 0;
+  return (
+    <span
+      className="text-[12px] font-bold"
+      style={{ color: up ? "#16a34a" : "#c8102e" }}
+    >
+      {up ? "+" : ""}{val.toFixed(2)}%
+    </span>
+  );
 }
 
 export default function CotacaoWidget() {
-  const [data, setData] = useState<QuoteData>({ usd: null, eur: null, lastUpdate: null });
+  const [data, setData] = useState<QuotesData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const fetchQuotes = () => {
-    fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL")
+    setLoading(true);
+    fetch("/api/quotes")
       .then((r) => r.json())
-      .then((json) => {
-        setData({
-          usd: json.USDBRL ?? null,
-          eur: json.EURBRL ?? null,
-          lastUpdate: new Date(),
-        });
+      .then((json: QuotesData) => {
+        setData(json);
         setLoading(false);
         setError(false);
       })
@@ -57,90 +61,116 @@ export default function CotacaoWidget() {
     return () => clearInterval(interval);
   }, []);
 
-  const fmt = (val: string) =>
-    parseFloat(val).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const moedas = [
+    { label: "Dólar",  q: data?.fx?.USDBRL },
+    { label: "Euro",   q: data?.fx?.EURBRL  },
+    { label: "Libra",  q: data?.fx?.GBPBRL  },
+  ];
+
+  const cryptos = [
+    { label: "Bitcoin",  q: data?.crypto?.BTCBRL },
+    { label: "Ethereum", q: data?.crypto?.ETHBRL  },
+  ];
+
+  const lastUpdate = data?.ts
+    ? new Date(data.ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+    : null;
 
   return (
-    <div className="border border-gray-100 rounded-sm overflow-hidden mb-6">
-      {/* Cabeçalho */}
-      <div className="flex items-center justify-between bg-[#0f0f4a] px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-4 bg-[#c8102e]" />
-          <span className="text-white text-[12px] font-bold uppercase tracking-wider">Cotações</span>
-        </div>
-        {data.lastUpdate && (
-          <span className="text-white/40 text-[9px]">
-            {data.lastUpdate.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-          </span>
-        )}
-      </div>
+    <div className="space-y-3 mb-6">
 
-      {/* Conteúdo */}
-      <div className="divide-y divide-gray-100 bg-white">
-        {loading && (
-          <div className="px-4 py-4 flex gap-3 animate-pulse">
-            <div className="flex-1 space-y-2">
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-              <div className="h-5 bg-gray-200 rounded w-2/3" />
-            </div>
-            <div className="flex-1 space-y-2">
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-              <div className="h-5 bg-gray-200 rounded w-2/3" />
-            </div>
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="px-4 py-3 text-center">
-            <p className="text-[11px] text-gray-400">Cotação indisponível</p>
-            <button
-              onClick={fetchQuotes}
-              className="text-[11px] text-[#1d4ed8] hover:underline mt-1"
-            >
-              Tentar novamente
+      {/* ── Moedas ── */}
+      <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[18px] font-bold text-[#1a1a1a]">Moedas</h3>
+          {lastUpdate && (
+            <button onClick={fetchQuotes} title="Atualizar"
+              className="text-gray-300 hover:text-gray-500 text-[13px] transition-colors">
+              ↻
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
-        {!loading && !error && (
-          <div className="grid grid-cols-2 divide-x divide-gray-100">
-            {[
-              { meta: CURRENCIES[0], quote: data.usd },
-              { meta: CURRENCIES[1], quote: data.eur },
-            ].map(({ meta, quote }) => (
-              <div key={meta.key} className="px-4 py-3">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-base leading-none">{meta.flag}</span>
-                  <span className="text-[11px] text-gray-500 font-semibold">{meta.label}</span>
-                </div>
-                {quote ? (
-                  <>
-                    <div className="text-[18px] font-black text-[#1a1a1a] leading-none mb-1">
-                      R$ {fmt(quote.bid)}
-                    </div>
-                    <Arrow pct={quote.pctChange} />
-                    <div className="text-[9px] text-gray-300 mt-1">
-                      {fmt(quote.low)} / {fmt(quote.high)}
-                    </div>
-                  </>
-                ) : (
-                  <span className="text-gray-300 text-xs">—</span>
-                )}
+        {loading && (
+          <div className="space-y-2 animate-pulse">
+            {[1,2,3].map(i => (
+              <div key={i} className="flex justify-between">
+                <div className="h-3 bg-gray-100 rounded w-16" />
+                <div className="h-3 bg-gray-100 rounded w-20" />
+                <div className="h-3 bg-gray-100 rounded w-20" />
               </div>
             ))}
           </div>
         )}
+
+        {!loading && !error && (
+          <>
+            <div className="grid grid-cols-3 text-[10px] text-gray-400 uppercase tracking-wider mb-2 pb-1 border-b border-gray-100">
+              <span>Moeda</span>
+              <span className="text-right">Compra</span>
+              <span className="text-right">Venda</span>
+            </div>
+            {moedas.map(({ label, q }) => (
+              <div key={label} className="grid grid-cols-3 py-1.5 items-center">
+                <span className="text-[13px] font-semibold text-[#1d4ed8]">{label}</span>
+                <span className="text-right text-[12px] text-gray-700">
+                  {q ? `R$ ${fmt2(q.bid)}` : "—"}
+                </span>
+                <span className="text-right text-[12px] text-gray-700">
+                  {q ? `R$ ${fmt2(q.ask)}` : "—"}
+                </span>
+              </div>
+            ))}
+          </>
+        )}
+
+        {error && !loading && (
+          <p className="text-[11px] text-gray-400 text-center py-2">
+            Indisponível —{" "}
+            <button onClick={fetchQuotes} className="text-[#1d4ed8] hover:underline">
+              tentar novamente
+            </button>
+          </p>
+        )}
       </div>
 
-      <div className="bg-gray-50 px-4 py-1.5 flex items-center justify-between">
-        <span className="text-[9px] text-gray-300 uppercase tracking-wider">Fonte: AwesomeAPI</span>
-        <button
-          onClick={fetchQuotes}
-          className="text-[9px] text-gray-400 hover:text-[#1d4ed8] transition-colors uppercase tracking-wider"
-        >
-          ↻ Atualizar
-        </button>
+      {/* ── Criptoativos ── */}
+      <div className="bg-white border border-gray-100 rounded-lg p-4 shadow-sm">
+        <h3 className="text-[18px] font-bold text-[#1a1a1a] mb-3">Criptoativos</h3>
+
+        {loading && (
+          <div className="space-y-2 animate-pulse">
+            {[1,2].map(i => (
+              <div key={i} className="flex justify-between">
+                <div className="h-3 bg-gray-100 rounded w-20" />
+                <div className="h-3 bg-gray-100 rounded w-14" />
+                <div className="h-3 bg-gray-100 rounded w-24" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="space-y-1">
+            {cryptos.map(({ label, q }) => (
+              <div key={label} className="flex items-center justify-between py-1.5">
+                <span className="text-[13px] font-semibold text-[#1d4ed8] w-24 shrink-0">
+                  {label}
+                </span>
+                <PctBadge pct={q?.pctChange ?? "0"} />
+                <span className="text-[12px] text-gray-700 text-right">
+                  {q ? `R$ ${fmtCrypto(q.bid)}` : "—"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {error && !loading && (
+          <p className="text-[11px] text-gray-400 text-center py-2">Indisponível</p>
+        )}
       </div>
+
     </div>
   );
 }
