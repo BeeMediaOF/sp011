@@ -5,6 +5,9 @@ const SECRET = process.env["SESSION_SECRET"] ?? "dev-secret-brasilia";
 export const ADMIN_USER = process.env["ADMIN_USER"] ?? "admin";
 export const ADMIN_PASS = process.env["ADMIN_PASSWORD"] ?? "brasilia@2024";
 
+// Static API key for webhook integrations (never expires)
+export const WEBHOOK_API_KEY = process.env["WEBHOOK_API_KEY"] ?? "";
+
 export function generateToken(username: string): string {
   const ts = Date.now().toString();
   const payload = `${username}:${ts}`;
@@ -40,6 +43,11 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     return;
   }
   const token = authHeader.slice(7);
+  // Accept static webhook API key (never expires) OR short-lived JWT
+  if (WEBHOOK_API_KEY && token === WEBHOOK_API_KEY) {
+    next();
+    return;
+  }
   if (!verifyToken(token)) {
     res.status(401).json({ error: "Invalid or expired token" });
     return;
