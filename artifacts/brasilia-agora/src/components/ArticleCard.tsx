@@ -21,8 +21,8 @@ export default function ArticleCard({
 }: ArticleCardProps) {
   return (
     <Link href={`/artigo/${id}`}>
-      <div className="flex gap-4 group cursor-pointer py-4 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-        <div className="w-[120px] h-[80px] shrink-0 overflow-hidden relative rounded-sm">
+      <div className="flex gap-5 group cursor-pointer py-5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
+        <div className="w-[180px] h-[120px] shrink-0 overflow-hidden relative rounded-sm">
           <img
             src={imageUrl}
             alt={title}
@@ -30,20 +30,20 @@ export default function ArticleCard({
           />
         </div>
         <div className="flex flex-col justify-center flex-1">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-2">
             <span
-              className="text-[10px] font-bold text-white px-1.5 py-0.5 rounded-sm"
+              className="text-[11px] font-bold text-white px-2 py-0.5 rounded-sm"
               style={{ backgroundColor: tagColor }}
             >
               {tag}
             </span>
-            <span className="text-xs text-gray-500 font-medium">{time}</span>
+            <span className="text-[12px] text-gray-500 font-medium">{time}</span>
           </div>
-          <h3 className="font-bold text-[15px] leading-snug text-[#1a2448] group-hover:text-[#1d4ed8] transition-colors line-clamp-2">
+          <h3 className="font-bold text-[19px] leading-snug text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-2" style={{ fontFamily: "'Merriweather', serif" }}>
             {title}
           </h3>
           {subtitle && (
-            <p className="text-sm text-gray-600 line-clamp-1 mt-1">{subtitle}</p>
+            <p className="text-[13px] text-gray-500 line-clamp-2 mt-1.5">{subtitle}</p>
           )}
         </div>
       </div>
