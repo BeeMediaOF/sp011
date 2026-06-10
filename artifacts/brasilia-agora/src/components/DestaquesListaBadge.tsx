@@ -158,7 +158,7 @@ export default function DestaquesListaBadge() {
           </div>
 
           {/* ── Sidebar: Cotações + Mais Lidas + Propaganda ── */}
-          <aside className="hidden lg:block w-[300px] shrink-0">
+          <aside className="hidden lg:block w-[300px] shrink-0 mt-[10px] mb-[10px]">
             {/* Cotações em tempo real */}
             <CotacaoWidget />
 
