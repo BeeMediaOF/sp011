@@ -59,7 +59,7 @@ export default function DestaquesSection() {
                   {item.tag}
                 </div>
               </div>
-              <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#1d4ed8] transition-colors flex-grow">
+              <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors flex-grow">
                 {item.title}
               </h3>
               <span className="text-gray-500 text-xs">{item.time}</span>

@@ -99,7 +99,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
                   >
                     {art.chapeu}
                   </span>
-                  <h4 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
+                  <h4 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
                     {art.title}
                   </h4>
                 </div>

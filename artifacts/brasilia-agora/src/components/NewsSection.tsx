@@ -76,7 +76,7 @@ export default function NewsSection({
                     {label}
                   </div>
                 </div>
-                <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-1 group-hover:text-[#1d4ed8] transition-colors flex-grow">
+                <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-1 group-hover:text-[#c8102e] transition-colors flex-grow">
                   {item.title}
                 </h3>
                 <span className="text-gray-500 text-xs">{item.time}</span>
@@ -135,7 +135,7 @@ export default function NewsSection({
                     >
                       {label}
                     </span>
-                    <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-2">
+                    <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
                       {item.title}
                     </h4>
                     <span className="text-gray-500 text-xs mt-1">{item.time}</span>

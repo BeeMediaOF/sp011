@@ -144,7 +144,7 @@ export default function DestaquesCardOverlay() {
                     <span className={`inline-block text-white text-[10px] font-bold px-2 py-0.5 mb-2 ${card.categoriaColor}`}>
                       {card.categoria}
                     </span>
-                    <h3 className="text-white font-bold text-[15px] leading-snug">
+                    <h3 className="text-white font-bold text-[15px] leading-snug group-hover:text-red-300 transition-colors">
                       {card.titulo}
                     </h3>
                   </div>

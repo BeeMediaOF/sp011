@@ -73,7 +73,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                 >
                   {featured.chapeu}
                 </span>
-                <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px]">
+                <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px] group-hover:text-red-300 transition-colors">
                   {featured.title}
                 </h3>
               </div>

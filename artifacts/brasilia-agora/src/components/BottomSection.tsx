@@ -52,7 +52,7 @@ export default function BottomSection() {
                 <Link href={`/artigo/${item.id}`} className="block">
                   <div className="flex group cursor-pointer">
                     <span className="text-[#1a2448] font-bold text-sm min-w-[50px] pt-0.5">{item.time}</span>
-                    <p className="text-[14px] text-gray-800 font-medium leading-snug group-hover:text-[#1d4ed8] transition-colors">
+                    <p className="text-[14px] text-gray-800 font-medium leading-snug group-hover:text-[#c8102e] transition-colors">
                       {item.text}
                     </p>
                   </div>
@@ -77,7 +77,7 @@ export default function BottomSection() {
                   ESPECIAL
                 </div>
               </div>
-              <h2 className="text-2xl font-bold text-[#1a2448] mb-2 leading-tight group-hover:text-[#1d4ed8] transition-colors">
+              <h2 className="text-2xl font-bold text-[#1a2448] mb-2 leading-tight group-hover:text-[#c8102e] transition-colors">
                 Os 64 anos de Brasília: a capital que inspira o futuro
               </h2>
               <p className="text-gray-600 text-sm mb-3">
@@ -101,7 +101,7 @@ export default function BottomSection() {
                 <div className="flex items-start gap-4 group cursor-pointer">
                   <img src={item.avatar} alt={item.name} className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300" />
                   <div>
-                    <h4 className="font-bold text-[#1a2448] text-sm group-hover:text-[#1d4ed8] transition-colors">{item.name}</h4>
+                    <h4 className="font-bold text-[#1a2448] text-sm group-hover:text-[#c8102e] transition-colors">{item.name}</h4>
                     <p className="text-xs text-gray-600 italic leading-snug mt-1">"{item.desc}"</p>
                   </div>
                 </div>

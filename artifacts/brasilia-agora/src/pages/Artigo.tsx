@@ -135,7 +135,7 @@ function ArticleSidebar() {
               >
                 {idx + 1}
               </span>
-              <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3">
+              <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3">
                 {item.title}
               </p>
             </Link>

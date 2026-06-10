@@ -24,7 +24,7 @@ export default function NewsCard({ id, title, summary, image, chapeu, chapeuColo
       <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: chapeuColor }}>
         {chapeu}
       </span>
-      <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#1d4ed8] transition-colors line-clamp-3">
+      <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#c8102e] transition-colors line-clamp-3">
         {title}
       </h3>
       <p className="text-gray-500 text-sm leading-relaxed mt-1.5 line-clamp-2">

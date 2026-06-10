@@ -130,7 +130,7 @@ export default function CategoryPage({
                     <Link key={idx} href={`/artigo/mais-lidas-${idx+1}`}>
                       <div className="flex gap-3 group cursor-pointer">
                         <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">{idx + 1}</span>
-                        <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#1d4ed8] transition-colors leading-snug pt-1">{title}</p>
+                        <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#c8102e] transition-colors leading-snug pt-1">{title}</p>
                       </div>
                     </Link>
                   ))}

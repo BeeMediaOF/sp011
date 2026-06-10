@@ -132,7 +132,7 @@ export default function Colunas() {
                       <span className="text-gray-500 text-xs font-bold mb-1 flex items-center gap-2">
                         {item.time} • <span className="text-[#1d4ed8]">{item.author}</span>
                       </span>
-                      <p className="text-[15px] text-[#1a2448] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors">
+                      <p className="text-[15px] text-[#1a2448] font-bold leading-snug group-hover:text-[#c8102e] transition-colors">
                         {item.title}
                       </p>
                     </Link>
