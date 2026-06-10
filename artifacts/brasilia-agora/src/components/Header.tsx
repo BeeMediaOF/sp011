@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaTwitter, FaYoutube, FaWhatsapp } from "react-icons/fa";
 import { useSite } from "../hooks/useSite";
-import logoImg from "../assets/images/logo_correio_v2.png";
+import logoImg from "../assets/images/logo_novo.png";
 
 export default function Header() {
   const { settings } = useSite();
