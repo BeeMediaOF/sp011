@@ -116,7 +116,7 @@ export default function Home() {
           articles={getByCategory("esporte", esporteArticles)}
         />
 
-        <SectionBlock
+        <SectionBlockCulturaLayout
           title="Cultura"
           color={editoriaColors.cultura}
           href="/cultura"
