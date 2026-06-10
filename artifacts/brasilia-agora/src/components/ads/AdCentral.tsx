@@ -14,22 +14,7 @@ export default function AdCentral() {
   }
 
   if (!ad) {
-    return (
-      <div className="w-full flex justify-center">
-        <a
-          href="https://www.ze.delivery/produtos"
-          target="_blank"
-          rel="noreferrer"
-          className="block w-full max-w-[952px] overflow-hidden group"
-        >
-          <img
-            src="/ad-ze-delivery.jpg"
-            alt="Zé Delivery — Entrega grátis de segunda a sexta"
-            className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform"
-          />
-        </a>
-      </div>
-    );
+    return null;
   }
 
   return (
