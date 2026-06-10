@@ -18,14 +18,13 @@ interface SectionBlockProps {
   color: string;
   href: string;
   articles: SectionArticle[];
+  pageSize?: number;
 }
 
-const PAGE_SIZE = 3;
-
-export default function SectionBlock({ title, color, href, articles }: SectionBlockProps) {
+export default function SectionBlock({ title, color, href, articles, pageSize = 3 }: SectionBlockProps) {
   const [page, setPage] = useState(0);
-  const totalPages = Math.ceil(articles.length / PAGE_SIZE);
-  const visible = articles.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const totalPages = Math.ceil(articles.length / pageSize);
+  const visible = articles.slice(page * pageSize, page * pageSize + pageSize);
 
   return (
     <section className="border-t border-gray-200 py-8">
@@ -67,7 +66,7 @@ export default function SectionBlock({ title, color, href, articles }: SectionBl
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 min-h-[280px]">
+        <div className={`grid gap-5 min-h-[280px] grid-cols-1 sm:grid-cols-2 ${pageSize === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           {visible.map((article) => (
             <NewsCard
               key={article.id}

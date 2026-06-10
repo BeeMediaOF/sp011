@@ -138,6 +138,7 @@ export default function Home() {
           color={editoriaColors.saude}
           href="/saude"
           articles={getByCategory("saude", saudeArticles)}
+          pageSize={4}
         />
 
         <SectionBlockFeatured
