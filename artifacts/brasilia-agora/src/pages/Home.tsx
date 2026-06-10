@@ -70,7 +70,6 @@ export default function Home() {
             ZONA 1 — HERO + MAIS LIDAS + ANÚNCIO
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <HeroSection />
-        <MostRead />
 
         <div className="max-w-[1280px] mx-auto px-4 py-4">
           <AdCentral />
@@ -86,6 +85,8 @@ export default function Home() {
           href="/brasil"
           articles={getByCategory("brasil", brasilArticles)}
         />
+
+        <MostRead />
 
         <SectionBlock
           title="Mundo"
