@@ -135,7 +135,7 @@ export default function DestaquesListaBadge() {
 
             <div className="flex flex-col divide-y divide-gray-200">
               {artigos.map((art) => (
-                <Link key={art.id} href={`/artigo/${art.slug}`} className="group block py-6 first:pt-0">
+                <Link key={art.id} href={`/artigo/${art.slug}`} className="group block py-6 first:pt-0 mr-[86px]">
                   <div className="flex gap-4 items-start">
                     <img
                       src={art.image}
