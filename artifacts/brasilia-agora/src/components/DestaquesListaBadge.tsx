@@ -149,7 +149,7 @@ export default function DestaquesListaBadge() {
                       >
                         {art.categoria}
                       </span>
-                      <h3 className="font-bold text-[#1a1a1a] text-[20px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors">
+                      <h3 className="font-serif font-black text-[#1a1a1a] text-[20px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors">
                         {art.titulo}
                       </h3>
                       <p className="text-[13px] text-gray-500 leading-relaxed mb-3 line-clamp-2">
