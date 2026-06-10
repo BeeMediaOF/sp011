@@ -8,7 +8,7 @@ import logoImg from "../assets/images/logo_novo.png";
 export default function Header() {
   const { settings } = useSite();
   return (
-    <header className="bg-[#000000] mb-[-17px] pt-[20px] pb-[20px] md:pt-[30px] md:pb-[30px]">
+    <header className="bg-[#000000] pt-[20px] pb-[20px] md:pt-[30px] md:pb-[30px] mb-[-2px]">
       <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-4">
         {/* Logo */}
         <Link href="/" className="group cursor-pointer block shrink-0">
