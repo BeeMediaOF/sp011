@@ -10,6 +10,7 @@ import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
 import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
+import ApoiadoresSection from "../components/ApoiadoresSection";
 import AdCentral from "../components/ads/AdCentral";
 import { useArticles } from "../hooks/useArticles";
 
@@ -182,6 +183,7 @@ export default function Home() {
             sidebar com Mais Lidas e propaganda
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
         <DestaquesListaBadge />
+        <ApoiadoresSection />
 
       </main>
 
