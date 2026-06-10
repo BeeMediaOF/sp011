@@ -5,7 +5,6 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
-import DestaquesCardOverlay from "../components/DestaquesCardOverlay";
 import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
@@ -102,12 +101,6 @@ export default function Home() {
         <div className="max-w-[1280px] mx-auto px-4 py-4">
           <AdCentral />
         </div>
-
-        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-            ZONA 4 — EM DESTAQUE
-            Carrossel de 2 cards com imagem overlay
-        ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <DestaquesCardOverlay />
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 5 — ESPORTE & CULTURA
