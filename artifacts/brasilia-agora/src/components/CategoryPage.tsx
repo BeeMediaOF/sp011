@@ -53,7 +53,7 @@ export default function CategoryPage({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
             {[featuredArticle, second].filter(Boolean).map((art) => art && (
               <Link key={art.id} href={`/artigo/${art.id}`} className="group block">
-                <div className="relative overflow-hidden bg-gray-100 h-[380px]">
+                <div className="relative overflow-hidden bg-gray-100 h-[220px] sm:h-[300px] md:h-[380px]">
                   <img
                     src={art.imageUrl}
                     alt={art.title}

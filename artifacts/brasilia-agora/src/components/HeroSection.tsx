@@ -46,7 +46,7 @@ export default function HeroSection() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
         {featured.map((item) => (
           <Link key={item.id} href={`/artigo/${item.id}`} className="group block">
-            <div className="relative overflow-hidden bg-gray-100 h-[420px]">
+            <div className="relative overflow-hidden bg-gray-100 h-[260px] sm:h-[340px] lg:h-[420px]">
               <img
                 src={item.img}
                 alt={item.title}
@@ -77,10 +77,10 @@ export default function HeroSection() {
       </div>
 
       {/* Faixa de secundárias */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 border-t border-gray-200 pt-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
         {secondary.map((item) => (
-          <Link key={item.id} href={`/artigo/${item.id}`} className="group flex gap-4 items-start">
-            <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100">
+          <Link key={item.id} href={`/artigo/${item.id}`} className="group flex gap-3 items-start">
+            <div className="w-[72px] h-[52px] sm:w-[100px] sm:h-[72px] shrink-0 overflow-hidden bg-gray-100">
               <img
                 src={item.img}
                 alt={item.chapeu}

@@ -86,7 +86,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 href={`/artigo/${item.id}`}
                 className="group flex gap-4 py-3 first:pt-0 last:pb-0 items-start"
               >
-                <div className="w-[160px] h-[107px] shrink-0 overflow-hidden bg-gray-100">
+                <div className="w-[90px] h-[68px] sm:w-[160px] sm:h-[107px] shrink-0 overflow-hidden bg-gray-100">
                   <img
                     src={imgSrc(item.image)}
                     alt={item.title}
@@ -95,7 +95,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                   />
                 </div>
                 <div className="flex-1 min-w-0 py-1">
-                  <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 mr-[18px] text-[19px]">
+                  <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 text-[15px] sm:text-[19px]">
                     {item.title}
                   </h4>
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">

@@ -22,7 +22,7 @@ export default function ArticleCard({
   return (
     <Link href={`/artigo/${id}`}>
       <div className="flex gap-5 group cursor-pointer py-5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
-        <div className="w-[180px] h-[120px] shrink-0 overflow-hidden relative rounded-sm">
+        <div className="w-[110px] h-[80px] sm:w-[180px] sm:h-[120px] shrink-0 overflow-hidden relative rounded-sm">
           <img
             src={imageUrl}
             alt={title}

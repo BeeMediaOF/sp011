@@ -122,10 +122,10 @@ export default function DestaquesListaBadge() {
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
-        <div className="flex gap-10 items-start">
+        <div className="flex flex-col lg:flex-row gap-10 items-start">
 
           {/* ── Coluna principal: lista de noticias ── */}
-          <div className="flex-1 min-w-0 ml-[0px] mr-[102px]">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1 h-5 bg-[#c8102e]" />
               <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
@@ -136,11 +136,11 @@ export default function DestaquesListaBadge() {
             <div className="flex flex-col divide-y divide-gray-200">
               {artigos.map((art) => (
                 <Link key={art.id} href={`/artigo/${art.slug}`} className="group block py-6 first:pt-0">
-                  <div className="flex gap-5 items-start">
+                  <div className="flex gap-4 items-start">
                     <img
                       src={art.image}
                       alt={art.titulo}
-                      className="w-[220px] h-[148px] object-cover rounded-lg flex-shrink-0 group-hover:opacity-90 transition-opacity"
+                      className="w-[100px] h-[75px] sm:w-[220px] sm:h-[148px] object-cover rounded-lg flex-shrink-0 group-hover:opacity-90 transition-opacity"
                     />
                     <div className="flex-1 min-w-0 py-1">
                       <span
@@ -166,7 +166,7 @@ export default function DestaquesListaBadge() {
           </div>
 
           {/* ── Sidebar: Cotações + Mais Lidas + Propaganda ── */}
-          <aside className="hidden lg:block w-[300px] shrink-0 mt-[10px] mb-[10px]">
+          <aside className="w-full lg:w-[300px] shrink-0 mt-2 lg:mt-[10px] mb-[10px]">
             {/* Cotações em tempo real */}
             <CotacaoWidget />
 
