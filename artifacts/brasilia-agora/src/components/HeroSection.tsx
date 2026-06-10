@@ -37,7 +37,7 @@ export default function HeroSection() {
             </div>
           </div>
           <div className="pt-4">
-            <h1 className="font-serif text-[#1a1a1a] text-2xl lg:text-[34px] font-black leading-[1.15] group-hover:text-[#1d4ed8] transition-colors mr-[23px]">
+            <h1 className="font-serif text-2xl lg:text-[34px] font-black leading-[1.15] group-hover:text-[#1d4ed8] transition-colors mr-[23px] text-[#000000]">
               Câmara Legislativa aprova projeto que cria o programa Morar DF
             </h1>
             <p className="text-gray-500 text-sm leading-relaxed mt-2 max-w-xl">
@@ -67,7 +67,7 @@ export default function HeroSection() {
                   <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: item.chapeuColor }}>
                     {item.chapeu}
                   </span>
-                  <h3 className="font-serif text-[#1a1a1a] text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-2">
+                  <h3 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-2 text-[#000000]">
                     {item.title}
                   </h3>
                   <p className="text-gray-400 text-[11px] mt-1 line-clamp-1 hidden sm:block">
