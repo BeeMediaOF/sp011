@@ -6,6 +6,7 @@ import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
 import SectionBlockFeatured from "../components/SectionBlockFeatured";
+import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
 import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
@@ -125,7 +126,7 @@ export default function Home() {
             ZONA 7 — CIDADE, SAÚDE & TECNOLOGIA
             Três carrosseis locais
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-        <SectionBlock
+        <SectionBlockDuploDestaque
           title="DF"
           color={editoriaColors.df}
           href="/df"
