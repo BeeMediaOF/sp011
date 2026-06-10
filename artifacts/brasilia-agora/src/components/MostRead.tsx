@@ -17,11 +17,6 @@ export default function MostRead() {
   return (
     <div className="bg-[#f8f9fa] border-t border-b border-gray-200 py-6">
       <div className="max-w-[1280px] mx-auto px-4">
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-1 h-5 bg-[#c8102e]" />
-          <h2 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">Mais Lidas</h2>
-        </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
           {maisLidas.map((item) => (
             <Link key={item.id} href={`/artigo/${item.id}`} className="block group">
