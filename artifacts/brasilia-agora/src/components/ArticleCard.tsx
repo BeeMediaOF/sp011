@@ -39,7 +39,7 @@ export default function ArticleCard({
             </span>
             <span className="text-[12px] text-gray-500 font-medium">{time}</span>
           </div>
-          <h3 className="font-bold text-[19px] leading-snug text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-2" style={{ fontFamily: "'Merriweather', serif" }}>
+          <h3 className="font-bold text-[19px] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2 text-[#000000]" style={{ fontFamily: "'Merriweather', serif" }}>
             {title}
           </h3>
           {subtitle && (
