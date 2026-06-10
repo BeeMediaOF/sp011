@@ -119,13 +119,6 @@ export default function Home() {
           reverse
         />
 
-        <SectionBlockCulturaLayout
-          title="Cultura"
-          color={editoriaColors.cultura}
-          href="/cultura"
-          articles={getByCategory("cultura", culturaArticles)}
-        />
-
         <div className="max-w-[1280px] mx-auto px-4 py-6">
           <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
           <div className="flex justify-center">
@@ -143,6 +136,13 @@ export default function Home() {
             </a>
           </div>
         </div>
+
+        <SectionBlockCulturaLayout
+          title="Cultura"
+          color={editoriaColors.cultura}
+          href="/cultura"
+          articles={getByCategory("cultura", culturaArticles)}
+        />
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 7 — CIDADE, SAÚDE & TECNOLOGIA
