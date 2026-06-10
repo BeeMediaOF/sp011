@@ -9,6 +9,9 @@ import economiaImg from "../assets/images/especial.png";
 import busImg from "../assets/images/bus.png";
 import trafficImg from "../assets/images/traffic.png";
 import festivalImg from "../assets/images/festival.png";
+import hospitalImg from "../assets/images/hospital.png";
+import policeImg from "../assets/images/police.png";
+import studentsImg from "../assets/images/students.png";
 
 interface MiniArticle {
   img: string;
@@ -39,6 +42,7 @@ const colunas: Coluna[] = [
     artigos: [
       { img: politics2Img, titulo: "Camara Legislativa aprova aumento de 12% para servidores publicos do DF", slug: "cldf-aumento-servidores" },
       { img: heroImg, titulo: "GDF encaminha a CLDF proposta do orcamento para 2025 com R$ 48 bilhoes", slug: "gdf-orcamento-2025" },
+      { img: policeImg, titulo: "Ministerio da Justica lanca programa nacional de combate a corrupcao municipal", slug: "mj-programa-corrupcao" },
     ],
   },
   {
@@ -54,6 +58,7 @@ const colunas: Coluna[] = [
     artigos: [
       { img: economiaImg, titulo: "Brasilia e eleita melhor cidade para investir no Brasil em 2025", slug: "brasilia-melhor-cidade-investir" },
       { img: brasilImg, titulo: "GDF libera R$ 500 milhoes em credito para micro e pequenas empresas", slug: "gdf-credito-micro-empresas" },
+      { img: hospitalImg, titulo: "Inflacao recua para 3,8% em maio, menor indice desde 2020", slug: "inflacao-recua-maio-2025" },
     ],
   },
   {

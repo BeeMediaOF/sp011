@@ -116,6 +116,7 @@ export default function Home() {
           color={editoriaColors.esporte}
           href="/esporte"
           articles={getByCategory("esporte", esporteArticles)}
+          reverse
         />
 
         <SectionBlockCulturaLayout

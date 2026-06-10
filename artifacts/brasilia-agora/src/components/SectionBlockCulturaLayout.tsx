@@ -16,6 +16,7 @@ interface Props {
   color: string;
   href: string;
   articles: Article[];
+  reverse?: boolean;
 }
 
 function imgSrc(img: unknown): string {
@@ -23,7 +24,7 @@ function imgSrc(img: unknown): string {
   return (img as { src?: string })?.src ?? "";
 }
 
-export default function SectionBlockCulturaLayout({ title, color, href, articles }: Props) {
+export default function SectionBlockCulturaLayout({ title, color, href, articles, reverse = false }: Props) {
   const [featured, ...rest] = articles;
   const listItems = rest.slice(0, 5);
 
@@ -45,7 +46,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
         </div>
 
         {/* Layout 2 colunas */}
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className={`flex flex-col gap-8 ${reverse ? "lg:flex-row-reverse" : "lg:flex-row"}`}>
 
           {/* Destaque principal — imagem overlay */}
           <Link href={`/artigo/${featured.id}`} className="group flex lg:w-[46%] shrink-0 self-stretch">
