@@ -116,35 +116,6 @@ export default function CategoryPage({
                 </div>
               </div>
 
-              {/* Editoriais */}
-              <div>
-                <div className="flex items-center mb-6">
-                  <div className="w-1.5 h-5 bg-[#1a2448] mr-3" />
-                  <h3 className="text-lg font-bold text-[#1a2448]">EDITORIAIS</h3>
-                </div>
-                <div className="flex flex-col space-y-5">
-                  {[
-                    { avatar: avatar1, name: "Denise Rothenburg", desc: "Bastidores e nos corredores do poder no DF" },
-                    { avatar: avatar2, name: "Ana Maria Campos", desc: "Cidades inteligentes e mobilidade urbana" },
-                    { avatar: avatar3, name: "Carlos Alexandre", desc: "Análise da criminalidade e políticas" }
-                  ].map((item, i) => (
-                    <Link key={i} href={`/colunas`}>
-                      <div className="flex items-start gap-4 group cursor-pointer">
-                        <img src={item.avatar} alt={item.name} className="w-14 h-14 rounded-full object-cover border border-gray-200 shrink-0 grayscale group-hover:grayscale-0 transition-all duration-300" />
-                        <div>
-                          <h4 className="font-bold text-[#1a2448] text-sm group-hover:text-[#1d4ed8] transition-colors">{item.name}</h4>
-                          <p className="text-xs text-gray-600 italic leading-snug mt-1">"{item.desc}"</p>
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-                <Link href="/colunas">
-                  <button className="w-full mt-6 py-2 border border-gray-300 text-gray-600 font-bold text-xs hover:bg-gray-100 transition-colors">
-                    VER TODOS OS COLUNISTAS
-                  </button>
-                </Link>
-              </div>
             </div>
           </div>
         </div>
