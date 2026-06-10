@@ -84,6 +84,7 @@ export default function Home() {
           color={editoriaColors.brasil}
           href="/brasil"
           articles={getByCategory("brasil", brasilArticles)}
+          pageSize={4}
         />
 
         <MostRead />
