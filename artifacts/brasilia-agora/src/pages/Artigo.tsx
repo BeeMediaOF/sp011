@@ -219,13 +219,12 @@ export default function Artigo() {
       <TopBar />
       <Header />
       <NavBar />
-
       <main className="flex-1 bg-white pb-16">
         <div className="max-w-[1280px] mx-auto px-4 mt-6">
           <div className="flex flex-col lg:flex-row gap-8">
 
             {/* ── CONTEÚDO PRINCIPAL ─────────────────────────────────── */}
-            <article className="w-full lg:flex-1 min-w-0">
+            <article className="w-full lg:flex-1 min-w-0 ml-[27px] mr-[27px] pl-[0px] pr-[0px] pt-[0px] pb-[0px]">
               {showSkeleton ? (
                 <ArticleSkeleton />
               ) : !article ? (
@@ -387,7 +386,6 @@ export default function Artigo() {
           </div>
         </div>
       </main>
-
       <Footer />
     </div>
   );
