@@ -543,4 +543,13 @@ export const dfArticles = [
     author: "Bruno Fernandes",
     time: "11 horas atrás",
   },
+  {
+    id: "df-7",
+    title: "Metrô do DF anuncia expansão de linha até Santa Maria até 2027",
+    summary: "Projeto prevê 8 novas estações e capacidade para 120 mil passageiros por dia.",
+    image: transport2Img,
+    chapeu: "DF",
+    author: "Carla Santos",
+    time: "13 horas atrás",
+  },
 ];
