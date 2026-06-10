@@ -6,7 +6,7 @@ import logoImg from "../assets/images/logo_correio_v2.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-[#1a1a1a] text-white pt-10 pb-6 border-t-[4px] border-[#c8102e]">
+    <footer className="text-white pt-10 pb-6 border-t-[4px] border-[#c8102e] bg-[#000000]">
       <div className="max-w-[1280px] mx-auto px-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10">
 
         {/* Logo + Sobre */}
@@ -81,7 +81,6 @@ export default function Footer() {
         </div>
 
       </div>
-
       <div className="max-w-[1280px] mx-auto px-4 border-t border-white/10 pt-5 flex flex-col md:flex-row justify-between items-center text-xs text-gray-500">
         <p>© 2026 Correio da Capital. Todos os direitos reservados.</p>
         <div className="flex space-x-4 mt-3 md:mt-0">
