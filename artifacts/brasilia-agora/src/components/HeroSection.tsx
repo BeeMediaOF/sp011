@@ -36,7 +36,6 @@ const secondary = [
   { id: "hero-4", img: policeImg,   chapeu: "Segurança", chapeuColor: "#dc2626", title: "Polícia Civil prende grupo suspeito de furtos no Plano Piloto" },
   { id: "hero-5", img: hospitalImg, chapeu: "Saúde",     chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
   { id: "hero-6", img: busImg,      chapeu: "DF",        chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
-  { id: "hero-7", img: studentsImg, chapeu: "Educação",  chapeuColor: "#0d9488", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023" },
 ];
 
 export default function HeroSection() {
@@ -78,10 +77,10 @@ export default function HeroSection() {
       </div>
 
       {/* Faixa de secundárias */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 border-t border-gray-200 pt-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 border-t border-gray-200 pt-5">
         {secondary.map((item) => (
-          <Link key={item.id} href={`/artigo/${item.id}`} className="group flex gap-3 items-start">
-            <div className="w-[80px] h-[58px] shrink-0 overflow-hidden bg-gray-100">
+          <Link key={item.id} href={`/artigo/${item.id}`} className="group flex gap-4 items-start">
+            <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100">
               <img
                 src={item.img}
                 alt={item.chapeu}
@@ -89,10 +88,10 @@ export default function HeroSection() {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: item.chapeuColor }}>
+              <span className="text-[11px] font-bold uppercase tracking-wider block mb-1" style={{ color: item.chapeuColor }}>
                 {item.chapeu}
               </span>
-              <h3 className="text-[13px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
+              <h3 className="text-[15px] font-bold leading-snug group-hover:text-[#1d4ed8] transition-colors line-clamp-3 text-[#1a1a1a]">
                 {item.title}
               </h3>
             </div>

@@ -224,7 +224,7 @@ export default function Artigo() {
           <div className="flex flex-col lg:flex-row gap-8">
 
             {/* ── CONTEÚDO PRINCIPAL ─────────────────────────────────── */}
-            <article className="w-full lg:flex-1 min-w-0 pl-[0px] pr-[0px] pt-[0px] pb-[0px] ml-[47px] mr-[47px]">
+            <article className="w-full lg:flex-1 min-w-0 pl-[0px] pr-[0px] pt-[0px] pb-[0px] ml-[0px] mr-[56px] mb-[0px]">
               {showSkeleton ? (
                 <ArticleSkeleton />
               ) : !article ? (
