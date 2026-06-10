@@ -48,12 +48,12 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
         <div className="flex flex-col lg:flex-row gap-8">
 
           {/* Destaque principal — imagem overlay */}
-          <Link href={`/artigo/${featured.id}`} className="group block lg:w-[46%] shrink-0">
-            <div className="relative overflow-hidden aspect-[4/3] bg-gray-100">
+          <Link href={`/artigo/${featured.id}`} className="group flex lg:w-[46%] shrink-0 self-stretch">
+            <div className="relative overflow-hidden w-full h-full min-h-[340px] bg-gray-100">
               <img
                 src={imgSrc(featured.image)}
                 alt={featured.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 loading="lazy"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
