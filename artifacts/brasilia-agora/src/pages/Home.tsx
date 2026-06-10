@@ -5,6 +5,7 @@ import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
+import SectionBlockFeatured from "../components/SectionBlockFeatured";
 import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
@@ -138,7 +139,7 @@ export default function Home() {
           articles={getByCategory("saude", saudeArticles)}
         />
 
-        <SectionBlock
+        <SectionBlockFeatured
           title="Tecnologia"
           color={editoriaColors.tecnologia}
           href="/tecnologia"
