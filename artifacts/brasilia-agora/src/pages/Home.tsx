@@ -7,6 +7,7 @@ import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
 import SectionBlockFeatured from "../components/SectionBlockFeatured";
 import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
+import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
 import EditoriasTriploBloco from "../components/EditoriasTriploBloco";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";

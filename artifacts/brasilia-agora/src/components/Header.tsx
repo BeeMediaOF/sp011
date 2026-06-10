@@ -8,7 +8,7 @@ import logoImg from "../assets/images/logo_correio_v2.png";
 export default function Header() {
   const { settings } = useSite();
   return (
-    <header className="py-4 border-b border-white/10 bg-[#0f0f4a]">
+    <header className="py-4 border-b border-white/10 bg-[#000000]">
       <div className="max-w-[1280px] mx-auto px-4 flex items-center justify-between gap-6">
         {/* Logo */}
         <Link href="/" className="group cursor-pointer block shrink-0">
