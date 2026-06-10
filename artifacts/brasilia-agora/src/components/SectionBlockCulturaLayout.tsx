@@ -25,7 +25,7 @@ function imgSrc(img: unknown): string {
 
 export default function SectionBlockCulturaLayout({ title, color, href, articles }: Props) {
   const [featured, ...rest] = articles;
-  const listItems = rest.slice(0, 4);
+  const listItems = rest.slice(0, 5);
 
   if (!featured) return null;
 
@@ -83,9 +83,9 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
               <Link
                 key={item.id}
                 href={`/artigo/${item.id}`}
-                className="group flex gap-5 py-5 first:pt-0 last:pb-0 items-start"
+                className="group flex gap-4 py-3 first:pt-0 last:pb-0 items-start"
               >
-                <div className="w-[200px] h-[134px] shrink-0 overflow-hidden bg-gray-100">
+                <div className="w-[160px] h-[107px] shrink-0 overflow-hidden bg-gray-100">
                   <img
                     src={imgSrc(item.image)}
                     alt={item.title}
