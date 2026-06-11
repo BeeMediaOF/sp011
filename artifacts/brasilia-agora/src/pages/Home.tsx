@@ -170,11 +170,12 @@ export default function Home() {
           pageSize={4}
         />
 
-        <SectionBlockFeatured
+        <SectionBlockCulturaLayout
           title="Tecnologia"
           color={editoriaColors.tecnologia}
           href="/tecnologia"
           articles={getByCategory("tecnologia", tecnologiaArticles)}
+          reverse
         />
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
