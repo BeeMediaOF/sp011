@@ -1,12 +1,12 @@
 import React from "react";
 import { Link } from "wouter";
-import heroImg from "../assets/images/hero.png";
-import trafficImg from "../assets/images/traffic.png";
-import policeImg from "../assets/images/police.png";
-import hospitalImg from "../assets/images/hospital.png";
-import busImg from "../assets/images/bus.png";
-import studentsImg from "../assets/images/students.png";
-import politicaFeatImg from "../assets/images/politica_feat.png";
+import heroImg from "../assets/images/hero.webp";
+import trafficImg from "../assets/images/traffic.webp";
+import policeImg from "../assets/images/police.webp";
+import hospitalImg from "../assets/images/hospital.webp";
+import busImg from "../assets/images/bus.webp";
+import studentsImg from "../assets/images/students.webp";
+import politicaFeatImg from "../assets/images/politica_feat.webp";
 
 const featured = [
   {
@@ -43,12 +43,17 @@ export default function HeroSection() {
     <section className="max-w-[1280px] mx-auto px-4 py-6">
       {/* Dois destaques grandes */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        {featured.map((item) => (
+        {featured.map((item, idx) => (
           <Link key={item.id} href={`/artigo/${item.id}`} className="group block">
             <div className="relative overflow-hidden bg-gray-100 h-[260px] sm:h-[340px] lg:h-[420px]">
               <img
                 src={item.img}
                 alt={item.title}
+                width={640}
+                height={420}
+                loading={idx === 0 ? "eager" : "lazy"}
+                fetchPriority={idx === 0 ? "high" : "auto"}
+                decoding={idx === 0 ? "sync" : "async"}
                 className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
@@ -64,7 +69,7 @@ export default function HeroSection() {
                 </h2>
                 <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
                 <div className="flex items-center gap-2 text-[11px] text-white/70">
-                  <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-90" />
+                  <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-90" loading="lazy" />
                   <span className="font-medium">Bee News</span>
                   <span className="w-1 h-1 rounded-full bg-white/40" />
                   <span>{item.time}</span>
@@ -82,6 +87,10 @@ export default function HeroSection() {
               <img
                 src={item.img}
                 alt={item.chapeu}
+                width={100}
+                height={72}
+                loading="lazy"
+                decoding="async"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             </div>

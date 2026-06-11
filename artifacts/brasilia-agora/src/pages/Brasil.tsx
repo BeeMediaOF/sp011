@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import brasilImg from "../assets/images/brasil.png";
-import politics2Img from "../assets/images/politics2.png";
+import brasilImg from "../assets/images/brasil.webp";
+import politics2Img from "../assets/images/politics2.webp";
 
 const articles = [
   { id: "brasil-1", title: "Senado aprova marco regulatório para inteligência artificial no Brasil", subtitle: "Texto prevê direitos e deveres para uso de IA em serviços públicos", time: "1 hora atrás", imageUrl: brasilImg, tag: "BRASIL", tagColor: "#16a34a" },

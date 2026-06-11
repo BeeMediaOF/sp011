@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "wouter";
 import { Share2, ChevronLeft, ChevronRight } from "lucide-react";
-import hospitalImg from "../assets/images/hospital.png";
-import cityImg from "../assets/images/city.png";
-import culturaFeatImg from "../assets/images/cultura_feat.png";
-import parkImg from "../assets/images/park.png";
+import hospitalImg from "../assets/images/hospital.webp";
+import cityImg from "../assets/images/city.webp";
+import culturaFeatImg from "../assets/images/cultura_feat.webp";
+import parkImg from "../assets/images/park.webp";
 
 const shareIcons = (
   <div className="flex items-center gap-2 mt-2">

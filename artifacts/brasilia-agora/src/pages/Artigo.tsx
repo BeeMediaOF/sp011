@@ -217,8 +217,79 @@ export default function Artigo() {
         .filter(Boolean)
     : [];
 
+  const canonicalUrl = article
+    ? `https://brasilia-agora.com/artigo/${article.id}`
+    : null;
+
+  const newsArticleSchema = article
+    ? {
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        headline: article.title,
+        description: article.subtitle ?? "",
+        image: article.imageUrl ? [article.imageUrl] : [],
+        datePublished: article.publishedAt,
+        dateModified: article.publishedAt,
+        author: {
+          "@type": "Person",
+          name: article.author ?? "Redação Brasília Agora",
+        },
+        publisher: {
+          "@type": "Organization",
+          name: "Brasília Agora",
+          logo: {
+            "@type": "ImageObject",
+            url: "https://brasilia-agora.com/favicon.jpg",
+          },
+        },
+        mainEntityOfPage: {
+          "@type": "WebPage",
+          "@id": canonicalUrl,
+        },
+      }
+    : null;
+
+  const breadcrumbSchema = article
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          {
+            "@type": "ListItem",
+            position: 1,
+            name: "Início",
+            item: "https://brasilia-agora.com/",
+          },
+          {
+            "@type": "ListItem",
+            position: 2,
+            name: article.tag,
+            item: `https://brasilia-agora.com/${article.category}`,
+          },
+          {
+            "@type": "ListItem",
+            position: 3,
+            name: article.title,
+            item: canonicalUrl,
+          },
+        ],
+      }
+    : null;
+
   return (
     <div className="min-h-screen w-full bg-white flex flex-col">
+      {newsArticleSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }}
+        />
+      )}
+      {breadcrumbSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        />
+      )}
       <TopBar />
       <Header />
       <NavBar />

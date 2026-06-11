@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import parkImg from "../assets/images/park.png";
-import cityImg from "../assets/images/city.png";
+import parkImg from "../assets/images/park.webp";
+import cityImg from "../assets/images/city.webp";
 
 const articles = [
   { id: "cidade-1", title: "Parques do DF terão programação especial no Dia do Meio Ambiente", subtitle: "Eventos gratuitos em todas as regiões administrativas", time: "5 horas atrás", imageUrl: parkImg, tag: "CIDADE", tagColor: "#2563eb" },

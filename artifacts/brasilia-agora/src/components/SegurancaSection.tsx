@@ -1,6 +1,6 @@
 import { Link } from "wouter";
-import policeImg from "../assets/images/police.png";
-import security2Img from "../assets/images/security2.png";
+import policeImg from "../assets/images/police.webp";
+import security2Img from "../assets/images/security2.webp";
 
 const articles = [
   {

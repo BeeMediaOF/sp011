@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import hospitalImg from "../assets/images/hospital.png";
-import health2Img from "../assets/images/health2.png";
+import hospitalImg from "../assets/images/hospital.webp";
+import health2Img from "../assets/images/health2.webp";
 
 const articles = [
   { id: "saude-1", title: "Hospitais do DF registram queda nos casos de dengue em maio", subtitle: "Ações de prevenção nos bairros têm surtido efeito positivo", time: "4 horas atrás", imageUrl: hospitalImg, tag: "SAÚDE", tagColor: "#16a34a" },

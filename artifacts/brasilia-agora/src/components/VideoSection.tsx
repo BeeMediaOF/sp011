@@ -1,10 +1,10 @@
 import { Link } from "wouter";
 import { Play } from "lucide-react";
-import heroImg from "../assets/images/hero.png";
-import trafficImg from "../assets/images/traffic.png";
-import policeImg from "../assets/images/police.png";
-import parkImg from "../assets/images/park.png";
-import festivalImg from "../assets/images/festival.png";
+import heroImg from "../assets/images/hero.webp";
+import trafficImg from "../assets/images/traffic.webp";
+import policeImg from "../assets/images/police.webp";
+import parkImg from "../assets/images/park.webp";
+import festivalImg from "../assets/images/festival.webp";
 
 const videos = [
   { id: "v-1", title: "Câmara Legislativa aprova programa Morar DF", thumb: heroImg, duration: "2:45" },

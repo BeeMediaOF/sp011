@@ -1,7 +1,7 @@
 import { Link } from "wouter";
-import sportsImg from "../assets/images/sports.png";
-import parkImg from "../assets/images/park.png";
-import festivalImg from "../assets/images/festival.png";
+import sportsImg from "../assets/images/sports.webp";
+import parkImg from "../assets/images/park.webp";
+import festivalImg from "../assets/images/festival.webp";
 
 const articles = [
   {

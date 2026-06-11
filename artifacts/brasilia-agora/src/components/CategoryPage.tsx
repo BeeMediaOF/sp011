@@ -44,6 +44,7 @@ export default function CategoryPage({
           <div className="text-white/80 text-xs font-medium">
             <Link href="/" className="hover:text-white transition-colors">Início</Link> &gt; {category}
           </div>
+          <h1 className="text-white text-2xl font-black mt-1 leading-tight">{category}</h1>
         </div>
       </div>
 
@@ -51,12 +52,17 @@ export default function CategoryPage({
         <div className="flex-1 min-w-0">
           {/* 2 Destaques grandes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
-            {[featuredArticle, second].filter(Boolean).map((art) => art && (
+            {[featuredArticle, second].filter(Boolean).map((art, idx) => art && (
               <Link key={art.id} href={`/artigo/${art.id}`} className="group block">
                 <div className="relative overflow-hidden bg-gray-100 h-[220px] sm:h-[300px] md:h-[380px]">
                   <img
                     src={art.imageUrl}
                     alt={art.title}
+                    width={640}
+                    height={380}
+                    loading={idx === 0 ? "eager" : "lazy"}
+                    fetchPriority={idx === 0 ? "high" : "auto"}
+                    decoding={idx === 0 ? "sync" : "async"}
                     className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
@@ -67,12 +73,11 @@ export default function CategoryPage({
                     >
                       {art.tag}
                     </span>
-                    <h2
+                    <h3
                       className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
-                     
                     >
                       {art.title}
-                    </h2>
+                    </h3>
                     {art.subtitle && (
                       <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.subtitle}</p>
                     )}

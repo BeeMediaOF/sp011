@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import festivalImg from "../assets/images/festival.png";
-import culture2Img from "../assets/images/culture2.png";
+import festivalImg from "../assets/images/festival.webp";
+import culture2Img from "../assets/images/culture2.webp";
 
 const articles = [
   { id: "cultura-1", title: "Festival de Inverno começa neste fim de semana no Plano Piloto", subtitle: "Evento contará com shows gratuitos e feira gastronômica", time: "8 horas atrás", imageUrl: festivalImg, tag: "CULTURA", tagColor: "#0d9488" },

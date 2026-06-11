@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import busImg from "../assets/images/bus.png";
-import transport2Img from "../assets/images/transport2.png";
+import busImg from "../assets/images/bus.webp";
+import transport2Img from "../assets/images/transport2.webp";
 
 const articles = [
   { id: "transporte-1", title: "GDF anuncia mais 124 ônibus para reforçar o transporte", subtitle: "Novos veículos vão atender principalmente a região oeste do DF", time: "6 horas atrás", imageUrl: busImg, tag: "TRANSPORTE", tagColor: "#0284c7" },

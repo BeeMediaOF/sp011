@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import mundoImg from "../assets/images/mundo.png";
-import trafficImg from "../assets/images/traffic.png";
+import mundoImg from "../assets/images/mundo.webp";
+import trafficImg from "../assets/images/traffic.webp";
 
 const articles = [
   { id: "mundo-1", title: "Cúpula do G7 debate crise climática e promete corte de 50% nas emissões até 2035", subtitle: "Líderes concordam em acelerar transição energética global", time: "1 hora atrás", imageUrl: mundoImg, tag: "MUNDO", tagColor: "#9333ea" },

@@ -65,6 +65,7 @@ export default function Home() {
       <NavBar />
 
       <main className="flex-1">
+        <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
 
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 1 — HERO + MAIS LIDAS + ANÚNCIO

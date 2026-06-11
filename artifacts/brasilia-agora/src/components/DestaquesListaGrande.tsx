@@ -1,8 +1,8 @@
 import React from "react";
 import { Link } from "wouter";
-import brasilImg from "../assets/images/brasil.png";
-import politicaFeatImg from "../assets/images/politica_feat.png";
-import sportsImg from "../assets/images/sports.png";
+import brasilImg from "../assets/images/brasil.webp";
+import politicaFeatImg from "../assets/images/politica_feat.webp";
+import sportsImg from "../assets/images/sports.webp";
 
 interface SubArticle {
   title: string;

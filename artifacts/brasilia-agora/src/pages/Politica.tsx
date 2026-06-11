@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import heroImg from "../assets/images/hero.png";
-import politics2Img from "../assets/images/politics2.png";
+import heroImg from "../assets/images/hero.webp";
+import politics2Img from "../assets/images/politics2.webp";
 
 const articles = [
   { id: "politica-1", title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", subtitle: "Iniciativa prevê subsídio para famílias de baixa renda", time: "2 horas atrás", imageUrl: heroImg, tag: "POLÍTICA", tagColor: "#1d4ed8" },

@@ -20,6 +20,7 @@ export default function LGPDConsent() {
       const t = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, []);
 
   function accept() {

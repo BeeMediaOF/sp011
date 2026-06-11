@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import policeImg from "../assets/images/police.png";
-import security2Img from "../assets/images/security2.png";
+import policeImg from "../assets/images/police.webp";
+import security2Img from "../assets/images/security2.webp";
 
 const articles = [
   { id: "seguranca-1", title: "Polícia Civil prende grupo suspeito de furtos em comércios", subtitle: "Operação foi deflagrada no Plano Piloto e em cidades satélites", time: "3 horas atrás", imageUrl: policeImg, tag: "SEGURANÇA", tagColor: "#dc2626" },

@@ -1,15 +1,15 @@
 import React from "react";
 import { Link } from "wouter";
 import CotacaoWidget from "./CotacaoWidget";
-import trafficImg from "../assets/images/traffic.png";
-import festivalImg from "../assets/images/festival.png";
-import busImg from "../assets/images/bus.png";
-import policeImg from "../assets/images/police.png";
-import brasilImg from "../assets/images/brasil.png";
-import politicaFeatImg from "../assets/images/politica_feat.png";
-import heroImg from "../assets/images/hero.png";
-import hospitalImg from "../assets/images/hospital.png";
-import studentsImg from "../assets/images/students.png";
+import trafficImg from "../assets/images/traffic.webp";
+import festivalImg from "../assets/images/festival.webp";
+import busImg from "../assets/images/bus.webp";
+import policeImg from "../assets/images/police.webp";
+import brasilImg from "../assets/images/brasil.webp";
+import politicaFeatImg from "../assets/images/politica_feat.webp";
+import heroImg from "../assets/images/hero.webp";
+import hospitalImg from "../assets/images/hospital.webp";
+import studentsImg from "../assets/images/students.webp";
 import { useAds, trackClick } from "./ads/useAds";
 
 const artigos = [

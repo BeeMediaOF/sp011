@@ -3,7 +3,7 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import sportsImg from "../assets/images/sports.png";
+import sportsImg from "../assets/images/sports.webp";
 
 const articles = [
   { id: "esportes-1", title: "Mané Garrincha receberá clássico Flamengo x Botafogo", subtitle: "Ingressos já estão à venda e expectativa é de casa cheia", time: "1 hora atrás", imageUrl: sportsImg, tag: "ESPORTES", tagColor: "#b45309" },

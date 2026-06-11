@@ -1,9 +1,9 @@
 import { Link } from "wouter";
-import heroImg from "../assets/images/hero.png";
-import trafficImg from "../assets/images/traffic.png";
-import hospitalImg from "../assets/images/hospital.png";
-import busImg from "../assets/images/bus.png";
-import studentsImg from "../assets/images/students.png";
+import heroImg from "../assets/images/hero.webp";
+import trafficImg from "../assets/images/traffic.webp";
+import hospitalImg from "../assets/images/hospital.webp";
+import busImg from "../assets/images/bus.webp";
+import studentsImg from "../assets/images/students.webp";
 
 const maisLidas = [
   { id: "ml-1", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", img: heroImg },

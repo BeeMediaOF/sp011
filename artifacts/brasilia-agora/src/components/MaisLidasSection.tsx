@@ -1,12 +1,12 @@
 import { Link } from "wouter";
-import heroImg from "../assets/images/hero.png";
-import trafficImg from "../assets/images/traffic.png";
-import hospitalImg from "../assets/images/hospital.png";
-import busImg from "../assets/images/bus.png";
-import studentsImg from "../assets/images/students.png";
-import policeImg from "../assets/images/police.png";
-import parkImg from "../assets/images/park.png";
-import culturaFeatImg from "../assets/images/cultura_feat.png";
+import heroImg from "../assets/images/hero.webp";
+import trafficImg from "../assets/images/traffic.webp";
+import hospitalImg from "../assets/images/hospital.webp";
+import busImg from "../assets/images/bus.webp";
+import studentsImg from "../assets/images/students.webp";
+import policeImg from "../assets/images/police.webp";
+import parkImg from "../assets/images/park.webp";
+import culturaFeatImg from "../assets/images/cultura_feat.webp";
 
 const maisLidas = [
   { id: "ml-1", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", tag: "POLÍTICA", tagColor: "#1d4ed8", time: "2 horas atrás", img: heroImg },

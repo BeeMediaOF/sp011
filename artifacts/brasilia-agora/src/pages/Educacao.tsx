@@ -3,8 +3,8 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
-import studentsImg from "../assets/images/students.png";
-import education2Img from "../assets/images/education2.png";
+import studentsImg from "../assets/images/students.webp";
+import education2Img from "../assets/images/education2.webp";
 
 const articles = [
   { id: "educacao-1", title: "Escolas públicas do DF alcançam melhores índices no IDEB", subtitle: "Secretaria credita avanço a novos programas de reforço escolar", time: "7 horas atrás", imageUrl: studentsImg, tag: "EDUCAÇÃO", tagColor: "#7c3aed" },

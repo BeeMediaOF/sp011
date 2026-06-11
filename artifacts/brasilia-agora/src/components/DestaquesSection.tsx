@@ -1,10 +1,10 @@
 import React from "react";
 import { Link } from "wouter";
 
-import parkImg from "../assets/images/park.png";
-import busImg from "../assets/images/bus.png";
-import studentsImg from "../assets/images/students.png";
-import festivalImg from "../assets/images/festival.png";
+import parkImg from "../assets/images/park.webp";
+import busImg from "../assets/images/bus.webp";
+import studentsImg from "../assets/images/students.webp";
+import festivalImg from "../assets/images/festival.webp";
 
 export default function DestaquesSection() {
   const destaques = [
