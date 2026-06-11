@@ -4,6 +4,9 @@ const apoiadores = [
   { name: "PABESA",   logo: "/apoiador-pabesa.png",   href: "#", bg: "bg-white" },
   { name: "BeeTale",  logo: "/apoiador-beetale.png",  href: "#", bg: "bg-[#1a1a1a]" },
   { name: "Jámap",    logo: "/apoiador-jamap.png",    href: "#", bg: "bg-white" },
+  { name: "BeePlace", logo: "/apoiador-beeplace.png", href: "#", bg: "bg-white" },
+  { name: "OleyBet",  logo: "/apoiador-oleybet.png",  href: "#", bg: "bg-[#1a1a2e]" },
+  { name: "4Action",  logo: "/apoiador-4action.png",  href: "#", bg: "bg-white" },
 ];
 
 // Duplicamos para criar o efeito de loop infinito
