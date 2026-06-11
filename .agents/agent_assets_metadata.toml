@@ -155,3 +155,9 @@ id = "avv4mY-jPf5CFZdBKPGP6"
 uri = "file://beenews-cpanel.zip"
 type = "unspecified"
 title = "BeeNews — Pacote cPanel (10.3 MB)"
+
+[[outputs]]
+id = "Jr3Q0WzM1LzMl2q0yBZd4"
+uri = "file://beenews-frontend.zip"
+type = "unspecified"
+title = "BeeNews — HTML + CSS + JS (9.9 MB)"
