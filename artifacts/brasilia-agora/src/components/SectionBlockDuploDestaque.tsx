@@ -81,10 +81,10 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
 
         {/* Faixa de 4 notícias menores */}
         {strip.length > 0 && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 border-t border-gray-200 pt-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
             {strip.map((art) => (
-              <Link key={art.id} href={`/artigo/${art.id}`} className="group flex gap-4 items-start">
-                <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100">
+              <Link key={art.id} href={`/artigo/${art.id}`} className="group flex gap-3 items-start">
+                <div className="w-[80px] h-[60px] shrink-0 overflow-hidden bg-gray-100">
                   <img
                     src={imgSrc(art.image)}
                     alt={art.chapeu}
@@ -94,12 +94,12 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
                 </div>
                 <div className="flex-1 min-w-0">
                   <span
-                    className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+                    className="text-[10px] font-bold uppercase tracking-wider block mb-1"
                     style={{ color }}
                   >
                     {art.chapeu}
                   </span>
-                  <h4 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
+                  <h4 className="font-serif text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
                     {art.title}
                   </h4>
                 </div>

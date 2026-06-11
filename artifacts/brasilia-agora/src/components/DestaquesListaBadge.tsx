@@ -135,27 +135,27 @@ export default function DestaquesListaBadge() {
 
             <div className="flex flex-col divide-y divide-gray-200">
               {artigos.map((art) => (
-                <Link key={art.id} href={`/artigo/${art.slug}`} className="group block py-6 first:pt-0 mr-[86px]">
-                  <div className="flex gap-4 items-start">
+                <Link key={art.id} href={`/artigo/${art.slug}`} className="group block py-4 first:pt-0">
+                  <div className="flex gap-3 items-start">
                     <img
                       src={art.image}
                       alt={art.titulo}
-                      className="w-[100px] h-[75px] sm:w-[220px] sm:h-[148px] object-cover rounded-lg flex-shrink-0 group-hover:opacity-90 transition-opacity"
+                      className="w-[90px] h-[68px] sm:w-[160px] sm:h-[108px] object-cover rounded flex-shrink-0 group-hover:opacity-90 transition-opacity"
                     />
-                    <div className="flex-1 min-w-0 py-1">
+                    <div className="flex-1 min-w-0 py-0.5">
                       <span
-                        className="text-[11px] font-bold uppercase tracking-widest mb-2 block"
+                        className="text-[10px] font-bold uppercase tracking-widest mb-1 block"
                         style={{ color: art.categoriaColor }}
                       >
                         {art.categoria}
                       </span>
-                      <h4 className="font-serif font-black text-[#1a1a1a] text-[20px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors">
+                      <h4 className="font-serif font-black text-[#1a1a1a] text-[15px] sm:text-[19px] leading-snug mb-1.5 group-hover:text-[#c8102e] transition-colors line-clamp-3">
                         {art.titulo}
                       </h4>
-                      <p className="text-[13px] text-gray-500 leading-relaxed mb-3 line-clamp-2">
+                      <p className="hidden sm:block text-[13px] text-gray-500 leading-relaxed mb-2 line-clamp-2">
                         {art.resumo}
                       </p>
-                      <span className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
                         {art.tempo}
                       </span>
                     </div>
