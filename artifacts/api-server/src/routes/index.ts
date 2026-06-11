@@ -9,6 +9,7 @@ import articlesRouter from "./articles";
 import siteRouter from "./site";
 import quotesRouter from "./quotes";
 import sitemapRouter from "./sitemap";
+import analyticsRouter from "./analytics";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use("/articles", articlesRouter);
 router.use("/quotes", quotesRouter);
 router.use(siteRouter);
 router.use(sitemapRouter);
+router.use("/analytics", analyticsRouter);
 
 export default router;

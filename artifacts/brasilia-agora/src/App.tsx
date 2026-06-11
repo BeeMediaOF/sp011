@@ -23,8 +23,15 @@ import Contato from "@/pages/Contato";
 import Privacidade from "@/pages/Privacidade";
 import Termos from "@/pages/Termos";
 import Admin from "@/pages/Admin";
+import LGPDConsent from "@/components/LGPDConsent";
+import { useAnalytics } from "@/hooks/useAnalytics";
 
 const queryClient = new QueryClient();
+
+function AnalyticsProvider() {
+  useAnalytics();
+  return null;
+}
 
 function Router() {
   return (
@@ -61,7 +68,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+          <AnalyticsProvider />
           <Router />
+          <LGPDConsent />
         </WouterRouter>
         <Toaster />
       </TooltipProvider>

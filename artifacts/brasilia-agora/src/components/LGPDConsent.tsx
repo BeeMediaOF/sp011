@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "wouter";
 
 const STORAGE_KEY = "bee_analytics_consent";
 
@@ -14,10 +15,11 @@ export function getConsent(): ConsentState {
 
 export default function LGPDConsent() {
   const [visible, setVisible] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
 
   useEffect(() => {
     if (getConsent() === null) {
-      const t = setTimeout(() => setVisible(true), 1200);
+      const t = setTimeout(() => setVisible(true), 1500);
       return () => clearTimeout(t);
     }
     return undefined;
@@ -38,32 +40,74 @@ export default function LGPDConsent() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-50 bg-[#1a1a1a] text-white shadow-2xl border-t-2 border-[#c8102e]"
+      className="fixed bottom-4 right-4 z-[9999] w-[320px] bg-white rounded-lg shadow-2xl border border-gray-200 overflow-hidden"
       role="dialog"
-      aria-label="Aviso de cookies e privacidade"
+      aria-label="Controle de privacidade"
     >
-      <div className="max-w-[1280px] mx-auto px-4 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <div className="flex-1 text-sm leading-relaxed">
-          <span className="font-bold text-yellow-400 mr-1">🍪 Privacidade e Cookies</span>
-          Utilizamos cookies e tecnologias similares para melhorar sua experiência, medir o desempenho do portal e exibir conteúdo relevante, em conformidade com a{" "}
-          <strong>Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018)</strong>.
-          Seus dados nunca são vendidos a terceiros.{" "}
-          <a href="/privacidade" className="underline text-blue-300 hover:text-blue-200 text-xs ml-1">
-            Política de Privacidade
-          </a>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="font-bold text-[#c8102e] text-[14px]">Controle sua privacidade</span>
+          <span className="text-xl">🦉</span>
         </div>
-        <div className="flex gap-2 shrink-0">
+        <p className="text-[12px] text-gray-600 leading-relaxed">
+          Nosso site usa cookies para melhorar a navegação e medir audiência, conforme a{" "}
+          <strong>LGPD (Lei nº 13.709/2018)</strong>.
+        </p>
+        <div className="flex gap-2 mt-2 text-[11px]">
+          <Link href="/privacidade" className="text-[#c8102e] underline hover:text-red-700">
+            Política de Privacidade
+          </Link>
+          <span className="text-gray-300">–</span>
+          <Link href="/termos" className="text-[#c8102e] underline hover:text-red-700">
+            Termos de uso
+          </Link>
+        </div>
+      </div>
+
+      {/* Options (expandable) */}
+      {showOptions && (
+        <div className="px-4 pb-3 border-t border-gray-100 pt-3 space-y-2">
+          <p className="text-[11px] text-gray-500 font-semibold uppercase tracking-wide">Categorias</p>
+          {[
+            { label: "Essenciais", desc: "Necessários para o funcionamento do site", locked: true },
+            { label: "Analytics", desc: "Audiência, páginas mais lidas, tempo de tela", locked: false },
+            { label: "Publicidade", desc: "Anúncios relevantes e mapa de calor", locked: false },
+          ].map(({ label, desc, locked }) => (
+            <div key={label} className="flex items-start gap-2">
+              <div className={`mt-0.5 w-8 h-4 rounded-full shrink-0 ${locked ? "bg-green-400" : "bg-gray-300"} relative`}>
+                <span className={`absolute top-0.5 ${locked ? "right-0.5" : "left-0.5"} w-3 h-3 bg-white rounded-full shadow`} />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold text-gray-700">{label}{locked && " *"}</p>
+                <p className="text-[10px] text-gray-400">{desc}</p>
+              </div>
+            </div>
+          ))}
+          <p className="text-[9px] text-gray-400">* Não pode ser desativado</p>
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="flex items-center gap-2 px-4 pb-4">
+        <button
+          onClick={() => setShowOptions(v => !v)}
+          className="text-[11px] font-medium text-gray-500 underline hover:text-gray-700 transition-colors shrink-0"
+        >
+          Minhas opções
+        </button>
+        <div className="flex gap-2 ml-auto">
           <button
             onClick={reject}
-            className="px-4 py-2 text-sm border border-gray-500 text-gray-300 rounded hover:bg-gray-700 transition-colors"
+            className="px-3 py-1.5 text-[12px] font-semibold border border-gray-300 text-gray-600 rounded hover:bg-gray-50 transition-colors"
           >
-            Recusar
+            Rejeitar
           </button>
           <button
             onClick={accept}
-            className="px-5 py-2 text-sm bg-[#c8102e] hover:bg-red-700 text-white font-bold rounded transition-colors"
+            className="px-4 py-1.5 text-[12px] font-bold bg-[#c8102e] hover:bg-red-700 text-white rounded transition-colors"
           >
-            Aceitar todos
+            Aceitar
           </button>
         </div>
       </div>
