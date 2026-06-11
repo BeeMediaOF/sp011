@@ -105,7 +105,7 @@ export default function Header() {
     <>
       {/* ── Barra principal ── */}
       <header className="bg-[#0a0a0a] sticky top-0 z-50 shadow-lg">
-        <div className="max-w-[1280px] mx-auto px-3 h-12 flex items-center gap-2">
+        <div className="max-w-[1280px] mx-auto px-3 h-12 flex items-center gap-2 mt-[23px] mb-[23px]">
 
           {/* Hamburger */}
           <button
@@ -200,7 +200,6 @@ export default function Header() {
           </div>
         )}
       </header>
-
       {/* ── Ticker de cotações ── */}
       <TickerBar />
     </>
