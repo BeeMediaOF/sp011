@@ -105,7 +105,7 @@ export default function Header() {
     <>
       {/* ── Barra principal ── */}
       <header className="bg-[#0a0a0a] sticky top-0 z-50 shadow-lg">
-        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2">
+        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[27px] mb-[27px]">
 
           {/* Hamburger */}
           <button
