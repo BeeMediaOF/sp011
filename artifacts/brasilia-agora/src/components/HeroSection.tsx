@@ -64,7 +64,7 @@ export default function HeroSection() {
                 >
                   {item.chapeu}
                 </span>
-                <h2 className="font-serif font-black text-[26px] leading-tight line-clamp-3 mb-2 group-hover:text-red-300 transition-colors text-[#ffffff]">
+                <h2 className="font-serif font-black text-[26px] leading-tight line-clamp-3 mb-2 transition-colors text-[#ffffff]">
                   {item.title}
                 </h2>
                 <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
