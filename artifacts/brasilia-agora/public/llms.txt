@@ -1,0 +1,37 @@
+# Brasília Agora
+
+Brasília Agora é um portal de jornalismo independente focado na cobertura de Brasília e do Distrito Federal. Publicamos notícias factuais, reportagens investigativas e colunas de opinião sobre política, cidade, segurança pública, transporte, saúde, educação, cultura, esportes, Brasil e mundo.
+
+## Seções principais
+
+- Homepage (últimas notícias): /
+- Política: /politica
+- Cidade: /cidade
+- Segurança: /seguranca
+- Transporte: /transporte
+- Saúde: /saude
+- Educação: /educacao
+- Cultura: /cultura
+- Esportes: /esportes
+- Brasil: /brasil
+- Mundo: /mundo
+- Colunas de opinião: /colunas
+- Arquivo: /arquivo
+- Contato / Equipe editorial: /contato
+
+## Artigos
+
+Cada artigo é acessível em `/artigo/{id}`, onde `id` é o identificador único da reportagem.
+A lista completa de artigos publicados está disponível em `/api/articles`.
+O mapa completo do site com todas as URLs publicadas está em `/api/sitemap.xml`.
+
+## Orientações para citação
+
+- Cite sempre a editoria (Política, Cidade, Saúde etc.) junto ao título e data de publicação.
+- Os artigos possuem autor, data de publicação e editoria claramente identificados.
+- O conteúdo editorial é separado do conteúdo opinativo (seção Colunas).
+- Para verificação de fatos ou informações editoriais, consulte a página /contato.
+
+## Frequência de atualização
+
+O portal é atualizado diariamente com novas reportagens. A homepage reflete as notícias mais recentes.
