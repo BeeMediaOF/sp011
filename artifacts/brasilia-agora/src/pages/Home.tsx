@@ -183,14 +183,14 @@ export default function Home() {
           <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
           <div className="flex justify-center">
             <a
-              href="https://www.toyota.com.br/carros/suv/rav4"
+              href="https://bileto.sympla.com.br/event/114114?share_id=1-copiarlink"
               target="_blank"
               rel="noreferrer"
               className="block w-full max-w-[952px] overflow-hidden group"
             >
               <img
-                src="/ad-toyota-rav4.jpg"
-                alt="Toyota RAV4 — O SUV que vai além"
+                src="/ad-percy-jackson-musical.png"
+                alt="Percy Jackson Musical — Uma aventura épica está para começar"
                 className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform"
               />
             </a>
