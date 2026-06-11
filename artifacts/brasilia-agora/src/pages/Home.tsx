@@ -179,6 +179,24 @@ export default function Home() {
           reverse
         />
 
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
+          <div className="flex justify-center">
+            <a
+              href="https://www.toyota.com.br/carros/suv/rav4"
+              target="_blank"
+              rel="noreferrer"
+              className="block w-full max-w-[952px] overflow-hidden group"
+            >
+              <img
+                src="/ad-toyota-rav4.jpg"
+                alt="Toyota RAV4 — O SUV que vai além"
+                className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform"
+              />
+            </a>
+          </div>
+        </div>
+
         {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             ZONA 8 — ÚLTIMAS NOTÍCIAS + SIDEBAR
             Lista com categoria colorida +
