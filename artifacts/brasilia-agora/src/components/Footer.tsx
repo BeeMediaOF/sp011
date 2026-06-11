@@ -48,7 +48,8 @@ export default function Footer() {
               <li><Link href="/saude" className="hover:text-white transition-colors">Saúde</Link></li>
               <li><Link href="/educacao" className="hover:text-white transition-colors">Educação</Link></li>
               <li><Link href="/cultura" className="hover:text-white transition-colors">Cultura</Link></li>
-              <li><Link href="/esporte" className="hover:text-white transition-colors">Esporte</Link></li>
+              <li><Link href="/esportes" className="hover:text-white transition-colors">Esportes</Link></li>
+              <li><Link href="/arquivo" className="hover:text-white transition-colors">Arquivo</Link></li>
             </ul>
           </div>
 
@@ -56,12 +57,12 @@ export default function Footer() {
           <div>
             <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#ffd300]">Institucional</h3>
             <ul className="flex flex-col gap-1.5 text-xs text-gray-400">
-              <li><Link href="/" className="hover:text-white transition-colors">Sobre nós</Link></li>
-              <li><Link href="/" className="hover:text-white transition-colors">Fale Conosco</Link></li>
-              <li><Link href="/" className="hover:text-white transition-colors">Anuncie</Link></li>
-              <li><Link href="/" className="hover:text-white transition-colors">Trabalhe Conosco</Link></li>
-              <li><Link href="/" className="hover:text-white transition-colors">Privacidade</Link></li>
-              <li><Link href="/" className="hover:text-white transition-colors">Termos de Uso</Link></li>
+              <li><Link href="/contato" className="hover:text-white transition-colors">Sobre nós</Link></li>
+              <li><Link href="/contato" className="hover:text-white transition-colors">Fale Conosco</Link></li>
+              <li><Link href="/contato" className="hover:text-white transition-colors">Anuncie</Link></li>
+              <li><Link href="/contato" className="hover:text-white transition-colors">Trabalhe Conosco</Link></li>
+              <li><Link href="/privacidade" className="hover:text-white transition-colors">Privacidade</Link></li>
+              <li><Link href="/termos" className="hover:text-white transition-colors">Termos de Uso</Link></li>
             </ul>
           </div>
 
@@ -91,11 +92,11 @@ export default function Footer() {
         <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-500">
           <p>© 2026 BeeNews.AI. Todos os direitos reservados.</p>
           <div className="flex gap-3">
-            <Link href="/" className="hover:text-white transition-colors">Privacidade</Link>
+            <Link href="/privacidade" className="hover:text-white transition-colors">Privacidade</Link>
             <span className="text-gray-700">|</span>
-            <Link href="/" className="hover:text-white transition-colors">Termos</Link>
+            <Link href="/termos" className="hover:text-white transition-colors">Termos</Link>
             <span className="text-gray-700">|</span>
-            <Link href="/" className="hover:text-white transition-colors">Contato</Link>
+            <Link href="/contato" className="hover:text-white transition-colors">Contato</Link>
           </div>
         </div>
 

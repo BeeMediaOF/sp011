@@ -122,7 +122,7 @@ export default function Home() {
         <SectionBlockCulturaLayout
           title="Esporte"
           color={editoriaColors.esporte}
-          href="/esporte"
+          href="/esportes"
           articles={getByCategory("esporte", esporteArticles)}
           reverse
         />
@@ -159,7 +159,7 @@ export default function Home() {
         <SectionBlockDuploDestaque
           title="DF"
           color={editoriaColors.df}
-          href="/df"
+          href="/cidade"
           articles={getByCategory("df", dfArticles)}
         />
 

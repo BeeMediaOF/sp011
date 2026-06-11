@@ -32,10 +32,10 @@ const featured = [
 ];
 
 const secondary = [
-  { id: "hero-3", img: trafficImg,  chapeu: "Trânsito",  chapeuColor: "#ea580c", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília" },
-  { id: "hero-4", img: policeImg,   chapeu: "Segurança", chapeuColor: "#dc2626", title: "Polícia Civil prende grupo suspeito de furtos no Plano Piloto" },
-  { id: "hero-5", img: hospitalImg, chapeu: "Saúde",     chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
-  { id: "hero-6", img: busImg,      chapeu: "DF",        chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
+  { id: "df-3",  img: trafficImg,  chapeu: "Trânsito",  chapeuColor: "#ea580c", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília" },
+  { id: "pol-3", img: policeImg,   chapeu: "Segurança", chapeuColor: "#dc2626", title: "Polícia Civil prende grupo suspeito de furtos no Plano Piloto" },
+  { id: "sau-1", img: hospitalImg, chapeu: "Saúde",     chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
+  { id: "df-4",  img: busImg,      chapeu: "DF",        chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
 ];
 
 export default function HeroSection() {

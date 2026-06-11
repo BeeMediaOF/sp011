@@ -126,13 +126,13 @@ export default function CategoryPage({
                 </h3>
                 <div className="flex flex-col space-y-4">
                   {[
-                    "GDF lança novo programa de pavimentação em Vicente Pires",
-                    "Concurso da Saúde tem edital publicado com 1.200 vagas",
-                    "Mané Garrincha receberá jogo da Seleção Brasileira em outubro",
-                    "Obras da linha do BRT avançam no Recanto das Emas",
-                    "Festival de Cinema de Brasília bate recorde de público"
-                  ].map((title, idx) => (
-                    <Link key={idx} href={`/artigo/mais-lidas-${idx+1}`}>
+                    { id: "pol-2", title: "Câmara Legislativa aprova projeto que cria o programa Morar DF" },
+                    { id: "df-3",  title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília" },
+                    { id: "sau-1", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
+                    { id: "df-4",  title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
+                    { id: "cul-1", title: "Festival de Cinema de Brasília bate recorde de público" },
+                  ].map(({ id, title }, idx) => (
+                    <Link key={id} href={`/artigo/${id}`}>
                       <div className="flex gap-3 group cursor-pointer">
                         <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">{idx + 1}</span>
                         <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#c8102e] transition-colors leading-snug pt-1">{title}</p>

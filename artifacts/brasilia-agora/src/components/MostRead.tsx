@@ -6,11 +6,11 @@ import busImg from "../assets/images/bus.webp";
 import studentsImg from "../assets/images/students.webp";
 
 const maisLidas = [
-  { id: "ml-1", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", img: heroImg },
-  { id: "ml-2", rank: 2, title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", img: trafficImg },
-  { id: "ml-3", rank: 3, title: "Hospitais do DF registram queda nos casos de dengue em maio", img: hospitalImg },
-  { id: "ml-4", rank: 4, title: "GDF anuncia mais 124 ônibus para reforçar o transporte público", img: busImg },
-  { id: "ml-5", rank: 5, title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", img: studentsImg },
+  { id: "pol-2", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", img: heroImg },
+  { id: "df-3",  rank: 2, title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília", img: trafficImg },
+  { id: "sau-1", rank: 3, title: "Hospitais do DF registram queda nos casos de dengue em maio", img: hospitalImg },
+  { id: "df-4",  rank: 4, title: "GDF anuncia mais 124 ônibus para reforçar o transporte público", img: busImg },
+  { id: "tec-4", rank: 5, title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023", img: studentsImg },
 ];
 
 export default function MostRead() {

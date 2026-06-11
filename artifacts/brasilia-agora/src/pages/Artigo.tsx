@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { useArticle } from "../hooks/useArticles";
+import { categoryRoute } from "../lib/categoryRoute";
 import {
   brasilArticles,
   mundoArticles,
@@ -264,7 +265,7 @@ export default function Artigo() {
             "@type": "ListItem",
             position: 2,
             name: article.tag,
-            item: `https://brasilia-agora.com/${article.category}`,
+            item: `https://brasilia-agora.com${categoryRoute(article.category)}`,
           },
           {
             "@type": "ListItem",
@@ -315,7 +316,7 @@ export default function Artigo() {
                     <Link href="/" className="hover:text-[#1d4ed8]">Início</Link>
                     <span>/</span>
                     <Link
-                      href={`/${article.category}`}
+                      href={categoryRoute(article.category)}
                       className="hover:text-[#1d4ed8] capitalize"
                     >
                       {article.tag}
