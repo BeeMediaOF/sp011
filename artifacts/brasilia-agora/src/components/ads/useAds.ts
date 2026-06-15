@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 
+export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05";
+
 export interface AdItem {
   id: string;
   imageBase64: string;
   link: string;
-  position: "banner" | "sidebar" | "central";
+  position: string;
 }
 
 export function useAds() {
@@ -21,11 +23,16 @@ export function useAds() {
       .catch(() => setLoading(false));
   }, []);
 
+  function getSlot(key: AdSlotKey): AdItem | null {
+    return ads.find((a) => a.position === key) ?? null;
+  }
+
+  // Legacy compat
   const banners = ads.filter((a) => a.position === "banner");
   const sidebars = ads.filter((a) => a.position === "sidebar");
   const centrals = ads.filter((a) => a.position === "central");
 
-  return { ads, banners, sidebars, centrals, loading };
+  return { ads, getSlot, banners, sidebars, centrals, loading };
 }
 
 export function trackClick(adId: string) {

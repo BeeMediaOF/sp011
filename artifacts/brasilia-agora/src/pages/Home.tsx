@@ -9,7 +9,6 @@ import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
 import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
-import AdCentral from "../components/ads/AdCentral";
 import AdBanner from "../components/ads/AdBanner";
 import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
@@ -235,25 +234,25 @@ export default function Home() {
             {/* Inject ads managed via admin panel */}
             {idx === 1 && (
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner index={0} />
+                <AdBanner slot="slot_01" />
               </div>
             )}
 
             {idx === 2 && (
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdCentral />
+                <AdBanner slot="slot_02" />
               </div>
             )}
 
             {idx === 4 && (
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner index={1} />
+                <AdBanner slot="slot_03" />
               </div>
             )}
 
             {idx === 7 && (
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner index={2} />
+                <AdBanner slot="slot_04" />
               </div>
             )}
 

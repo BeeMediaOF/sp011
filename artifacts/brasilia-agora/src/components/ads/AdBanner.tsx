@@ -1,22 +1,29 @@
 import React from "react";
-import { useAds, trackClick } from "./useAds";
+import { useAds, trackClick, type AdSlotKey } from "./useAds";
 
-export default function AdBanner({ index = 0 }: { index?: number }) {
-  const { banners, loading } = useAds();
-  const ad = banners[index] ?? banners[0] ?? null;
+interface Props {
+  slot: AdSlotKey;
+  placeholder?: string;
+}
+
+export default function AdBanner({ slot, placeholder }: Props) {
+  const { getSlot, loading } = useAds();
 
   if (loading) {
     return (
-      <div className="w-full h-[90px] max-w-[728px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center animate-pulse">
+      <div className="w-full h-[60px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center animate-pulse">
         <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade</p>
       </div>
     );
   }
 
+  const ad = getSlot(slot);
+
   if (!ad) {
+    if (!placeholder) return null;
     return (
-      <div className="w-full h-[90px] max-w-[728px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade — 728 × 90</p>
+      <div className="w-full h-[60px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
+        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">{placeholder}</p>
       </div>
     );
   }
