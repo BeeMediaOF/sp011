@@ -108,6 +108,15 @@ export interface ContactInfo {
   termsOfUse: string;
 }
 
+export interface RssSource {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  active: boolean;
+  createdAt: string;
+}
+
 interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
@@ -115,6 +124,7 @@ interface StoreData {
   ads: Ad[];
   columnists: Columnist[];
   contactInfo: ContactInfo;
+  rssSources: RssSource[];
 }
 
 const STORE_FILE = "/tmp/brasilia-store.json";
@@ -170,6 +180,7 @@ const defaultStore: StoreData = {
     desktopEnabled: true,
     homeBlocks: DEFAULT_HOME_BLOCKS,
   },
+  rssSources: [],
   ads: [],
   columnists: [
     {
@@ -352,6 +363,32 @@ export const store = {
     const before = _store.columnists.length;
     _store.columnists = _store.columnists.filter((c) => c.id !== id);
     const deleted = _store.columnists.length < before;
+    if (deleted) saveStore(_store);
+    return deleted;
+  },
+
+  // RSS Sources
+  getRssSources: () => [...(_store.rssSources ?? [])],
+  createRssSource: (data: Omit<RssSource, "id" | "createdAt">): RssSource => {
+    const src: RssSource = { ...data, id: randomUUID(), createdAt: new Date().toISOString() };
+    if (!_store.rssSources) _store.rssSources = [];
+    _store.rssSources.push(src);
+    saveStore(_store);
+    return src;
+  },
+  updateRssSource: (id: string, data: Partial<Omit<RssSource, "id" | "createdAt">>): RssSource | null => {
+    if (!_store.rssSources) _store.rssSources = [];
+    const idx = _store.rssSources.findIndex((s) => s.id === id);
+    if (idx === -1) return null;
+    _store.rssSources[idx] = { ..._store.rssSources[idx]!, ...data };
+    saveStore(_store);
+    return _store.rssSources[idx]!;
+  },
+  deleteRssSource: (id: string): boolean => {
+    if (!_store.rssSources) return false;
+    const before = _store.rssSources.length;
+    _store.rssSources = _store.rssSources.filter((s) => s.id !== id);
+    const deleted = _store.rssSources.length < before;
     if (deleted) saveStore(_store);
     return deleted;
   },

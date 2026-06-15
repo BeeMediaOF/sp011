@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
-  Users, Mail, BarChart2, LayoutGrid,
+  Users, Mail, BarChart2, LayoutGrid, Rss,
 } from "lucide-react";
 import logoImg from "../../assets/images/logo_sbc_negativo.png";
 
@@ -16,6 +16,7 @@ const NAV = [
   { label: "Blocos Home",  icon: LayoutGrid,       path: "/admin/home-blocos" },
   { label: "Propagandas",  icon: Megaphone,        path: "/admin/propagandas" },
   { label: "Colunistas",   icon: Users,            path: "/admin/colunistas" },
+  { label: "Importar RSS", icon: Rss,              path: "/admin/rss" },
   { label: "Logo",         icon: Image,            path: "/admin/logo" },
   { label: "Contato",      icon: Mail,             path: "/admin/contato" },
   { label: "Webhook",      icon: Webhook,          path: "/admin/webhook" },
