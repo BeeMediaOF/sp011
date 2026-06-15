@@ -105,6 +105,10 @@ export interface HomeBlock {
   name: string;
   visible: boolean;
   order: number;
+  category?: string;
+  layout?: "grid" | "featured" | "duplo" | "cultura";
+  color?: string;
+  custom?: boolean;
 }
 
 export interface SiteSettings {

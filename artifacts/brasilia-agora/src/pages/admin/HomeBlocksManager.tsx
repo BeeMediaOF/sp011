@@ -1,8 +1,98 @@
 import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock } from "../../lib/adminApi";
-import { GripVertical, Eye, EyeOff, Save, CheckCircle, LayoutGrid } from "lucide-react";
+import {
+  GripVertical, Eye, EyeOff, Save, CheckCircle, LayoutGrid,
+  Plus, X, Trash2,
+} from "lucide-react";
 
+// ─── Layout definitions ───────────────────────────────────────────────────────
+const LAYOUTS: {
+  id: "grid" | "featured" | "duplo" | "cultura";
+  label: string;
+  desc: string;
+  preview: React.ReactNode;
+}[] = [
+  {
+    id: "grid",
+    label: "Grade",
+    desc: "4 cards em linha com carrossel",
+    preview: (
+      <div className="flex gap-1 w-full">
+        {[0,1,2,3].map(i => (
+          <div key={i} className="flex-1 h-8 bg-gray-300 rounded" />
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: "featured",
+    label: "Destaque",
+    desc: "1 grande + 4 títulos laterais",
+    preview: (
+      <div className="flex gap-1 w-full">
+        <div className="flex-[2] h-8 bg-gray-300 rounded" />
+        <div className="flex-1 flex flex-col gap-1">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="h-1.5 bg-gray-300 rounded" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "duplo",
+    label: "Duplo Destaque",
+    desc: "2 cards grandes + tira inferior",
+    preview: (
+      <div className="flex flex-col gap-1 w-full">
+        <div className="flex gap-1">
+          <div className="flex-1 h-5 bg-gray-300 rounded" />
+          <div className="flex-1 h-5 bg-gray-300 rounded" />
+        </div>
+        <div className="flex gap-1">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="flex-1 h-2 bg-gray-200 rounded" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "cultura",
+    label: "Foto + Lista",
+    desc: "Foto grande + lista de notícias ao lado",
+    preview: (
+      <div className="flex gap-1 w-full">
+        <div className="flex-[3] h-8 bg-gray-300 rounded" />
+        <div className="flex-[2] flex flex-col gap-1 justify-center">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className="h-1.5 bg-gray-200 rounded" />
+          ))}
+        </div>
+      </div>
+    ),
+  },
+];
+
+// ─── Categories ──────────────────────────────────────────────────────────────
+const CATEGORIES = [
+  { value: "politica",   label: "Política",    color: "#1d4ed8" },
+  { value: "cidade",     label: "Cidade / DF",  color: "#0b3d91" },
+  { value: "seguranca",  label: "Segurança",   color: "#7c3aed" },
+  { value: "saude",      label: "Saúde",       color: "#16a34a" },
+  { value: "educacao",   label: "Educação",    color: "#0284c7" },
+  { value: "cultura",    label: "Cultura",     color: "#0d9488" },
+  { value: "esportes",   label: "Esportes",    color: "#dc2626" },
+  { value: "tecnologia", label: "Tecnologia",  color: "#0284c7" },
+  { value: "economia",   label: "Economia",    color: "#b45309" },
+  { value: "brasil",     label: "Brasil",      color: "#16a34a" },
+  { value: "mundo",      label: "Mundo",       color: "#6b21a8" },
+  { value: "colunas",    label: "Colunas",     color: "#7c3aed" },
+  { value: "geral",      label: "Geral",       color: "#6b7280" },
+];
+
+// ─── Fixed block icons ────────────────────────────────────────────────────────
 const BLOCK_ICONS: Record<string, string> = {
   "hero":       "🏆",
   "brasil":     "🇧🇷",
@@ -13,7 +103,15 @@ const BLOCK_ICONS: Record<string, string> = {
   "df":         "🏙️",
   "saude":      "🏥",
   "tecnologia": "💻",
+  "colunistas": "✍️",
   "ultimas":    "📰",
+};
+
+const LAYOUT_ICONS: Record<string, string> = {
+  grid: "▦",
+  featured: "◧",
+  duplo: "⊞",
+  cultura: "▣",
 };
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
@@ -26,15 +124,34 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
   { id: "df",         name: "DF",                  visible: true, order: 6 },
   { id: "saude",      name: "Saúde",               visible: true, order: 7 },
   { id: "tecnologia", name: "Tecnologia",          visible: true, order: 8 },
-  { id: "ultimas",    name: "Últimas Notícias",    visible: true, order: 9 },
+  { id: "colunistas", name: "Colunistas",          visible: true, order: 9 },
+  { id: "ultimas",    name: "Últimas Notícias",    visible: true, order: 10 },
 ];
 
+// ─── New-block form state ─────────────────────────────────────────────────────
+interface NewBlockForm {
+  name: string;
+  category: string;
+  layout: "grid" | "featured" | "duplo" | "cultura";
+  color: string;
+}
+
+const FORM_EMPTY: NewBlockForm = {
+  name: "",
+  category: "politica",
+  layout: "grid",
+  color: "#1d4ed8",
+};
+
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function HomeBlocksManager() {
-  const [blocks, setBlocks] = useState<HomeBlock[]>([]);
+  const [blocks, setBlocks]   = useState<HomeBlock[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm]       = useState<NewBlockForm>(FORM_EMPTY);
 
   useEffect(() => {
     adminApi.getSettings().then((r) => {
@@ -72,6 +189,37 @@ export default function HomeBlocksManager() {
     });
   }
 
+  function deleteCustomBlock(id: string) {
+    setBlocks((prev) => prev.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i })));
+  }
+
+  function handleFormChange<K extends keyof NewBlockForm>(key: K, value: NewBlockForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (key === "category") {
+      const cat = CATEGORIES.find((c) => c.value === value as string);
+      if (cat) setForm((prev) => ({ ...prev, category: value as string, color: cat.color }));
+    }
+  }
+
+  function handleAddBlock(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim()) return;
+    const id = `custom-${Date.now()}`;
+    const newBlock: HomeBlock = {
+      id,
+      name: form.name.trim(),
+      visible: true,
+      order: blocks.length,
+      category: form.category,
+      layout: form.layout,
+      color: form.color,
+      custom: true,
+    };
+    setBlocks((prev) => [...prev, newBlock]);
+    setForm(FORM_EMPTY);
+    setShowForm(false);
+  }
+
   async function handleSave() {
     setSaving(true); setSaved(false);
     const ordered = blocks.map((b, i) => ({ ...b, order: i }));
@@ -79,26 +227,149 @@ export default function HomeBlocksManager() {
       await adminApi.updateSettings({ homeBlocks: ordered });
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { /* ignore */ } finally {
+    } catch { } finally {
       setSaving(false);
     }
   }
+
+  const selectedLayout = LAYOUTS.find((l) => l.id === form.layout)!;
 
   return (
     <AdminLayout title="Blocos da Home">
       <div className="max-w-2xl mx-auto space-y-4">
 
+        {/* Header */}
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <LayoutGrid size={18} className="text-[#1a2448]" />
-                <h2 className="text-sm font-bold text-[#1a2448]">Ordem dos blocos da página inicial</h2>
+                <h2 className="text-sm font-bold text-[#1a2448]">Blocos da página inicial</h2>
               </div>
-              <p className="text-xs text-gray-500">Arraste para reordenar ou use as setas. Clique no olho para ocultar sem excluir.</p>
+              <p className="text-xs text-gray-500">Arraste para reordenar. Clique no olho para ocultar. Crie novos blocos personalizados abaixo.</p>
             </div>
+            <button
+              onClick={() => setShowForm((s) => !s)}
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#1a2448] text-white rounded-lg text-sm font-semibold hover:bg-[#243060] transition-colors"
+            >
+              {showForm ? <X size={14} /> : <Plus size={14} />}
+              {showForm ? "Cancelar" : "Novo Bloco"}
+            </button>
           </div>
 
+          {/* New block form */}
+          {showForm && (
+            <form onSubmit={handleAddBlock} className="border border-[#1a2448]/20 rounded-xl p-5 space-y-4 bg-blue-50/30">
+              <h3 className="text-xs font-bold text-[#1a2448] uppercase tracking-wide">Criar novo bloco</h3>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Nome do bloco</label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => handleFormChange("name", e.target.value)}
+                    required
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                    placeholder="Ex: Notícias Locais"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Categoria de artigos</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) => handleFormChange("category", e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  >
+                    {CATEGORIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Layout picker */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Formato / Layout</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {LAYOUTS.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => handleFormChange("layout", l.id)}
+                      className={`p-3 border-2 rounded-xl text-left transition-all ${
+                        form.layout === l.id
+                          ? "border-[#1a2448] bg-[#1a2448]/5"
+                          : "border-gray-200 hover:border-gray-300 bg-white"
+                      }`}
+                    >
+                      <div className="mb-2">{l.preview}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-[#1a2448] text-xs">{l.label}</span>
+                        {form.layout === l.id && (
+                          <span className="text-[10px] bg-[#1a2448] text-white rounded px-1.5 py-0.5">Selecionado</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{l.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color picker */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Cor de destaque</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={form.color}
+                    onChange={(e) => handleFormChange("color", e.target.value)}
+                    className="w-9 h-9 rounded-lg border border-gray-200 cursor-pointer p-0.5"
+                  />
+                  <span className="text-xs text-gray-500 font-mono">{form.color}</span>
+                  <div className="flex gap-1.5 ml-2">
+                    {CATEGORIES.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        title={c.label}
+                        onClick={() => handleFormChange("color", c.color)}
+                        className="w-5 h-5 rounded-full border-2 transition-all hover:scale-110"
+                        style={{
+                          backgroundColor: c.color,
+                          borderColor: form.color === c.color ? "#1a2448" : "transparent",
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="bg-white border border-gray-200 rounded-xl p-4">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">Prévia do cabeçalho</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-1 h-5 rounded-full" style={{ backgroundColor: form.color }} />
+                  <span className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">
+                    {form.name || "Nome do Bloco"}
+                  </span>
+                  <span className="ml-auto text-[10px] font-mono text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                    {LAYOUT_ICONS[form.layout]} {selectedLayout?.label}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 px-5 py-2 bg-[#c8102e] text-white rounded-lg text-sm font-semibold hover:bg-[#a00d24] transition-colors"
+                >
+                  <Plus size={14} /> Adicionar Bloco
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* Block list */}
           {loading ? (
             <div className="text-center text-gray-400 py-8">Carregando...</div>
           ) : (
@@ -118,13 +389,36 @@ export default function HomeBlocksManager() {
                     <GripVertical size={18} />
                   </span>
 
-                  <span className="text-lg shrink-0 w-7 text-center">{BLOCK_ICONS[block.id] ?? "📄"}</span>
+                  {/* Icon or color dot */}
+                  {block.custom ? (
+                    <span
+                      className="w-5 h-5 rounded-full shrink-0 border-2 border-white shadow-sm"
+                      style={{ backgroundColor: block.color ?? "#6b7280" }}
+                    />
+                  ) : (
+                    <span className="text-lg shrink-0 w-7 text-center">{BLOCK_ICONS[block.id] ?? "📄"}</span>
+                  )}
 
                   <span className="text-[11px] text-gray-300 w-5 text-center font-mono shrink-0">{idx + 1}</span>
 
                   <span className={`flex-1 text-sm font-semibold ${block.visible ? "text-gray-800" : "text-gray-400"}`}>
                     {block.name}
                   </span>
+
+                  {/* Layout badge for custom blocks */}
+                  {block.custom && block.layout && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 shrink-0">
+                      {LAYOUT_ICONS[block.layout]} {LAYOUTS.find(l => l.id === block.layout)?.label}
+                    </span>
+                  )}
+
+                  {/* Category badge for custom blocks */}
+                  {block.custom && block.category && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                      style={{ backgroundColor: `${block.color ?? "#6b7280"}20`, color: block.color ?? "#6b7280" }}>
+                      {CATEGORIES.find(c => c.value === block.category)?.label ?? block.category}
+                    </span>
+                  )}
 
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${block.visible ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
                     {block.visible ? "Visível" : "Oculto"}
@@ -153,6 +447,19 @@ export default function HomeBlocksManager() {
                   >
                     {block.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                   </button>
+
+                  {/* Delete — only for custom blocks */}
+                  {block.custom ? (
+                    <button
+                      onClick={() => deleteCustomBlock(block.id)}
+                      className="shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                      title="Remover bloco"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  ) : (
+                    <span className="w-[14px] shrink-0" />
+                  )}
                 </div>
               ))}
             </div>
@@ -171,19 +478,21 @@ export default function HomeBlocksManager() {
           </div>
         </div>
 
-        {/* Preview */}
+        {/* Preview strip */}
         <div className="bg-white rounded-xl shadow-sm p-5">
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Prévia da ordem</h3>
           <div className="flex flex-wrap gap-2">
             {blocks.filter((b) => b.visible).map((b, i) => (
-              <span key={b.id} className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700">
+              <span key={b.id} className="flex items-center gap-1.5 border border-gray-200 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-700"
+                style={b.custom ? { borderLeftColor: b.color ?? "#6b7280", borderLeftWidth: 3 } : {}}>
                 <span className="text-gray-400 font-mono">{i + 1}.</span>
-                <span>{BLOCK_ICONS[b.id]}</span>
+                <span>{b.custom ? (LAYOUT_ICONS[b.layout ?? "grid"]) : (BLOCK_ICONS[b.id] ?? "📄")}</span>
                 {b.name}
               </span>
             ))}
           </div>
         </div>
+
       </div>
     </AdminLayout>
   );

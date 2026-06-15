@@ -25,23 +25,32 @@ const SPECIALTY_COLORS: Record<string, { bg: string; text: string; border: strin
 
 const TABS: Specialty[] = ["Todos", "Política", "Esporte", "Economia", "Cultura", "Segurança Pública", "Social"];
 
-function Initials({ name }: { name: string }) {
-  const parts = name.trim().split(" ").filter(Boolean);
-  const initials = parts.length >= 2
-    ? `${parts[0]![0]}${parts[parts.length - 1]![0]}`
-    : (parts[0]?.slice(0, 2) ?? "?");
-  return <span className="text-xl font-bold text-white">{initials.toUpperCase()}</span>;
-}
-
 const BG_PALETTE = [
   "bg-[#0b3d91]", "bg-[#c8102e]", "bg-green-600", "bg-teal-600",
   "bg-orange-500", "bg-purple-600", "bg-indigo-600",
 ];
 
-export default function ColumnistsSection() {
+function Initials({ name, size = "lg" }: { name: string; size?: "md" | "lg" }) {
+  const parts = name.trim().split(" ").filter(Boolean);
+  const initials = parts.length >= 2
+    ? `${parts[0]![0]}${parts[parts.length - 1]![0]}`
+    : (parts[0]?.slice(0, 2) ?? "?");
+  return (
+    <span className={size === "lg" ? "text-xl font-bold text-white" : "text-base font-bold text-white"}>
+      {initials.toUpperCase()}
+    </span>
+  );
+}
+
+interface Props {
+  /** When set, shows a compact 4-up horizontal strip with no filter tabs */
+  limit?: number;
+}
+
+export default function ColumnistsSection({ limit }: Props) {
   const [columnists, setColumnists] = useState<Columnist[]>([]);
-  const [active, setActive] = useState<Specialty>("Todos");
-  const [loading, setLoading] = useState(true);
+  const [active, setActive]         = useState<Specialty>("Todos");
+  const [loading, setLoading]       = useState(true);
 
   useEffect(() => {
     fetch("/api/columnists")
@@ -51,12 +60,93 @@ export default function ColumnistsSection() {
       .finally(() => setLoading(false));
   }, []);
 
+  if (loading) return null;
+  if (columnists.length === 0) return null;
+
+  const active4 = columnists.filter((c) => c.active !== false);
+
+  /* ── COMPACT HOME STRIP (limit prop) ─────────────────────────── */
+  if (limit) {
+    const shown = active4.slice(0, limit);
+    return (
+      <section className="py-10 bg-[#f8f8f8] border-t border-gray-100">
+        <div className="max-w-[1280px] mx-auto px-4">
+
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <span className="w-1 h-7 bg-[#c8102e] rounded-full" />
+              <div className="flex items-center gap-2">
+                <Pen size={18} className="text-[#1a2448]" />
+                <h2 className="font-['Merriweather',serif] font-bold text-[#1a2448] text-2xl leading-tight">
+                  Colunistas
+                </h2>
+              </div>
+            </div>
+            <Link
+              href="/colunas"
+              className="flex items-center gap-1 text-xs font-semibold text-[#c8102e] uppercase tracking-wider hover:underline"
+            >
+              Ver todas as colunas <ChevronRight size={14} />
+            </Link>
+          </div>
+
+          {/* 4-column strip */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {shown.map((columnist, idx) => {
+              const colors  = SPECIALTY_COLORS[columnist.specialty] ?? SPECIALTY_COLORS["Outro"]!;
+              const bgClass = BG_PALETTE[idx % BG_PALETTE.length]!;
+              return (
+                <Link
+                  key={columnist.id}
+                  href="/colunas"
+                  className="group flex flex-col items-center text-center bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all p-5 gap-3"
+                >
+                  {/* Avatar */}
+                  {columnist.avatarBase64 ? (
+                    <img
+                      src={columnist.avatarBase64}
+                      alt={columnist.name}
+                      className="w-20 h-20 rounded-full object-cover border-2 border-gray-100 shrink-0"
+                    />
+                  ) : (
+                    <div className={`w-20 h-20 rounded-full ${bgClass} flex items-center justify-center border-2 border-white shadow-sm shrink-0`}>
+                      <Initials name={columnist.name} />
+                    </div>
+                  )}
+
+                  {/* Specialty badge */}
+                  <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${colors.bg} ${colors.text}`}>
+                    {columnist.specialty}
+                  </span>
+
+                  {/* Name */}
+                  <h3 className="font-['Merriweather',serif] font-bold text-[#1a2448] text-[15px] leading-snug group-hover:text-[#c8102e] transition-colors">
+                    {columnist.name}
+                  </h3>
+
+                  {/* Bio snippet */}
+                  <p className="text-xs text-gray-400 leading-relaxed line-clamp-2 flex-1">
+                    {columnist.bio}
+                  </p>
+
+                  <span className="flex items-center gap-1 text-xs font-semibold text-[#c8102e] group-hover:gap-2 transition-all mt-auto">
+                    Ver coluna <ChevronRight size={12} />
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+
+        </div>
+      </section>
+    );
+  }
+
+  /* ── FULL PAGE GRID (no limit prop — used on /colunas) ────────── */
   const filtered = active === "Todos"
     ? columnists
     : columnists.filter((c) => c.specialty === active);
-
-  if (loading) return null;
-  if (columnists.length === 0) return null;
 
   return (
     <section className="py-10 bg-[#f8f8f8] border-t border-gray-100">
@@ -105,48 +195,48 @@ export default function ColumnistsSection() {
           })}
         </div>
 
-        {/* Grid */}
+        {/* Grid 3-col */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
           {filtered.map((columnist, idx) => {
-            const colors = SPECIALTY_COLORS[columnist.specialty] ?? SPECIALTY_COLORS["Outro"]!;
+            const colors  = SPECIALTY_COLORS[columnist.specialty] ?? SPECIALTY_COLORS["Outro"]!;
             const bgClass = BG_PALETTE[idx % BG_PALETTE.length]!;
             return (
-              <Link key={columnist.id} href="/colunas" className="group flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all overflow-hidden">
-                  <div className="flex items-start gap-4 p-5">
-                    {/* Avatar */}
-                    <div className="shrink-0">
-                      {columnist.avatarBase64 ? (
-                        <img
-                          src={columnist.avatarBase64}
-                          alt={columnist.name}
-                          className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
-                        />
-                      ) : (
-                        <div className={`w-16 h-16 rounded-full ${bgClass} flex items-center justify-center border-2 border-white shadow-sm`}>
-                          <Initials name={columnist.name} />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0">
-                      <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md mb-1.5 ${colors.bg} ${colors.text}`}>
-                        {columnist.specialty}
-                      </span>
-                      <h3 className="font-['Merriweather',serif] font-bold text-[#1a2448] text-base leading-snug group-hover:text-[#c8102e] transition-colors">
-                        {columnist.name}
-                      </h3>
-                    </div>
+              <Link
+                key={columnist.id}
+                href="/colunas"
+                className="group flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md hover:border-gray-200 transition-all overflow-hidden"
+              >
+                <div className="flex items-start gap-4 p-5">
+                  <div className="shrink-0">
+                    {columnist.avatarBase64 ? (
+                      <img
+                        src={columnist.avatarBase64}
+                        alt={columnist.name}
+                        className="w-16 h-16 rounded-full object-cover border-2 border-gray-100"
+                      />
+                    ) : (
+                      <div className={`w-16 h-16 rounded-full ${bgClass} flex items-center justify-center border-2 border-white shadow-sm`}>
+                        <Initials name={columnist.name} size="lg" />
+                      </div>
+                    )}
                   </div>
-
-                  <div className="px-5 pb-5 pt-0 border-t border-gray-50">
-                    <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mt-3">
-                      {columnist.bio}
-                    </p>
-                    <div className="flex items-center gap-1 mt-3 text-xs font-semibold text-[#c8102e] group-hover:gap-2 transition-all">
-                      Ver coluna <ChevronRight size={12} />
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md mb-1.5 ${colors.bg} ${colors.text}`}>
+                      {columnist.specialty}
+                    </span>
+                    <h3 className="font-['Merriweather',serif] font-bold text-[#1a2448] text-base leading-snug group-hover:text-[#c8102e] transition-colors">
+                      {columnist.name}
+                    </h3>
                   </div>
+                </div>
+                <div className="px-5 pb-5 pt-0 border-t border-gray-50">
+                  <p className="text-sm text-gray-500 leading-relaxed line-clamp-2 mt-3">
+                    {columnist.bio}
+                  </p>
+                  <div className="flex items-center gap-1 mt-3 text-xs font-semibold text-[#c8102e] group-hover:gap-2 transition-all">
+                    Ver coluna <ChevronRight size={12} />
+                  </div>
+                </div>
               </Link>
             );
           })}
