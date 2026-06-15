@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { adminApi, type Columnist } from "../../lib/adminApi";
+import { adminApi, type Columnist, type ColumnistSpecialty } from "../../lib/adminApi";
 import { Users, Plus, Trash2, Eye, EyeOff, ImageIcon } from "lucide-react";
 
 function toBase64(file: File): Promise<string> {

@@ -24,17 +24,40 @@ export interface MenuItem {
   visible: boolean;
 }
 
+export interface HomeBlock {
+  id: string;
+  name: string;
+  visible: boolean;
+  order: number;
+}
+
 export interface SiteSettings {
   siteName: string;
   tagline: string;
   logoBase64?: string;
+  logoSize?: number;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   ogImageBase64?: string;
   faviconBase64?: string;
+  homeBlocks?: HomeBlock[];
 }
+
+const DEFAULT_HOME_BLOCKS: HomeBlock[] = [
+  { id: "hero",       name: "Hero / Destaques",   visible: true, order: 0 },
+  { id: "brasil",     name: "Brasil",              visible: true, order: 1 },
+  { id: "mais-lidas", name: "Mais Lidas",          visible: true, order: 2 },
+  { id: "mundo",      name: "Mundo",               visible: true, order: 3 },
+  { id: "esporte",    name: "Esporte",             visible: true, order: 4 },
+  { id: "cultura",    name: "Cultura",             visible: true, order: 5 },
+  { id: "df",         name: "DF",                  visible: true, order: 6 },
+  { id: "saude",      name: "Saúde",               visible: true, order: 7 },
+  { id: "tecnologia", name: "Tecnologia",          visible: true, order: 8 },
+  { id: "colunistas", name: "Colunistas",          visible: true, order: 9 },
+  { id: "ultimas",    name: "Últimas Notícias",    visible: true, order: 10 },
+];
 
 export interface Ad {
   id: string;
@@ -48,10 +71,20 @@ export interface Ad {
   updatedAt: string;
 }
 
+export type ColumnistSpecialty =
+  | "Política"
+  | "Esporte"
+  | "Economia"
+  | "Cultura"
+  | "Segurança Pública"
+  | "Social"
+  | "Outro";
+
 export interface Columnist {
   id: string;
   name: string;
   bio: string;
+  specialty: ColumnistSpecialty;
   avatarBase64: string;
   active: boolean;
   createdAt: string;
@@ -132,11 +165,50 @@ const defaultStore: StoreData = {
   settings: {
     siteName: "Brasília Hoje",
     tagline: "A notícia da nossa capital, agora.",
+    logoSize: 101,
     mobileEnabled: true,
     desktopEnabled: true,
+    homeBlocks: DEFAULT_HOME_BLOCKS,
   },
   ads: [],
-  columnists: [],
+  columnists: [
+    {
+      id: "c1", name: "Ana Paula Mendes", specialty: "Política" as const,
+      bio: "Jornalista com 15 anos de cobertura do Congresso Nacional e Palácio do Planalto. Especialista em política externa e relações institucionais.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "c2", name: "Carlos Eduardo Rocha", specialty: "Esporte" as const,
+      bio: "Cronista esportivo, ex-atleta e comentarista. Cobertura de futebol, atletismo e esportes olímpicos há mais de 10 anos.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "c3", name: "Beatriz Fonseca", specialty: "Economia" as const,
+      bio: "Economista e analista de mercado. Escreve sobre finanças pessoais, macroeconomia e o impacto das políticas fiscais no cotidiano.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "c4", name: "Rafael Martins", specialty: "Cultura" as const,
+      bio: "Crítico de cinema, teatro e literatura. Doutor em comunicação pela UnB, escreve sobre arte, comportamento e identidade cultural brasileira.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "c5", name: "Juliana Soares", specialty: "Segurança Pública" as const,
+      bio: "Especialista em segurança pública e direitos humanos. Acompanha as políticas de segurança do DF e dos estados brasileiros.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+    {
+      id: "c6", name: "Marcos Vinicius Costa", specialty: "Social" as const,
+      bio: "Assistente social e colunista. Escreve sobre desigualdade, políticas públicas, habitação e os desafios das comunidades periféricas.",
+      avatarBase64: "", active: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    },
+  ],
   contactInfo: {
     supportEmail: "suporte@beemedia.ai",
     displayEmail: "redacao@brasiliaagora.com.br",

@@ -11,6 +11,7 @@ import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 
 import AdCentral from "../components/ads/AdCentral";
+import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
 
 import {
@@ -200,6 +201,8 @@ export default function Home() {
             Lista com categoria colorida +
             sidebar com Mais Lidas e propaganda
         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        <ColumnistsSection />
+
         <DestaquesListaBadge />
 
       </main>

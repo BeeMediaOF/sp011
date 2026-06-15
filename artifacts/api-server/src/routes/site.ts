@@ -3,10 +3,11 @@ import { store } from "../lib/store.js";
 
 const router = Router();
 
-/** GET /api/site — site settings (public) */
+/** GET /api/site — site settings + menu items (public) */
 router.get("/site", (_req, res) => {
   const settings = store.getSettings();
-  res.json(settings);
+  const menuItems = store.getMenuItems().filter((m) => m.visible);
+  res.json({ ...settings, menuItems });
 });
 
 export default router;

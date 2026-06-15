@@ -63,6 +63,13 @@ export const adminApi = {
   // Contact Info
   getContactInfo: () => req<{ contactInfo: ContactInfo }>("GET", "/contact"),
   updateContactInfo: (info: Partial<ContactInfo>) => req<{ contactInfo: ContactInfo }>("PUT", "/contact", info),
+
+  // Analytics
+  getAnalyticsStats: (): Promise<AnalyticsStats> => {
+    const token = localStorage.getItem("admin_token");
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    return fetch("/api/analytics/stats", { headers }).then((r) => r.json()) as Promise<AnalyticsStats>;
+  },
 };
 
 export interface Article {
@@ -88,16 +95,34 @@ export interface MenuItem {
   visible: boolean;
 }
 
+export interface HomeBlock {
+  id: string;
+  name: string;
+  visible: boolean;
+  order: number;
+}
+
 export interface SiteSettings {
   siteName: string;
   tagline: string;
   logoBase64?: string;
+  logoSize?: number;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   ogImageBase64?: string;
   faviconBase64?: string;
+  homeBlocks?: HomeBlock[];
+}
+
+export interface AnalyticsStats {
+  totals: { today: number; week: number; month: number; allTime: number };
+  dailyChart: { date: string; views: number }[];
+  hourlyChart: { hour: number; views: number }[];
+  topArticles: { id: string; title: string; views: number }[];
+  topCategories: { name: string; views: number }[];
+  devices: { mobile: number; desktop: number; tablet: number };
 }
 
 export interface Ad {
@@ -112,10 +137,20 @@ export interface Ad {
   updatedAt: string;
 }
 
+export type ColumnistSpecialty =
+  | "Política"
+  | "Esporte"
+  | "Economia"
+  | "Cultura"
+  | "Segurança Pública"
+  | "Social"
+  | "Outro";
+
 export interface Columnist {
   id: string;
   name: string;
   bio: string;
+  specialty: ColumnistSpecialty;
   avatarBase64: string;
   active: boolean;
   createdAt: string;

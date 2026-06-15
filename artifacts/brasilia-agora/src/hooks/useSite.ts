@@ -1,15 +1,33 @@
 import { useState, useEffect } from "react";
 
+export interface HomeBlock {
+  id: string;
+  name: string;
+  visible: boolean;
+  order: number;
+}
+
+export interface MenuItem {
+  id: string;
+  label: string;
+  path: string;
+  order: number;
+  visible: boolean;
+}
+
 export interface SiteSettings {
   siteName: string;
   tagline: string;
   logoBase64?: string;
+  logoSize?: number;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   ogImageBase64?: string;
   faviconBase64?: string;
+  homeBlocks?: HomeBlock[];
+  menuItems?: MenuItem[];
 }
 
 export function useSite() {

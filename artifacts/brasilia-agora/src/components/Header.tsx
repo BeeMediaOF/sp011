@@ -4,17 +4,17 @@ import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
 import logoImg from "../assets/images/logo_brasilia_agora.png";
 
-const navItems = [
+const FALLBACK_NAV = [
   { label: "Início",     path: "/" },
   { label: "Brasil",     path: "/brasil" },
   { label: "Mundo",      path: "/mundo" },
   { label: "Política",   path: "/politica" },
   { label: "Economia",   path: "/economia" },
-  { label: "Esporte",    path: "/esporte" },
+  { label: "Esporte",    path: "/esportes" },
   { label: "Cultura",    path: "/cultura" },
   { label: "Tecnologia", path: "/tecnologia" },
   { label: "Saúde",      path: "/saude" },
-  { label: "DF",         path: "/df" },
+  { label: "DF",         path: "/cidade" },
 ];
 
 // ─── Ticker de cotações ───────────────────────────────────────────────────────
@@ -93,10 +93,15 @@ function TickerBar() {
 
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
-  const { settings }          = useSite();
-  const [location]            = useLocation();
-  const [menuOpen, setMenu]   = useState(false);
+  const { settings }            = useSite();
+  const [location]              = useLocation();
+  const [menuOpen, setMenu]     = useState(false);
   const [searchOpen, setSearch] = useState(false);
+
+  const navItems =
+    settings?.menuItems && settings.menuItems.length > 0
+      ? settings.menuItems
+      : FALLBACK_NAV;
 
   const isActive = (path: string) =>
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
@@ -121,7 +126,8 @@ export default function Header() {
             <img
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
-              className="h-[101px] w-auto object-contain mt-[0px] mb-[0px] pt-[0px] pb-[14px] pr-[4px] pl-[16px]"
+              style={{ height: settings?.logoSize ?? 101 }}
+              className="w-auto object-contain pt-[0px] pb-[14px] pr-[4px] pl-[16px]"
             />
           </Link>
 

@@ -24,6 +24,7 @@ import Privacidade from "@/pages/Privacidade";
 import Termos from "@/pages/Termos";
 import Admin from "@/pages/Admin";
 import LGPDConsent from "@/components/LGPDConsent";
+import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
 
 const queryClient = new QueryClient();
@@ -69,6 +70,7 @@ function App() {
       <TooltipProvider>
         <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AnalyticsProvider />
+          <SEOHead />
           <Router />
           <LGPDConsent />
         </WouterRouter>
