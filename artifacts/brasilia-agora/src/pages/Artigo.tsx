@@ -211,11 +211,75 @@ export default function Artigo() {
   const chapeuColor =
     editoriaColor[article?.category?.toLowerCase() ?? ""] ?? "#c8102e";
 
-  const paragraphs = article
-    ? article.content
-        .split(/\n\n+/)
-        .filter(Boolean)
-    : [];
+  // ── Content renderer ─────────────────────────────────────────────────────
+  // Handles: ## headings, - bullet lists, **bold**, \n\n paragraphs
+  // Also splits walls of text into readable paragraphs intelligently
+
+  function renderInline(text: string): React.ReactNode[] {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, i) =>
+      part.startsWith("**") && part.endsWith("**")
+        ? <strong key={i}>{part.slice(2, -2)}</strong>
+        : part
+    );
+  }
+
+  function renderContent(raw: string): React.ReactNode[] {
+    // Split on double newlines OR single newlines
+    const lines = raw
+      .split(/\n\n+|\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    const nodes: React.ReactNode[] = [];
+    let listItems: string[] = [];
+
+    function flushList() {
+      if (listItems.length === 0) return;
+      nodes.push(
+        <ul key={`ul-${nodes.length}`} className="list-disc pl-6 mb-5 space-y-1.5">
+          {listItems.map((item, i) => (
+            <li key={i} className="text-[16px] leading-relaxed text-[#2a2a2a]">
+              {renderInline(item)}
+            </li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+
+    for (const line of lines) {
+      // ## Intertítulo
+      if (line.startsWith("## ") || line.startsWith("### ")) {
+        flushList();
+        const text = line.replace(/^#{2,3}\s+/, "");
+        nodes.push(
+          <h2 key={`h-${nodes.length}`}
+            className="text-[20px] font-bold text-[#1a2448] mt-8 mb-3 leading-snug border-l-4 pl-3"
+            style={{ borderColor: chapeuColor }}
+          >
+            {text}
+          </h2>
+        );
+      // - Lista
+      } else if (/^[-•]\s+/.test(line)) {
+        listItems.push(line.replace(/^[-•]\s+/, ""));
+      // Parágrafo normal
+      } else {
+        flushList();
+        nodes.push(
+          <p key={`p-${nodes.length}`}
+            className="mb-5 leading-relaxed text-[16.5px] text-[#2a2a2a]"
+            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
+          >
+            {renderInline(line)}
+          </p>
+        );
+      }
+    }
+    flushList();
+    return nodes;
+  }
 
   const canonicalUrl = article
     ? `https://brasilia-agora.com/artigo/${article.id}`
@@ -402,16 +466,8 @@ export default function Artigo() {
                   )}
 
                   {/* Corpo */}
-                  <div className="prose prose-lg max-w-none text-[#1a1a1a]">
-                    {paragraphs.length > 0
-                      ? paragraphs.map((p, i) => (
-                          <p key={i} className="mb-5 leading-relaxed text-[16px]">{p}</p>
-                        ))
-                      : (
-                        <p className="mb-5 leading-relaxed text-[16px]">
-                          {article.content}
-                        </p>
-                      )}
+                  <div className="max-w-none">
+                    {renderContent(article.content)}
                   </div>
 
                   {/* Tags + compartilhamento inferior */}

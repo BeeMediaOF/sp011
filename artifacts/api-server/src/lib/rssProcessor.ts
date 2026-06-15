@@ -173,22 +173,41 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       ".main-content main", "main",
     ];
 
+    /** Extract paragraphs from an element, preserving structure */
+    function extractParagraphs(el: ReturnType<typeof $>): string {
+      const paras: string[] = [];
+      el.find("p, h2, h3, h4, li").each((_i, node) => {
+        const tag  = (node as { tagName?: string }).tagName?.toLowerCase() ?? "p";
+        const t    = $(node).text().replace(/\s+/g, " ").trim();
+        if (t.length < 20) return;
+        if (tag === "h2" || tag === "h3" || tag === "h4") {
+          paras.push(`## ${t}`);
+        } else if (tag === "li") {
+          paras.push(`- ${t}`);
+        } else {
+          paras.push(t);
+        }
+      });
+      return paras.join("\n\n");
+    }
+
     let text = "";
     for (const sel of bodySelectors) {
       const el = $(sel);
       if (el.length && el.text().trim().length > 250) {
-        text = el.text().replace(/\s+/g, " ").trim();
+        const structured = extractParagraphs(el);
+        text = structured.length > 100 ? structured : el.text().replace(/\s+/g, " ").trim();
         break;
       }
     }
 
-    // 4. Fallback: gather all <p> text
+    // 4. Fallback: gather all <p> text preserving paragraph breaks
     if (!text) {
       text = $("p")
-        .map((_i, el) => $(el).text().trim())
+        .map((_i, el) => $(el).text().replace(/\s+/g, " ").trim())
         .get()
         .filter((t) => t.length > 50)
-        .join(" ");
+        .join("\n\n");
     }
 
     return { text: text.slice(0, 8000), imageUrl };
