@@ -1,0 +1,39 @@
+Você é um desenvolvedor fullstack sênior trabalhando em um portal de notícias chamado [NOME DO PROJETO] hospedado no Replit. 
+Preciso de 7 correções e melhorias específicas. Implemente TODAS de uma vez de forma coesa. 
+Leia cada item com atenção antes de começar.
+
+---
+
+## CONTEXTO DO PROJETO
+- Portal de notícias com painel admin
+- Stack atual: [INFORME SUA STACK — ex: React + Vite, ou HTML/CSS/JS puro, etc.]
+- Hospedado no Replit
+- Usa RSS e Webscraping para coletar notícias
+- Integração com Gemini API (gratuita) para reescrita de conteúdo
+- O painel tem sidebar com cores personalizáveis
+
+---
+
+## CORREÇÃO 01 — Persistência de cores do painel (PRIORIDADE MÁXIMA)
+
+**Problema:** Quando o usuário escolhe "Cor da sidebar" e "Cor de destaque (links ativos)" no painel, 
+as cores voltam ao padrão ao recarregar a página ou clicar em qualquer elemento.
+
+**Solução:**
+- Salvar IMEDIATAMENTE as cores escolhidas no `localStorage` (chave sugerida: `theme_sidebar_color`, `theme_accent_color`)
+- Ao inicializar o app (antes de qualquer render), LER essas cores do localStorage e aplicar via CSS variables no `:root`
+- Exemplo: `document.documentElement.style.setProperty('--sidebar-color', savedColor)`
+- Usar CSS variables em TODOS os elementos que dependem dessas cores — nenhum elemento pode ter cor hardcoded
+- O `<ColorPicker>` (ou input color) deve refletir o valor salvo ao abrir o painel
+- Nenhuma cor deve resetar ao navegar entre páginas, clicar em menus, ou recarregar
+
+---
+
+## CORREÇÃO 02 — Reescrita de notícias com Gemini (tom jornalístico + SEO)
+
+**Contexto:** Notícias coletadas via RSS e Webscraping podem ser selecionadas para reescrita.
+
+**Solução:**
+- Usar a API gratuita do Gemini (`gemini-1.5-flash` ou `gemini-2.0-flash-exp` — checar disponibilidade)
+- Endpoint: `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=API_KEY`
+- O prompt enviado ao Gemini para cada notícia deve ser EXATAMENTE este (não altere):
