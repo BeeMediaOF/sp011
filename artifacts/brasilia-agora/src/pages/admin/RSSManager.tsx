@@ -111,7 +111,7 @@ function AutoModeBadge({ mode }: { mode: AutoMode }) {
     rewrite_draft:   { label: "IA → Rascunho",  cls: "bg-purple-50 text-purple-600" },
     rewrite_publish: { label: "IA → Publicar",  cls: "bg-purple-100 text-purple-700" },
   };
-  const { label, cls } = map[mode];
+  const { label, cls } = map[mode] ?? map["none"];
   return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
 }
 
