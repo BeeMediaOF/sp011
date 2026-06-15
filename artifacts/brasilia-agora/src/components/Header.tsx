@@ -69,7 +69,7 @@ function TickerBar() {
   const track = [...items, ...items, ...items];
 
   return (
-    <div className="bg-[#111111] border-b border-white/5 overflow-hidden h-8 flex items-center select-none">
+    <div className="bg-gray-100 border-b border-gray-200 overflow-hidden h-8 flex items-center select-none">
       <div className="overflow-hidden flex-1">
         <div ref={railRef} className="flex items-center gap-10 w-max will-change-transform">
           {track.map(({ code, value, pct }, i) => {
@@ -77,9 +77,9 @@ function TickerBar() {
             const up  = val >= 0;
             return (
               <span key={i} className="flex items-center gap-1.5 shrink-0 text-[11px]">
-                <span className="font-bold text-white/50 uppercase tracking-wider">{code}</span>
-                <span className="text-white font-medium">{value}</span>
-                <span className="font-bold" style={{ color: up ? "#4ade80" : "#f87171" }}>
+                <span className="font-bold text-gray-400 uppercase tracking-wider">{code}</span>
+                <span className="text-gray-800 font-medium">{value}</span>
+                <span className="font-bold" style={{ color: up ? "#16a34a" : "#dc2626" }}>
                   {up ? "▲" : "▼"} {Math.abs(val).toFixed(2)}%
                 </span>
               </span>
@@ -104,13 +104,13 @@ export default function Header() {
   return (
     <>
       {/* ── Barra principal ── */}
-      <header className="bg-[#0a0a0a] sticky top-0 z-50 shadow-lg">
-        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[27px] mb-[27px]">
+      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200">
+        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2">
 
           {/* Hamburger */}
           <button
             onClick={() => setMenu(v => !v)}
-            className="text-white/60 hover:text-white transition-colors p-1.5 shrink-0 rounded"
+            className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded"
             aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -133,8 +133,8 @@ export default function Header() {
                 href={path}
                 className={`text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm ${
                   isActive(path)
-                    ? "text-white bg-white/10"
-                    : "text-white/55 hover:text-white hover:bg-white/5"
+                    ? "text-[#c8102e] bg-red-50"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 {label}
@@ -153,11 +153,11 @@ export default function Header() {
                   autoFocus
                   type="text"
                   placeholder="Pesquisar..."
-                  className="bg-white/10 border border-white/20 text-white placeholder-white/30 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-white/50 w-[150px] sm:w-[200px]"
+                  className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
                 />
                 <button
                   onClick={() => setSearch(false)}
-                  className="text-white/50 hover:text-white p-1 transition-colors"
+                  className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
                   aria-label="Fechar busca"
                 >
                   <X size={15} />
@@ -166,7 +166,7 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => setSearch(true)}
-                className="text-white/60 hover:text-white p-1.5 transition-colors rounded"
+                className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
                 aria-label="Pesquisar"
               >
                 <Search size={17} />
@@ -177,7 +177,7 @@ export default function Header() {
 
         {/* ── Drawer mobile ── */}
         {menuOpen && (
-          <div className="lg:hidden bg-[#111] border-t border-white/10">
+          <div className="lg:hidden bg-white border-t border-gray-200">
             <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
               {navItems.map(({ label, path }) => (
                 <li key={path}>
@@ -185,12 +185,12 @@ export default function Header() {
                     href={path}
                     onClick={() => setMenu(false)}
                     className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${
-                      isActive(path) ? "text-white" : "text-white/55 hover:text-white"
+                      isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"
                     }`}
                   >
                     <span
                       className="w-1 h-4 rounded-full shrink-0"
-                      style={{ backgroundColor: isActive(path) ? "#c8102e" : "rgba(255,255,255,0.2)" }}
+                      style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }}
                     />
                     {label}
                   </Link>
