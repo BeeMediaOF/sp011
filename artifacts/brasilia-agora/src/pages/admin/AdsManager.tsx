@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
-import { Megaphone, Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink, ImageIcon, Layers, Zap, TrendingUp } from "lucide-react";
+import {
+  Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink,
+  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper,
+} from "lucide-react";
 
 function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -14,136 +17,359 @@ function toBase64(file: File): Promise<string> {
 
 type AdPosition = Ad["position"];
 
-// ─── Slot definitions ─────────────────────────────────────────────────────────
+// ─── Slot definitions ──────────────────────────────────────────────────────────
 const SLOTS: {
   key: AdPosition;
   label: string;
-  desc: string;
-  dims: string;
-  color: string;
-  badge: string;
-  preview: string;
+  location: string;
+  hint: string;
+  pagePos: string;
+  icon: React.ReactNode;
+  accent: string;
+  bg: string;
 }[] = [
   {
-    key:     "slot_01",
-    label:   "Propaganda 01",
-    desc:    "Logo após o bloco principal (hero)",
-    dims:    "Livre",
-    color:   "bg-red-100 text-red-700 border-red-200",
-    badge:   "bg-red-100 text-red-700",
-    preview: "w-56 h-10",
+    key:      "slot_01",
+    label:    "Espaço 1 — Home",
+    location: "Após o 1º bloco de notícias",
+    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
+    pagePos:  "top-[22%]",
+    icon:     <Home size={14} />,
+    accent:   "#c8102e",
+    bg:       "bg-red-50 border-red-200",
   },
   {
-    key:     "slot_02",
-    label:   "Propaganda 02",
-    desc:    "Após a 2ª seção de notícias",
-    dims:    "Livre",
-    color:   "bg-blue-100 text-blue-700 border-blue-200",
-    badge:   "bg-blue-100 text-blue-700",
-    preview: "w-56 h-10",
+    key:      "slot_02",
+    label:    "Espaço 2 — Home",
+    location: "Após o 2º bloco de notícias",
+    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
+    pagePos:  "top-[38%]",
+    icon:     <Home size={14} />,
+    accent:   "#0b3d91",
+    bg:       "bg-blue-50 border-blue-200",
   },
   {
-    key:     "slot_03",
-    label:   "Propaganda 03",
-    desc:    "No meio da página",
-    dims:    "Livre",
-    color:   "bg-purple-100 text-purple-700 border-purple-200",
-    badge:   "bg-purple-100 text-purple-700",
-    preview: "w-56 h-10",
+    key:      "slot_03",
+    label:    "Espaço 3 — Home",
+    location: "Após o 4º bloco de notícias",
+    hint:     "Banner horizontal, largura total. Ex: 970×250 px",
+    pagePos:  "top-[55%]",
+    icon:     <Home size={14} />,
+    accent:   "#7c3aed",
+    bg:       "bg-purple-50 border-purple-200",
   },
   {
-    key:     "slot_04",
-    label:   "Propaganda 04",
-    desc:    "Na parte inferior da página",
-    dims:    "Livre",
-    color:   "bg-orange-100 text-orange-700 border-orange-200",
-    badge:   "bg-orange-100 text-orange-700",
-    preview: "w-56 h-10",
+    key:      "slot_04",
+    label:    "Espaço 4 — Home",
+    location: "Após o 7º bloco de notícias",
+    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
+    pagePos:  "top-[72%]",
+    icon:     <Home size={14} />,
+    accent:   "#ea580c",
+    bg:       "bg-orange-50 border-orange-200",
   },
   {
-    key:     "slot_05",
-    label:   "Propaganda 05 – SlideBar",
-    desc:    "Barra lateral fixa (slide bar)",
-    dims:    "Livre",
-    color:   "bg-teal-100 text-teal-700 border-teal-200",
-    badge:   "bg-teal-100 text-teal-700",
-    preview: "w-16 h-20",
+    key:      "slot_05",
+    label:    "Espaço 5 — Editorias",
+    location: "Dentro das páginas de editoria",
+    hint:     "Banner ou retângulo. Ex: 300×250 px",
+    pagePos:  "top-[45%]",
+    icon:     <Newspaper size={14} />,
+    accent:   "#0d9488",
+    bg:       "bg-teal-50 border-teal-200",
   },
 ];
 
-// Legacy slots (backward compat display only)
-const LEGACY: Record<string, { label: string; badge: string; preview: string }> = {
-  topo:        { label: "Topo (legado)",              badge: "bg-gray-100 text-gray-500", preview: "w-56 h-14" },
-  centro:      { label: "Centro (legado)",            badge: "bg-gray-100 text-gray-500", preview: "w-56 h-8"  },
-  lateral:     { label: "Lateral (legado)",           badge: "bg-gray-100 text-gray-500", preview: "w-10 h-24" },
-  rodape:      { label: "Rodapé (legado)",            badge: "bg-gray-100 text-gray-500", preview: "w-52 h-14" },
-  slidebar_250:{ label: "Slide Bar 250 (legado)",     badge: "bg-gray-100 text-gray-500", preview: "w-16 h-14" },
-  slidebar_500:{ label: "Slide Bar 500 (legado)",     badge: "bg-gray-100 text-gray-500", preview: "w-16 h-24" },
-  banner:      { label: "Banner (legado)",            badge: "bg-gray-100 text-gray-500", preview: "w-48 h-10" },
-  sidebar:     { label: "Sidebar (legado)",           badge: "bg-gray-100 text-gray-500", preview: "w-10 h-24" },
-  central:     { label: "Central (legado)",           badge: "bg-gray-100 text-gray-500", preview: "w-52 h-14" },
-};
-
-function slotInfo(pos: AdPosition) {
-  const found = SLOTS.find((s) => s.key === pos);
-  if (found) return { label: found.label, badge: found.badge, preview: found.preview };
-  const leg = LEGACY[pos as string];
-  if (leg) return leg;
-  return { label: pos, badge: "bg-gray-100 text-gray-500", preview: "w-48 h-10" };
+// ─── Add form (per-slot) ───────────────────────────────────────────────────────
+interface SlotFormProps {
+  slotKey: AdPosition;
+  onSaved: () => void;
+  onCancel: () => void;
 }
 
-type FilterKey = "all" | "active" | "inactive" | AdPosition;
-
-export default function AdsManager() {
-  const [ads, setAds] = useState<Ad[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [link, setLink] = useState("");
-  const [position, setPosition] = useState<AdPosition>("topo");
+function SlotForm({ slotKey, onSaved, onCancel }: SlotFormProps) {
+  const [name, setName]       = useState("");
+  const [link, setLink]       = useState("");
   const [preview, setPreview] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [filter, setFilter] = useState<FilterKey>("all");
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [saving, setSaving]   = useState(false);
+  const fileRef               = useRef<HTMLInputElement>(null);
 
-  const stats = useMemo(() => {
-    const total = ads.length;
-    const active = ads.filter((a) => a.active).length;
-    const totalClicks = ads.reduce((sum, a) => sum + (a.clicks ?? 0), 0);
-    const byPos: Record<string, number> = {};
-    ads.forEach((a) => { byPos[a.position] = (byPos[a.position] ?? 0) + 1; });
-    return { total, active, inactive: total - active, totalClicks, byPos };
-  }, [ads]);
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) setPreview(await toBase64(f));
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim() || !link.trim() || !preview) return;
+    setSaving(true);
+    try {
+      await adminApi.createAd({ name, link, imageBase64: preview, position: slotKey, active: true });
+      onSaved();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-5 mt-3 space-y-4 shadow-sm">
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-sm font-bold text-gray-700">Adicionar propaganda</p>
+        <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600 p-1">
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Anunciante</label>
+          <input
+            value={name} onChange={(e) => setName(e.target.value)} required
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="Ex: Loja ABC"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Link ao clicar</label>
+          <input
+            value={link} onChange={(e) => setLink(e.target.value)} required
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            placeholder="https://..."
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Imagem da propaganda</label>
+        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+        {!preview ? (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors w-full justify-center"
+          >
+            <ImageIcon size={16} />
+            Clique para selecionar a imagem
+          </button>
+        ) : (
+          <div className="flex items-start gap-3">
+            <img src={preview} alt="Preview" className="max-h-24 max-w-xs rounded-lg border border-gray-200 object-contain" />
+            <button
+              type="button"
+              onClick={() => { setPreview(""); if (fileRef.current) fileRef.current.value = ""; }}
+              className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 mt-1"
+            >
+              <X size={12} /> Trocar imagem
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel}
+          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          disabled={saving || !preview || !name.trim() || !link.trim()}
+          className="px-5 py-2 bg-[#1a2448] text-white rounded-lg text-sm font-semibold hover:bg-[#2a3458] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {saving ? "Salvando..." : <><CheckCircle size={14} /> Publicar propaganda</>}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Ad card ──────────────────────────────────────────────────────────────────
+interface AdCardProps {
+  ad: Ad;
+  accent: string;
+  onToggle: (ad: Ad) => void;
+  onDelete: (id: string) => void;
+}
+
+function AdCard({ ad, accent, onToggle, onDelete }: AdCardProps) {
+  return (
+    <div className={`flex gap-4 items-start p-4 rounded-xl border bg-white shadow-sm transition-opacity ${!ad.active ? "opacity-50" : ""}`}>
+      <div className="shrink-0 w-[120px] h-[72px] overflow-hidden rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center">
+        <img src={ad.imageBase64} alt={ad.name} className="max-w-full max-h-full object-contain" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-bold text-[#1a2448] truncate text-sm">{ad.name}</p>
+          <span
+            className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
+            style={{ backgroundColor: accent + "20", color: accent }}
+          >
+            {ad.active ? "● Ativo" : "● Inativo"}
+          </span>
+        </div>
+        <a
+          href={ad.link} target="_blank" rel="noreferrer"
+          className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5 break-all"
+        >
+          {ad.link.length > 50 ? ad.link.slice(0, 50) + "…" : ad.link}
+          <ExternalLink size={10} />
+        </a>
+        <div className="flex items-center gap-3 mt-1.5">
+          <span className="flex items-center gap-1 text-[11px] text-orange-600 font-semibold">
+            <MousePointer size={11} /> {ad.clicks ?? 0} clique{ad.clicks !== 1 ? "s" : ""}
+          </span>
+          <span className="text-[11px] text-gray-400">
+            {new Date(ad.createdAt).toLocaleDateString("pt-BR")}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          onClick={() => onToggle(ad)}
+          title={ad.active ? "Pausar" : "Ativar"}
+          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
+        >
+          {ad.active ? <EyeOff size={14} /> : <Eye size={14} />}
+        </button>
+        <button
+          onClick={() => onDelete(ad.id)}
+          title="Excluir"
+          className="w-8 h-8 rounded-lg border border-red-200 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page map visual ──────────────────────────────────────────────────────────
+function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
+  const homeSlots = SLOTS.filter((s) => s.key !== "slot_05");
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <LayoutTemplate size={16} className="text-gray-500" />
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mapa da página</h3>
+        <span className="text-[11px] text-gray-400 ml-1">— onde cada espaço aparece na home</span>
+      </div>
+      <div className="flex gap-6 items-start">
+        {/* Visual page mockup */}
+        <div className="shrink-0 relative w-[140px] h-[320px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+          {/* Header bar */}
+          <div className="h-7 bg-gray-300 border-b border-gray-300 flex items-center px-2 gap-1">
+            <div className="w-14 h-3 bg-gray-400 rounded-sm" />
+          </div>
+          {/* Content area */}
+          <div className="p-1.5 space-y-1">
+            {/* Hero */}
+            <div className="h-14 bg-gray-300 rounded-sm" />
+            {/* Slot 01 */}
+            <div
+              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
+              style={{ backgroundColor: SLOTS[0].accent }}
+            >
+              AD 1
+            </div>
+            {/* Block */}
+            <div className="h-10 bg-gray-200 rounded-sm" />
+            {/* Slot 02 */}
+            <div
+              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
+              style={{ backgroundColor: SLOTS[1].accent }}
+            >
+              AD 2
+            </div>
+            {/* Block */}
+            <div className="h-10 bg-gray-200 rounded-sm" />
+            {/* Block */}
+            <div className="h-8 bg-gray-200 rounded-sm" />
+            {/* Slot 03 */}
+            <div
+              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
+              style={{ backgroundColor: SLOTS[2].accent }}
+            >
+              AD 3
+            </div>
+            {/* Block */}
+            <div className="h-8 bg-gray-200 rounded-sm" />
+            {/* Block */}
+            <div className="h-8 bg-gray-200 rounded-sm" />
+            {/* Block */}
+            <div className="h-8 bg-gray-200 rounded-sm" />
+            {/* Slot 04 */}
+            <div
+              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
+              style={{ backgroundColor: SLOTS[3].accent }}
+            >
+              AD 4
+            </div>
+          </div>
+        </div>
+
+        {/* Slot legend */}
+        <div className="flex-1 space-y-2">
+          {homeSlots.map((s) => {
+            const count = adsBySlot[s.key]?.length ?? 0;
+            const active = adsBySlot[s.key]?.filter((a) => a.active).length ?? 0;
+            return (
+              <div key={s.key} className="flex items-center gap-3">
+                <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0"
+                  style={{ backgroundColor: s.accent }}>
+                  {s.key.replace("slot_0", "")}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-gray-700 truncate">{s.location}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${count === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
+                  {count === 0 ? "Vazio" : `${active} ativo${active !== 1 ? "s" : ""}`}
+                </span>
+              </div>
+            );
+          })}
+          <div className="flex items-center gap-3 pt-1 border-t border-gray-100 mt-2">
+            <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0"
+              style={{ backgroundColor: SLOTS[4].accent }}>
+              5
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-700 truncate">Páginas de editoria</p>
+            </div>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${(adsBySlot["slot_05"]?.length ?? 0) === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
+              {(adsBySlot["slot_05"]?.length ?? 0) === 0 ? "Vazio" : `${adsBySlot["slot_05"]?.filter((a) => a.active).length ?? 0} ativo${(adsBySlot["slot_05"]?.filter((a) => a.active).length ?? 0) !== 1 ? "s" : ""}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+export default function AdsManager() {
+  const [ads, setAds]         = useState<Ad[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openForm, setOpenForm] = useState<AdPosition | null>(null);
 
   const load = async () => {
     setLoading(true);
     try { const data = await adminApi.getAds(); setAds(data.ads); }
-    catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    catch { } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
 
-  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setPreview(await toBase64(file));
-  }
+  const adsBySlot = useMemo(() => {
+    const map: Record<string, Ad[]> = {};
+    SLOTS.forEach((s) => { map[s.key] = []; });
+    ads.forEach((a) => {
+      if (map[a.position]) map[a.position].push(a);
+    });
+    return map;
+  }, [ads]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() || !link.trim() || !preview) return;
-    setSubmitting(true);
-    try {
-      await adminApi.createAd({ name, link, imageBase64: preview, position, active: true });
-      setName(""); setLink(""); setPreview(""); setShowForm(false); setPosition("topo");
-      await load();
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const totalActive = useMemo(() => ads.filter((a) => a.active).length, [ads]);
 
   async function toggleActive(ad: Ad) {
     try { await adminApi.updateAd(ad.id, { active: !ad.active }); await load(); }
@@ -156,245 +382,96 @@ export default function AdsManager() {
     catch (err) { alert((err as Error).message); }
   }
 
-  const filteredAds = useMemo(() => {
-    if (filter === "all")      return ads;
-    if (filter === "active")   return ads.filter((a) => a.active);
-    if (filter === "inactive") return ads.filter((a) => !a.active);
-    return ads.filter((a) => a.position === filter);
-  }, [ads, filter]);
-
-  const selectedSlot = SLOTS.find((s) => s.key === position);
-
   return (
     <AdminLayout title="Propagandas">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Megaphone className="text-[#F5A623]" size={24} />
-            <h2 className="text-xl font-bold text-[#1a2448]">Gerenciar Propagandas</h2>
-          </div>
-          <button
-            onClick={() => setShowForm((s) => !s)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1a2448] text-white rounded-lg hover:bg-[#2a3458] transition-colors text-sm font-semibold"
-          >
-            <Plus size={16} />
-            {showForm ? "Fechar" : "Nova Propaganda"}
-          </button>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Layers size={18} className="text-blue-600" />
-              <span className="text-xs font-semibold text-gray-500 uppercase">Total</span>
-            </div>
-            <div className="text-3xl font-black text-[#1a2448]">{stats.total}</div>
-            <div className="text-xs text-gray-400 mt-1">propagandas cadastradas</div>
-          </div>
-          <div className="bg-white rounded-xl border p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap size={18} className="text-green-600" />
-              <span className="text-xs font-semibold text-gray-500 uppercase">Ativos</span>
-            </div>
-            <div className="text-3xl font-black text-green-600">{stats.active}</div>
-            <div className="text-xs text-gray-400 mt-1">{stats.inactive} inativos</div>
-          </div>
-          <div className="bg-white rounded-xl border p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <MousePointer size={18} className="text-orange-600" />
-              <span className="text-xs font-semibold text-gray-500 uppercase">Cliques</span>
-            </div>
-            <div className="text-3xl font-black text-orange-600">{stats.totalClicks}</div>
-            <div className="text-xs text-gray-400 mt-1">interações totais</div>
-          </div>
-          <div className="bg-white rounded-xl border p-5 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp size={18} className="text-purple-600" />
-              <span className="text-xs font-semibold text-gray-500 uppercase">Por Espaço</span>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {SLOTS.map((s) => stats.byPos[s.key] ? (
-                <span key={s.key} className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${s.badge}`}>
-                  {s.label.split(" ")[0]}: {stats.byPos[s.key]}
-                </span>
-              ) : null)}
-              {stats.byPos["banner"] || stats.byPos["sidebar"] || stats.byPos["central"] ? (
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">leg: {(stats.byPos["banner"] ?? 0) + (stats.byPos["sidebar"] ?? 0) + (stats.byPos["central"] ?? 0)}</span>
-              ) : null}
-            </div>
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-xl font-black text-[#1a2448]">Propagandas</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {loading ? "Carregando…" : `${ads.length} propaganda${ads.length !== 1 ? "s" : ""} · ${totalActive} ativa${totalActive !== 1 ? "s" : ""}`}
+            </p>
           </div>
         </div>
 
-        {/* ── Mapa visual de espaços ──────────────────────────────────────────── */}
-        <div className="bg-white rounded-xl border shadow-sm p-5">
-          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Espaços disponíveis</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {SLOTS.map((s) => (
-              <div key={s.key} className={`rounded-lg border px-4 py-3 flex items-center gap-3 ${s.color}`}>
-                <div className={`shrink-0 rounded bg-current opacity-20 ${s.preview}`} />
-                <div className="min-w-0">
-                  <p className="font-bold text-sm leading-tight">{s.label}</p>
-                  <p className="text-[11px] opacity-80 mt-0.5">{s.dims} px</p>
-                  <p className="text-[10px] opacity-60 mt-0.5 truncate">{s.desc}</p>
-                </div>
-                <span className="ml-auto shrink-0 text-[11px] font-black">
-                  {stats.byPos[s.key] ?? 0}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* ── Mapa visual ── */}
+        <PageMap adsBySlot={adsBySlot} />
 
-        {/* Form */}
-        {showForm && (
-          <form onSubmit={handleCreate} className="bg-white rounded-xl border p-6 space-y-4 shadow-sm">
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Nova Propaganda</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nome do anunciante</label>
-                <input value={name} onChange={(e) => setName(e.target.value)} required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A623] focus:border-transparent"
-                  placeholder="Ex: Loja ABC" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Link de destino</label>
-                <input value={link} onChange={(e) => setLink(e.target.value)} required
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#F5A623] focus:border-transparent"
-                  placeholder="https://..." />
-              </div>
-            </div>
-
-            {/* Position selector */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Espaço publicitário</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {SLOTS.map((s) => (
-                  <button
-                    key={s.key}
-                    type="button"
-                    onClick={() => setPosition(s.key)}
-                    className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
-                      position === s.key
-                        ? "border-[#F5A623] bg-amber-50 ring-2 ring-[#F5A623]/30"
-                        : "border-gray-200 bg-white hover:border-gray-300"
-                    }`}
-                  >
-                    <p className="font-semibold text-sm text-[#1a2448]">{s.label}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{s.dims} px</p>
-                  </button>
-                ))}
-              </div>
-              {selectedSlot && (
-                <p className="mt-1.5 text-xs text-gray-400">
-                  ↳ {selectedSlot.desc} — imagem recomendada: <span className="font-semibold">{selectedSlot.dims}</span> px
-                </p>
-              )}
-            </div>
-
-            {/* Image upload */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Imagem da propaganda</label>
-              <input ref={fileRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
-              <div className="flex gap-4 items-center">
-                <button type="button" onClick={() => fileRef.current?.click()}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-2">
-                  <ImageIcon size={16} /> Selecionar imagem
-                </button>
-                {preview && (
-                  <div className="relative">
-                    <img src={preview} alt="Preview"
-                      className={`rounded-lg border border-gray-200 object-contain ${selectedSlot?.preview ?? "w-48 h-16"}`} />
-                    <button type="button"
-                      onClick={() => { setPreview(""); if (fileRef.current) fileRef.current.value = ""; }}
-                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">
-                      &times;
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button type="submit" disabled={submitting || !preview}
-                className="px-6 py-2 bg-[#F5A623] text-[#1a2448] rounded-lg font-semibold text-sm hover:bg-[#e09520] transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {submitting ? "Salvando..." : "Salvar Propaganda"}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Filter bar */}
-        <div className="flex flex-wrap gap-2">
-          {([
-            { key: "all",      label: "Todas" },
-            { key: "active",   label: "Ativas" },
-            { key: "inactive", label: "Inativas" },
-            ...SLOTS.map((s) => ({ key: s.key, label: s.label })),
-          ] as { key: FilterKey; label: string }[]).map((f) => (
-            <button key={f.key} onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-                filter === f.key ? "bg-[#1a2448] text-white border-[#1a2448]" : "bg-white text-gray-600 border-gray-300 hover:bg-gray-50"
-              }`}>
-              {f.label}
-            </button>
-          ))}
-          <span className="ml-auto text-xs text-gray-400 self-center">
-            {filteredAds.length} resultado{filteredAds.length !== 1 ? "s" : ""}
-          </span>
-        </div>
-
-        {/* Lista */}
+        {/* ── Slots ── */}
         {loading ? (
-          <div className="text-center py-12 text-gray-400">Carregando...</div>
-        ) : filteredAds.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-xl border text-gray-400">
-            <Megaphone size={32} className="mx-auto mb-3 text-gray-300" />
-            <p>Nenhuma propaganda encontrada.</p>
-          </div>
+          <div className="text-center py-12 text-gray-400 text-sm">Carregando propagandas…</div>
         ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {filteredAds.map((ad) => {
-              const info = slotInfo(ad.position);
+          <div className="space-y-4">
+            {SLOTS.map((slot) => {
+              const slotAds = adsBySlot[slot.key] ?? [];
+              const isOpen  = openForm === slot.key;
+
               return (
-                <div key={ad.id} className={`bg-white rounded-xl border p-4 flex gap-4 items-start shadow-sm ${!ad.active ? "opacity-60" : ""}`}>
-                  <div className="shrink-0">
-                    <img src={ad.imageBase64} alt={ad.name}
-                      className={`rounded-lg border border-gray-100 object-cover ${info.preview}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h4 className="font-bold text-[#1a2448] truncate">{ad.name}</h4>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${info.badge}`}>
-                        {info.label}
-                      </span>
-                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ${ad.active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                        {ad.active ? "Ativo" : "Inativo"}
-                      </span>
+                <div key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.bg}`}>
+                  {/* Slot header */}
+                  <div className="flex items-center gap-3 px-5 py-3.5">
+                    <div
+                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
+                      style={{ backgroundColor: slot.accent }}
+                    >
+                      {slot.icon}
                     </div>
-                    <a href={ad.link} target="_blank" rel="noreferrer"
-                      className="text-xs text-[#1d4ed8] hover:underline flex items-center gap-1 break-all">
-                      {ad.link} <ExternalLink size={10} />
-                    </a>
-                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                      <span className="flex items-center gap-1 text-orange-600 font-semibold">
-                        <MousePointer size={12} /> {ad.clicks} clique{ad.clicks !== 1 ? "s" : ""}
-                      </span>
-                      <span>Criado: {new Date(ad.createdAt).toLocaleDateString("pt-BR")}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-[#1a2448] text-sm">{slot.label}</p>
+                      <p className="text-[11px] text-gray-500 truncate">{slot.location} · {slot.hint}</p>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => toggleActive(ad)} title={ad.active ? "Desativar" : "Ativar"}
-                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors">
-                      {ad.active ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                    <button onClick={() => handleDelete(ad.id)} title="Remover"
-                      className="w-8 h-8 rounded-lg border border-red-200 flex items-center justify-center text-red-500 hover:bg-red-50 transition-colors">
-                      <Trash2 size={14} />
+                    {slotAds.length > 0 && (
+                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-gray-600 shrink-0">
+                        {slotAds.length} anúncio{slotAds.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setOpenForm(isOpen ? null : slot.key)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors shrink-0"
+                      style={{ backgroundColor: slot.accent }}
+                    >
+                      <Plus size={13} />
+                      {isOpen ? "Fechar" : "Adicionar"}
                     </button>
                   </div>
+
+                  {/* Inline add form */}
+                  {isOpen && (
+                    <div className="px-5 pb-4">
+                      <SlotForm
+                        slotKey={slot.key}
+                        onSaved={() => { setOpenForm(null); load(); }}
+                        onCancel={() => setOpenForm(null)}
+                      />
+                    </div>
+                  )}
+
+                  {/* Ad cards */}
+                  {slotAds.length > 0 && (
+                    <div className="px-5 pb-4 space-y-2">
+                      {slotAds.map((ad) => (
+                        <AdCard
+                          key={ad.id}
+                          ad={ad}
+                          accent={slot.accent}
+                          onToggle={toggleActive}
+                          onDelete={handleDelete}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {slotAds.length === 0 && !isOpen && (
+                    <div className="px-5 pb-4">
+                      <div className="rounded-lg border border-dashed border-current/30 py-4 flex items-center justify-center gap-2 opacity-40">
+                        <ImageIcon size={14} />
+                        <span className="text-xs font-medium">Espaço vazio — clique em Adicionar para publicar aqui</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
