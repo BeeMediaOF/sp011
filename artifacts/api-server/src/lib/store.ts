@@ -1,6 +1,19 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { randomUUID } from "crypto";
 
+function slugify(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80)
+    .replace(/^-+|-+$/g, "");
+}
+
 export interface Article {
   id: string;
   title: string;
@@ -19,6 +32,8 @@ export interface Article {
   rssSourceName?: string;
   rssSourceUrl?: string;
   aiRewritten?: boolean;
+  slug?: string;
+  keywords?: string;
 }
 
 export interface MenuItem {
@@ -280,9 +295,18 @@ export const store = {
   // Articles
   getArticles: () => [..._store.articles],
   getArticle: (id: string) => _store.articles.find((a) => a.id === id) ?? null,
+  isDuplicateArticle: (title: string, rssSourceUrl?: string): boolean => {
+    const norm = title.trim().toLowerCase();
+    return _store.articles.some(
+      (a) =>
+        a.title.trim().toLowerCase() === norm ||
+        (rssSourceUrl && rssSourceUrl.length > 0 && a.rssSourceUrl === rssSourceUrl)
+    );
+  },
   createArticle: (data: Omit<Article, "id" | "createdAt" | "updatedAt">): Article => {
     const article: Article = {
       ...data,
+      slug: data.slug ?? slugify(data.title),
       id: randomUUID(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

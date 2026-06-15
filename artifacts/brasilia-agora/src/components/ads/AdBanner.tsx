@@ -1,9 +1,9 @@
 import React from "react";
 import { useAds, trackClick } from "./useAds";
 
-export default function AdBanner() {
+export default function AdBanner({ index = 0 }: { index?: number }) {
   const { banners, loading } = useAds();
-  const ad = banners[0] ?? null;
+  const ad = banners[index] ?? banners[0] ?? null;
 
   if (loading) {
     return (

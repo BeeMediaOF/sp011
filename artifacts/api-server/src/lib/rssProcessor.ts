@@ -43,7 +43,7 @@ Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
 **ESTRUTURA JORNALÍSTICA:**
 1. Primeiro parágrafo: responda às perguntas Quem, O quê, Quando, Onde e Por quê (pirâmide invertida)
 2. Desenvolvimento: detalhe os fatos em ordem decrescente de importância
-3. Use intertítulos em negrito (**Exemplo de intertítulo**) para seções com 3+ parágrafos sobre o mesmo tema
+3. Use intertítulos com ## para seções principais (H2) e ### para subseções (H3) — obrigatório quando houver 3+ parágrafos sobre o mesmo tema
 4. Use listas com marcadores (-) para enumerações ou sequências de dados
 
 **SEO (ranqueamento em buscadores):**
@@ -61,9 +61,12 @@ Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
 - NUNCA invente informações — use apenas os dados do texto original
 - NÃO inclua o título no corpo do texto
 - NÃO adicione notas, explicações ou comentários fora do artigo
-- Retorne APENAS o texto reescrito, sem prefácio, sem "Aqui está:" ou similar
 - Português brasileiro formal, mas acessível
-${giveCredit ? `- ÚLTIMA LINHA OBRIGATÓRIA: "Com informações de: ${sourceName}"` : ""}
+${giveCredit ? `- PENÚLTIMA LINHA OBRIGATÓRIA antes dos metadados: "Com informações de: ${sourceName}"` : ""}
+
+**METADADOS SEO (sempre ao final, exatamente neste formato):**
+SLUG: [slug-seo-do-artigo-em-kebab-case-sem-acentos-max-60-chars]
+KEYWORDS: [palavra1, palavra2, palavra3, palavra4, palavra5, palavra6]
 
 Título original: ${title}
 
@@ -80,12 +83,33 @@ function getGeminiFree() {
   return new GoogleGenAI({ apiKey, httpOptions: { baseUrl: baseURL } });
 }
 
+export interface RewriteResult {
+  content: string;
+  keywords: string;
+  slug: string;
+}
+
+function parseRewriteResult(raw: string): RewriteResult {
+  const slugMatch    = raw.match(/^SLUG:\s*(.+)$/m);
+  const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
+  const slug     = (slugMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "").slice(0, 80);
+  const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
+  const content  = raw
+    .replace(/^SLUG:\s*.+$/m, "")
+    .replace(/^KEYWORDS:\s*.+$/m, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { content, keywords, slug };
+}
+
 export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean
-): Promise<string> {
+): Promise<RewriteResult> {
   const settings = store.getSettings();
   const provider = settings.rssAiProvider ?? "gemini_free";
   const prompt   = buildPrompt(title, text, sourceName, giveCredit);
+
+  let raw = "";
 
   if (provider === "openai") {
     const apiKey = settings.rssAiApiKey;
@@ -106,10 +130,8 @@ export async function rewriteWithAI(
       throw new Error(`OpenAI: ${err?.error?.message ?? res.statusText}`);
     }
     const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content ?? "";
-  }
-
-  if (provider === "gemini_paid") {
+    raw = data.choices?.[0]?.message?.content ?? "";
+  } else if (provider === "gemini_paid") {
     const apiKey = settings.rssAiApiKey;
     if (!apiKey) throw new Error("API key do Gemini não configurada");
     const model = settings.rssAiModel || "gemini-2.5-flash";
@@ -119,18 +141,20 @@ export async function rewriteWithAI(
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       config: { maxOutputTokens: 8192 },
     });
-    return resp.text ?? "";
+    raw = resp.text ?? "";
+  } else {
+    // Default: gemini_free (Replit integration)
+    const ai    = getGeminiFree();
+    const model = settings.rssAiModel || "gemini-2.5-flash";
+    const resp  = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { maxOutputTokens: 8192 },
+    });
+    raw = resp.text ?? "";
   }
 
-  // Default: gemini_free (Replit integration)
-  const ai    = getGeminiFree();
-  const model = settings.rssAiModel || "gemini-2.5-flash";
-  const resp  = await ai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    config: { maxOutputTokens: 8192 },
-  });
-  return resp.text ?? "";
+  return parseRewriteResult(raw);
 }
 
 // ─── Scraping ─────────────────────────────────────────────────────────────────
@@ -344,12 +368,23 @@ export async function autoProcessArticle(
   const { autoMode, giveCredit, name: sourceName, category } = src;
   if (autoMode === "none") return;
 
-  let content = art.fullText;
-  let author  = giveCredit ? `Redação (via ${sourceName})` : "Redação";
+  // Skip duplicates — check by title or source URL
+  if (store.isDuplicateArticle(art.title, art.link)) {
+    logger.info({ title: art.title }, "Skipping duplicate RSS article");
+    return;
+  }
+
+  let content  = art.fullText;
+  let keywords = "";
+  let slug     = "";
+  let author   = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
     try {
-      content = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit);
+      const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit);
+      content  = result.content;
+      keywords = result.keywords;
+      slug     = result.slug;
     } catch (err) {
       logger.warn({ err, sourceId: src.id }, "AI rewrite failed — using original text");
     }
@@ -373,6 +408,8 @@ export async function autoProcessArticle(
     rssSourceName: art.sourceName,
     rssSourceUrl:  art.link,
     aiRewritten:   autoMode === "rewrite_draft" || autoMode === "rewrite_publish",
+    keywords:      keywords || undefined,
+    slug:          slug || undefined,
   });
 }
 

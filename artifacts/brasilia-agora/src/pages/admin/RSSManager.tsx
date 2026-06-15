@@ -33,6 +33,7 @@ interface ArticleState extends FetchedArticle {
   importing?: boolean; imported?: boolean;
   error?: string; expanded?: boolean;
   editTitle?: string; editSubtitle?: string; editContent?: string;
+  aiKeywords?: string; aiSlug?: string;
 }
 
 interface AiSettings {
@@ -142,6 +143,9 @@ export default function RSSManager() {
   // ── Dynamic categories from menu ──
   const [menuCategories, setMenuCategories] = useState<{ slug: string; label: string }[]>([]);
 
+  // ── Stats ──
+  const [rssStats, setRssStats] = useState({ total: 0, rewritten: 0 });
+
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
   const [fetching, setFetching]       = useState(false);
@@ -149,6 +153,21 @@ export default function RSSManager() {
   const [articles, setArticles]       = useState<ArticleState[]>([]);
 
   // ─── Load ───────────────────────────────────────────────────────────────────
+
+  const loadRssStats = useCallback(async () => {
+    try {
+      const base = import.meta.env.BASE_URL ?? "/";
+      const res = await fetch(`${base}api/admin/articles`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const d = await res.json() as { articles: { origin?: string; aiRewritten?: boolean }[] };
+      const rssArticles = (d.articles ?? []).filter((a) => a.origin === "rss");
+      setRssStats({
+        total: rssArticles.length,
+        rewritten: rssArticles.filter((a) => a.aiRewritten).length,
+      });
+    } catch { /* ignore */ }
+  }, []);
 
   const loadAiSettings = useCallback(async () => {
     try {
@@ -184,7 +203,8 @@ export default function RSSManager() {
     void loadAiSettings();
     void loadSources();
     void loadMenuCategories();
-  }, [loadAiSettings, loadSources, loadMenuCategories]);
+    void loadRssStats();
+  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -313,7 +333,7 @@ export default function RSSManager() {
     updateArticle(idx, { rewriting: true, error: undefined });
     try {
       const src = sources.find((s) => s.id === art.sourceId);
-      const d = await apiFetch<{ rewritten: string }>("/rewrite", {
+      const d = await apiFetch<{ rewritten: string; keywords?: string; slug?: string }>("/rewrite", {
         method: "POST",
         body: JSON.stringify({
           title: art.title, text: art.fullText || art.excerpt,
@@ -323,6 +343,8 @@ export default function RSSManager() {
       updateArticle(idx, {
         rewriting: false, rewritten: d.rewritten,
         editContent: d.rewritten, expanded: true,
+        aiKeywords: d.keywords ?? "",
+        aiSlug: d.slug ?? "",
       });
     } catch (e) { updateArticle(idx, { rewriting: false, error: String(e) }); }
   }
@@ -348,10 +370,19 @@ export default function RSSManager() {
           rssSourceName: art.sourceName,
           rssSourceUrl:  art.link,
           aiRewritten:   !!art.rewritten,
+          keywords:      art.aiKeywords || undefined,
+          slug:          art.aiSlug || undefined,
         }),
       });
       updateArticle(idx, { importing: false, imported: true });
-    } catch (e) { updateArticle(idx, { importing: false, error: String(e) }); }
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("duplicado") || msg.includes("409")) {
+        updateArticle(idx, { importing: false, imported: true, error: "⚠ Já importado anteriormente" });
+      } else {
+        updateArticle(idx, { importing: false, error: msg });
+      }
+    }
   }
 
   // ─── Render ──────────────────────────────────────────────────────────────────
@@ -362,6 +393,32 @@ export default function RSSManager() {
   return (
     <AdminLayout title="Importar via RSS">
       <div className="max-w-5xl mx-auto space-y-6">
+
+        {/* ══ STATS ══════════════════════════════════════════════════════════ */}
+        <section className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total coletado</span>
+            <span className="text-3xl font-bold text-[#1a2448]">{rssStats.total}</span>
+            <span className="text-[11px] text-gray-400">artigos via RSS no sistema</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Reescritos com IA</span>
+            <span className="text-3xl font-bold text-purple-600">{rssStats.rewritten}</span>
+            <span className="text-[11px] text-gray-400">com SEO/AIO aplicado</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Taxa de reescrita</span>
+            <span className="text-3xl font-bold text-[#c8102e]">
+              {rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%
+            </span>
+            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1">
+              <div
+                className="bg-purple-500 h-1.5 rounded-full transition-all"
+                style={{ width: `${rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%` }}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* ══ AI SETTINGS ════════════════════════════════════════════════════ */}
         <section className="bg-white rounded-xl shadow-sm border">
@@ -708,6 +765,24 @@ export default function RSSManager() {
                           rows={10}
                           className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] font-mono leading-relaxed"/>
                       </div>
+
+                      {/* Keywords + Slug gerados pela IA */}
+                      {art.rewritten && (art.aiKeywords || art.aiSlug) && (
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                          {art.aiSlug && (
+                            <div>
+                              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Slug SEO</span>
+                              <p className="text-sm font-mono text-purple-800 mt-0.5">{art.aiSlug}</p>
+                            </div>
+                          )}
+                          {art.aiKeywords && (
+                            <div>
+                              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Palavras-chave</span>
+                              <p className="text-sm text-purple-800 mt-0.5">{art.aiKeywords}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

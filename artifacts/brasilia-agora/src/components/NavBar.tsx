@@ -31,6 +31,7 @@ const editoriaColors: Record<string, string> = {
 export default function NavBar() {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const activeLabel = navItems.find(
     (item) => item.path === location || (item.path !== "/" && location.startsWith(item.path + "/"))
@@ -47,6 +48,7 @@ export default function NavBar() {
                 ? location === "/"
                 : location === item.path || location.startsWith(item.path + "/");
               const color = editoriaColors[item.label] || "#c8102e";
+              const isHovered = hovered === item.label;
               return (
                 <li key={item.label}>
                   <Link
@@ -54,10 +56,11 @@ export default function NavBar() {
                     className="block text-[15px] font-bold py-3 px-4 border-b-2 transition-all whitespace-nowrap"
                     style={{
                       borderColor: isActive ? color : "transparent",
-                      color: isActive ? color : "#6b7280",
+                      color: isActive || isHovered ? color : "#6b7280",
                     }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = color; }}
-                    onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.color = "#6b7280"; }}
+                    onMouseEnter={() => setHovered(item.label)}
+                    onMouseLeave={() => setHovered(null)}
+                    onClick={() => setHovered(null)}
                   >
                     {item.label}
                   </Link>

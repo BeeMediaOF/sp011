@@ -94,10 +94,10 @@ router.post("/rewrite", async (req, res) => {
   };
   if (!text) { res.status(400).json({ error: "text é obrigatório" }); return; }
   try {
-    const rewritten = await rewriteWithAI(
+    const result = await rewriteWithAI(
       title ?? "", text, sourceName ?? "fonte", giveCredit !== false
     );
-    res.json({ rewritten });
+    res.json({ rewritten: result.content, keywords: result.keywords, slug: result.slug });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
@@ -133,12 +133,20 @@ router.post("/run", async (req, res) => {
 /** POST /api/admin/rss/import */
 router.post("/import", (req, res) => {
   const { title, subtitle, content, category, tag, imageUrl, author, status,
-    rssSourceId, rssSourceName, rssSourceUrl, aiRewritten } = req.body as {
+    rssSourceId, rssSourceName, rssSourceUrl, aiRewritten, keywords, slug } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
     rssSourceId?: string; rssSourceName?: string; rssSourceUrl?: string; aiRewritten?: boolean;
+    keywords?: string; slug?: string;
   };
   if (!title) { res.status(400).json({ error: "title é obrigatório" }); return; }
+
+  // Block duplicate imports
+  if (store.isDuplicateArticle(title, rssSourceUrl)) {
+    res.status(409).json({ error: "Artigo duplicado — já existe um artigo com este título ou URL de origem" });
+    return;
+  }
+
   const article = store.createArticle({
     title:         title ?? "",
     subtitle:      subtitle ?? "",
@@ -154,6 +162,8 @@ router.post("/import", (req, res) => {
     rssSourceName: rssSourceName ?? "",
     rssSourceUrl:  rssSourceUrl ?? "",
     aiRewritten:   aiRewritten === true,
+    keywords:      keywords || undefined,
+    slug:          slug || undefined,
   });
   res.status(201).json({ article });
 });

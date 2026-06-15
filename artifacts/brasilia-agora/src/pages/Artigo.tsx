@@ -319,17 +319,39 @@ export default function Artigo() {
     }
 
     for (const line of lines) {
-      // ## Intertítulo
-      if (line.startsWith("## ") || line.startsWith("### ")) {
+      // ## H2
+      if (line.startsWith("## ")) {
         flushList();
-        const text = line.replace(/^#{2,3}\s+/, "");
+        const text = line.replace(/^##\s+/, "");
         nodes.push(
-          <h2 key={`h-${nodes.length}`}
+          <h2 key={`h2-${nodes.length}`}
             className="text-[20px] font-bold text-[#1a2448] mt-8 mb-3 leading-snug border-l-4 pl-3"
             style={{ borderColor: chapeuColor }}
           >
             {text}
           </h2>
+        );
+      // ### H3
+      } else if (line.startsWith("### ")) {
+        flushList();
+        const text = line.replace(/^###\s+/, "");
+        nodes.push(
+          <h3 key={`h3-${nodes.length}`}
+            className="text-[17px] font-bold text-[#1a2448] mt-6 mb-2 leading-snug"
+          >
+            {text}
+          </h3>
+        );
+      // #### H4
+      } else if (line.startsWith("#### ")) {
+        flushList();
+        const text = line.replace(/^####\s+/, "");
+        nodes.push(
+          <h4 key={`h4-${nodes.length}`}
+            className="text-[15px] font-semibold text-gray-700 mt-4 mb-1.5 leading-snug uppercase tracking-wide"
+          >
+            {text}
+          </h4>
         );
       // - Lista
       } else if (/^[-•]\s+/.test(line)) {

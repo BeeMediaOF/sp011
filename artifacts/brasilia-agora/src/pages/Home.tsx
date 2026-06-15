@@ -10,6 +10,7 @@ import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 import AdCentral from "../components/ads/AdCentral";
+import AdBanner from "../components/ads/AdBanner";
 import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
 import { useSite, type HomeBlock } from "../hooks/useSite";
@@ -231,31 +232,10 @@ export default function Home() {
 
         {visibleBlocks.map((block, idx) => (
           <React.Fragment key={block.id}>
-            {/* Inject ad after certain positions */}
+            {/* Inject ads managed via admin panel */}
             {idx === 1 && (
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
-                <div className="flex justify-center">
-                  <a href="https://www.metro.sp.gov.br" target="_blank" rel="noreferrer"
-                    className="block w-full max-w-[952px] overflow-hidden group">
-                    <img src="/ad-metro-sp.gif" alt="Metrô SP"
-                      className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform" />
-                  </a>
-                </div>
-              </div>
-            )}
-
-            {idx === 4 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-6">
-                <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
-                <div className="flex justify-center">
-                  <a href="https://bileto.sympla.com.br/event/114114?share_id=1-copiarlink"
-                    target="_blank" rel="noreferrer"
-                    className="block w-full max-w-[952px] overflow-hidden group">
-                    <img src="/ad-percy-jackson.gif" alt="Percy Jackson Musical"
-                      className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform" />
-                  </a>
-                </div>
+                <AdBanner index={0} />
               </div>
             )}
 
@@ -265,16 +245,15 @@ export default function Home() {
               </div>
             )}
 
+            {idx === 4 && (
+              <div className="max-w-[1280px] mx-auto px-4 py-4">
+                <AdBanner index={1} />
+              </div>
+            )}
+
             {idx === 7 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-6">
-                <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
-                <div className="flex justify-center">
-                  <a href="https://www.byd.com/br/car/atto2" target="_blank" rel="noreferrer"
-                    className="block w-full max-w-[952px] overflow-hidden group">
-                    <img src="/ad-byd-atto2.png" alt="BYD Atto 2"
-                      className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform" />
-                  </a>
-                </div>
+              <div className="max-w-[1280px] mx-auto px-4 py-4">
+                <AdBanner index={2} />
               </div>
             )}
 
