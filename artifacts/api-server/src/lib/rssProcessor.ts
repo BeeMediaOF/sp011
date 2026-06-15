@@ -371,6 +371,7 @@ export async function autoProcessArticle(
     origin:        "rss",
     rssSourceId:   art.sourceId,
     rssSourceName: art.sourceName,
+    rssSourceUrl:  art.link,
     aiRewritten:   autoMode === "rewrite_draft" || autoMode === "rewrite_publish",
   });
 }

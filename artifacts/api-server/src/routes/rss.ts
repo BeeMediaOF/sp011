@@ -133,10 +133,10 @@ router.post("/run", async (req, res) => {
 /** POST /api/admin/rss/import */
 router.post("/import", (req, res) => {
   const { title, subtitle, content, category, tag, imageUrl, author, status,
-    rssSourceId, rssSourceName, aiRewritten } = req.body as {
+    rssSourceId, rssSourceName, rssSourceUrl, aiRewritten } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
-    rssSourceId?: string; rssSourceName?: string; aiRewritten?: boolean;
+    rssSourceId?: string; rssSourceName?: string; rssSourceUrl?: string; aiRewritten?: boolean;
   };
   if (!title) { res.status(400).json({ error: "title é obrigatório" }); return; }
   const article = store.createArticle({
@@ -152,6 +152,7 @@ router.post("/import", (req, res) => {
     origin:        "rss",
     rssSourceId:   rssSourceId ?? "",
     rssSourceName: rssSourceName ?? "",
+    rssSourceUrl:  rssSourceUrl ?? "",
     aiRewritten:   aiRewritten === true,
   });
   res.status(201).json({ article });

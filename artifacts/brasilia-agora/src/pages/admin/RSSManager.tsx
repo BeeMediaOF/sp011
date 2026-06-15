@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import {
   Plus, Trash2, RefreshCw, Wand2, Send, CheckCircle,
@@ -41,7 +41,7 @@ interface AiSettings {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CATEGORIES = [
+const BASE_CATEGORIES = [
   "politica","cidade","seguranca","transporte","saude",
   "educacao","cultura","esportes","economia","tecnologia","geral",
 ];
@@ -139,6 +139,9 @@ export default function RSSManager() {
   const [editingSource, setEditingSource] = useState<RssSource | null>(null);
   const [runningId, setRunningId]     = useState<string | null>(null);
 
+  // ── Dynamic categories from menu ──
+  const [menuCategories, setMenuCategories] = useState<{ slug: string; label: string }[]>([]);
+
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
   const [fetching, setFetching]       = useState(false);
@@ -161,7 +164,36 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { void loadAiSettings(); void loadSources(); }, [loadAiSettings, loadSources]);
+  const loadMenuCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}api/admin/menu`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const d = await res.json() as { menuItems: { label: string; path: string }[] };
+      const cats = (d.menuItems ?? [])
+        .filter((m) => m.path && m.path !== "/" && m.path.startsWith("/"))
+        .map((m) => ({
+          slug:  m.path.slice(1).toLowerCase(),
+          label: m.label.toUpperCase(),
+        }));
+      setMenuCategories(cats);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    void loadAiSettings();
+    void loadSources();
+    void loadMenuCategories();
+  }, [loadAiSettings, loadSources, loadMenuCategories]);
+
+  const allCategories = useMemo(() => {
+    const baseSet = new Set(BASE_CATEGORIES);
+    const extra = menuCategories.filter((m) => !baseSet.has(m.slug));
+    return [
+      ...BASE_CATEGORIES.map((s) => ({ slug: s, label: TAG_MAP[s] ?? s.toUpperCase() })),
+      ...extra,
+    ];
+  }, [menuCategories]);
 
   // ─── AI Settings ────────────────────────────────────────────────────────────
 
@@ -314,6 +346,7 @@ export default function RSSManager() {
           status,
           rssSourceId:   art.sourceId,
           rssSourceName: art.sourceName,
+          rssSourceUrl:  art.link,
           aiRewritten:   !!art.rewritten,
         }),
       });
@@ -435,7 +468,7 @@ export default function RSSManager() {
                   placeholder="URL do feed RSS" className="flex-[2] min-w-[250px] border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
                 <select value={newCat} onChange={(e) => setNewCat(e.target.value)}
                   className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
-                  {CATEGORIES.map((c) => <option key={c} value={c}>{TAG_MAP[c]}</option>)}
+                  {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
                 </select>
               </div>
               <div className="flex flex-wrap gap-3 items-center">
@@ -485,7 +518,7 @@ export default function RSSManager() {
                             className="flex-[2] min-w-[250px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
                           <select value={editingSource.category} onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
                             className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                            {CATEGORIES.map((c) => <option key={c} value={c}>{TAG_MAP[c]}</option>)}
+                            {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
                           </select>
                         </div>
                         <div className="flex flex-wrap gap-3 items-center">

@@ -88,6 +88,7 @@ export interface Article {
   origin?: "manual" | "rss";
   rssSourceId?: string;
   rssSourceName?: string;
+  rssSourceUrl?: string;
   aiRewritten?: boolean;
 }
 

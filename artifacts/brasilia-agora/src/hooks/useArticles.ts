@@ -10,6 +10,11 @@ export interface Article {
   imageUrl: string;
   author: string;
   publishedAt: string;
+  origin?: "manual" | "rss";
+  rssSourceId?: string;
+  rssSourceName?: string;
+  rssSourceUrl?: string;
+  aiRewritten?: boolean;
 }
 
 export function useArticles() {

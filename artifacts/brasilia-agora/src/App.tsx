@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter } from "wouter";
+import { Switch, Route, Router as WouterRouter, useParams } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -23,11 +23,58 @@ import Contato from "@/pages/Contato";
 import Privacidade from "@/pages/Privacidade";
 import Termos from "@/pages/Termos";
 import Admin from "@/pages/Admin";
+import CategoryArchivePage from "@/pages/CategoryArchivePage";
 import LGPDConsent from "@/components/LGPDConsent";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useState, useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "#0b3d91": "#0b3d91", default: "#0b3d91",
+};
+const COLOR_PALETTE = [
+  "#0b3d91","#c8102e","#16a34a","#6b21a8","#0284c7",
+  "#b45309","#0d9488","#dc2626","#ea580c","#7c3aed",
+];
+
+function colorForSlug(slug: string): string {
+  let h = 0;
+  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
+  return COLOR_PALETTE[h % COLOR_PALETTE.length]!;
+}
+
+interface MenuItemApi { label: string; path: string; visible?: boolean; }
+
+function DynamicCategory() {
+  const { slug } = useParams<{ slug: string }>();
+  const [menuItem, setMenuItem] = useState<MenuItemApi | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!slug) { setMenuItem(null); return; }
+    fetch("/api/admin/menu")
+      .then((r) => r.json())
+      .then((d: { menuItems: MenuItemApi[] }) => {
+        const found = (d.menuItems ?? []).find(
+          (m) => m.path === `/${slug}` || m.path.replace(/^\//, "") === slug
+        );
+        setMenuItem(found ?? null);
+      })
+      .catch(() => setMenuItem(null));
+  }, [slug]);
+
+  if (menuItem === undefined) return null;
+  if (!menuItem) return <NotFound />;
+
+  return (
+    <CategoryArchivePage
+      category={menuItem.label.toUpperCase()}
+      slug={slug ?? ""}
+      color={colorForSlug(slug ?? "")}
+    />
+  );
+}
 
 function AnalyticsProvider() {
   useAnalytics();
@@ -59,6 +106,7 @@ function Router() {
       <Route path="/contato" component={Contato} />
       <Route path="/privacidade" component={Privacidade} />
       <Route path="/termos" component={Termos} />
+      <Route path="/:slug" component={DynamicCategory} />
       <Route component={NotFound} />
     </Switch>
   );

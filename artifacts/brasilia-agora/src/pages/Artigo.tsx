@@ -540,6 +540,28 @@ export default function Artigo() {
                     {renderContent(article.content)}
                   </div>
 
+                  {/* Crédito de fonte — só para artigos RSS não reescritos */}
+                  {article.origin === "rss" && !article.aiRewritten && article.rssSourceName && (
+                    <div className="mt-6 pt-4 border-t border-gray-100">
+                      <p className="text-[12px] text-gray-400 italic">
+                        Conteúdo originalmente publicado por{" "}
+                        {article.rssSourceUrl ? (
+                          <a
+                            href={article.rssSourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#0b3d91] hover:underline font-medium"
+                          >
+                            {article.rssSourceName}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-gray-500">{article.rssSourceName}</span>
+                        )}
+                        . Reproduzido com fins informativos.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Tags + compartilhamento inferior */}
                   <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                     <div className="flex flex-wrap gap-2">
