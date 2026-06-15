@@ -108,11 +108,14 @@ export default function Header() {
   const isActive = (path: string) =>
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
 
+  const bgColor = settings?.headerBgColor ?? "#ffffff";
+  const bgStyle = { backgroundColor: bgColor };
+
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
       <div className="sticky top-0 z-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
           <div className="max-w-[1280px] mx-auto px-4 h-11 flex items-center gap-2">
             <button
               onClick={() => setMenu(v => !v)}
@@ -187,7 +190,7 @@ export default function Header() {
   if (style === "centered") {
     return (
       <div className="sticky top-0 z-50">
-        <header className="bg-white shadow-sm border-b border-gray-200">
+        <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
           {/* Top row: logo centered */}
           <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-center relative">
             <button
@@ -265,7 +268,7 @@ export default function Header() {
   // ── Standard style (default) ───────────────────────────────────────────────
   return (
     <div className="sticky top-0 z-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
+      <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
         <div className="max-w-[1280px] mx-auto px-4 py-2 flex items-center gap-3">
 
           <button

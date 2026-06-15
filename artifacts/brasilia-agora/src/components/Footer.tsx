@@ -26,11 +26,13 @@ const NAV_LINKS = [
 export default function Footer() {
   const { settings } = useSite();
   const style = settings?.footerStyle ?? "dark";
+  const bgColor = settings?.footerBgColor;
 
   // ── Minimal ────────────────────────────────────────────────────────────────
   if (style === "minimal") {
     return (
-      <footer className="bg-gray-100 border-t border-gray-200 py-4">
+      <footer className="border-t border-gray-200 py-4"
+        style={{ backgroundColor: bgColor ?? "#f3f4f6" }}>
         <div className="max-w-[1280px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
           <p>© {new Date().getFullYear()} SBC Agora. Todos os direitos reservados.</p>
           <div className="flex items-center gap-4">
@@ -54,7 +56,8 @@ export default function Footer() {
   // ── Light ─────────────────────────────────────────────────────────────────
   if (style === "light") {
     return (
-      <footer className="bg-gray-50 border-t-4 border-[#c8102e] pt-8 pb-5">
+      <footer className="border-t-4 border-[#c8102e] pt-8 pb-5"
+        style={{ backgroundColor: bgColor ?? "#f9fafb" }}>
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
@@ -129,7 +132,8 @@ export default function Footer() {
 
   // ── Dark (default) ────────────────────────────────────────────────────────
   return (
-    <footer className="text-white pt-8 pb-5 border-t-[4px] border-[#c89110] bg-[#000000]">
+    <footer className="text-white pt-8 pb-5 border-t-[4px] border-[#c89110]"
+      style={{ backgroundColor: bgColor ?? "#000000" }}>
       <div className="max-w-[1280px] mx-auto px-4">
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">

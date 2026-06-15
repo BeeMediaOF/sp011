@@ -136,6 +136,8 @@ export interface SiteSettings {
   bylineLogoBase64?: string;
   headerStyle?: "standard" | "compact" | "centered";
   footerStyle?: "dark" | "light" | "minimal";
+  headerBgColor?: string;
+  footerBgColor?: string;
 }
 
 export interface AnalyticsStats {

@@ -366,6 +366,60 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
+
+              {/* Portal colors */}
+              <div className="border-t border-gray-100 pt-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Globe size={14} className="text-[#1a2448]" />
+                  <label className="text-xs font-semibold text-gray-600">Cores do portal público</label>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-1">Fundo do cabeçalho</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={settings.headerBgColor ?? "#ffffff"}
+                        onChange={(e) => setField("headerBgColor", e.target.value)}
+                        className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.headerBgColor ?? "#ffffff"}
+                        onChange={(e) => setField("headerBgColor", e.target.value)}
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                        placeholder="#ffffff"
+                      />
+                    </div>
+                    <div className="mt-2 rounded-lg h-8 flex items-center px-3 text-xs font-semibold border border-gray-200"
+                      style={{ backgroundColor: settings.headerBgColor ?? "#ffffff", color: settings.headerBgColor ? "#000" : "#6b7280" }}>
+                      Cabeçalho
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-gray-500 mb-1">Fundo do rodapé</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={settings.footerBgColor ?? "#000000"}
+                        onChange={(e) => setField("footerBgColor", e.target.value)}
+                        className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={settings.footerBgColor ?? "#000000"}
+                        onChange={(e) => setField("footerBgColor", e.target.value)}
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                        placeholder="#000000"
+                      />
+                    </div>
+                    <div className="mt-2 rounded-lg h-8 flex items-center px-3 text-xs font-semibold text-white"
+                      style={{ backgroundColor: settings.footerBgColor ?? "#000000" }}>
+                      Rodapé
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Device visibility */}

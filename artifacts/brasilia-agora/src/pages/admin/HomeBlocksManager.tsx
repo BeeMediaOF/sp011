@@ -352,6 +352,8 @@ export default function HomeBlocksManager() {
   const [tab, setTab]               = useState<Tab>("blocks");
   const [headerStyle, setHeaderStyle] = useState<HeaderStyle>("standard");
   const [footerStyle, setFooterStyle] = useState<FooterStyle>("dark");
+  const [headerBgColor, setHeaderBgColor] = useState<string>("#ffffff");
+  const [footerBgColor, setFooterBgColor] = useState<string>("#000000");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -363,6 +365,8 @@ export default function HomeBlocksManager() {
         setBlocks(bl && bl.length > 0 ? bl : DEFAULT_BLOCKS);
         setHeaderStyle(r.settings.headerStyle ?? "standard");
         setFooterStyle(r.settings.footerStyle ?? "dark");
+        setHeaderBgColor(r.settings.headerBgColor ?? "#ffffff");
+        setFooterBgColor(r.settings.footerBgColor ?? "#000000");
       })
       .catch(() => setBlocks(DEFAULT_BLOCKS))
       .finally(() => setLoading(false));
@@ -433,10 +437,17 @@ export default function HomeBlocksManager() {
     }, 500);
   }, []);
 
-  async function saveHeaderFooter(hs: HeaderStyle, fs: FooterStyle) {
+  async function saveHeaderFooter(
+    hs: HeaderStyle, fs: FooterStyle, hBg?: string, fBg?: string
+  ) {
     setSaving(true);
     try {
-      await adminApi.updateSettings({ headerStyle: hs, footerStyle: fs });
+      await adminApi.updateSettings({
+        headerStyle: hs,
+        footerStyle: fs,
+        ...(hBg !== undefined ? { headerBgColor: hBg } : {}),
+        ...(fBg !== undefined ? { footerBgColor: fBg } : {}),
+      });
       invalidateSiteCache();
       setSaved(true);
       setPreviewKey((k) => k + 1);
@@ -728,7 +739,7 @@ export default function HomeBlocksManager() {
                     type="button"
                     onClick={async () => {
                       setHeaderStyle(preset.id);
-                      await saveHeaderFooter(preset.id, footerStyle);
+                      await saveHeaderFooter(preset.id, footerStyle, headerBgColor, undefined);
                     }}
                     className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
                       headerStyle === preset.id
@@ -751,6 +762,51 @@ export default function HomeBlocksManager() {
                   </button>
                 ))}
               </div>
+
+              {/* Color picker */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-[11px] font-semibold text-gray-500 mb-2">Cor de fundo do cabeçalho</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={headerBgColor}
+                    onChange={(e) => setHeaderBgColor(e.target.value)}
+                    className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={headerBgColor}
+                    onChange={(e) => setHeaderBgColor(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                    placeholder="#ffffff"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveHeaderFooter(headerStyle, footerStyle, headerBgColor, undefined);
+                    }}
+                    className="px-3 py-1.5 bg-[#1a2448] text-white text-xs font-semibold rounded-lg hover:bg-[#243060] transition-colors"
+                  >
+                    Salvar
+                  </button>
+                </div>
+                <div className="mt-2 rounded-lg h-8 border border-gray-200 flex items-center px-3 text-xs font-semibold"
+                  style={{ backgroundColor: headerBgColor }}>
+                  <span style={{ color: headerBgColor === "#ffffff" || !headerBgColor ? "#6b7280" : "#000" }}>
+                    Pré-visualização
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {["#ffffff", "#f8fafc", "#f1f5f9", "#1a2448", "#0b3d91", "#c8102e", "#18181b"].map((c) => (
+                    <button key={c} type="button"
+                      onClick={() => setHeaderBgColor(c)}
+                      title={c}
+                      className={`w-6 h-6 rounded border-2 transition-all ${headerBgColor === c ? "border-[#1a2448] scale-110" : "border-transparent hover:border-gray-300"}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -765,7 +821,7 @@ export default function HomeBlocksManager() {
                     type="button"
                     onClick={async () => {
                       setFooterStyle(preset.id);
-                      await saveHeaderFooter(headerStyle, preset.id);
+                      await saveHeaderFooter(headerStyle, preset.id, undefined, footerBgColor);
                     }}
                     className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
                       footerStyle === preset.id
@@ -787,6 +843,49 @@ export default function HomeBlocksManager() {
                     </div>
                   </button>
                 ))}
+              </div>
+
+              {/* Color picker */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-[11px] font-semibold text-gray-500 mb-2">Cor de fundo do rodapé</p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={footerBgColor}
+                    onChange={(e) => setFooterBgColor(e.target.value)}
+                    className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                  />
+                  <input
+                    type="text"
+                    value={footerBgColor}
+                    onChange={(e) => setFooterBgColor(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                    placeholder="#000000"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await saveHeaderFooter(headerStyle, footerStyle, undefined, footerBgColor);
+                    }}
+                    className="px-3 py-1.5 bg-[#1a2448] text-white text-xs font-semibold rounded-lg hover:bg-[#243060] transition-colors"
+                  >
+                    Salvar
+                  </button>
+                </div>
+                <div className="mt-2 rounded-lg h-8 flex items-center px-3 text-xs font-semibold text-white"
+                  style={{ backgroundColor: footerBgColor }}>
+                  Pré-visualização
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {["#000000", "#18181b", "#1a2448", "#0b3d91", "#1a3a2a", "#3b1f6e", "#1e293b", "#ffffff"].map((c) => (
+                    <button key={c} type="button"
+                      onClick={() => setFooterBgColor(c)}
+                      title={c}
+                      className={`w-6 h-6 rounded border-2 transition-all ${footerBgColor === c ? "border-[#1a2448] scale-110" : "border-transparent hover:border-gray-300"}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           )}
