@@ -26,6 +26,7 @@ const NAV = [
 interface AdminLayoutProps {
   children: React.ReactNode;
   title: string;
+  noPadding?: boolean;
 }
 
 interface PanelTheme {
@@ -60,7 +61,7 @@ function usePanelTheme(): PanelTheme {
   return theme;
 }
 
-export default function AdminLayout({ children, title }: AdminLayoutProps) {
+export default function AdminLayout({ children, title, noPadding }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [location, navigate] = useLocation();
   const theme = usePanelTheme();
@@ -135,7 +136,7 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
           <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
           <span className="text-xs text-gray-400">Painel Administrativo</span>
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className={`flex-1 overflow-hidden ${noPadding ? "" : "overflow-y-auto p-6"}`}>{children}</main>
       </div>
     </div>
   );
