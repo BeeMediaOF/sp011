@@ -127,12 +127,12 @@ export default function Header() {
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
               style={{ height: settings?.logoSize ?? 48 }}
-              className="w-auto object-contain block"
+              className="w-auto object-contain block pt-[0px] pb-[0px] mt-[1px] mb-[9px] pl-[0px] pr-[0px]"
             />
           </Link>
 
           {/* Nav links — apenas desktop */}
-          <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
+          <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar mt-[0px] mb-[-33px]">
             {navItems.map(({ label, path }) => (
               <Link
                 key={path}
@@ -168,7 +168,7 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => setSearch(true)}
-                className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
+                className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded pt-[4px] pb-[4px] mt-[1px] mb-[-27px]"
                 aria-label="Pesquisar"
               >
                 <Search size={17} />
