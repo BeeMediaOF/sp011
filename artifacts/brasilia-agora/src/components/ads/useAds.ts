@@ -27,12 +27,15 @@ export function useAds() {
     return ads.find((a) => a.position === key) ?? null;
   }
 
-  // Legacy compat
+  function getSlotAll(key: AdSlotKey): AdItem[] {
+    return ads.filter((a) => a.position === key);
+  }
+
   const banners = ads.filter((a) => a.position === "banner");
   const sidebars = ads.filter((a) => a.position === "sidebar");
   const centrals = ads.filter((a) => a.position === "central");
 
-  return { ads, getSlot, banners, sidebars, centrals, loading };
+  return { ads, getSlot, getSlotAll, banners, sidebars, centrals, loading };
 }
 
 export function trackClick(adId: string) {

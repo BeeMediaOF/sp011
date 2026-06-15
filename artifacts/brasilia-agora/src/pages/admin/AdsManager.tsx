@@ -3,7 +3,7 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import {
   Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink,
-  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper,
+  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal,
 } from "lucide-react";
 
 function toBase64(file: File): Promise<string> {
@@ -422,9 +422,15 @@ export default function AdsManager() {
                       <p className="font-bold text-[#1a2448] text-sm">{slot.label}</p>
                       <p className="text-[11px] text-gray-500 truncate">{slot.location} · {slot.hint}</p>
                     </div>
-                    {slotAds.length > 0 && (
+                    {slotAds.length > 1 && (
+                      <span className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 shrink-0">
+                        <GalleryHorizontal size={11} />
+                        Carrossel · {slotAds.length}
+                      </span>
+                    )}
+                    {slotAds.length === 1 && (
                       <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-gray-600 shrink-0">
-                        {slotAds.length} anúncio{slotAds.length !== 1 ? "s" : ""}
+                        1 anúncio
                       </span>
                     )}
                     <button
