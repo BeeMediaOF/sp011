@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import {
   Plus, Trash2, RefreshCw, Wand2, Send, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
   Settings, Key, Brain, Clock, BadgeCheck, Zap, Eye, EyeOff,
-  Play,
+  Play, ListChecks, Square, CheckSquare, StopCircle, Timer,
+  Loader2,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL ?? "/";
@@ -28,12 +29,16 @@ interface FetchedArticle {
   imageUrl: string; excerpt: string; fullText: string;
 }
 
+type QueueStatus = "pending" | "rewriting" | "publishing" | "done" | "skipped" | "error";
+
 interface ArticleState extends FetchedArticle {
   rewritten?: string; rewriting?: boolean;
   importing?: boolean; imported?: boolean;
   error?: string; expanded?: boolean;
   editTitle?: string; editSubtitle?: string; editContent?: string;
   aiKeywords?: string; aiSlug?: string;
+  queueStatus?: QueueStatus;
+  selectedForQueue?: boolean;
 }
 
 interface AiSettings {
@@ -151,6 +156,11 @@ export default function RSSManager() {
   const [fetching, setFetching]       = useState(false);
   const [fetchError, setFetchError]   = useState("");
   const [articles, setArticles]       = useState<ArticleState[]>([]);
+
+  // ── Queue ──
+  const [queueRunning, setQueueRunning] = useState(false);
+  const [queueDelay, setQueueDelay]     = useState(5);
+  const cancelQueueRef                  = useRef(false);
 
   // ─── Load ───────────────────────────────────────────────────────────────────
 
@@ -385,10 +395,125 @@ export default function RSSManager() {
     }
   }
 
+  // ─── Queue processing ────────────────────────────────────────────────────────
+
+  async function processQueue() {
+    const delayMs = queueDelay * 1000;
+    setQueueRunning(true);
+    cancelQueueRef.current = false;
+
+    // Snapshot at start to get stable indices + data
+    const snapshot = articles
+      .map((a, i) => ({ ...a, _idx: i }))
+      .filter((a) => a.selectedForQueue && !a.imported && a.queueStatus !== "done" && a.queueStatus !== "skipped");
+
+    for (let qi = 0; qi < snapshot.length; qi++) {
+      if (cancelQueueRef.current) break;
+      const item = snapshot[qi]!;
+      const idx  = item._idx;
+      const src  = sources.find((s) => s.id === item.sourceId);
+
+      // Step 1: Rewrite
+      updateArticle(idx, { queueStatus: "rewriting", error: undefined });
+      let rewrote: { content: string; keywords: string; slug: string } | null = null;
+
+      try {
+        const d = await apiFetch<{ rewritten: string; keywords?: string; slug?: string }>("/rewrite", {
+          method: "POST",
+          body: JSON.stringify({
+            title:      item.title,
+            text:       item.fullText || item.excerpt,
+            sourceName: item.sourceName,
+            giveCredit: src?.giveCredit !== false,
+          }),
+        });
+        rewrote = { content: d.rewritten, keywords: d.keywords ?? "", slug: d.slug ?? "" };
+        updateArticle(idx, {
+          rewritten:    rewrote.content,
+          editContent:  rewrote.content,
+          aiKeywords:   rewrote.keywords,
+          aiSlug:       rewrote.slug,
+          queueStatus:  "publishing",
+        });
+      } catch (err) {
+        updateArticle(idx, { queueStatus: "error", error: String(err) });
+        if (qi < snapshot.length - 1 && !cancelQueueRef.current) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+        continue;
+      }
+
+      // Step 2: Publish
+      try {
+        await apiFetch("/import", {
+          method: "POST",
+          body: JSON.stringify({
+            title:         item.editTitle ?? item.title,
+            subtitle:      item.editSubtitle ?? item.excerpt.slice(0, 160),
+            content:       rewrote.content,
+            category:      item.category,
+            tag:           TAG_MAP[item.category] ?? "GERAL",
+            imageUrl:      item.imageUrl,
+            author:        src?.giveCredit !== false
+                             ? `Redação (via ${item.sourceName})`
+                             : "Redação",
+            status:        "published",
+            rssSourceId:   item.sourceId,
+            rssSourceName: item.sourceName,
+            rssSourceUrl:  item.link,
+            aiRewritten:   true,
+            keywords:      rewrote.keywords || undefined,
+            slug:          rewrote.slug || undefined,
+          }),
+        });
+        updateArticle(idx, { queueStatus: "done", imported: true });
+      } catch (err) {
+        const msg    = String(err);
+        const isDupe = msg.includes("duplicado") || msg.includes("409");
+        updateArticle(idx, {
+          queueStatus: isDupe ? "skipped" : "error",
+          imported:    isDupe,
+          error:       isDupe ? "⚠ Já importado anteriormente" : msg,
+        });
+      }
+
+      // Delay between requests (respects free-tier rate limits)
+      if (qi < snapshot.length - 1 && !cancelQueueRef.current) {
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+
+    setQueueRunning(false);
+    void loadRssStats();
+  }
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   const needsKey = aiSettings.provider !== "gemini_free";
   const modelList = aiSettings.provider === "openai" ? OPENAI_MODELS : GEMINI_MODELS;
+
+  // ── Queue derived stats ──
+  const queueStats = useMemo(() => {
+    const selectable = articles.filter((a) => !a.imported && a.queueStatus !== "done" && a.queueStatus !== "skipped");
+    const selected   = selectable.filter((a) => a.selectedForQueue);
+    const done       = articles.filter((a) => a.queueStatus === "done").length;
+    const errors     = articles.filter((a) => a.queueStatus === "error").length;
+    const skipped    = articles.filter((a) => a.queueStatus === "skipped").length;
+    const active     = articles.find(
+      (a) => a.queueStatus === "rewriting" || a.queueStatus === "publishing"
+    );
+    const allSelected = selectable.length > 0 && selected.length === selectable.length;
+    return { selectable: selectable.length, selected: selected.length, done, errors, skipped, active, allSelected };
+  }, [articles]);
+
+  function toggleSelectAll() {
+    const allSelected = queueStats.allSelected;
+    setArticles((prev) => prev.map((a) =>
+      !a.imported && a.queueStatus !== "done" && a.queueStatus !== "skipped"
+        ? { ...a, selectedForQueue: !allSelected }
+        : a
+    ));
+  }
 
   return (
     <AdminLayout title="Importar via RSS">
@@ -693,136 +818,321 @@ export default function RSSManager() {
           </div>
         </section>
 
-        {/* ══ RESULTS ════════════════════════════════════════════════════════ */}
+        {/* ══ RESULTS + QUEUE ════════════════════════════════════════════════ */}
         {articles.length > 0 && (
           <section className="space-y-3">
-            <p className="text-sm text-gray-500 px-1">
-              {articles.length} artigo(s) encontrado(s)
-            </p>
-            {articles.map((art, idx) => (
-              <div key={`${art.sourceId}-${idx}`}
-                className={`bg-white rounded-xl shadow-sm border overflow-hidden ${art.imported ? "opacity-60" : ""}`}>
-                <div className="flex gap-4 p-4">
-                  {/* Featured image */}
-                  {art.imageUrl ? (
-                    <img src={art.imageUrl} alt=""
-                      className="w-28 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}/>
-                  ) : (
-                    <div className="w-28 h-20 rounded-lg flex-shrink-0 bg-gray-100 flex items-center justify-center">
-                      <Rss size={24} className="text-gray-300"/>
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <span className="text-xs font-bold text-[#c8102e] uppercase tracking-wide">
-                        {TAG_MAP[art.category] ?? art.category}
-                      </span>
-                      <span className="text-xs text-gray-400">·</span>
-                      <span className="text-xs text-gray-400">{art.sourceName}</span>
-                      {art.link && (
-                        <a href={art.link} target="_blank" rel="noreferrer"
-                          className="text-gray-300 hover:text-[#0b3d91] ml-auto flex-shrink-0 transition-colors">
-                          <ExternalLink size={13}/>
-                        </a>
-                      )}
-                    </div>
-                    <p className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">{art.title}</p>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-2">{art.excerpt}</p>
-                  </div>
-                </div>
 
-                {/* Expand panel */}
-                <div className="border-t px-4 py-3">
+            {/* ── Queue control bar ── */}
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">
+                <ListChecks size={16} className="text-purple-600 shrink-0"/>
+                <span className="font-semibold text-sm text-gray-800">
+                  Fila de Reescrita e Publicação
+                </span>
+                <span className="ml-auto text-xs text-gray-400">
+                  {articles.length} artigo(s) coletado(s)
+                </span>
+              </div>
+
+              <div className="p-4 space-y-3">
+                {/* Selecionar todos */}
+                <div className="flex items-center gap-3 flex-wrap">
                   <button
-                    onClick={() => updateArticle(idx, { expanded: !art.expanded })}
-                    className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
-                    {art.expanded ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
-                    {art.expanded ? "Recolher" : "Editar / Publicar"}
+                    onClick={toggleSelectAll}
+                    disabled={queueRunning}
+                    className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#1a2448] disabled:opacity-40 transition-colors"
+                  >
+                    {queueStats.allSelected
+                      ? <CheckSquare size={17} className="text-purple-600"/>
+                      : <Square size={17} className="text-gray-400"/>
+                    }
+                    {queueStats.allSelected ? "Desmarcar todos" : "Selecionar todos"}
                   </button>
+                  <span className="text-xs text-gray-400">
+                    {queueStats.selected} de {queueStats.selectable} selecionados
+                  </span>
 
-                  {art.expanded && (
-                    <div className="mt-3 space-y-3">
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Título</label>
-                        <input value={art.editTitle ?? art.title}
-                          onChange={(e) => updateArticle(idx, { editTitle: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Subtítulo / Chapéu</label>
-                        <input value={art.editSubtitle ?? ""}
-                          onChange={(e) => updateArticle(idx, { editSubtitle: e.target.value })}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">
-                          Conteúdo
-                          {art.rewritten && <span className="ml-2 text-purple-600 font-semibold">✦ Reescrito com IA (SEO/AIO)</span>}
-                        </label>
-                        <textarea value={art.editContent ?? art.fullText}
-                          onChange={(e) => updateArticle(idx, { editContent: e.target.value })}
-                          rows={10}
-                          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] font-mono leading-relaxed"/>
-                      </div>
-
-                      {/* Keywords + Slug gerados pela IA */}
-                      {art.rewritten && (art.aiKeywords || art.aiSlug) && (
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-                          {art.aiSlug && (
-                            <div>
-                              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Slug SEO</span>
-                              <p className="text-sm font-mono text-purple-800 mt-0.5">{art.aiSlug}</p>
-                            </div>
-                          )}
-                          {art.aiKeywords && (
-                            <div>
-                              <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Palavras-chave</span>
-                              <p className="text-sm text-purple-800 mt-0.5">{art.aiKeywords}</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {art.error && (
-                    <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
-                      <AlertCircle size={12}/>{art.error}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {art.imported ? (
-                      <span className="flex items-center gap-1 text-sm text-green-600 font-semibold">
-                        <CheckCircle size={16}/> Importado!
-                      </span>
-                    ) : (
-                      <>
-                        <button onClick={() => { void rewrite(idx); }}
-                          disabled={art.rewriting || art.importing}
-                          className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors">
-                          <Wand2 size={13} className={art.rewriting ? "animate-pulse" : ""}/>
-                          {art.rewriting ? "Reescrevendo com IA…" : "Reescrever com IA (SEO/AIO)"}
-                        </button>
-                        <button onClick={() => { void importArticle(idx, "draft"); }}
-                          disabled={art.importing || art.rewriting}
-                          className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors">
-                          <Send size={13}/>
-                          {art.importing ? "Salvando…" : "Salvar Rascunho"}
-                        </button>
-                        <button onClick={() => { void importArticle(idx, "published"); }}
-                          disabled={art.importing || art.rewriting}
-                          className="flex items-center gap-1.5 bg-[#c8102e] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#c8102e]/90 disabled:opacity-50 transition-colors">
-                          <Send size={13}/>
-                          {art.importing ? "Publicando…" : "Publicar"}
-                        </button>
-                      </>
+                  {/* Delay setting (important for Gemini free) */}
+                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+                    <Timer size={13} className="text-amber-500"/>
+                    <span>Intervalo:</span>
+                    <input
+                      type="number" min={1} max={60} value={queueDelay}
+                      onChange={(e) => setQueueDelay(Math.max(1, Number(e.target.value)))}
+                      disabled={queueRunning}
+                      className="w-14 border rounded px-2 py-1 text-center text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-40"
+                    />
+                    <span>segundos entre requisições</span>
+                    {aiSettings.provider === "gemini_free" && (
+                      <span className="text-amber-600 font-semibold">(Gemini grátis: mín. 4s)</span>
                     )}
                   </div>
                 </div>
+
+                {/* Progress bar + stats (visible after queue starts) */}
+                {(queueStats.done > 0 || queueStats.errors > 0 || queueStats.skipped > 0 || queueRunning) && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-4 text-xs flex-wrap">
+                      <span className="flex items-center gap-1 text-green-600 font-semibold">
+                        <CheckCircle size={12}/> {queueStats.done} publicado(s)
+                      </span>
+                      {queueStats.skipped > 0 && (
+                        <span className="flex items-center gap-1 text-amber-500 font-semibold">
+                          ⚠ {queueStats.skipped} duplicado(s)
+                        </span>
+                      )}
+                      {queueStats.errors > 0 && (
+                        <span className="flex items-center gap-1 text-red-500 font-semibold">
+                          <AlertCircle size={12}/> {queueStats.errors} erro(s)
+                        </span>
+                      )}
+                      {queueStats.active && (
+                        <span className="flex items-center gap-1 text-purple-600 font-semibold animate-pulse">
+                          <Loader2 size={12} className="animate-spin"/>
+                          {queueStats.active.queueStatus === "rewriting" ? "Reescrevendo…" : "Publicando…"}
+                        </span>
+                      )}
+                    </div>
+                    {/* Progress bar */}
+                    {(() => {
+                      const total = queueStats.done + queueStats.errors + queueStats.skipped +
+                        articles.filter((a) => a.selectedForQueue && (a.queueStatus === "pending" || a.queueStatus === "rewriting" || a.queueStatus === "publishing")).length;
+                      const pct = total > 0 ? Math.round(((queueStats.done + queueStats.errors + queueStats.skipped) / total) * 100) : 0;
+                      return (
+                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                          <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }}/>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex gap-2 flex-wrap">
+                  {queueRunning ? (
+                    <button
+                      onClick={() => { cancelQueueRef.current = true; }}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
+                    >
+                      <StopCircle size={15}/> Pausar fila
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { void processQueue(); }}
+                      disabled={queueStats.selected === 0}
+                      className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <Wand2 size={15}/>
+                      Processar fila — Reescrever e Publicar com IA ({queueStats.selected})
+                    </button>
+                  )}
+                  <p className="text-[11px] text-gray-400 self-center">
+                    SEO/AIO · padrão jornalístico · palavras-chave automáticas
+                  </p>
+                </div>
               </div>
-            ))}
+            </div>
+
+            {/* ── Article cards ── */}
+            {articles.map((art, idx) => {
+              const isQueued  = !!art.selectedForQueue;
+              const qs        = art.queueStatus;
+              const isActive  = qs === "rewriting" || qs === "publishing";
+              const isDone    = qs === "done";
+              const isSkipped = qs === "skipped";
+              const isError   = qs === "error";
+
+              return (
+                <div key={`${art.sourceId}-${idx}`}
+                  className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all
+                    ${isDone || isSkipped ? "opacity-50" : ""}
+                    ${isQueued && !isDone && !isSkipped ? "border-purple-200" : ""}
+                    ${isActive ? "border-purple-400 shadow-md" : ""}
+                  `}>
+
+                  <div className="flex gap-3 p-4 items-start">
+                    {/* Queue checkbox */}
+                    <button
+                      onClick={() => {
+                        if (!queueRunning && !isDone && !isSkipped)
+                          updateArticle(idx, { selectedForQueue: !art.selectedForQueue });
+                      }}
+                      disabled={queueRunning || isDone || isSkipped}
+                      className="mt-0.5 shrink-0 disabled:cursor-default"
+                      title={isDone ? "Já publicado" : isSkipped ? "Duplicado" : "Selecionar para fila"}
+                    >
+                      {isDone
+                        ? <CheckCircle size={18} className="text-green-500"/>
+                        : isSkipped
+                          ? <span className="text-amber-400 text-base">⚠</span>
+                          : isError
+                            ? <AlertCircle size={18} className="text-red-400"/>
+                            : isQueued
+                              ? <CheckSquare size={18} className="text-purple-600"/>
+                              : <Square size={18} className="text-gray-300 hover:text-gray-400 transition-colors"/>
+                      }
+                    </button>
+
+                    {/* Featured image */}
+                    {art.imageUrl ? (
+                      <img src={art.imageUrl} alt=""
+                        className="w-24 h-16 object-cover rounded-lg flex-shrink-0 bg-gray-100"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}/>
+                    ) : (
+                      <div className="w-24 h-16 rounded-lg flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                        <Rss size={20} className="text-gray-300"/>
+                      </div>
+                    )}
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-bold text-[#c8102e] uppercase tracking-wide">
+                          {TAG_MAP[art.category] ?? art.category}
+                        </span>
+                        <span className="text-xs text-gray-400">·</span>
+                        <span className="text-xs text-gray-400">{art.sourceName}</span>
+
+                        {/* Queue status badge */}
+                        {qs === "pending" && (
+                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-500">
+                            ⏳ Na fila
+                          </span>
+                        )}
+                        {qs === "rewriting" && (
+                          <span className="ml-1 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 animate-pulse">
+                            <Loader2 size={9} className="animate-spin"/> Reescrevendo…
+                          </span>
+                        )}
+                        {qs === "publishing" && (
+                          <span className="ml-1 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 animate-pulse">
+                            <Loader2 size={9} className="animate-spin"/> Publicando…
+                          </span>
+                        )}
+                        {qs === "done" && (
+                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                            ✓ Publicado com IA
+                          </span>
+                        )}
+                        {qs === "skipped" && (
+                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
+                            ⚠ Duplicado
+                          </span>
+                        )}
+                        {qs === "error" && (
+                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                            ✗ Erro
+                          </span>
+                        )}
+
+                        {art.link && (
+                          <a href={art.link} target="_blank" rel="noreferrer"
+                            className="text-gray-300 hover:text-[#0b3d91] ml-auto flex-shrink-0 transition-colors">
+                            <ExternalLink size={13}/>
+                          </a>
+                        )}
+                      </div>
+                      <p className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">{art.title}</p>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{art.excerpt}</p>
+                    </div>
+                  </div>
+
+                  {/* Expand panel — manual editing / individual actions */}
+                  <div className="border-t px-4 py-3">
+                    <button
+                      onClick={() => updateArticle(idx, { expanded: !art.expanded })}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                      {art.expanded ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+                      {art.expanded ? "Recolher" : "Editar / Publicar manualmente"}
+                    </button>
+
+                    {art.expanded && (
+                      <div className="mt-3 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Título</label>
+                          <input value={art.editTitle ?? art.title}
+                            onChange={(e) => updateArticle(idx, { editTitle: e.target.value })}
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">Subtítulo / Chapéu</label>
+                          <input value={art.editSubtitle ?? ""}
+                            onChange={(e) => updateArticle(idx, { editSubtitle: e.target.value })}
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-600 mb-1">
+                            Conteúdo
+                            {art.rewritten && (
+                              <span className="ml-2 text-purple-600 font-semibold">✦ Reescrito com IA (SEO/AIO)</span>
+                            )}
+                          </label>
+                          <textarea value={art.editContent ?? art.fullText}
+                            onChange={(e) => updateArticle(idx, { editContent: e.target.value })}
+                            rows={10}
+                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] font-mono leading-relaxed"/>
+                        </div>
+
+                        {art.rewritten && (art.aiKeywords || art.aiSlug) && (
+                          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
+                            {art.aiSlug && (
+                              <div>
+                                <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Slug SEO</span>
+                                <p className="text-sm font-mono text-purple-800 mt-0.5">{art.aiSlug}</p>
+                              </div>
+                            )}
+                            {art.aiKeywords && (
+                              <div>
+                                <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Palavras-chave</span>
+                                <p className="text-sm text-purple-800 mt-0.5">{art.aiKeywords}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {art.error && !isSkipped && (
+                      <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
+                        <AlertCircle size={12}/>{art.error}
+                      </p>
+                    )}
+
+                    {/* Individual actions */}
+                    {!isDone && !isSkipped && (
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {art.imported ? (
+                          <span className="flex items-center gap-1 text-sm text-green-600 font-semibold">
+                            <CheckCircle size={16}/> Importado!
+                          </span>
+                        ) : (
+                          <>
+                            <button onClick={() => { void rewrite(idx); }}
+                              disabled={art.rewriting || art.importing || queueRunning}
+                              className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                              <Wand2 size={13} className={art.rewriting ? "animate-pulse" : ""}/>
+                              {art.rewriting ? "Reescrevendo com IA…" : "Reescrever com IA"}
+                            </button>
+                            <button onClick={() => { void importArticle(idx, "draft"); }}
+                              disabled={art.importing || art.rewriting || queueRunning}
+                              className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors">
+                              <Send size={13}/>
+                              {art.importing ? "Salvando…" : "Rascunho"}
+                            </button>
+                            <button onClick={() => { void importArticle(idx, "published"); }}
+                              disabled={art.importing || art.rewriting || queueRunning}
+                              className="flex items-center gap-1.5 bg-[#c8102e] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#c8102e]/90 disabled:opacity-50 transition-colors">
+                              <Send size={13}/>
+                              {art.importing ? "Publicando…" : "Publicar"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </section>
         )}
 
