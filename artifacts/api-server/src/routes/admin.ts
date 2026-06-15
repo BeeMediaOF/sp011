@@ -185,9 +185,14 @@ router.post("/ads", (req, res) => {
   if (!name || !imageBase64 || !link) {
     res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
   }
+  const VALID_POSITIONS = [
+    "slot_01","slot_02","slot_03","slot_04","slot_05",
+    "banner","sidebar","central","topo","centro","lateral","rodape",
+    "slidebar_250","slidebar_500",
+  ];
   const ad = store.createAd({
     name, imageBase64, link,
-    position: (position === "banner" || position === "sidebar" ? position : "banner"),
+    position: (VALID_POSITIONS.includes(position ?? "") ? position! : "slot_01") as Parameters<typeof store.createAd>[0]["position"],
     active: !!active,
   });
   res.status(201).json({ ad });
