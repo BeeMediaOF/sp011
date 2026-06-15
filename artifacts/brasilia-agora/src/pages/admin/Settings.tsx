@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings } from "../../lib/adminApi";
-import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch } from "lucide-react";
+import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard } from "lucide-react";
 
 export default function Settings() {
   const [settings, setSettings] = useState<SiteSettings>({
@@ -18,6 +18,13 @@ export default function Settings() {
   const [error, setError] = useState("");
   const ogRef = useRef<HTMLInputElement>(null);
   const faviconRef = useRef<HTMLInputElement>(null);
+  const adminLogoRef = useRef<HTMLInputElement>(null);
+
+  function handleAdminLogoFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => setField("adminLogoBase64", e.target?.result as string);
+    reader.readAsDataURL(file);
+  }
 
   useEffect(() => {
     adminApi.getSettings()
@@ -184,6 +191,121 @@ export default function Settings() {
                       >&times;</button>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Admin panel appearance */}
+            <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
+              <div className="flex items-center gap-2">
+                <LayoutDashboard size={16} className="text-[#1a2448]" />
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aparência do Painel Administrativo</h3>
+              </div>
+
+              {/* Admin Logo */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Logo do painel (sidebar)</label>
+                <p className="text-[11px] text-gray-400 mb-2">Substitui o logo exibido na sidebar e na tela de login do admin. Recomendado: PNG transparente, 300×80px.</p>
+                <input
+                  ref={adminLogoRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAdminLogoFile(f); }}
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => adminLogoRef.current?.click()}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Selecionar logo
+                  </button>
+                  {settings.adminLogoBase64 && (
+                    <div className="relative bg-[#1a2448] rounded-lg p-2">
+                      <img src={settings.adminLogoBase64} alt="Admin logo" className="h-8 max-w-[120px] object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => setField("adminLogoBase64", undefined)}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                      >&times;</button>
+                    </div>
+                  )}
+                  {!settings.adminLogoBase64 && (
+                    <p className="text-[11px] text-gray-400 italic">Usando logo padrão do site</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Sidebar color */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Cor da sidebar</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={settings.adminSidebarColor ?? "#1a2448"}
+                      onChange={(e) => setField("adminSidebarColor", e.target.value)}
+                      className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.adminSidebarColor ?? "#1a2448"}
+                      onChange={(e) => setField("adminSidebarColor", e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                      placeholder="#1a2448"
+                    />
+                  </div>
+                  <div className="mt-2 rounded-lg overflow-hidden h-8 flex items-center px-3 text-white text-xs font-semibold"
+                    style={{ backgroundColor: settings.adminSidebarColor ?? "#1a2448" }}>
+                    Pré-visualização
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1">Cor de destaque (links ativos)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={settings.adminAccentColor ?? "#c8102e"}
+                      onChange={(e) => setField("adminAccentColor", e.target.value)}
+                      className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={settings.adminAccentColor ?? "#c8102e"}
+                      onChange={(e) => setField("adminAccentColor", e.target.value)}
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                      placeholder="#c8102e"
+                    />
+                  </div>
+                  <div className="mt-2 rounded-lg overflow-hidden h-8 flex items-center px-3 text-white text-xs font-semibold"
+                    style={{ backgroundColor: settings.adminAccentColor ?? "#c8102e" }}>
+                    Pré-visualização
+                  </div>
+                </div>
+              </div>
+
+              {/* Presets */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Temas prontos</label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: "SBC Agora (padrão)", sidebar: "#1a2448", accent: "#c8102e" },
+                    { label: "Oceano", sidebar: "#0b3d91", accent: "#e8a020" },
+                    { label: "Floresta", sidebar: "#1a3a2a", accent: "#22c55e" },
+                    { label: "Grafite", sidebar: "#18181b", accent: "#f59e0b" },
+                    { label: "Roxo", sidebar: "#3b1f6e", accent: "#a855f7" },
+                  ].map((t) => (
+                    <button
+                      key={t.label} type="button"
+                      onClick={() => { setField("adminSidebarColor", t.sidebar); setField("adminAccentColor", t.accent); }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-400 transition-colors text-xs text-gray-700"
+                    >
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: t.sidebar }}/>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: t.accent }}/>
+                      {t.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>

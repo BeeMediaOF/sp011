@@ -1,0 +1,316 @@
+/**
+ * RSS Processor — shared logic used by both the route handler and the scheduler.
+ * Handles scraping, AI rewrite, and auto-import of articles.
+ */
+
+import Parser from "rss-parser";
+import * as cheerio from "cheerio";
+import { GoogleGenAI } from "@google/genai";
+import { store, type RssSource, type RssAutoMode } from "./store.js";
+import { logger } from "./logger.js";
+
+// ─── RSS parser ───────────────────────────────────────────────────────────────
+
+export const rssParser = new Parser({
+  timeout: 10_000,
+  headers: { "User-Agent": "SBC-Agora-RSS-Bot/1.0" },
+  customFields: {
+    item: [
+      ["media:content",   "media:content",   { keepArray: false }],
+      ["media:thumbnail", "media:thumbnail", { keepArray: false }],
+    ],
+  },
+});
+
+// ─── Tag mapping ──────────────────────────────────────────────────────────────
+
+export const TAG_MAP: Record<string, string> = {
+  politica: "POLÍTICA", cidade: "CIDADE", seguranca: "SEGURANÇA",
+  transporte: "TRANSPORTE", saude: "SAÚDE", educacao: "EDUCAÇÃO",
+  cultura: "CULTURA", esportes: "ESPORTES", economia: "ECONOMIA",
+  tecnologia: "TECNOLOGIA", geral: "GERAL",
+};
+
+// ─── SEO / AIO journalist prompt ──────────────────────────────────────────────
+
+export function buildPrompt(
+  title: string, text: string, sourceName: string, giveCredit: boolean
+): string {
+  return `Você é um jornalista sênior especialista em SEO e AIO (AI Overview) para portais de notícias brasileiros.
+
+Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
+
+**ESTRUTURA JORNALÍSTICA:**
+1. Primeiro parágrafo: responda às perguntas Quem, O quê, Quando, Onde e Por quê (pirâmide invertida)
+2. Desenvolvimento: detalhe os fatos em ordem decrescente de importância
+3. Use intertítulos em negrito (**Exemplo de intertítulo**) para seções com 3+ parágrafos sobre o mesmo tema
+4. Use listas com marcadores (-) para enumerações ou sequências de dados
+
+**SEO (ranqueamento em buscadores):**
+- Insira o tema central naturalmente no primeiro parágrafo
+- Varie os termos relacionados ao longo do texto (sinônimos, contexto)
+- Parágrafos curtos (máx. 3-4 frases)
+- Linguagem clara e acessível ao público geral
+
+**AIO (para ser citado por respostas de IA como ChatGPT e Google):**
+- Responda perguntas de forma explícita no texto (ex: "O que é X? Trata-se de...")
+- Seja factual e completo — não omita dados relevantes do original
+- Inclua todos os dados do texto original: números, datas, nomes, locais, percentuais
+
+**REGRAS ABSOLUTAS:**
+- NUNCA invente informações — use apenas os dados do texto original
+- NÃO inclua o título no corpo do texto
+- NÃO adicione notas, explicações ou comentários fora do artigo
+- Retorne APENAS o texto reescrito, sem prefácio, sem "Aqui está:" ou similar
+- Português brasileiro formal, mas acessível
+${giveCredit ? `- ÚLTIMA LINHA OBRIGATÓRIA: "Com informações de: ${sourceName}"` : ""}
+
+Título original: ${title}
+
+Texto original a reescrever:
+${text.slice(0, 7000)}`;
+}
+
+// ─── AI rewrite ───────────────────────────────────────────────────────────────
+
+function getGeminiFree() {
+  const baseURL = process.env["AI_INTEGRATIONS_GEMINI_BASE_URL"];
+  const apiKey  = process.env["AI_INTEGRATIONS_GEMINI_API_KEY"] ?? "dummy";
+  if (!baseURL) throw new Error("AI_INTEGRATIONS_GEMINI_BASE_URL não configurada");
+  return new GoogleGenAI({ apiKey, httpOptions: { baseUrl: baseURL } });
+}
+
+export async function rewriteWithAI(
+  title: string, text: string, sourceName: string, giveCredit: boolean
+): Promise<string> {
+  const settings = store.getSettings();
+  const provider = settings.rssAiProvider ?? "gemini_free";
+  const prompt   = buildPrompt(title, text, sourceName, giveCredit);
+
+  if (provider === "openai") {
+    const apiKey = settings.rssAiApiKey;
+    if (!apiKey) throw new Error("API key da OpenAI não configurada");
+    const model = settings.rssAiModel || "gpt-4o-mini";
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 8192,
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+      throw new Error(`OpenAI: ${err?.error?.message ?? res.statusText}`);
+    }
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+    return data.choices?.[0]?.message?.content ?? "";
+  }
+
+  if (provider === "gemini_paid") {
+    const apiKey = settings.rssAiApiKey;
+    if (!apiKey) throw new Error("API key do Gemini não configurada");
+    const model = settings.rssAiModel || "gemini-2.5-flash";
+    const ai = new GoogleGenAI({ apiKey });
+    const resp = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { maxOutputTokens: 8192 },
+    });
+    return resp.text ?? "";
+  }
+
+  // Default: gemini_free (Replit integration)
+  const ai    = getGeminiFree();
+  const model = settings.rssAiModel || "gemini-2.5-flash";
+  const resp  = await ai.models.generateContent({
+    model,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: { maxOutputTokens: 8192 },
+  });
+  return resp.text ?? "";
+}
+
+// ─── Scraping ─────────────────────────────────────────────────────────────────
+
+/** Fetch article URL and extract og:image + full text body */
+export async function scrapeArticle(url: string): Promise<{ text: string; imageUrl: string }> {
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return { text: "", imageUrl: "" };
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // 1. Featured image — prefer og:image over anything else
+    const imageUrl =
+      $("meta[property='og:image']").attr("content") ??
+      $("meta[name='twitter:image']").attr("content") ??
+      $("meta[property='og:image:secure_url']").attr("content") ??
+      $("meta[name='thumbnail']").attr("content") ??
+      "";
+
+    // 2. Remove noise
+    $([
+      "script","style","nav","header","footer","aside",
+      ".ad",".advertisement",".sidebar",".menu",".popup",
+      "[class*='cookie']","[class*='banner']","[id*='cookie']",
+      "figure figcaption","noscript",
+    ].join(",")).remove();
+
+    // 3. Article body selectors (priority order)
+    const bodySelectors = [
+      "[itemprop='articleBody']",
+      ".article-body", ".article-content", ".article-text",
+      ".post-content", ".entry-content",
+      ".materia-conteudo", ".noticia-texto", ".texto-noticia",
+      ".content-article", ".content-body",
+      "article .content", "article .body", "article",
+      ".main-content main", "main",
+    ];
+
+    let text = "";
+    for (const sel of bodySelectors) {
+      const el = $(sel);
+      if (el.length && el.text().trim().length > 250) {
+        text = el.text().replace(/\s+/g, " ").trim();
+        break;
+      }
+    }
+
+    // 4. Fallback: gather all <p> text
+    if (!text) {
+      text = $("p")
+        .map((_i, el) => $(el).text().trim())
+        .get()
+        .filter((t) => t.length > 50)
+        .join(" ");
+    }
+
+    return { text: text.slice(0, 8000), imageUrl };
+  } catch {
+    return { text: "", imageUrl: "" };
+  }
+}
+
+/** Extract image directly from RSS item fields (fallback if page not scraped) */
+export function extractRssImage(item: Parser.Item): string {
+  type IE = Parser.Item & {
+    "media:content"?: { $?: { url?: string }; url?: string };
+    "media:thumbnail"?: { $?: { url?: string }; url?: string };
+    enclosure?: { url?: string };
+  };
+  const it = item as IE;
+  if (it["media:content"]?.$?.url) return it["media:content"]!.$!.url!;
+  if (it["media:content"]?.url)     return it["media:content"]!.url!;
+  if (it["media:thumbnail"]?.$?.url) return it["media:thumbnail"]!.$!.url!;
+  if (it.enclosure?.url)            return it.enclosure.url;
+  const html = item["content:encoded"] ?? item.content ?? item.summary ?? "";
+  if (html) {
+    const $ = cheerio.load(html);
+    const src = $("img[src]").filter((_i, el) => {
+      const s = $(el).attr("src") ?? "";
+      return !s.includes("logo") && !s.includes("icon") && !s.includes("pixel");
+    }).first().attr("src");
+    if (src) return src;
+  }
+  return "";
+}
+
+/** Strip HTML tags and normalise whitespace */
+export function stripHtml(html: string): string {
+  const $ = cheerio.load(html);
+  $("script, style").remove();
+  return $("body").text().replace(/\s+/g, " ").trim();
+}
+
+// ─── Fetch + process one source ───────────────────────────────────────────────
+
+export interface FetchedArticle {
+  sourceId: string; sourceName: string; category: string;
+  title: string; link: string; pubDate: string;
+  imageUrl: string; excerpt: string; fullText: string;
+}
+
+export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticle[]> {
+  const feed  = await rssParser.parseURL(src.url);
+  const items = feed.items.slice(0, 15);
+
+  const results: FetchedArticle[] = [];
+  await Promise.allSettled(items.map(async (item) => {
+    const link    = item.link ?? "";
+    const rawHtml = item["content:encoded"] ?? item.content ?? item.summary ?? "";
+    const excerpt = stripHtml(rawHtml).slice(0, 300);
+
+    // Always scrape article page for og:image + full text
+    const scraped  = link ? await scrapeArticle(link) : { text: "", imageUrl: "" };
+    const imageUrl = scraped.imageUrl || extractRssImage(item);
+    const fullText = scraped.text || (rawHtml.length > 500 ? stripHtml(rawHtml) : excerpt);
+
+    results.push({
+      sourceId: src.id, sourceName: src.name, category: src.category,
+      title:     item.title ?? "Sem título",
+      link,
+      pubDate:   item.pubDate ?? item.isoDate ?? new Date().toISOString(),
+      imageUrl,
+      excerpt,
+      fullText: fullText || excerpt,
+    });
+  }));
+
+  return results;
+}
+
+/** Auto-process a fetched article based on source autoMode */
+export async function autoProcessArticle(
+  art: FetchedArticle, src: RssSource
+): Promise<void> {
+  const { autoMode, giveCredit, name: sourceName, category } = src;
+  if (autoMode === "none") return;
+
+  let content = art.fullText;
+  let author  = giveCredit ? `Redação (via ${sourceName})` : "Redação";
+
+  if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
+    try {
+      content = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit);
+    } catch (err) {
+      logger.warn({ err, sourceId: src.id }, "AI rewrite failed — using original text");
+    }
+  }
+
+  const status = (autoMode === "publish" || autoMode === "rewrite_publish")
+    ? "published" : "draft";
+
+  store.createArticle({
+    title:       art.title,
+    subtitle:    art.excerpt.slice(0, 160),
+    content,
+    category,
+    tag:         TAG_MAP[category] ?? "GERAL",
+    imageUrl:    art.imageUrl,
+    author,
+    publishedAt: new Date().toISOString(),
+    status,
+  });
+}
+
+/** Full pipeline: fetch source, process each article */
+export async function processDueSource(src: RssSource): Promise<number> {
+  const articles = await fetchSourceArticles(src);
+  let processed = 0;
+  for (const art of articles) {
+    try {
+      await autoProcessArticle(art, src);
+      processed++;
+    } catch (err) {
+      logger.warn({ err, articleTitle: art.title }, "Error processing article");
+    }
+  }
+  store.updateRssSource(src.id, { lastFetchedAt: new Date().toISOString() });
+  return processed;
+}

@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { adminApi } from "../../lib/adminApi";
 import { Lock, User, Eye, EyeOff } from "lucide-react";
-import logoImg from "../../assets/images/logo_final.png";
+import logoFallback from "../../assets/images/logo_final.png";
 
 export default function Login() {
   const [, navigate] = useLocation();
@@ -11,6 +11,20 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [logoSrc, setLogoSrc] = useState(logoFallback);
+  const [sidebarColor, setSidebarColor] = useState("#1a2448");
+
+  useEffect(() => {
+    fetch("/api/site")
+      .then((r) => r.json())
+      .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string }) => {
+        if (data.adminLogoBase64 || data.logoBase64) {
+          setLogoSrc(data.adminLogoBase64 || data.logoBase64 || logoFallback);
+        }
+        if (data.adminSidebarColor) setSidebarColor(data.adminSidebarColor);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,10 +42,10 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a2448] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: sidebarColor }}>
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src={logoImg} alt="Brasília Hoje" className="h-20 w-auto object-contain" />
+          <img src={logoSrc} alt="Logo" className="h-20 w-auto object-contain" />
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">
@@ -47,7 +61,8 @@ export default function Login() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2"
+                  style={{ "--tw-ring-color": sidebarColor } as React.CSSProperties}
                   placeholder="admin"
                   required
                 />
@@ -62,7 +77,7 @@ export default function Login() {
                   type={showPwd ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2"
                   placeholder="••••••••"
                   required
                 />
@@ -85,7 +100,8 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#1a2448] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#243060] transition-colors disabled:opacity-60"
+              className="w-full text-white py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+              style={{ backgroundColor: sidebarColor }}
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>

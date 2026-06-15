@@ -28,6 +28,9 @@ export interface SiteSettings {
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
   menuItems?: MenuItem[];
+  adminLogoBase64?: string;
+  adminSidebarColor?: string;
+  adminAccentColor?: string;
 }
 
 export function useSite() {

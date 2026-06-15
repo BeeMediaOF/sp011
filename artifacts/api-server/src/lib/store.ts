@@ -43,6 +43,12 @@ export interface SiteSettings {
   ogImageBase64?: string;
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
+  adminLogoBase64?: string;
+  adminSidebarColor?: string;
+  adminAccentColor?: string;
+  rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
+  rssAiApiKey?: string;
+  rssAiModel?: string;
 }
 
 const DEFAULT_HOME_BLOCKS: HomeBlock[] = [
@@ -108,6 +114,8 @@ export interface ContactInfo {
   termsOfUse: string;
 }
 
+export type RssAutoMode = "none" | "draft" | "publish" | "rewrite_draft" | "rewrite_publish";
+
 export interface RssSource {
   id: string;
   name: string;
@@ -115,6 +123,10 @@ export interface RssSource {
   category: string;
   active: boolean;
   createdAt: string;
+  scheduleHours: number;
+  giveCredit: boolean;
+  autoMode: RssAutoMode;
+  lastFetchedAt?: string;
 }
 
 interface StoreData {

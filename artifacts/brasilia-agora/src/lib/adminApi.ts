@@ -114,6 +114,12 @@ export interface SiteSettings {
   ogImageBase64?: string;
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
+  adminLogoBase64?: string;
+  adminSidebarColor?: string;
+  adminAccentColor?: string;
+  rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
+  rssAiApiKey?: string;
+  rssAiModel?: string;
 }
 
 export interface AnalyticsStats {

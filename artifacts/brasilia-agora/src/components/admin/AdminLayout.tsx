@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
   Users, Mail, BarChart2, LayoutGrid, Rss,
 } from "lucide-react";
-import logoImg from "../../assets/images/logo_sbc_negativo.png";
+import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 
 const NAV = [
   { label: "Dashboard",    icon: LayoutDashboard, path: "/admin" },
@@ -28,9 +28,42 @@ interface AdminLayoutProps {
   title: string;
 }
 
+interface PanelTheme {
+  logo: string;
+  sidebar: string;
+  accent: string;
+  accentText: string;
+}
+
+function usePanelTheme(): PanelTheme {
+  const [theme, setTheme] = useState<PanelTheme>({
+    logo: logoFallback,
+    sidebar: "#1a2448",
+    accent: "#F5A623",
+    accentText: "#1a2448",
+  });
+
+  useEffect(() => {
+    fetch("/api/site")
+      .then((r) => r.json())
+      .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
+        setTheme({
+          logo: data.adminLogoBase64 || data.logoBase64 || logoFallback,
+          sidebar: data.adminSidebarColor || "#1a2448",
+          accent: data.adminAccentColor || "#F5A623",
+          accentText: data.adminSidebarColor ? "#ffffff" : "#1a2448",
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  return theme;
+}
+
 export default function AdminLayout({ children, title }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [location, navigate] = useLocation();
+  const theme = usePanelTheme();
 
   function handleLogout() {
     localStorage.removeItem("admin_token");
@@ -40,14 +73,15 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
       <aside
-        className={`flex flex-col bg-[#1a2448] text-white transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
+        className={`flex flex-col text-white transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
+        style={{ backgroundColor: theme.sidebar }}
       >
         <div className="flex items-center justify-between px-3 py-4 border-b border-white/10">
           {!collapsed && (
             <img
-              src={logoImg}
-              alt="SBC Agora"
-              className="h-9 w-auto object-contain"
+              src={theme.logo}
+              alt="Logo"
+              className="h-9 w-auto object-contain max-w-[160px]"
             />
           )}
           <button
@@ -66,7 +100,8 @@ export default function AdminLayout({ children, title }: AdminLayoutProps) {
                 key={path}
                 href={path}
                 className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors cursor-pointer
-                  ${active ? "bg-[#F5A623] text-[#1a2448] font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+                  ${active ? "font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+                style={active ? { backgroundColor: theme.accent, color: theme.accentText } : {}}
               >
                 <Icon size={18} className="shrink-0" />
                 {!collapsed && <span>{label}</span>}
