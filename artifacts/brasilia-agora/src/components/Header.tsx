@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
-import logoImg from "../assets/images/logo_novo.png";
+import logoImg from "../assets/images/logo_brasilia_agora.png";
 
 const navItems = [
   { label: "Início",     path: "/" },
@@ -105,7 +105,7 @@ export default function Header() {
     <>
       {/* ── Barra principal ── */}
       <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200">
-        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2">
+        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[13px] mb-[13px]">
 
           {/* Hamburger */}
           <button
