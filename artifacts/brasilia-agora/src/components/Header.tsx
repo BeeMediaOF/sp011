@@ -107,9 +107,9 @@ export default function Header() {
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
 
   return (
-    <>
+    <div className="sticky top-0 z-50">
       {/* ── Barra principal ── */}
-      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200">
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2">
 
           {/* Hamburger */}
@@ -126,8 +126,8 @@ export default function Header() {
             <img
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
-              style={{ height: settings?.logoSize ?? 101 }}
-              className="w-auto object-contain pt-[0px] pr-[4px] pl-[16px] pb-[23px]"
+              style={{ height: settings?.logoSize ?? 48 }}
+              className="w-auto object-contain"
             />
           </Link>
 
@@ -204,6 +204,6 @@ export default function Header() {
       </header>
       {/* ── Ticker de cotações ── */}
       <TickerBar />
-    </>
+    </div>
   );
 }
