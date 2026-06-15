@@ -154,12 +154,27 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       $("meta[name='thumbnail']").attr("content") ??
       "";
 
-    // 2. Remove noise
+    // 2. Remove noise — structural elements + common Brazilian news site widgets
     $([
       "script","style","nav","header","footer","aside",
       ".ad",".advertisement",".sidebar",".menu",".popup",
       "[class*='cookie']","[class*='banner']","[id*='cookie']",
       "figure figcaption","noscript",
+      // Agência Brasil / EBC specific
+      ".destaques-ebc",".radio-agencia",".tv-brasil",
+      ".relacionadas",".related",".related-news",
+      ".mais-noticias",".mais-lidas",".mais-conteudo",
+      ".ver-mais",".leia-mais",".read-more",
+      ".tags-list",".tags",".article-tags",
+      ".compartilhe",".share",".social-share",
+      ".newsletter",".newsletter-box",
+      ".breadcrumb",".breadcrumbs",
+      // G1, UOL, Folha
+      ".gpt-ad",".gam-ad","[id*='gpt']","[id*='taboola']",
+      ".paywall",".subscription",".premium-content",
+      ".edicao",".edition-bar",
+      ".article-footer",".post-footer",
+      "[class*='recommend']","[class*='sugest']","[class*='widget']",
     ].join(",")).remove();
 
     // 3. Article body selectors (priority order)
@@ -209,6 +224,44 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
         .filter((t) => t.length > 50)
         .join("\n\n");
     }
+
+    // 5. Post-processing: truncate at common "end of article" sentinels
+    //    (inline navigation/widgets that DOM removal didn't catch)
+    const SENTINELS = [
+      /\bRelacionadas?\b/,
+      /\bVer mais\b/i,
+      /\bMais not[ií]cias?\b/i,
+      /\bDestaques EBC\b/i,
+      /\bRadioagência\b/i,
+      /\bTV Brasil\b/i,
+      /\bCompartilhe essa not[ií]cia\b/i,
+      /\bContinuar lendo\b/i,
+      /\bLeia (também|mais)\b/i,
+      /\bEdi[çc][aã]o:\s/i,
+      /\bPublicidade\b/i,
+      /\bNewsletter\b/i,
+      /^Tags?:/im,
+    ];
+    for (const sentinel of SENTINELS) {
+      const match = sentinel.exec(text);
+      if (match && match.index > 200) {
+        text = text.slice(0, match.index).trim();
+        break;
+      }
+    }
+
+    // 6. Strip leading metadata noise (category header, title echo, byline, date)
+    //    Pattern: lines before the first real sentence of the article
+    text = text
+      // Remove "Publicado em dd/mm/yyyy - hh:mm Cidade Versão em áudio"
+      .replace(/Publicado em \d{2}\/\d{2}\/\d{4}[^.]*?(Versão em áudio\s*)?/gi, "")
+      // Remove standalone city names at start ("São Paulo", "Brasília", etc.)
+      .replace(/^(São Paulo|Brasília|Rio de Janeiro|Belo Horizonte|Curitiba|Salvador|Fortaleza)\s+/i, "")
+      // Remove ">> Siga o canal..." CTAs
+      .replace(/>>?\s*Siga .{0,80}/gi, "")
+      // Collapse multiple spaces
+      .replace(/\s{2,}/g, " ")
+      .trim();
 
     return { text: text.slice(0, 8000), imageUrl };
   } catch {

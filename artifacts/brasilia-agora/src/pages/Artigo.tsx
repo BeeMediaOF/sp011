@@ -224,12 +224,82 @@ export default function Artigo() {
     );
   }
 
+  /** Remove trailing navigation/widget noise from scraped content */
+  function cleanContent(raw: string): string {
+    // Truncate at common Brazilian news-site end-of-article markers
+    const SENTINELS = [
+      /\bRelacionadas?\b/,
+      /\bVer mais\b/i,
+      /\bMais not[ií]cias?\b/i,
+      /\bDestaques EBC\b/i,
+      /\bRadioagência\b/i,
+      /\bTV Brasil\b/i,
+      /\bCompartilhe essa not[ií]cia\b/i,
+      /\bContinuar lendo\b/i,
+      /\bLeia (também|mais)\b/i,
+      /\bEdi[çc][aã]o:\s/i,
+      /\bEdição:/i,
+      /\bPublicidade\b/i,
+      /\bNewsletter\b/i,
+      /\bSiga o canal\b/i,
+      /\bSiga nosso\b/i,
+      /seg,\s+\d{2}\/\d{2}\/\d{4}\s+-\s+\d{2}:\d{2}/i,  // "seg, 15/06/2026 - 14:00"
+    ];
+    let text = raw;
+    for (const s of SENTINELS) {
+      const m = s.exec(text);
+      if (m && m.index > 200) {
+        text = text.slice(0, m.index).trim();
+        break;
+      }
+    }
+    // Strip leading metadata block (category label, title echo, byline, date, city, "Versão em áudio")
+    // Strategy: find "Versão em áudio" in first 1000 chars — everything before it is header noise
+    const audioIdx = text.search(/Versão em áudio/i);
+    if (audioIdx > 0 && audioIdx < 1000) {
+      text = text.slice(audioIdx + "Versão em áudio".length).trim();
+    } else {
+      // Fallback: strip byline/date patterns
+      text = text
+        .replace(/^[\s\S]{0,300}?Publicado em \d{2}\/\d{2}\/\d{4}[^.\n]{0,80}/i, "")
+        .trim();
+    }
+
+    // Strip reporter bylines: "Nome Sobrenome – Repórter da Agência"
+    text = text.replace(/^[^.!?]{0,80}–\s*(Repórter|Correspondente|Colaborad[oa]r|Editor)\b[^.\n]{0,100}/i, "").trim();
+
+    text = text
+      .replace(/Publicado em \d{2}\/\d{2}\/\d{4}[^.\n]*?(Versão em áudio\s*)?/gi, "")
+      .replace(/>>?\s*Siga .{0,100}/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    return text;
+  }
+
+  /** Split a wall-of-text into readable paragraphs using sentence boundaries */
+  function smartSplit(text: string): string[] {
+    // Split on ". Uppercase", "? Uppercase", "! Uppercase" — handles PT-BR
+    const sentences = text.split(
+      /(?<=[.!?])\s+(?=[A-ZÁÀÂÃÉÈÊÍÌÓÒÔÕÚÙÇ"'"'0-9(])/g
+    );
+    const paras: string[] = [];
+    const PER_PARA = 4; // sentences per paragraph
+    for (let i = 0; i < sentences.length; i += PER_PARA) {
+      const chunk = sentences.slice(i, i + PER_PARA).join(" ").trim();
+      if (chunk) paras.push(chunk);
+    }
+    return paras;
+  }
+
   function renderContent(raw: string): React.ReactNode[] {
-    // Split on double newlines OR single newlines
-    const lines = raw
-      .split(/\n\n+|\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
+    // 1. Clean noise first (works on both old stored articles and new ones)
+    const cleaned = cleanContent(raw);
+
+    // 2. If content has no line breaks → scraped wall of text, split by sentences
+    const hasStructure = /\n/.test(cleaned);
+    const lines = hasStructure
+      ? cleaned.split(/\n\n+|\n/).map((l) => l.trim()).filter(Boolean)
+      : smartSplit(cleaned);
 
     const nodes: React.ReactNode[] = [];
     let listItems: string[] = [];
