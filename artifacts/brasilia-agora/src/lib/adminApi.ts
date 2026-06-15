@@ -94,6 +94,10 @@ export interface SiteSettings {
   logoBase64?: string;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
+  seoDescription?: string;
+  seoKeywords?: string;
+  ogImageBase64?: string;
+  faviconBase64?: string;
 }
 
 export interface Ad {
