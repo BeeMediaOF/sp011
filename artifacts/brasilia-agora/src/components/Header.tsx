@@ -104,7 +104,7 @@ export default function Header() {
   return (
     <>
       {/* ── Barra principal ── */}
-      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200">
+      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200 mt-[14px] mb-[14px]">
         <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[13px] mb-[13px]">
 
           {/* Hamburger */}
@@ -131,11 +131,7 @@ export default function Header() {
               <Link
                 key={path}
                 href={path}
-                className={`text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm ${
-                  isActive(path)
-                    ? "text-[#c8102e] bg-red-50"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-                }`}
+                className="text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm text-gray-500 hover:text-gray-900 hover:bg-gray-100 text-center ml-[4px] mr-[4px]"
               >
                 {label}
               </Link>
