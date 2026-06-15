@@ -150,7 +150,7 @@ export default function CategoryPage({
 
       {/* Banner acima do rodapé */}
       <div className="max-w-[1280px] mx-auto px-4 py-6">
-        <AdBanner />
+        <AdBanner slot="slot_05" />
       </div>
     </div>
   );

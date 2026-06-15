@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock } from "../../lib/adminApi";
 import {
   GripVertical, Eye, EyeOff, Save, CheckCircle, LayoutGrid,
-  Plus, X, Trash2, Pencil, ChevronDown, ChevronUp,
+  Plus, X, Trash2, Pencil, ChevronDown, ChevronUp, Monitor, RefreshCw,
 } from "lucide-react";
 
 // ─── Layout definitions ───────────────────────────────────────────────────────
 const LAYOUTS: {
-  id: "grid" | "featured" | "duplo" | "cultura";
+  id: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
   label: string;
   desc: string;
   preview: React.ReactNode;
@@ -65,6 +65,47 @@ const LAYOUTS: {
       </div>
     ),
   },
+  {
+    id: "lista",
+    label: "Lista",
+    desc: "Lista vertical numerada com miniaturas",
+    preview: (
+      <div className="flex flex-col gap-1 w-full">
+        {[0,1,2,3,4].map(i => (
+          <div key={i} className="flex gap-1 items-center">
+            <div className="w-2 h-2 bg-current rounded opacity-40 shrink-0" />
+            <div className="flex-1 h-1.5 bg-current rounded opacity-20" />
+          </div>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: "manchete",
+    label: "Manchete",
+    desc: "1 hero full-width + 3 secundárias",
+    preview: (
+      <div className="flex flex-col gap-1 w-full">
+        <div className="w-full h-6 bg-current rounded opacity-30" />
+        <div className="flex gap-1">
+          {[0,1,2].map(i => <div key={i} className="flex-1 h-4 bg-current rounded opacity-20" />)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "mosaico",
+    label: "Mosaico",
+    desc: "1 grande + 4 pequenos em grade",
+    preview: (
+      <div className="flex gap-1 w-full">
+        <div className="flex-[2] h-10 bg-current rounded opacity-30" />
+        <div className="flex-[2] grid grid-cols-2 gap-1">
+          {[0,1,2,3].map(i => <div key={i} className="h-4 bg-current rounded opacity-20" />)}
+        </div>
+      </div>
+    ),
+  },
 ];
 
 // ─── Categories ──────────────────────────────────────────────────────────────
@@ -88,7 +129,7 @@ const CATEGORIES = [
 const SPECIAL_BLOCKS = new Set(["hero", "mais-lidas", "colunistas", "ultimas"]);
 
 // Default configs for predefined configurable blocks
-const BLOCK_DEFAULTS: Record<string, { category: string; layout: "grid"|"featured"|"duplo"|"cultura"; color: string }> = {
+const BLOCK_DEFAULTS: Record<string, { category: string; layout: "grid"|"featured"|"duplo"|"cultura"|"lista"|"manchete"|"mosaico"; color: string }> = {
   brasil:     { category: "brasil",     layout: "grid",    color: "#16a34a" },
   mundo:      { category: "mundo",      layout: "grid",    color: "#6b21a8" },
   esporte:    { category: "esportes",   layout: "cultura", color: "#dc2626" },
@@ -114,6 +155,7 @@ const BLOCK_ICONS: Record<string, string> = {
 
 const LAYOUT_LABELS: Record<string, string> = {
   grid: "Grade", featured: "Destaque", duplo: "Duplo", cultura: "Foto+Lista",
+  lista: "Lista", manchete: "Manchete", mosaico: "Mosaico",
 };
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
@@ -134,7 +176,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 interface EditForm {
   name: string;
   category: string;
-  layout: "grid" | "featured" | "duplo" | "cultura";
+  layout: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
   color: string;
 }
 
@@ -151,17 +193,21 @@ function blockToEditForm(block: HomeBlock): EditForm {
 // ─── New-block form ───────────────────────────────────────────────────────────
 const FORM_EMPTY: EditForm = { name: "", category: "politica", layout: "grid", color: "#1d4ed8" };
 
+
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function HomeBlocksManager() {
-  const [blocks, setBlocks]     = useState<HomeBlock[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [saved, setSaved]       = useState(false);
-  const [dragIdx, setDragIdx]   = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm]         = useState<EditForm>(FORM_EMPTY);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm]   = useState<EditForm>(FORM_EMPTY);
+  const [blocks, setBlocks]         = useState<HomeBlock[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
+  const [dragIdx, setDragIdx]       = useState<number | null>(null);
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState<EditForm>(FORM_EMPTY);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [editForm, setEditForm]     = useState<EditForm>(FORM_EMPTY);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewKey, setPreviewKey]   = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     adminApi.getSettings().then((r) => {
@@ -212,13 +258,22 @@ export default function HomeBlocksManager() {
     setEditForm(blockToEditForm(block));
   }
 
-  function applyEdit(id: string) {
-    setBlocks((prev) => prev.map((b) =>
+  async function applyAndSave(id: string) {
+    const newBlocks = blocks.map((b) =>
       b.id === id
         ? { ...b, name: editForm.name, category: editForm.category, layout: editForm.layout, color: editForm.color }
         : b
-    ));
+    );
+    setBlocks(newBlocks);
     setEditingId(null);
+    setSaving(true);
+    const ordered = newBlocks.map((b, i) => ({ ...b, order: i }));
+    try {
+      await adminApi.updateSettings({ homeBlocks: ordered });
+      setSaved(true);
+      setPreviewKey((k) => k + 1);
+      setTimeout(() => setSaved(false), 2500);
+    } catch { } finally { setSaving(false); }
   }
 
   function setEditField<K extends keyof EditForm>(key: K, value: EditForm[K]) {
@@ -261,6 +316,7 @@ export default function HomeBlocksManager() {
     try {
       await adminApi.updateSettings({ homeBlocks: ordered });
       setSaved(true);
+      setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2500);
     } catch { } finally { setSaving(false); }
   }
@@ -395,10 +451,11 @@ export default function HomeBlocksManager() {
           </button>
           <button
             type="button"
-            onClick={() => applyEdit(block.id)}
-            className="px-4 py-1.5 bg-[#1a2448] text-white rounded-lg text-xs font-semibold hover:bg-[#243060]"
+            onClick={() => applyAndSave(block.id)}
+            disabled={saving}
+            className="px-4 py-1.5 bg-[#1a2448] text-white rounded-lg text-xs font-semibold hover:bg-[#243060] disabled:opacity-60 flex items-center gap-1.5"
           >
-            Aplicar
+            {saving ? <><RefreshCw size={12} className="animate-spin" /> Salvando…</> : <><CheckCircle size={12} /> Aplicar e Salvar</>}
           </button>
         </div>
       </div>
@@ -421,13 +478,27 @@ export default function HomeBlocksManager() {
                 Arraste para reordenar · 👁 ocultar · ✏ editar categoria/formato
               </p>
             </div>
-            <button
-              onClick={() => { setShowForm((s) => !s); setEditingId(null); }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-[#1a2448] text-white rounded-lg text-sm font-semibold hover:bg-[#243060] transition-colors"
-            >
-              {showForm ? <X size={14} /> : <Plus size={14} />}
-              {showForm ? "Cancelar" : "Novo Bloco"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowPreview((s) => !s)}
+                className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-semibold transition-colors ${
+                  showPreview
+                    ? "border-[#1a2448] bg-[#1a2448]/5 text-[#1a2448]"
+                    : "border-gray-200 text-gray-500 hover:border-[#1a2448] hover:text-[#1a2448]"
+                }`}
+                title="Pré-visualizar Home ao vivo"
+              >
+                <Monitor size={14} />
+                Prévia
+              </button>
+              <button
+                onClick={() => { setShowForm((s) => !s); setEditingId(null); }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[#1a2448] text-white rounded-lg text-sm font-semibold hover:bg-[#243060] transition-colors"
+              >
+                {showForm ? <X size={14} /> : <Plus size={14} />}
+                {showForm ? "Cancelar" : "Novo Bloco"}
+              </button>
+            </div>
           </div>
 
           {/* ── New block form ── */}
@@ -624,9 +695,9 @@ export default function HomeBlocksManager() {
           </div>
         </div>
 
-        {/* Preview strip */}
+        {/* Order preview strip */}
         <div className="bg-white rounded-xl shadow-sm p-5">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Prévia da ordem</h3>
+          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Ordem dos blocos</h3>
           <div className="flex flex-wrap gap-2">
             {blocks.filter((b) => b.visible).map((b, i) => {
               const color = b.color ?? BLOCK_DEFAULTS[b.id]?.color;
@@ -642,6 +713,41 @@ export default function HomeBlocksManager() {
             })}
           </div>
         </div>
+
+        {/* Live HOME preview */}
+        {showPreview && (
+          <div className="bg-white rounded-xl shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Monitor size={16} className="text-[#1a2448]" />
+                <h3 className="text-sm font-bold text-[#1a2448]">Prévia ao Vivo da Home</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-gray-400">Atualiza automaticamente após salvar</span>
+                <button
+                  onClick={() => setPreviewKey((k) => k + 1)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:border-[#1a2448] hover:text-[#1a2448] transition-colors"
+                  title="Forçar atualização"
+                >
+                  <RefreshCw size={12} />
+                  Atualizar
+                </button>
+              </div>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50" style={{ height: 640 }}>
+              <iframe
+                key={previewKey}
+                ref={iframeRef}
+                src="/"
+                className="w-full h-full border-0"
+                title="Prévia da Home"
+              />
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2 text-center">
+              Edite um bloco → clique <strong>Aplicar e Salvar</strong> → a prévia atualiza automaticamente
+            </p>
+          </div>
+        )}
 
       </div>
     </AdminLayout>

@@ -7,6 +7,8 @@ import SectionBlock from "../components/SectionBlock";
 import SectionBlockFeatured from "../components/SectionBlockFeatured";
 import SectionBlockDuploDestaque from "../components/SectionBlockDuploDestaque";
 import SectionBlockCulturaLayout from "../components/SectionBlockCulturaLayout";
+import SectionBlockLista from "../components/SectionBlockLista";
+import SectionBlockManchete from "../components/SectionBlockManchete";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 import AdBanner from "../components/ads/AdBanner";
@@ -115,6 +117,10 @@ function CustomBlock({ block, getArticles }: {
       return <SectionBlockDuploDestaque title={block.name} color={color} href={href} articles={articles} />;
     case "cultura":
       return <SectionBlockCulturaLayout title={block.name} color={color} href={href} articles={articles} />;
+    case "lista":
+      return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} />;
+    case "manchete":
+      return <SectionBlockManchete title={block.name} color={color} href={href} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={block.name} color={color} href={href} articles={articles} pageSize={4} />;
@@ -161,6 +167,10 @@ function ConfigurableBlock({ block, getArticles }: {
       return <SectionBlockDuploDestaque title={title} color={color} href={href} articles={articles} />;
     case "cultura":
       return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} />;
+    case "lista":
+      return <SectionBlockLista title={title} color={color} href={href} articles={articles} />;
+    case "manchete":
+      return <SectionBlockManchete title={title} color={color} href={href} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} />;

@@ -6,7 +6,7 @@ export interface HomeBlock {
   visible: boolean;
   order: number;
   category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura";
+  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
   color?: string;
   custom?: boolean;
 }
@@ -44,7 +44,7 @@ export function useSite() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/site")
+    fetch("/api/site", { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
         setSettings(data);
