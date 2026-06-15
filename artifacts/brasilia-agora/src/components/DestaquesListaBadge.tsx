@@ -142,7 +142,7 @@ export default function DestaquesListaBadge() {
                       alt={art.titulo}
                       className="w-[90px] h-[68px] sm:w-[160px] sm:h-[108px] object-cover rounded flex-shrink-0 group-hover:opacity-90 transition-opacity"
                     />
-                    <div className="flex-1 min-w-0 py-0.5">
+                    <div className="flex-1 min-w-0 py-0.5 mr-[101px]">
                       <span
                         className="text-[10px] font-bold uppercase tracking-widest mb-1 block"
                         style={{ color: art.categoriaColor }}
