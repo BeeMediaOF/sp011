@@ -28,12 +28,12 @@ export default function AdBanner({ index = 0 }: { index?: number }) {
         target="_blank"
         rel="noreferrer"
         onClick={() => trackClick(ad.id)}
-        className="block w-full max-w-[728px] h-[90px] rounded-lg border border-gray-100 overflow-hidden group relative"
+        className="block rounded-lg border border-gray-100 overflow-hidden group"
       >
         <img
           src={ad.imageBase64}
           alt="Publicidade"
-          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
+          className="block max-w-full h-auto group-hover:scale-[1.02] transition-transform"
         />
       </a>
     </div>

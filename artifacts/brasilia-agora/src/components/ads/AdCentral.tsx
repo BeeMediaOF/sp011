@@ -24,12 +24,12 @@ export default function AdCentral() {
         target="_blank"
         rel="noreferrer"
         onClick={() => trackClick(ad.id)}
-        className="block w-full max-w-[952px] h-[264px] rounded-lg border border-gray-100 overflow-hidden group relative"
+        className="block rounded-lg border border-gray-100 overflow-hidden group"
       >
         <img
           src={ad.imageBase64}
           alt="Publicidade"
-          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform"
+          className="block max-w-full h-auto group-hover:scale-[1.02] transition-transform"
         />
       </a>
     </div>

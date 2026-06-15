@@ -112,10 +112,9 @@ function FeaturedCard({
         >
           {item.chapeu}
         </span>
-        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight line-clamp-3 mb-1.5 transition-colors group-hover:text-gray-200">
+        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[18px] sm:text-[20px] line-clamp-4 mb-2 transition-colors group-hover:text-gray-200">
           {item.title}
         </h2>
-        <p className="text-white/65 text-[12px] line-clamp-2 mb-2 hidden sm:block">{item.summary}</p>
         <div className="flex items-center gap-2 text-[11px] text-white/60">
           <img src="/favicon.jpg" alt="SBC Agora" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
           <span className="font-medium">{item.author || "Redação"}</span>
