@@ -163,24 +163,13 @@ function MobileCarousel() {
   );
 }
 
-// ─── Layout desktop: 1 grande + 2 empilhados ─────────────────────────────────
+// ─── Layout desktop: 3 cards de igual tamanho lado a lado ───────────────────
 function DesktopGrid() {
   return (
-    <div className="grid grid-cols-3 gap-1 h-[480px]">
-      {/* Destaque principal — ocupa 2 colunas */}
-      <div className="col-span-2">
-        <FeaturedCard
-          item={featured[0]!}
-          priority
-          className="h-full text-[22px]"
-        />
-      </div>
-
-      {/* Coluna direita — 2 cards empilhados */}
-      <div className="flex flex-col gap-1">
-        <FeaturedCard item={featured[1]!} className="flex-1" />
-        <FeaturedCard item={featured[2]!} className="flex-1" />
-      </div>
+    <div className="grid grid-cols-3 gap-3 h-[420px]">
+      {featured.map((item, idx) => (
+        <FeaturedCard key={item.id} item={item} priority={idx === 0} className="h-full" />
+      ))}
     </div>
   );
 }
