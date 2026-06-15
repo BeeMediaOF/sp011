@@ -94,7 +94,7 @@ export interface Ad {
   name: string;
   imageBase64: string;
   link: string;
-  position: "banner" | "sidebar" | "central";
+  position: "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
   active: boolean;
   clicks: number;
   createdAt: string;
