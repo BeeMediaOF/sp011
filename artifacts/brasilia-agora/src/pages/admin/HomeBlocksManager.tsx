@@ -5,6 +5,7 @@ import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   GripVertical, Eye, EyeOff, Plus, Trash2, ChevronDown,
   CheckCircle, RefreshCw, Save, LayoutGrid, X, Layout, AlignLeft,
+  Upload, Minus, ImageIcon,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -354,6 +355,12 @@ export default function HomeBlocksManager() {
   const [footerStyle, setFooterStyle] = useState<FooterStyle>("dark");
   const [headerBgColor, setHeaderBgColor] = useState<string>("#ffffff");
   const [footerBgColor, setFooterBgColor] = useState<string>("#000000");
+  const [logoBase64, setLogoBase64]       = useState<string | null>(null);
+  const [logoPreview, setLogoPreview]     = useState<string | null>(null);
+  const [logoSize, setLogoSize]           = useState<number>(48);
+  const [logoSaving, setLogoSaving]       = useState(false);
+  const [logoStatus, setLogoStatus]       = useState<"idle" | "ok" | "err">("idle");
+  const logoInputRef                      = useRef<HTMLInputElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -367,6 +374,8 @@ export default function HomeBlocksManager() {
         setFooterStyle(r.settings.footerStyle ?? "dark");
         setHeaderBgColor(r.settings.headerBgColor ?? "#ffffff");
         setFooterBgColor(r.settings.footerBgColor ?? "#000000");
+        if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
+        if (r.settings.logoSize)   setLogoSize(r.settings.logoSize);
       })
       .catch(() => setBlocks(DEFAULT_BLOCKS))
       .finally(() => setLoading(false));
@@ -453,6 +462,26 @@ export default function HomeBlocksManager() {
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2000);
     } catch { } finally { setSaving(false); }
+  }
+
+  async function saveLogo() {
+    setLogoSaving(true); setLogoStatus("idle");
+    try {
+      if (logoPreview) {
+        await adminApi.uploadLogo(logoPreview);
+        setLogoBase64(logoPreview);
+        setLogoPreview(null);
+      }
+      await adminApi.updateSettings({ logoSize });
+      invalidateSiteCache();
+      setLogoStatus("ok");
+      setPreviewKey((k) => k + 1);
+      setTimeout(() => setLogoStatus("idle"), 2500);
+    } catch {
+      setLogoStatus("err");
+    } finally {
+      setLogoSaving(false);
+    }
   }
 
   // ── Block actions ─────────────────────────────────────────────────────────
@@ -730,6 +759,7 @@ export default function HomeBlocksManager() {
 
           {/* ── Tab: Header ── */}
           {tab === "header" && (
+            <>
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               <p className="text-[11px] text-gray-500">Escolha um formato pré-salvo para o cabeçalho do portal.</p>
               <div className="space-y-3">
@@ -808,6 +838,112 @@ export default function HomeBlocksManager() {
                 </div>
               </div>
             </div>
+            {/* ── Logo section ── */}
+            <div className="mx-4 mb-4 bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-4">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide flex items-center gap-1.5">
+                <ImageIcon size={13} /> Logo do cabeçalho
+              </p>
+
+              {/* Current logo preview */}
+              {(logoPreview ?? logoBase64) && (
+                <div className="bg-white border rounded-lg p-3 flex items-center justify-center overflow-hidden" style={{ backgroundColor: headerBgColor || "#fff" }}>
+                  <img
+                    src={logoPreview ?? logoBase64!}
+                    alt="logo preview"
+                    style={{ height: logoSize, transition: "height 0.15s" }}
+                    className="w-auto object-contain"
+                  />
+                </div>
+              )}
+
+              {/* Upload drop zone */}
+              <div
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const f = e.dataTransfer.files[0];
+                  if (f && f.type.startsWith("image/")) {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+                    reader.readAsDataURL(f);
+                  }
+                }}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => logoInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-200 rounded-xl py-4 px-3 flex flex-col items-center gap-2 cursor-pointer hover:border-[#1a2448] hover:bg-white transition-colors"
+              >
+                <Upload size={22} className="text-gray-300" />
+                <p className="text-xs text-gray-500 text-center">
+                  Clique ou arraste a nova logo aqui<br />
+                  <span className="text-[10px] text-gray-400">PNG, SVG, WEBP — fundo transparente</span>
+                </p>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setLogoPreview(ev.target?.result as string);
+                      reader.readAsDataURL(f);
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Size control */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Tamanho</span>
+                  <span className="text-sm font-bold text-[#1a2448]">{logoSize}px</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setLogoSize((s) => Math.max(32, s - 8))}
+                    className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-white transition-colors bg-white"
+                  >
+                    <Minus size={12} />
+                  </button>
+                  <input
+                    type="range" min={32} max={160} step={4}
+                    value={logoSize}
+                    onChange={(e) => setLogoSize(Number(e.target.value))}
+                    className="flex-1 accent-[#1a2448]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLogoSize((s) => Math.min(160, s + 8))}
+                    className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-white transition-colors bg-white"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Status & save button */}
+              {logoStatus === "ok" && (
+                <div className="flex items-center gap-1.5 text-green-700 text-xs bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <CheckCircle size={13} /> Logo atualizada com sucesso!
+                </div>
+              )}
+              {logoStatus === "err" && (
+                <div className="flex items-center gap-1.5 text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  Erro ao salvar logo
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={saveLogo}
+                disabled={logoSaving}
+                className="w-full py-2 rounded-lg bg-[#1a2448] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0d1730] disabled:opacity-50 transition-colors"
+              >
+                {logoSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                {logoSaving ? "Salvando…" : "Salvar logo"}
+              </button>
+            </div>
+            </>
           )}
 
           {/* ── Tab: Footer ── */}
