@@ -374,17 +374,19 @@ export async function autoProcessArticle(
     return;
   }
 
-  let content  = art.fullText;
-  let keywords = "";
-  let slug     = "";
-  let author   = giveCredit ? `Redação (via ${sourceName})` : "Redação";
+  let content         = art.fullText;
+  let keywords        = "";
+  let slug            = "";
+  let aiRewriteSuccess = false;
+  let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
     try {
       const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit);
-      content  = result.content;
-      keywords = result.keywords;
-      slug     = result.slug;
+      content          = result.content;
+      keywords         = result.keywords;
+      slug             = result.slug;
+      aiRewriteSuccess = true;
     } catch (err) {
       logger.warn({ err, sourceId: src.id }, "AI rewrite failed — using original text");
     }
@@ -407,7 +409,7 @@ export async function autoProcessArticle(
     rssSourceId:   art.sourceId,
     rssSourceName: art.sourceName,
     rssSourceUrl:  art.link,
-    aiRewritten:   autoMode === "rewrite_draft" || autoMode === "rewrite_publish",
+    aiRewritten:   aiRewriteSuccess,
     keywords:      keywords || undefined,
     slug:          slug || undefined,
   });

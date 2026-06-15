@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware, generateToken, validateCredentials } from "../middlewares/auth.js";
 import { store, type ContactInfo } from "../lib/store.js";
+import { rewriteWithAI } from "../lib/rssProcessor.js";
 
 const router = Router();
 
@@ -71,6 +72,32 @@ router.delete("/articles/:id", (req, res) => {
   const deleted = store.deleteArticle(req.params.id ?? "");
   if (!deleted) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ success: true });
+});
+
+/** POST /api/admin/articles/:id/rewrite — re-run AI rewrite on any article */
+router.post("/articles/:id/rewrite", async (req, res) => {
+  const article = store.getArticle(req.params.id ?? "");
+  if (!article) { res.status(404).json({ error: "Article not found" }); return; }
+
+  try {
+    const sourceText = article.content ?? article.title;
+    const result = await rewriteWithAI(
+      article.title,
+      sourceText,
+      article.rssSourceName ?? "Redação",
+      !!article.rssSourceName,
+    );
+    const updated = store.updateArticle(article.id, {
+      content:     result.content,
+      keywords:    result.keywords || undefined,
+      slug:        result.slug || undefined,
+      aiRewritten: true,
+    });
+    res.json({ article: updated });
+  } catch (err: unknown) {
+    req.log.error({ err }, "AI rewrite failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "AI rewrite failed" });
+  }
 });
 
 // ─── Publish ─────────────────────────────────────────────────────────────────

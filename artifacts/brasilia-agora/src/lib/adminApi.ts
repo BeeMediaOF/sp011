@@ -33,6 +33,7 @@ export const adminApi = {
   updateArticle: (id: string, data: Partial<Article>) => req<{ article: Article }>("PUT", `/articles/${id}`, data),
   deleteArticle: (id: string) => req<{ success: boolean }>("DELETE", `/articles/${id}`),
   publishArticle: (id: string) => req<{ article: Article }>("POST", `/publish/${id}`, {}),
+  rewriteArticle: (id: string) => req<{ article: Article }>("POST", `/articles/${id}/rewrite`, {}),
 
   // Menu
   getMenu: () => req<{ menuItems: MenuItem[] }>("GET", "/menu"),
@@ -90,6 +91,8 @@ export interface Article {
   rssSourceName?: string;
   rssSourceUrl?: string;
   aiRewritten?: boolean;
+  keywords?: string;
+  slug?: string;
 }
 
 export interface MenuItem {

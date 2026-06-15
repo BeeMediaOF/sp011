@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
-import { Save, Send, ArrowLeft, Monitor, Smartphone, Image, X, CheckCircle } from "lucide-react";
+import { Save, Send, ArrowLeft, Monitor, Smartphone, Image, X, CheckCircle, Sparkles } from "lucide-react";
 
 const CATEGORIES = [
   { value: "politica",   label: "Política" },
@@ -45,6 +45,7 @@ export default function ArticleEdit() {
   const [form, setForm]         = useState<Partial<Article>>(empty);
   const [loading, setLoading]   = useState(!isNew);
   const [saving, setSaving]     = useState(false);
+  const [rewriting, setRewriting] = useState(false);
   const [error, setError]       = useState("");
   const [success, setSuccess]   = useState("");
   const [preview, setPreview]   = useState<Preview>("desktop");
@@ -115,6 +116,22 @@ export default function ArticleEdit() {
       setError(err instanceof Error ? err.message : "Erro ao salvar");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleRewrite() {
+    if (!articleId) return;
+    setError(""); setSuccess("");
+    setRewriting(true);
+    try {
+      const { article } = await adminApi.rewriteArticle(articleId);
+      setForm(article);
+      setSuccess("✦ Reescrito com IA (SEO/AIO)!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Erro na reescrita com IA");
+    } finally {
+      setRewriting(false);
     }
   }
 
@@ -335,15 +352,43 @@ export default function ArticleEdit() {
                   />
                 </div>
 
-                {/* RSS info (read-only) */}
+                {/* RSS info + rewrite button */}
                 {form.origin === "rss" && (
-                  <div className="bg-blue-50 rounded-lg p-3 space-y-1">
+                  <div className="bg-blue-50 rounded-lg p-3 space-y-2">
                     <p className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Importado via RSS</p>
                     {form.rssSourceName && (
                       <p className="text-xs text-blue-700">Fonte: {form.rssSourceName}</p>
                     )}
-                    {form.aiRewritten && (
+                    {form.aiRewritten ? (
                       <p className="text-xs text-purple-600 font-semibold">✦ Reescrito com IA (SEO/AIO)</p>
+                    ) : (
+                      <p className="text-xs text-amber-600">⚠ Texto original — não reescrito pela IA</p>
+                    )}
+
+                    {/* Keywords + Slug */}
+                    {form.keywords && (
+                      <div className="pt-1 border-t border-blue-100">
+                        <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Palavras-chave</p>
+                        <p className="text-xs text-purple-800 mt-0.5">{form.keywords}</p>
+                      </div>
+                    )}
+                    {form.slug && (
+                      <div>
+                        <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Slug SEO</p>
+                        <p className="text-xs font-mono text-purple-800 mt-0.5">{form.slug}</p>
+                      </div>
+                    )}
+
+                    {/* Re-run AI rewrite */}
+                    {!isNew && articleId && (
+                      <button
+                        onClick={handleRewrite}
+                        disabled={rewriting}
+                        className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors disabled:opacity-60"
+                      >
+                        <Sparkles size={13} className={rewriting ? "animate-spin" : ""} />
+                        {rewriting ? "Reescrevendo…" : form.aiRewritten ? "Re-escrever com IA" : "Reescrever com IA (SEO/AIO)"}
+                      </button>
                     )}
                   </div>
                 )}
