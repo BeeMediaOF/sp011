@@ -22,18 +22,31 @@ import Archive from "@/pages/Archive";
 import Contato from "@/pages/Contato";
 import Privacidade from "@/pages/Privacidade";
 import Termos from "@/pages/Termos";
-import Admin from "@/pages/Admin";
 import CategoryArchivePage from "@/pages/CategoryArchivePage";
 import LGPDConsent from "@/components/LGPDConsent";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useState, useEffect } from "react";
 
+// Admin pages
+import { RequireAuth } from "@/pages/Admin";
+import Login from "@/pages/admin/Login";
+import Dashboard from "@/pages/admin/Dashboard";
+import Articles from "@/pages/admin/Articles";
+import ArticleEdit from "@/pages/admin/ArticleEdit";
+import MenuManager from "@/pages/admin/MenuManager";
+import LogoUpload from "@/pages/admin/LogoUpload";
+import Settings from "@/pages/admin/Settings";
+import Webhook from "@/pages/admin/Webhook";
+import AdsManager from "@/pages/admin/AdsManager";
+import ColumnistsManager from "@/pages/admin/ColumnistsManager";
+import ContactSettings from "@/pages/admin/ContactSettings";
+import Analytics from "@/pages/admin/Analytics";
+import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
+import RSSManager from "@/pages/admin/RSSManager";
+
 const queryClient = new QueryClient();
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "#0b3d91": "#0b3d91", default: "#0b3d91",
-};
 const COLOR_PALETTE = [
   "#0b3d91","#c8102e","#16a34a","#6b21a8","#0284c7",
   "#b45309","#0d9488","#dc2626","#ea580c","#7c3aed",
@@ -84,9 +97,52 @@ function AnalyticsProvider() {
 function Router() {
   return (
     <Switch>
-      <Route path="/admin/login" component={Admin} />
-      <Route path="/admin/:rest*" component={Admin} />
-      <Route path="/admin" component={Admin} />
+      {/* ── Admin routes (flattened — avoids Wouter v3 nested-Switch issues) ── */}
+      <Route path="/admin/login" component={Login} />
+      <Route path="/admin/artigos/novo">
+        <RequireAuth><ArticleEdit /></RequireAuth>
+      </Route>
+      <Route path="/admin/artigos/:id">
+        <RequireAuth><ArticleEdit /></RequireAuth>
+      </Route>
+      <Route path="/admin/artigos">
+        <RequireAuth><Articles /></RequireAuth>
+      </Route>
+      <Route path="/admin/menu">
+        <RequireAuth><MenuManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/logo">
+        <RequireAuth><LogoUpload /></RequireAuth>
+      </Route>
+      <Route path="/admin/configuracoes">
+        <RequireAuth><Settings /></RequireAuth>
+      </Route>
+      <Route path="/admin/webhook">
+        <RequireAuth><Webhook /></RequireAuth>
+      </Route>
+      <Route path="/admin/propagandas">
+        <RequireAuth><AdsManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/colunistas">
+        <RequireAuth><ColumnistsManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/contato">
+        <RequireAuth><ContactSettings /></RequireAuth>
+      </Route>
+      <Route path="/admin/analytics">
+        <RequireAuth><Analytics /></RequireAuth>
+      </Route>
+      <Route path="/admin/home-blocos">
+        <RequireAuth><HomeBlocksManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/rss">
+        <RequireAuth><RSSManager /></RequireAuth>
+      </Route>
+      <Route path="/admin">
+        <RequireAuth><Dashboard /></RequireAuth>
+      </Route>
+
+      {/* ── Public routes ── */}
       <Route path="/" component={Home} />
       <Route path="/politica" component={Politica} />
       <Route path="/cidade" component={Cidade} />
