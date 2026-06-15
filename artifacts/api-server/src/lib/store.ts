@@ -1,5 +1,7 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { randomUUID } from "crypto";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
 function slugify(text: string): string {
   return text
@@ -166,7 +168,9 @@ interface StoreData {
   rssSources: RssSource[];
 }
 
-const STORE_FILE = "/tmp/brasilia-store.json";
+// Persistent path relative to the built dist/ folder: dist/ → ../data/store.json
+const _storeDir = join(dirname(fileURLToPath(import.meta.url)), "..", "data");
+const STORE_FILE = join(_storeDir, "store.json");
 
 const defaultStore: StoreData = {
   articles: [
@@ -288,6 +292,7 @@ function loadStore(): StoreData {
 
 function saveStore(data: StoreData): void {
   try {
+    mkdirSync(_storeDir, { recursive: true });
     writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), "utf-8");
   } catch { /* ignore */ }
 }
