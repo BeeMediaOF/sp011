@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useAds, trackClick, type AdSlotKey } from "./useAds";
+import { useAds, trackClick, trackImpression, type AdSlotKey } from "./useAds";
 
 interface Props {
   slot: AdSlotKey;
@@ -47,6 +47,16 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
   useEffect(() => {
     if (index >= items.length && items.length > 0) setIndex(0);
   }, [index, items.length]);
+
+  // Track impression once per unique ad shown
+  const trackedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const ad = items[index];
+    if (ad && !trackedRef.current.has(ad.id)) {
+      trackedRef.current.add(ad.id);
+      void trackImpression(ad.id);
+    }
+  }, [index, items]);
 
   if (loading) {
     return (

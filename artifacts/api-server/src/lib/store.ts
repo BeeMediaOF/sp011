@@ -99,6 +99,7 @@ export interface Ad {
   position: "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
   active: boolean;
   clicks: number;
+  impressions: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -351,11 +352,12 @@ export const store = {
   // Ads
   getAds: () => [..._store.ads],
   getAd: (id: string) => _store.ads.find((a) => a.id === id) ?? null,
-  createAd: (data: Omit<Ad, "id" | "createdAt" | "updatedAt" | "clicks">): Ad => {
+  createAd: (data: Omit<Ad, "id" | "createdAt" | "updatedAt" | "clicks" | "impressions">): Ad => {
     const ad: Ad = {
       ...data,
       id: randomUUID(),
       clicks: 0,
+      impressions: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -381,6 +383,13 @@ export const store = {
     const idx = _store.ads.findIndex((a) => a.id === id);
     if (idx === -1 || !_store.ads[idx]!.active) return false;
     _store.ads[idx]!.clicks += 1;
+    saveStore(_store);
+    return true;
+  },
+  trackAdImpression: (id: string): boolean => {
+    const idx = _store.ads.findIndex((a) => a.id === id);
+    if (idx === -1) return false;
+    _store.ads[idx]!.impressions = (_store.ads[idx]!.impressions ?? 0) + 1;
     saveStore(_store);
     return true;
   },

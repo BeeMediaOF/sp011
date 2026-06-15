@@ -338,7 +338,7 @@ export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticl
     feed = await rssParser.parseURL(src.url);
   } catch (parseErr) {
     const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
-    throw new Error(`Feed inválido ou URL não é RSS/Atom. Detalhe: ${msg}`);
+    throw new Error(`Feed inválido — a URL não parece ser RSS/Atom. Tente adicionar "/feed", "/rss" ou "/rss.xml" ao final do domínio. Detalhe: ${msg}`);
   }
   const items = feed.items.slice(0, 3); // max 3 por rodada
 

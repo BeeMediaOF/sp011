@@ -171,25 +171,41 @@ export default function Dashboard() {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Top categorias</h2>
+            <h2 className="text-sm font-semibold text-gray-700 mb-1">Top categorias</h2>
+            <p className="text-[10px] text-gray-400 mb-3">por acessos (barras) e artigos publicados</p>
             {!stats || stats.topCategories.length === 0 ? (
               <div className="h-36 flex flex-col items-center justify-center text-gray-300 gap-2">
                 <FileText size={24} />
                 <p className="text-sm">Sem dados</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={140}>
-                <BarChart data={stats.topCategories.slice(0, 5)} layout="vertical">
-                  <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={68} />
-                  <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }} />
-                  <Bar dataKey="views" radius={[0, 4, 4, 0]}>
-                    {stats.topCategories.slice(0, 5).map((_e, i) => (
-                      <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                <ResponsiveContainer width="100%" height={130}>
+                  <BarChart data={stats.topCategories.slice(0, 6)} layout="vertical" margin={{ right: 8 }}>
+                    <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={72} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
+                      formatter={(v: number, name: string) => [v, name === "views" ? "Acessos" : "Artigos"]}
+                    />
+                    <Bar dataKey="views" name="Acessos" radius={[0, 3, 3, 0]} stackId="a">
+                      {stats.topCategories.slice(0, 6).map((_e, i) => (
+                        <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-2 space-y-1">
+                  {stats.topCategories.slice(0, 5).map((cat, i) => (
+                    <div key={cat.name} className="flex items-center gap-2 text-[11px]">
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
+                      <span className="flex-1 text-gray-600 truncate capitalize">{cat.name}</span>
+                      <span className="text-gray-400">{cat.views > 0 ? `${cat.views} acesso${cat.views !== 1 ? "s" : ""}` : ""}</span>
+                      <span className="font-semibold text-gray-700">{cat.articles} art.</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -285,29 +301,48 @@ export default function Dashboard() {
               {activeAds.length === 0 ? (
                 <p className="text-xs text-gray-400 py-1">Nenhuma propaganda ativa</p>
               ) : (
-                <div className="space-y-2">
-                  {activeAds.slice(0, 3).map((ad) => (
-                    <div key={ad.id} className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                      <p className="text-xs text-gray-700 truncate flex-1">{ad.name}</p>
-                      <span className="text-[10px] text-gray-400 shrink-0 bg-gray-100 px-1.5 py-0.5 rounded">
-                        {ad.position}
-                      </span>
+                <div className="space-y-2.5">
+                  {activeAds.slice(0, 4).map((ad) => (
+                    <div key={ad.id} className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+                        <p className="text-xs text-gray-700 truncate flex-1 font-medium">{ad.name}</p>
+                        <span className="text-[10px] text-gray-400 shrink-0 bg-gray-100 px-1.5 py-0.5 rounded">{ad.position}</span>
+                      </div>
+                      <div className="flex gap-3 pl-4 text-[10px]">
+                        <span className="flex items-center gap-1 text-blue-600">
+                          <span>👁</span>
+                          <span>{(ad.impressions ?? 0).toLocaleString("pt-BR")} views</span>
+                        </span>
+                        <span className="flex items-center gap-1 text-[#c8102e]">
+                          <span>🖱</span>
+                          <span>{(ad.clicks ?? 0).toLocaleString("pt-BR")} cliques</span>
+                        </span>
+                        {(ad.impressions ?? 0) > 0 && (
+                          <span className="text-gray-400">
+                            CTR {((ad.clicks / ad.impressions) * 100).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
-                  {activeAds.length > 3 && (
-                    <p className="text-[11px] text-gray-400 pl-4">+{activeAds.length - 3} mais</p>
+                  {activeAds.length > 4 && (
+                    <p className="text-[11px] text-gray-400 pl-4">+{activeAds.length - 4} mais</p>
                   )}
                 </div>
               )}
-              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-2 gap-2 text-center">
+              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
                 <div>
                   <p className="text-xl font-bold text-gray-800">{activeAds.length}</p>
                   <p className="text-[10px] text-gray-400 mt-0.5">Ativas</p>
                 </div>
                 <div>
-                  <p className="text-xl font-bold text-gray-800">{ads.length}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Total</p>
+                  <p className="text-xl font-bold text-[#0b3d91]">{ads.reduce((s, a) => s + (a.impressions ?? 0), 0).toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Views</p>
+                </div>
+                <div>
+                  <p className="text-xl font-bold text-[#c8102e]">{ads.reduce((s, a) => s + (a.clicks ?? 0), 0).toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Cliques</p>
                 </div>
               </div>
             </div>

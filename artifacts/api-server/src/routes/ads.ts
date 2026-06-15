@@ -16,4 +16,10 @@ router.post("/:id/click", (req, res) => {
   res.json({ ok: true, message: "Click tracked" });
 });
 
+/** POST /api/ads/:id/impression — track impression (public) */
+router.post("/:id/impression", (req, res) => {
+  store.trackAdImpression(req.params.id ?? "");
+  res.json({ ok: true });
+});
+
 export default router;

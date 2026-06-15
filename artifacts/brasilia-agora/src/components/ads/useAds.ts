@@ -41,3 +41,7 @@ export function useAds() {
 export function trackClick(adId: string) {
   return fetch(`/api/ads/${adId}/click`, { method: "POST" }).catch(() => {});
 }
+
+export function trackImpression(adId: string) {
+  return fetch(`/api/ads/${adId}/impression`, { method: "POST" }).catch(() => {});
+}

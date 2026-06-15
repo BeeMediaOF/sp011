@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
+import { store } from "../lib/store.js";
 
 const router = Router();
 
@@ -111,10 +112,19 @@ router.get("/stats", authMiddleware, (_req, res) => {
     .slice(0, 10)
     .map(([id, { title, views }]) => ({ id, title, views }));
 
-  const topCategories = Object.entries(catMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([name, views]) => ({ name, views }));
+  // Merge analytics category views with article counts per category (fallback when no events yet)
+  const articles = store.getArticles().filter((a) => a.status === "published");
+  const articleCountByCategory: Record<string, number> = {};
+  for (const a of articles) {
+    if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;
+  }
+
+  // Union of all known categories
+  const allCatNames = new Set([...Object.keys(catMap), ...Object.keys(articleCountByCategory)]);
+  const topCategories = Array.from(allCatNames)
+    .map((name) => ({ name, views: catMap[name] ?? 0, articles: articleCountByCategory[name] ?? 0 }))
+    .sort((a, b) => (b.views || b.articles) - (a.views || a.articles))
+    .slice(0, 10);
 
   const dailyChart = Object.entries(byDay).map(([date, views]) => ({ date, views }));
   const hourlyChart = byHour.map((views, hour) => ({ hour, views }));
