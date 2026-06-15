@@ -22,7 +22,10 @@ function send(payload: Record<string, unknown>) {
   const data = { ...payload, sessionId: getSessionId() };
   // Use sendBeacon for reliability (especially on page unload)
   if (navigator.sendBeacon) {
-    navigator.sendBeacon("/api/analytics/event", JSON.stringify(data));
+    navigator.sendBeacon(
+      "/api/analytics/event",
+      new Blob([JSON.stringify(data)], { type: "application/json" }),
+    );
   } else {
     fetch("/api/analytics/event", {
       method: "POST",
