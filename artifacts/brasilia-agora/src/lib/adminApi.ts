@@ -85,6 +85,10 @@ export interface Article {
   status: "draft" | "published";
   createdAt: string;
   updatedAt: string;
+  origin?: "manual" | "rss";
+  rssSourceId?: string;
+  rssSourceName?: string;
+  aiRewritten?: boolean;
 }
 
 export interface MenuItem {

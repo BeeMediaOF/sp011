@@ -304,14 +304,17 @@ export default function RSSManager() {
       await apiFetch("/import", {
         method: "POST",
         body: JSON.stringify({
-          title:    art.editTitle ?? art.title,
-          subtitle: art.editSubtitle ?? art.excerpt.slice(0, 160),
-          content:  art.editContent ?? art.fullText,
-          category: art.category,
-          tag:      TAG_MAP[art.category] ?? "GERAL",
-          imageUrl: art.imageUrl,
-          author:   src?.giveCredit !== false ? `Redação (via ${art.sourceName})` : "Redação",
+          title:         art.editTitle ?? art.title,
+          subtitle:      art.editSubtitle ?? art.excerpt.slice(0, 160),
+          content:       art.editContent ?? art.fullText,
+          category:      art.category,
+          tag:           TAG_MAP[art.category] ?? "GERAL",
+          imageUrl:      art.imageUrl,
+          author:        src?.giveCredit !== false ? `Redação (via ${art.sourceName})` : "Redação",
           status,
+          rssSourceId:   art.sourceId,
+          rssSourceName: art.sourceName,
+          aiRewritten:   !!art.rewritten,
         }),
       });
       updateArticle(idx, { importing: false, imported: true });

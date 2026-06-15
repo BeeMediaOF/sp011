@@ -132,21 +132,27 @@ router.post("/run", async (req, res) => {
 
 /** POST /api/admin/rss/import */
 router.post("/import", (req, res) => {
-  const { title, subtitle, content, category, tag, imageUrl, author, status } = req.body as {
+  const { title, subtitle, content, category, tag, imageUrl, author, status,
+    rssSourceId, rssSourceName, aiRewritten } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
+    rssSourceId?: string; rssSourceName?: string; aiRewritten?: boolean;
   };
   if (!title) { res.status(400).json({ error: "title é obrigatório" }); return; }
   const article = store.createArticle({
-    title:       title ?? "",
-    subtitle:    subtitle ?? "",
-    content:     content ?? "",
-    category:    category ?? "geral",
-    tag:         tag ?? "GERAL",
-    imageUrl:    imageUrl ?? "",
-    author:      author ?? "Redação",
-    publishedAt: new Date().toISOString(),
-    status:      (status === "published" ? "published" : "draft"),
+    title:         title ?? "",
+    subtitle:      subtitle ?? "",
+    content:       content ?? "",
+    category:      category ?? "geral",
+    tag:           tag ?? "GERAL",
+    imageUrl:      imageUrl ?? "",
+    author:        author ?? "Redação",
+    publishedAt:   new Date().toISOString(),
+    status:        (status === "published" ? "published" : "draft"),
+    origin:        "rss",
+    rssSourceId:   rssSourceId ?? "",
+    rssSourceName: rssSourceName ?? "",
+    aiRewritten:   aiRewritten === true,
   });
   res.status(201).json({ article });
 });

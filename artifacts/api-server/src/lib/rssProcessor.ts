@@ -287,15 +287,19 @@ export async function autoProcessArticle(
     ? "published" : "draft";
 
   store.createArticle({
-    title:       art.title,
-    subtitle:    art.excerpt.slice(0, 160),
+    title:         art.title,
+    subtitle:      art.excerpt.slice(0, 160),
     content,
     category,
-    tag:         TAG_MAP[category] ?? "GERAL",
-    imageUrl:    art.imageUrl,
+    tag:           TAG_MAP[category] ?? "GERAL",
+    imageUrl:      art.imageUrl,
     author,
-    publishedAt: new Date().toISOString(),
+    publishedAt:   new Date().toISOString(),
     status,
+    origin:        "rss",
+    rssSourceId:   art.sourceId,
+    rssSourceName: art.sourceName,
+    aiRewritten:   autoMode === "rewrite_draft" || autoMode === "rewrite_publish",
   });
 }
 
