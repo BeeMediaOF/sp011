@@ -121,7 +121,7 @@ export default function Header() {
             <img
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
-              className="h-[84px] w-auto object-contain"
+              className="h-[84px] w-auto object-contain mt-[0px] mb-[0px] pt-[0px] pb-[14px] pr-[4px] pl-[16px]"
             />
           </Link>
 
