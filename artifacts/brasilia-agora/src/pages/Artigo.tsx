@@ -3,7 +3,6 @@ import { useParams, Link } from "wouter";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { useArticle } from "../hooks/useArticles";
 import { categoryRoute } from "../lib/categoryRoute";
@@ -293,7 +292,6 @@ export default function Artigo() {
       )}
       <TopBar />
       <Header />
-      <NavBar />
       <main className="flex-1 bg-white pb-16">
         <div className="max-w-[1280px] mx-auto px-4 mt-6">
           <div className="flex flex-col lg:flex-row gap-8">

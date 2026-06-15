@@ -1,6 +1,5 @@
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
 import hospitalImg from "../assets/images/hospital.webp";
@@ -22,7 +21,6 @@ export default function Saude() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
       <main className="flex-1 bg-white">
         <CategoryPage category="SAÚDE" color="#16a34a" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>

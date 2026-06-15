@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { Send, CheckCircle, Mail, Phone, MapPin } from "lucide-react";
 
@@ -39,7 +38,6 @@ export default function Contato() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
 
       <main className="flex-1 bg-white py-12">
         <div className="max-w-[1280px] mx-auto px-4">

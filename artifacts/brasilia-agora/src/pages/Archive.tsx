@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import { type Article } from "../lib/adminApi";
 import { Search, Calendar, ChevronRight } from "lucide-react";
@@ -122,7 +121,6 @@ export default function Archive() {
     <div className="min-h-screen w-full bg-white flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
 
       <main className="flex-1 pb-16">
 

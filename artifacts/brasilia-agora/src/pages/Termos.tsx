@@ -1,6 +1,5 @@
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 
 export default function Termos() {
@@ -8,7 +7,6 @@ export default function Termos() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
 
       <main className="flex-1 bg-white py-12">
         <div className="max-w-[860px] mx-auto px-4">

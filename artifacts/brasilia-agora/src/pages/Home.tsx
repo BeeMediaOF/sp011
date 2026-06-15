@@ -1,7 +1,6 @@
 import React from "react";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import HeroSection from "../components/HeroSection";
 import MostRead from "../components/MostRead";
 import SectionBlock from "../components/SectionBlock";
@@ -62,7 +61,6 @@ export default function Home() {
     <div className="min-h-screen w-full bg-white flex flex-col overflow-x-hidden">
       <TopBar />
       <Header />
-      <NavBar />
 
       <main className="flex-1">
         <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>

@@ -1,6 +1,5 @@
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
 import festivalImg from "../assets/images/festival.webp";
@@ -22,7 +21,6 @@ export default function Cultura() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
       <main className="flex-1 bg-white">
         <CategoryPage category="CULTURA" color="#0d9488" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>

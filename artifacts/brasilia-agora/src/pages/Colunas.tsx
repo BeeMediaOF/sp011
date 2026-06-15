@@ -1,7 +1,6 @@
 import { Link } from "wouter";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
@@ -31,7 +30,6 @@ export default function Colunas() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
       
       <main className="flex-1 bg-white">
         {/* Section header bar */}

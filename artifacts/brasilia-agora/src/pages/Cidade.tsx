@@ -1,6 +1,5 @@
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
-import NavBar from "../components/NavBar";
 import CategoryPage from "../components/CategoryPage";
 import Footer from "../components/Footer";
 import parkImg from "../assets/images/park.webp";
@@ -22,7 +21,6 @@ export default function Cidade() {
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />
       <Header />
-      <NavBar />
       <main className="flex-1 bg-white">
         <CategoryPage category="CIDADE" color="#2563eb" articles={articles.slice(1)} featuredArticle={articles[0]} />
       </main>
