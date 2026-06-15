@@ -362,7 +362,6 @@ export default function Artigo() {
         nodes.push(
           <p key={`p-${nodes.length}`}
             className="mb-5 leading-relaxed text-[16.5px] text-[#2a2a2a]"
-            style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}
           >
             {renderInline(line)}
           </p>
