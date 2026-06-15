@@ -5,6 +5,7 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useArticle } from "../hooks/useArticles";
+import { useSite } from "../hooks/useSite";
 import { categoryRoute } from "../lib/categoryRoute";
 import {
   brasilArticles,
@@ -182,6 +183,7 @@ export default function Artigo() {
   );
 
   const { article: apiArticle, loading } = useArticle(slug ?? "");
+  const { settings } = useSite();
 
   /* Usa API se disponível, senão converte o mock para o mesmo shape */
   const article = apiArticle
@@ -216,12 +218,17 @@ export default function Artigo() {
   // Also splits walls of text into readable paragraphs intelligently
 
   function renderInline(text: string): React.ReactNode[] {
-    const parts = text.split(/(\*\*[^*]+\*\*)/g);
-    return parts.map((part, i) =>
-      part.startsWith("**") && part.endsWith("**")
-        ? <strong key={i}>{part.slice(2, -2)}</strong>
-        : part
-    );
+    const parts = text.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|\[[^\]]+\]\([^)]+\))/g);
+    return parts.map((part, i) => {
+      if (part.startsWith("**") && part.endsWith("**"))
+        return <strong key={i}>{part.slice(2, -2)}</strong>;
+      if (part.startsWith("*") && part.endsWith("*"))
+        return <em key={i}>{part.slice(1, -1)}</em>;
+      const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (link)
+        return <a key={i} href={link[2]} target="_blank" rel="noreferrer" className="text-[#0b3d91] underline hover:text-[#c8102e] transition-colors">{link[1]}</a>;
+      return part;
+    });
   }
 
   /** Remove trailing navigation/widget noise from scraped content */
@@ -506,13 +513,13 @@ export default function Artigo() {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-y border-gray-100 mb-6 gap-3">
                     <div className="flex items-center gap-3">
                       <img
-                        src="/favicon.jpg"
-                        alt="Bee News"
+                        src={settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg"}
+                        alt={settings?.bylineName || settings?.siteName || "Portal"}
                         className="w-9 h-9 rounded-full object-cover shrink-0"
                       />
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          Por Bee News
+                          Por {settings?.bylineName || settings?.siteName || "Redação"}
                         </div>
                         <div className="text-xs text-gray-400">
                           {new Date(article.publishedAt).toLocaleDateString("pt-BR", {

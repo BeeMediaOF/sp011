@@ -35,6 +35,8 @@ export interface SiteSettings {
   adminLogoBase64?: string;
   adminSidebarColor?: string;
   adminAccentColor?: string;
+  bylineName?: string;
+  bylineLogoBase64?: string;
 }
 
 export function useSite() {

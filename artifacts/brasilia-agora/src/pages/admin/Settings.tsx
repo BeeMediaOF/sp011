@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings } from "../../lib/adminApi";
-import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard } from "lucide-react";
+import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard, UserCircle } from "lucide-react";
 
 export default function Settings() {
   const [settings, setSettings] = useState<SiteSettings>({
@@ -19,6 +19,13 @@ export default function Settings() {
   const ogRef = useRef<HTMLInputElement>(null);
   const faviconRef = useRef<HTMLInputElement>(null);
   const adminLogoRef = useRef<HTMLInputElement>(null);
+  const bylineLogoRef = useRef<HTMLInputElement>(null);
+
+  function handleBylineLogoFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => setField("bylineLogoBase64", e.target?.result as string);
+    reader.readAsDataURL(file);
+  }
 
   function handleAdminLogoFile(file: File) {
     const reader = new FileReader();
@@ -120,6 +127,57 @@ export default function Settings() {
                   className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
                   placeholder="brasília, notícias, df, política (separadas por vírgula)"
                 />
+              </div>
+            </div>
+
+            {/* Byline dos artigos */}
+            <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <UserCircle size={16} className="text-[#1a2448]" />
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assinatura dos artigos ("Por…")</h3>
+              </div>
+              <p className="text-[11px] text-gray-400">Foto e nome que aparecem no cabeçalho de cada artigo publicado.</p>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">Nome da assinatura</label>
+                <input
+                  value={settings.bylineName ?? ""}
+                  onChange={(e) => setField("bylineName", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  placeholder={`Padrão: ${settings.siteName || "nome do portal"}`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-2">Foto da assinatura</label>
+                <input
+                  ref={bylineLogoRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBylineLogoFile(f); }}
+                />
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => bylineLogoRef.current?.click()}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Selecionar foto
+                  </button>
+                  {settings.bylineLogoBase64 ? (
+                    <div className="relative">
+                      <img src={settings.bylineLogoBase64} alt="Byline" className="h-10 w-10 object-cover rounded-full border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setField("bylineLogoBase64", undefined)}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                      >&times;</button>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 italic">Usando logo do portal</p>
+                  )}
+                </div>
               </div>
             </div>
 

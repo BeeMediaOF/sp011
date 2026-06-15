@@ -73,6 +73,8 @@ export interface SiteSettings {
   rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
   rssAiApiKey?: string;
   rssAiModel?: string;
+  bylineName?: string;
+  bylineLogoBase64?: string;
 }
 
 const DEFAULT_HOME_BLOCKS: HomeBlock[] = [

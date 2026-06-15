@@ -132,6 +132,8 @@ export interface SiteSettings {
   rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
   rssAiApiKey?: string;
   rssAiModel?: string;
+  bylineName?: string;
+  bylineLogoBase64?: string;
 }
 
 export interface AnalyticsStats {
@@ -149,6 +151,7 @@ export interface Ad {
   imageBase64: string;
   link: string;
   position: "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
+
   active: boolean;
   clicks: number;
   createdAt: string;

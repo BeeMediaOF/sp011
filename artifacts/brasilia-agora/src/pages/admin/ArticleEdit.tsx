@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
-import { Save, Send, ArrowLeft, Monitor, Smartphone, Image, X, CheckCircle, Sparkles } from "lucide-react";
+import { Save, Send, ArrowLeft, Monitor, Smartphone, Image, X, CheckCircle, Sparkles, Bold, Italic, Link, Heading2, Heading3, List } from "lucide-react";
 
 const CATEGORIES = [
   { value: "politica",   label: "Política" },
@@ -51,6 +51,7 @@ export default function ArticleEdit() {
   const [preview, setPreview]   = useState<Preview>("desktop");
   const [showPreview, setShowPreview] = useState(false);
   const imageRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (!isNew && articleId) {
@@ -61,6 +62,53 @@ export default function ArticleEdit() {
         .finally(() => setLoading(false));
     }
   }, [articleId, isNew]);
+
+  function insertFormat(type: "bold" | "italic" | "link" | "h2" | "h3" | "list") {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart ?? 0;
+    const end   = el.selectionEnd ?? 0;
+    const sel   = el.value.slice(start, end);
+    const before = el.value.slice(0, start);
+    const after  = el.value.slice(end);
+    let replacement = "";
+    let cursorOffset = 0;
+    switch (type) {
+      case "bold":
+        replacement = `**${sel || "texto em negrito"}**`;
+        cursorOffset = sel ? replacement.length : 2;
+        break;
+      case "italic":
+        replacement = `*${sel || "texto em itálico"}*`;
+        cursorOffset = sel ? replacement.length : 1;
+        break;
+      case "link":
+        replacement = `[${sel || "texto do link"}](https://url.com)`;
+        cursorOffset = replacement.length - 1;
+        break;
+      case "h2":
+        replacement = `\n## ${sel || "Subtítulo H2"}\n`;
+        cursorOffset = replacement.length;
+        break;
+      case "h3":
+        replacement = `\n### ${sel || "Subtítulo H3"}\n`;
+        cursorOffset = replacement.length;
+        break;
+      case "list":
+        replacement = sel
+          ? sel.split("\n").map((l) => `- ${l}`).join("\n")
+          : `- item 1\n- item 2\n- item 3`;
+        cursorOffset = replacement.length;
+        break;
+    }
+    const newVal = before + replacement + after;
+    setField("content", newVal);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + cursorOffset;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   function setField<K extends keyof Article>(key: K, value: Article[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -176,13 +224,40 @@ export default function ArticleEdit() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 mb-1">Conteúdo</label>
-                  <textarea
-                    value={form.content ?? ""}
-                    onChange={(e) => setField("content", e.target.value)}
-                    rows={16}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] resize-y leading-relaxed"
-                    placeholder="Texto completo do artigo. Use linhas em branco para separar parágrafos."
-                  />
+                  <div className="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-[#1a2448]">
+                    {/* Formatting toolbar */}
+                    <div className="flex items-center gap-0.5 px-2 py-1.5 bg-gray-50 border-b border-gray-200 flex-wrap">
+                      {[
+                        { type: "bold"   as const, icon: <Bold   size={13}/>, title: "Negrito — **texto**"          },
+                        { type: "italic" as const, icon: <Italic size={13}/>, title: "Itálico — *texto*"            },
+                        { type: "link"   as const, icon: <Link   size={13}/>, title: "Hyperlink — [texto](url)"     },
+                        { type: "h2"     as const, icon: <Heading2 size={13}/>, title: "Subtítulo H2 — ## Título"   },
+                        { type: "h3"     as const, icon: <Heading3 size={13}/>, title: "Subtítulo H3 — ### Título"  },
+                        { type: "list"   as const, icon: <List   size={13}/>, title: "Lista — - item"               },
+                      ].map(({ type, icon, title }) => (
+                        <button
+                          key={type}
+                          type="button"
+                          title={title}
+                          onMouseDown={(e) => { e.preventDefault(); insertFormat(type); }}
+                          className="p-1.5 rounded text-gray-500 hover:bg-gray-200 hover:text-[#1a2448] transition-colors"
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                      <span className="ml-auto text-[10px] text-gray-400 font-mono pr-1">
+                        **negrito**&nbsp;·&nbsp;*itálico*&nbsp;·&nbsp;[link](url)&nbsp;·&nbsp;## H2
+                      </span>
+                    </div>
+                    <textarea
+                      ref={contentRef}
+                      value={form.content ?? ""}
+                      onChange={(e) => setField("content", e.target.value)}
+                      rows={16}
+                      className="w-full px-3 py-2.5 text-sm focus:outline-none resize-y leading-relaxed"
+                      placeholder="Texto completo do artigo. Use linhas em branco para separar parágrafos.&#10;&#10;Formatação SEO:&#10;**palavra-chave** → negrito&#10;*ênfase* → itálico&#10;[texto](https://url.com) → link&#10;## Título → H2 (subseções)&#10;- item → lista"
+                    />
+                  </div>
                   <p className="text-[11px] text-gray-400 mt-1 text-right">
                     {(form.content ?? "").length} caracteres
                   </p>
