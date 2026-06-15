@@ -72,12 +72,17 @@ router.post("/fetch", async (req, res) => {
     try {
       const articles = await fetchSourceArticles(src);
       store.updateRssSource(src.id, { lastFetchedAt: new Date().toISOString() });
-      allArticles.push(...articles);
+      // Mark duplicates so the UI can flag them without blocking preview
+      const tagged = articles.map((a) => ({
+        ...a,
+        isDuplicate: store.isDuplicateArticle(a.title, a.link),
+      }));
+      allArticles.push(...tagged);
     } catch (err) {
       allArticles.push({
         sourceId: src.id, sourceName: src.name, category: src.category,
         title: `Erro: ${String(err)}`, link: "", pubDate: "",
-        imageUrl: "", excerpt: "", fullText: "",
+        imageUrl: "", excerpt: "", fullText: "", isDuplicate: false,
       });
     }
   }));

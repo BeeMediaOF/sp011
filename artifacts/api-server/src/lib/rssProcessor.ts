@@ -333,8 +333,14 @@ export interface FetchedArticle {
 }
 
 export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticle[]> {
-  const feed  = await rssParser.parseURL(src.url);
-  const items = feed.items.slice(0, 15);
+  let feed: Awaited<ReturnType<typeof rssParser.parseURL>>;
+  try {
+    feed = await rssParser.parseURL(src.url);
+  } catch (parseErr) {
+    const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+    throw new Error(`Feed inválido ou URL não é RSS/Atom. Detalhe: ${msg}`);
+  }
+  const items = feed.items.slice(0, 3); // max 3 por rodada
 
   const results: FetchedArticle[] = [];
   await Promise.allSettled(items.map(async (item) => {
@@ -416,10 +422,17 @@ export async function autoProcessArticle(
 }
 
 /** Full pipeline: fetch source, process each article */
+const MAX_PER_ROUND = 3;
+
 export async function processDueSource(src: RssSource): Promise<number> {
-  const articles = await fetchSourceArticles(src);
+  const articles = await fetchSourceArticles(src); // already capped at 3 by fetchSourceArticles
   let processed = 0;
   for (const art of articles) {
+    if (processed >= MAX_PER_ROUND) break;
+    if (store.isDuplicateArticle(art.title, art.link)) {
+      logger.info({ title: art.title }, "Skipping duplicate RSS article in scheduler");
+      continue;
+    }
     try {
       await autoProcessArticle(art, src);
       processed++;

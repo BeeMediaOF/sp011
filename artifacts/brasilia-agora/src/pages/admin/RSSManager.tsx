@@ -5,7 +5,7 @@ import {
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
   Settings, Key, Brain, Clock, BadgeCheck, Zap, Eye, EyeOff,
   Play, ListChecks, Square, CheckSquare, StopCircle, Timer,
-  Loader2,
+  Loader2, SplitSquareHorizontal, BookOpen, Pencil, X,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL ?? "/";
@@ -27,6 +27,7 @@ interface FetchedArticle {
   sourceId: string; sourceName: string; category: string;
   title: string; link: string; pubDate: string;
   imageUrl: string; excerpt: string; fullText: string;
+  isDuplicate?: boolean;
 }
 
 type QueueStatus = "pending" | "rewriting" | "publishing" | "done" | "skipped" | "error";
@@ -39,6 +40,7 @@ interface ArticleState extends FetchedArticle {
   aiKeywords?: string; aiSlug?: string;
   queueStatus?: QueueStatus;
   selectedForQueue?: boolean;
+  compareOpen?: boolean;
 }
 
 interface AiSettings {
@@ -144,12 +146,14 @@ export default function RSSManager() {
   const [adding, setAdding]           = useState(false);
   const [editingSource, setEditingSource] = useState<RssSource | null>(null);
   const [runningId, setRunningId]     = useState<string | null>(null);
+  const [sourceError, setSourceError] = useState("");
+  const [runSuccess, setRunSuccess]   = useState<{ id: string; count: number } | null>(null);
 
   // ── Dynamic categories from menu ──
   const [menuCategories, setMenuCategories] = useState<{ slug: string; label: string }[]>([]);
 
   // ── Stats ──
-  const [rssStats, setRssStats] = useState({ total: 0, rewritten: 0 });
+  const [rssStats, setRssStats] = useState({ total: 0, rewritten: 0, manual: 0 });
 
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
@@ -171,10 +175,13 @@ export default function RSSManager() {
         headers: { Authorization: `Bearer ${token()}` },
       });
       const d = await res.json() as { articles: { origin?: string; aiRewritten?: boolean }[] };
-      const rssArticles = (d.articles ?? []).filter((a) => a.origin === "rss");
+      const all         = d.articles ?? [];
+      const rssArticles = all.filter((a) => a.origin === "rss");
+      const manual      = all.filter((a) => !a.origin || a.origin === "manual");
       setRssStats({
-        total: rssArticles.length,
+        total:     rssArticles.length,
         rewritten: rssArticles.filter((a) => a.aiRewritten).length,
+        manual:    manual.length,
       });
     } catch { /* ignore */ }
   }, []);
@@ -279,17 +286,18 @@ export default function RSSManager() {
           autoMode:     editingSource.autoMode,
         }),
       });
-      setEditingSource(null); await loadSources();
-    } catch (e) { alert(String(e)); }
+      setEditingSource(null); setSourceError(""); await loadSources();
+    } catch (e) { setSourceError(String(e)); }
   }
 
   async function deleteSource(id: string) {
     if (!confirm("Remover esta fonte RSS?")) return;
     try {
       await apiFetch(`/sources/${id}`, { method: "DELETE" });
+      setSourceError("");
       await loadSources();
       setArticles((p) => p.filter((a) => a.sourceId !== id));
-    } catch (e) { alert(String(e)); }
+    } catch (e) { setSourceError(String(e)); }
   }
 
   async function toggleSource(src: RssSource) {
@@ -297,19 +305,20 @@ export default function RSSManager() {
       await apiFetch(`/sources/${src.id}`, {
         method: "PATCH", body: JSON.stringify({ active: !src.active }),
       });
+      setSourceError("");
       await loadSources();
-    } catch (e) { alert(String(e)); }
+    } catch (e) { setSourceError(String(e)); }
   }
 
   async function runSource(id: string) {
-    setRunningId(id);
+    setRunningId(id); setRunSuccess(null); setSourceError("");
     try {
       const d = await apiFetch<{ processed: number }>("/run", {
         method: "POST", body: JSON.stringify({ sourceId: id }),
       });
-      alert(`✅ ${d.processed} artigo(s) processado(s) com sucesso`);
+      setRunSuccess({ id, count: d.processed });
       await loadSources();
-    } catch (e) { alert(`Erro: ${String(e)}`); }
+    } catch (e) { setSourceError(String(e)); }
     finally { setRunningId(null); }
   }
 
@@ -520,23 +529,28 @@ export default function RSSManager() {
       <div className="max-w-5xl mx-auto space-y-6">
 
         {/* ══ STATS ══════════════════════════════════════════════════════════ */}
-        <section className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total coletado</span>
+        <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coletados via RSS</span>
             <span className="text-3xl font-bold text-[#1a2448]">{rssStats.total}</span>
-            <span className="text-[11px] text-gray-400">artigos via RSS no sistema</span>
+            <span className="text-[11px] text-gray-400">artigos importados</span>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
+          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Escritos manualmente</span>
+            <span className="text-3xl font-bold text-[#0b3d91]">{rssStats.manual}</span>
+            <span className="text-[11px] text-gray-400">artigos próprios</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Reescritos com IA</span>
             <span className="text-3xl font-bold text-purple-600">{rssStats.rewritten}</span>
             <span className="text-[11px] text-gray-400">com SEO/AIO aplicado</span>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border p-5 flex flex-col gap-1">
+          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
             <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Taxa de reescrita</span>
             <span className="text-3xl font-bold text-[#c8102e]">
               {rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%
             </span>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-1">
+            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
               <div
                 className="bg-purple-500 h-1.5 rounded-full transition-all"
                 style={{ width: `${rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%` }}
@@ -682,6 +696,22 @@ export default function RSSManager() {
               </div>
               {addError && <p className="text-sm text-red-500">{addError}</p>}
             </form>
+
+            {/* Inline feedback for source operations */}
+            {sourceError && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700">
+                <AlertCircle size={15} className="flex-shrink-0"/>
+                <span className="flex-1">{sourceError}</span>
+                <button onClick={() => setSourceError("")} className="text-red-400 hover:text-red-600 ml-2">✕</button>
+              </div>
+            )}
+            {runSuccess && (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-700">
+                <CheckCircle size={15} className="flex-shrink-0"/>
+                <span className="flex-1">✅ {runSuccess.count} artigo(s) processado(s) com sucesso</span>
+                <button onClick={() => setRunSuccess(null)} className="text-green-400 hover:text-green-600 ml-2">✕</button>
+              </div>
+            )}
 
             {/* Source list */}
             {sources.length === 0 ? (
