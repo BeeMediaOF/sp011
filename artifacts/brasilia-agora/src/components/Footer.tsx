@@ -2,7 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import logoImg from "../assets/images/logo_footer.png";
+import logoImg from "../assets/images/logo_sbc_negativo.png";
 
 export default function Footer() {
   return (
@@ -12,7 +12,7 @@ export default function Footer() {
         {/* Linha superior: Logo + Redes sociais (mobile: empilhado) */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            <img src={logoImg} alt="Bee News" className="h-10 w-auto object-contain mb-2" />
+            <img src={logoImg} alt="Bee News" className="h-10 w-auto object-contain mb-2 ml-[1px] pl-[33px] pr-[46px] pt-[-3px] pb-[-8px]" />
             <p className="text-gray-500 text-xs leading-relaxed max-w-[280px]">
               Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
             </p>
