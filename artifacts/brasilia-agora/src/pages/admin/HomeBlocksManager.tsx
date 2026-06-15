@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock } from "../../lib/adminApi";
+import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   GripVertical, Eye, EyeOff, Save, CheckCircle, LayoutGrid,
   Plus, X, Trash2, Pencil, ChevronDown, ChevronUp, Monitor, RefreshCw,
@@ -270,6 +271,7 @@ export default function HomeBlocksManager() {
     const ordered = newBlocks.map((b, i) => ({ ...b, order: i }));
     try {
       await adminApi.updateSettings({ homeBlocks: ordered });
+      invalidateSiteCache();
       setSaved(true);
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2500);
@@ -315,6 +317,7 @@ export default function HomeBlocksManager() {
     const ordered = blocks.map((b, i) => ({ ...b, order: i }));
     try {
       await adminApi.updateSettings({ homeBlocks: ordered });
+      invalidateSiteCache();
       setSaved(true);
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2500);

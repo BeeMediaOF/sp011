@@ -39,18 +39,37 @@ export interface SiteSettings {
   bylineLogoBase64?: string;
 }
 
+// ─── Singleton module-level cache ─────────────────────────────────────────────
+let _cache: SiteSettings | null = null;
+let _fetch: Promise<void> | null = null;
+
+export function invalidateSiteCache() {
+  _cache = null;
+  _fetch = null;
+}
+
 export function useSite() {
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [settings, setSettings] = useState<SiteSettings | null>(_cache);
+  const [loading, setLoading] = useState(_cache === null);
 
   useEffect(() => {
-    fetch("/api/site", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((data) => {
-        setSettings(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    if (_cache) {
+      setSettings(_cache);
+      setLoading(false);
+      return;
+    }
+
+    if (!_fetch) {
+      _fetch = fetch("/api/site")
+        .then((r) => r.json())
+        .then((data) => { _cache = data; })
+        .catch(() => {});
+    }
+
+    _fetch.then(() => {
+      if (_cache) setSettings(_cache);
+      setLoading(false);
+    });
   }, []);
 
   return { settings, loading };

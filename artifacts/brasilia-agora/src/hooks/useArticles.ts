@@ -17,18 +17,37 @@ export interface Article {
   aiRewritten?: boolean;
 }
 
+// ─── Singleton module-level cache ─────────────────────────────────────────────
+let _cache: Article[] | null = null;
+let _fetch: Promise<void> | null = null;
+
+export function invalidateArticlesCache() {
+  _cache = null;
+  _fetch = null;
+}
+
 export function useArticles() {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [articles, setArticles] = useState<Article[]>(_cache ?? []);
+  const [loading, setLoading] = useState(_cache === null);
 
   useEffect(() => {
-    fetch("/api/articles")
-      .then((r) => r.json())
-      .then((data) => {
-        setArticles(data.articles ?? []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    if (_cache) {
+      setArticles(_cache);
+      setLoading(false);
+      return;
+    }
+
+    if (!_fetch) {
+      _fetch = fetch("/api/articles")
+        .then((r) => r.json())
+        .then((data) => { _cache = data.articles ?? []; })
+        .catch(() => {});
+    }
+
+    _fetch.then(() => {
+      if (_cache) setArticles(_cache);
+      setLoading(false);
+    });
   }, []);
 
   return { articles, loading };

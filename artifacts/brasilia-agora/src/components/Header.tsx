@@ -5,16 +5,16 @@ import { useSite } from "../hooks/useSite";
 import logoImg from "../assets/images/logo_brasilia_agora.png";
 
 const FALLBACK_NAV = [
-  { label: "Início",     path: "/" },
-  { label: "Brasil",     path: "/brasil" },
-  { label: "Mundo",      path: "/mundo" },
-  { label: "Política",   path: "/politica" },
-  { label: "Economia",   path: "/economia" },
-  { label: "Esporte",    path: "/esportes" },
-  { label: "Cultura",    path: "/cultura" },
-  { label: "Tecnologia", path: "/tecnologia" },
-  { label: "Saúde",      path: "/saude" },
-  { label: "DF",         path: "/cidade" },
+  { label: "HOME",       path: "/" },
+  { label: "POLÍTICA",   path: "/politica" },
+  { label: "CIDADE",     path: "/cidade" },
+  { label: "SEGURANÇA",  path: "/seguranca" },
+  { label: "TRANSPORTE", path: "/transporte" },
+  { label: "SAÚDE",      path: "/saude" },
+  { label: "EDUCAÇÃO",   path: "/educacao" },
+  { label: "CULTURA",    path: "/cultura" },
+  { label: "ESPORTES",   path: "/esportes" },
+  { label: "COLUNAS",    path: "/colunas" },
 ];
 
 // ─── Ticker de cotações ───────────────────────────────────────────────────────
@@ -109,8 +109,8 @@ export default function Header() {
   return (
     <>
       {/* ── Barra principal ── */}
-      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200 mt-[29px] mb-[29px]">
-        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[13px] mb-[13px]">
+      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200">
+        <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2">
 
           {/* Hamburger */}
           <button

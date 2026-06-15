@@ -228,18 +228,6 @@ export default function HeroSection() {
       }))
     : MOCK_SECONDARY;
 
-  if (loading) {
-    return (
-      <section className="max-w-[1280px] mx-auto px-4 py-6">
-        <div className="grid grid-cols-3 gap-3 h-[420px]">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-gray-200 animate-pulse rounded" />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
       <div className="block lg:hidden mb-5">
