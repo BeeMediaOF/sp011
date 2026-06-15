@@ -332,13 +332,126 @@ export interface FetchedArticle {
   imageUrl: string; excerpt: string; fullText: string;
 }
 
+/** Scrape a news site homepage, extract article links and their content */
+async function scrapeNewsHomepage(src: RssSource): Promise<FetchedArticle[]> {
+  const res = await fetch(src.url, {
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} ao acessar ${src.url}`);
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  // Determine base origin for resolving relative URLs
+  const baseOrigin = new URL(src.url).origin;
+
+  // Collect candidate article links — prioritise structured elements
+  const seen = new Set<string>();
+  const links: string[] = [];
+
+  const selectors = [
+    "article a[href]", ".post a[href]", ".noticia a[href]",
+    ".news-item a[href]", ".lista-noticias a[href]", ".card a[href]",
+    "h2 a[href]", "h3 a[href]", ".headline a[href]", ".titulo a[href]",
+    "main a[href]", "section a[href]",
+  ];
+
+  for (const sel of selectors) {
+    $(sel).each((_i, el) => {
+      if (links.length >= 12) return false as unknown as void;
+      let href = $(el).attr("href") ?? "";
+      if (!href || href.startsWith("#") || href.startsWith("javascript") || href.startsWith("mailto")) return;
+      if (!href.startsWith("http")) href = new URL(href, baseOrigin).href;
+      // Must be same domain
+      try { if (new URL(href).origin !== baseOrigin) return; } catch { return; }
+      // Skip taxonomy / utility pages
+      if (/\/(tag|tags|categoria|category|author|autor|busca|search|page|pagina|wp-content|cdn-cgi)\//i.test(href)) return;
+      // Skip anchor-only fragments
+      if (/#/.test(href) && href.split("#")[0] === src.url) return;
+      // Must look like an article (has a meaningful path)
+      const path = new URL(href).pathname;
+      if (path === "/" || path === "" || path.split("/").filter(Boolean).length < 1) return;
+      if (seen.has(href)) return;
+      seen.add(href);
+      links.push(href);
+    });
+    if (links.length >= 9) break;
+  }
+
+  if (links.length === 0) {
+    throw new Error("Nenhum link de artigo encontrado na página. Verifique se a URL aponta para um portal de notícias.");
+  }
+
+  const toScrape = links.slice(0, 3);
+
+  const results: FetchedArticle[] = [];
+  await Promise.allSettled(toScrape.map(async (link) => {
+    try {
+      const artRes = await fetch(link, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!artRes.ok) return;
+      const artHtml = await artRes.text();
+      const $a = cheerio.load(artHtml);
+
+      const title = (
+        $a("meta[property='og:title']").attr("content") ??
+        $a("meta[name='twitter:title']").attr("content") ??
+        $a("h1").first().text().trim() ??
+        ""
+      ).replace(/\s+/g, " ").trim();
+
+      if (!title || title.length < 5) return;
+
+      const { text, imageUrl } = await scrapeArticle(link);
+
+      // Detect category from meta or URL path
+      const metaCat =
+        $a("meta[property='article:section']").attr("content") ??
+        $a("meta[name='section']").attr("content") ??
+        $a(".breadcrumb li").eq(1).text().trim() ??
+        "";
+      const urlParts = new URL(link).pathname.split("/").filter(Boolean);
+      const rawCat = metaCat || (urlParts.length > 1 ? urlParts[0]! : "") || src.category;
+      const category = src.category; // default to source category; raw used as hint
+      void rawCat; // acknowledged but source category is the authoritative assignment
+
+      const excerpt = (
+        $a("meta[property='og:description']").attr("content") ??
+        $a("meta[name='description']").attr("content") ??
+        text.slice(0, 300)
+      ).slice(0, 300);
+
+      const finalImage =
+        imageUrl ||
+        ($a("meta[property='og:image']").attr("content") ??
+        $a("meta[name='twitter:image']").attr("content") ??
+        "");
+
+      results.push({
+        sourceId: src.id, sourceName: src.name, category,
+        title, link,
+        pubDate: new Date().toISOString(),
+        imageUrl: finalImage,
+        excerpt,
+        fullText: text || excerpt,
+      });
+    } catch {
+      // skip failed articles silently
+    }
+  }));
+
+  return results;
+}
+
 export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticle[]> {
   let feed: Awaited<ReturnType<typeof rssParser.parseURL>>;
   try {
     feed = await rssParser.parseURL(src.url);
-  } catch (parseErr) {
-    const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
-    throw new Error(`Feed inválido — a URL não parece ser RSS/Atom. Tente adicionar "/feed", "/rss" ou "/rss.xml" ao final do domínio. Detalhe: ${msg}`);
+  } catch {
+    // RSS/Atom parsing failed — fall back to HTML web scraping
+    return scrapeNewsHomepage(src);
   }
   const items = feed.items.slice(0, 3); // max 3 por rodada
 
