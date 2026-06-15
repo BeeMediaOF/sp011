@@ -196,19 +196,67 @@ function PredefinedBlock({ block, getArticles }: {
   return null;
 }
 
-// ─── Ads between blocks ───────────────────────────────────────────────────────
-const AD_POSITIONS = new Set([1, 3, 7]); // after block index N
+// ─── Admin preview overlay ────────────────────────────────────────────────────
+function AdminBar({
+  block, idx, total, dragOver,
+  onEdit, onDragStart, onDragOver, onDragEnd, isDragging,
+}: {
+  block: HomeBlock; idx: number; total: number; dragOver: boolean;
+  onEdit: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  isDragging: boolean;
+}) {
+  return (
+    <div
+      className={`group relative transition-all ${isDragging ? "opacity-40 scale-[0.99]" : ""} ${dragOver ? "ring-2 ring-[#c8102e] ring-inset" : ""}`}
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+    >
+      {/* Hover handle bar */}
+      <div className="flex items-center gap-2 px-4 py-1.5 bg-[#1a2448] text-white text-[11px] font-bold select-none cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" className="opacity-50 shrink-0">
+          <circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
+          <circle cx="3" cy="6" r="1.2"/><circle cx="9" cy="6" r="1.2"/>
+          <circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/>
+        </svg>
+        <span className="flex-1 truncate">{block.name}</span>
+        <span className="text-white/40 text-[10px]">{idx + 1}/{total}</span>
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(); }}
+          className="flex items-center gap-1 px-2 py-0.5 bg-white/15 hover:bg-white/30 rounded text-[10px] cursor-pointer"
+        >
+          ✏️ Editar
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const { articles } = useArticles();
   const { settings } = useSite();
 
-  const blocks: HomeBlock[] = (settings?.homeBlocks && settings.homeBlocks.length > 0)
+  const isAdminPreview = typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("adminPreview") === "1";
+
+  const baseBlocks: HomeBlock[] = (settings?.homeBlocks && settings.homeBlocks.length > 0)
     ? [...settings.homeBlocks].sort((a, b) => a.order - b.order)
     : DEFAULT_BLOCKS;
 
-  const visibleBlocks = blocks.filter((b) => b.visible);
+  const [previewBlocks, setPreviewBlocks] = React.useState<HomeBlock[]>([]);
+  const [dragIdx, setDragIdx] = React.useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = React.useState<number | null>(null);
+
+  React.useEffect(() => {
+    setPreviewBlocks(baseBlocks.filter((b) => b.visible));
+  }, [settings]);
+
+  const visibleBlocks = isAdminPreview ? previewBlocks : baseBlocks.filter((b) => b.visible);
 
   function getArticles(cat: string): SectionArticle[] {
     const fallback = FALLBACK_DATA[cat] ?? brasilArticles;
@@ -231,49 +279,89 @@ export default function Home() {
     return fallback;
   }
 
+  function handlePreviewDragStart(idx: number) {
+    setDragIdx(idx);
+  }
+
+  function handlePreviewDragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    setDragOverIdx(idx);
+    setPreviewBlocks((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIdx, 1);
+      next.splice(idx, 0, moved!);
+      return next;
+    });
+    setDragIdx(idx);
+  }
+
+  function handlePreviewDragEnd() {
+    setDragIdx(null);
+    setDragOverIdx(null);
+    if (isAdminPreview) {
+      window.parent.postMessage(
+        { type: "block:reorder", blockIds: previewBlocks.map((b) => b.id) },
+        "*"
+      );
+    }
+  }
+
+  function handleEditBlock(blockId: string) {
+    if (isAdminPreview) {
+      window.parent.postMessage({ type: "block:edit", blockId }, "*");
+    }
+  }
+
   return (
     <div className="min-h-screen w-full bg-white flex flex-col overflow-x-hidden">
       <TopBar />
       <Header />
 
+      {isAdminPreview && (
+        <div className="bg-[#c8102e] text-white text-[11px] font-bold text-center py-1 px-4">
+          ✏️ Modo de edição — passe o mouse sobre um bloco para editar ou arrastar
+        </div>
+      )}
+
       <main className="flex-1">
         <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
 
-        {visibleBlocks.map((block, idx) => (
-          <React.Fragment key={block.id}>
-            {/* Inject ads managed via admin panel */}
-            {idx === 1 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner slot="slot_01" />
-              </div>
-            )}
+        {visibleBlocks.map((block, idx) => {
+          const content = (
+            <>
+              {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
+              {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
+              {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
+              {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
+              {block.custom
+                ? <CustomBlock block={block} getArticles={getArticles} />
+                : <PredefinedBlock block={block} getArticles={getArticles} />
+              }
+            </>
+          );
 
-            {idx === 2 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner slot="slot_02" />
-              </div>
-            )}
+          if (!isAdminPreview) {
+            return <React.Fragment key={block.id}>{content}</React.Fragment>;
+          }
 
-            {idx === 4 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner slot="slot_03" />
-              </div>
-            )}
-
-            {idx === 7 && (
-              <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <AdBanner slot="slot_04" />
-              </div>
-            )}
-
-            {/* Render the block */}
-            {block.custom ? (
-              <CustomBlock block={block} getArticles={getArticles} />
-            ) : (
-              <PredefinedBlock block={block} getArticles={getArticles} />
-            )}
-          </React.Fragment>
-        ))}
+          return (
+            <div key={block.id}>
+              <AdminBar
+                block={block}
+                idx={idx}
+                total={visibleBlocks.length}
+                dragOver={dragOverIdx === idx}
+                isDragging={dragIdx === idx}
+                onEdit={() => handleEditBlock(block.id)}
+                onDragStart={() => handlePreviewDragStart(idx)}
+                onDragOver={(e) => handlePreviewDragOver(e, idx)}
+                onDragEnd={handlePreviewDragEnd}
+              />
+              {content}
+            </div>
+          );
+        })}
       </main>
 
       <Footer />

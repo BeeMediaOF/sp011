@@ -3,13 +3,16 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import {
-  GripVertical, Eye, EyeOff, Plus, Trash2, ChevronDown, ChevronUp,
-  CheckCircle, RefreshCw, Save, LayoutGrid, X,
+  GripVertical, Eye, EyeOff, Plus, Trash2, ChevronDown,
+  CheckCircle, RefreshCw, Save, LayoutGrid, X, Layout, AlignLeft,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
+type HeaderStyle = "standard" | "compact" | "centered";
+type FooterStyle = "dark" | "light" | "minimal";
+type Tab = "blocks" | "header" | "footer";
 
 const LAYOUTS: { id: LayoutId; label: string; desc: string; mini: React.ReactNode }[] = [
   {
@@ -102,14 +105,89 @@ function blockToForm(block: HomeBlock): BlockForm {
   return {
     name:     block.name,
     category: block.category ?? d?.category ?? "geral",
-    layout:   block.layout   ?? d?.layout   ?? "grid",
-    color:    block.color    ?? d?.color    ?? "#6b7280",
+    layout:   (block.layout ?? d?.layout ?? "grid") as LayoutId,
+    color:    block.color ?? d?.color ?? "#6b7280",
   };
 }
 
 const EMPTY_FORM: BlockForm = { name: "", category: "politica", layout: "grid", color: "#1d4ed8" };
 
-// ─── Block settings panel ─────────────────────────────────────────────────────
+// ─── Header presets ───────────────────────────────────────────────────────────
+const HEADER_PRESETS: { id: HeaderStyle; label: string; desc: string; preview: React.ReactNode }[] = [
+  {
+    id: "standard", label: "Padrão", desc: "Logo à esquerda, nav à direita, ticker abaixo",
+    preview: (
+      <div className="w-full space-y-0.5">
+        <div className="flex items-center gap-1.5 px-1.5 py-1 bg-white rounded-sm">
+          <div className="w-8 h-4 bg-gray-300 rounded-sm shrink-0" />
+          <div className="flex gap-1 flex-1">{[0,1,2,3,4].map(i=><div key={i} className="h-2 bg-gray-200 rounded flex-1"/>)}</div>
+        </div>
+        <div className="flex gap-1 px-1.5 py-0.5 bg-gray-100 rounded-sm">
+          {[0,1,2,3].map(i=><div key={i} className="h-1 bg-gray-300 rounded flex-1"/>)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "compact", label: "Compacto", desc: "Header fino, sem ticker, mais espaço para conteúdo",
+    preview: (
+      <div className="w-full">
+        <div className="flex items-center gap-1.5 px-1.5 py-0.5 bg-white rounded-sm">
+          <div className="w-6 h-3 bg-gray-300 rounded-sm shrink-0" />
+          <div className="flex gap-1 flex-1">{[0,1,2,3,4].map(i=><div key={i} className="h-1.5 bg-gray-200 rounded flex-1"/>)}</div>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "centered", label: "Centralizado", desc: "Logo no centro, nav em barra escura abaixo",
+    preview: (
+      <div className="w-full space-y-0.5">
+        <div className="flex items-center justify-center px-1.5 py-1 bg-white rounded-sm">
+          <div className="w-10 h-4 bg-gray-300 rounded-sm" />
+        </div>
+        <div className="flex items-center justify-center gap-1 px-1.5 py-1 bg-[#1a2448] rounded-sm">
+          {[0,1,2,3,4].map(i=><div key={i} className="h-1.5 bg-white/30 rounded w-5"/>)}
+        </div>
+      </div>
+    ),
+  },
+];
+
+// ─── Footer presets ───────────────────────────────────────────────────────────
+const FOOTER_PRESETS: { id: FooterStyle; label: string; desc: string; preview: React.ReactNode }[] = [
+  {
+    id: "dark", label: "Escuro", desc: "Fundo preto, colunas com links, newsletter",
+    preview: (
+      <div className="w-full space-y-1 px-1.5 py-2 bg-black rounded-sm">
+        <div className="flex gap-1.5">{[0,1,2,3].map(i=><div key={i} className="flex-1 space-y-0.5">{[0,1,2].map(j=><div key={j} className="h-1 bg-white/20 rounded"/>)}</div>)}</div>
+        <div className="h-px bg-white/10"/>
+        <div className="h-1 bg-white/10 rounded w-2/3 mx-auto"/>
+      </div>
+    ),
+  },
+  {
+    id: "light", label: "Claro", desc: "Fundo branco, colunas com links, borda vermelha",
+    preview: (
+      <div className="w-full border-t-2 border-[#c8102e] space-y-1 px-1.5 py-2 bg-gray-50 rounded-sm">
+        <div className="flex gap-1.5">{[0,1,2,3].map(i=><div key={i} className="flex-1 space-y-0.5">{[0,1,2].map(j=><div key={j} className="h-1 bg-gray-300 rounded"/>)}</div>)}</div>
+        <div className="h-px bg-gray-200"/>
+        <div className="h-1 bg-gray-200 rounded w-2/3 mx-auto"/>
+      </div>
+    ),
+  },
+  {
+    id: "minimal", label: "Minimal", desc: "Apenas uma linha com copyright e links",
+    preview: (
+      <div className="w-full px-1.5 py-2 bg-gray-100 rounded-sm flex items-center justify-between gap-2">
+        <div className="h-1.5 bg-gray-300 rounded w-12"/>
+        <div className="flex gap-1">{[0,1,2].map(i=><div key={i} className="h-1.5 bg-gray-300 rounded w-5"/>)}</div>
+      </div>
+    ),
+  },
+];
+
+// ─── Settings panel ───────────────────────────────────────────────────────────
 interface SettingsPanelProps {
   block: HomeBlock;
   form: BlockForm;
@@ -118,11 +196,11 @@ interface SettingsPanelProps {
   onApply: () => void;
   onCancel: () => void;
 }
+
 function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: SettingsPanelProps) {
   const isSpecial = SPECIAL_BLOCKS.has(block.id);
   return (
     <div className="px-4 pb-4 pt-2 space-y-4 border-t border-gray-100 bg-gray-50/50 rounded-b-xl">
-      {/* Name */}
       <div>
         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Nome do bloco</label>
         <input
@@ -135,20 +213,16 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: Set
 
       {!isSpecial && (
         <>
-          {/* Category */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Categoria de artigos</label>
             <div className="grid grid-cols-3 gap-1.5">
               {CATEGORIES.map((c) => (
-                <button
-                  key={c.value}
-                  type="button"
+                <button key={c.value} type="button"
                   onClick={() => { onChange("category", c.value); onChange("color", c.color); }}
                   className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all text-left"
                   style={form.category === c.value
                     ? { borderColor: c.color, backgroundColor: c.color + "15", color: c.color }
-                    : { borderColor: "#e5e7eb", color: "#6b7280" }}
-                >
+                    : { borderColor: "#e5e7eb", color: "#6b7280" }}>
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
                   {c.label}
                 </button>
@@ -156,22 +230,21 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: Set
             </div>
           </div>
 
-          {/* Layout */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-2">Layout visual</label>
             <div className="grid grid-cols-2 gap-1.5">
               {LAYOUTS.map((l) => (
-                <button
-                  key={l.id}
-                  type="button"
+                <button key={l.id} type="button"
                   onClick={() => onChange("layout", l.id)}
                   className="flex flex-col gap-1.5 p-2 rounded-lg border text-left transition-all"
                   style={form.layout === l.id
                     ? { borderColor: form.color, backgroundColor: form.color + "10", color: form.color }
-                    : { borderColor: "#e5e7eb", color: "#9ca3af" }}
-                >
+                    : { borderColor: "#e5e7eb", color: "#9ca3af" }}>
                   <div className="w-full">{l.mini}</div>
-                  <span className="text-[10px] font-bold uppercase tracking-wide">{l.label}</span>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wide block">{l.label}</span>
+                    <span className="text-[9px] opacity-60">{l.desc}</span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -179,21 +252,14 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: Set
         </>
       )}
 
-      {/* Actions */}
       <div className="flex gap-2 pt-1">
-        <button
-          type="button"
-          onClick={onCancel}
-          className="flex-1 px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
+        <button type="button" onClick={onCancel}
+          className="flex-1 px-3 py-2 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
           Cancelar
         </button>
-        <button
-          type="button"
-          onClick={onApply}
+        <button type="button" onClick={onApply}
           disabled={saving || !form.name.trim()}
-          className="flex-[2] flex items-center justify-center gap-2 px-4 py-2 bg-[#1a2448] text-white text-sm font-semibold rounded-lg hover:bg-[#243060] disabled:opacity-50 transition-colors"
-        >
+          className="flex-[2] flex items-center justify-center gap-2 px-4 py-2 bg-[#1a2448] text-white text-sm font-semibold rounded-lg hover:bg-[#243060] disabled:opacity-50 transition-colors">
           {saving
             ? <><RefreshCw size={13} className="animate-spin" /> Salvando…</>
             : <><CheckCircle size={13} /> Aplicar e Salvar</>
@@ -211,6 +277,7 @@ interface AddPanelProps {
   onAdd: () => void;
   onClose: () => void;
 }
+
 function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
   return (
     <div className="border-2 border-dashed border-[#1a2448]/30 rounded-xl p-4 space-y-4 bg-white">
@@ -223,12 +290,9 @@ function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
 
       <div>
         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Nome</label>
-        <input
-          value={form.name}
-          onChange={(e) => onChange("name", e.target.value)}
+        <input value={form.name} onChange={(e) => onChange("name", e.target.value)}
           className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]/30 focus:border-[#1a2448]"
-          placeholder="Ex: Política, Esporte..."
-          autoFocus
+          placeholder="Ex: Política, Esporte..." autoFocus
         />
       </div>
 
@@ -265,12 +329,8 @@ function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={onAdd}
-        disabled={!form.name.trim()}
-        className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-semibold hover:bg-[#a00d24] disabled:opacity-40 transition-colors"
-      >
+      <button type="button" onClick={onAdd} disabled={!form.name.trim()}
+        className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-semibold hover:bg-[#a00d24] disabled:opacity-40 transition-colors">
         <Plus size={14} /> Adicionar à home
       </button>
     </div>
@@ -279,29 +339,85 @@ function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function HomeBlocksManager() {
-  const [blocks, setBlocks]       = useState<HomeBlock[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [saving, setSaving]       = useState(false);
-  const [saved, setSaved]         = useState(false);
-  const [dragIdx, setDragIdx]     = useState<number | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm]   = useState<BlockForm>(EMPTY_FORM);
-  const [showAdd, setShowAdd]     = useState(false);
-  const [addForm, setAddForm]     = useState<BlockForm>(EMPTY_FORM);
+  const [blocks, setBlocks]         = useState<HomeBlock[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
+  const [saved, setSaved]           = useState(false);
+  const [dragIdx, setDragIdx]       = useState<number | null>(null);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [editForm, setEditForm]     = useState<BlockForm>(EMPTY_FORM);
+  const [showAdd, setShowAdd]       = useState(false);
+  const [addForm, setAddForm]       = useState<BlockForm>(EMPTY_FORM);
   const [previewKey, setPreviewKey] = useState(0);
+  const [tab, setTab]               = useState<Tab>("blocks");
+  const [headerStyle, setHeaderStyle] = useState<HeaderStyle>("standard");
+  const [footerStyle, setFooterStyle] = useState<FooterStyle>("dark");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blockRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     adminApi.getSettings()
       .then((r) => {
         const bl = r.settings.homeBlocks;
         setBlocks(bl && bl.length > 0 ? bl : DEFAULT_BLOCKS);
+        setHeaderStyle(r.settings.headerStyle ?? "standard");
+        setFooterStyle(r.settings.footerStyle ?? "dark");
       })
       .catch(() => setBlocks(DEFAULT_BLOCKS))
       .finally(() => setLoading(false));
   }, []);
 
-  // ── Auto-save helper ────────────────────────────────────────────────────────
+  // ── postMessage listener (from preview iframe) ───────────────────────────
+  useEffect(() => {
+    function handleMessage(e: MessageEvent) {
+      if (!e.data || typeof e.data !== "object") return;
+      const { type, blockId, blockIds } = e.data as {
+        type: string; blockId?: string; blockIds?: string[];
+      };
+
+      if (type === "block:edit" && blockId) {
+        setTab("blocks");
+        const block = blocks.find((b) => b.id === blockId);
+        if (block) {
+          setEditingId(blockId);
+          setEditForm(blockToForm(block));
+          setTimeout(() => {
+            blockRefs.current[blockId]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 80);
+        }
+      }
+
+      if (type === "block:reorder" && blockIds) {
+        setBlocks((prev) => {
+          const map = new Map(prev.map((b) => [b.id, b]));
+          const reordered = blockIds
+            .map((id, i) => map.has(id) ? { ...map.get(id)!, order: i } : null)
+            .filter(Boolean) as HomeBlock[];
+          const rest = prev.filter((b) => !blockIds.includes(b.id));
+          return [...reordered, ...rest];
+        });
+        if (saveTimer.current) clearTimeout(saveTimer.current);
+        saveTimer.current = setTimeout(async () => {
+          setSaving(true);
+          try {
+            const latest = await adminApi.getSettings();
+            const map = new Map((latest.settings.homeBlocks ?? DEFAULT_BLOCKS).map((b) => [b.id, b]));
+            const ordered = (blockIds ?? []).map((id, i) =>
+              map.has(id) ? { ...map.get(id)!, order: i } : null
+            ).filter(Boolean) as HomeBlock[];
+            await adminApi.updateSettings({ homeBlocks: ordered });
+            invalidateSiteCache();
+          } catch { } finally { setSaving(false); }
+        }, 800);
+      }
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [blocks]);
+
+  // ── Auto-save helper ──────────────────────────────────────────────────────
   const autoSave = useCallback(async (newBlocks: HomeBlock[]) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
@@ -317,19 +433,20 @@ export default function HomeBlocksManager() {
     }, 500);
   }, []);
 
-  // ── Block actions ────────────────────────────────────────────────────────────
-  function toggleVisible(idx: number) {
-    const next = blocks.map((b, i) => i === idx ? { ...b, visible: !b.visible } : b);
-    setBlocks(next);
-    autoSave(next);
+  async function saveHeaderFooter(hs: HeaderStyle, fs: FooterStyle) {
+    setSaving(true);
+    try {
+      await adminApi.updateSettings({ headerStyle: hs, footerStyle: fs });
+      invalidateSiteCache();
+      setSaved(true);
+      setPreviewKey((k) => k + 1);
+      setTimeout(() => setSaved(false), 2000);
+    } catch { } finally { setSaving(false); }
   }
 
-  function moveBlock(idx: number, dir: -1 | 1) {
-    const n = idx + dir;
-    if (n < 0 || n >= blocks.length) return;
-    const arr = [...blocks];
-    [arr[idx], arr[n]] = [arr[n]!, arr[idx]!];
-    const next = arr.map((b, i) => ({ ...b, order: i }));
+  // ── Block actions ─────────────────────────────────────────────────────────
+  function toggleVisible(idx: number) {
+    const next = blocks.map((b, i) => i === idx ? { ...b, visible: !b.visible } : b);
     setBlocks(next);
     autoSave(next);
   }
@@ -341,7 +458,7 @@ export default function HomeBlocksManager() {
     autoSave(next);
   }
 
-  // ── Drag & drop ──────────────────────────────────────────────────────────────
+  // ── Drag & drop ───────────────────────────────────────────────────────────
   function handleDragStart(idx: number) {
     if (editingId) return;
     setDragIdx(idx);
@@ -362,7 +479,7 @@ export default function HomeBlocksManager() {
     autoSave(blocks);
   }
 
-  // ── Edit block ───────────────────────────────────────────────────────────────
+  // ── Edit block ────────────────────────────────────────────────────────────
   function openEdit(block: HomeBlock) {
     if (editingId === block.id) { setEditingId(null); return; }
     setEditingId(block.id);
@@ -392,7 +509,7 @@ export default function HomeBlocksManager() {
     } catch { } finally { setSaving(false); }
   }
 
-  // ── Add block ────────────────────────────────────────────────────────────────
+  // ── Add block ─────────────────────────────────────────────────────────────
   function setAddField<K extends keyof BlockForm>(key: K, val: BlockForm[K]) {
     setAddForm((prev) => ({ ...prev, [key]: val }));
   }
@@ -400,14 +517,14 @@ export default function HomeBlocksManager() {
   function handleAddBlock() {
     if (!addForm.name.trim()) return;
     const newBlock: HomeBlock = {
-      id:       `custom-${Date.now()}`,
-      name:     addForm.name.trim(),
-      visible:  true,
-      order:    blocks.length,
+      id: `custom-${Date.now()}`,
+      name: addForm.name.trim(),
+      visible: true,
+      order: blocks.length,
       category: addForm.category,
-      layout:   addForm.layout,
-      color:    addForm.color,
-      custom:   true,
+      layout: addForm.layout,
+      color: addForm.color,
+      custom: true,
     };
     const next = [...blocks, newBlock];
     setBlocks(next);
@@ -422,203 +539,268 @@ export default function HomeBlocksManager() {
     <AdminLayout title="Blocos da Home" noPadding>
       <div className="flex h-[calc(100vh-57px)] overflow-hidden">
 
-        {/* ══ LEFT PANEL — Block editor ══════════════════════════════════════════ */}
-        <div className="w-[360px] shrink-0 flex flex-col border-r border-gray-200 bg-gray-50 overflow-y-auto">
+        {/* ══ LEFT PANEL ══════════════════════════════════════════════════════ */}
+        <div className="w-[360px] shrink-0 flex flex-col border-r border-gray-200 bg-gray-50 overflow-hidden">
 
           {/* Header */}
-          <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-black text-[#1a2448]">Blocos da Home</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">
-                {loading ? "Carregando…" : `${visibleCount} visível${visibleCount !== 1 ? "s" : ""} · ${blocks.length} total`}
-              </p>
+          <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
+            <div className="px-4 py-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-black text-[#1a2448]">Blocos da Home</h2>
+                <p className="text-[11px] text-gray-400 mt-0.5">
+                  {loading ? "Carregando…" : `${visibleCount} visível${visibleCount !== 1 ? "s" : ""} · ${blocks.length} total`}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {saved && <span className="flex items-center gap-1 text-[11px] text-green-600 font-semibold"><CheckCircle size={12} /> Salvo</span>}
+                {saving && <RefreshCw size={13} className="text-gray-400 animate-spin" />}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              {saved && (
-                <span className="flex items-center gap-1 text-[11px] text-green-600 font-semibold">
-                  <CheckCircle size={12} /> Salvo
-                </span>
-              )}
-              {saving && (
-                <RefreshCw size={13} className="text-gray-400 animate-spin" />
-              )}
+
+            {/* Tabs */}
+            <div className="flex border-t border-gray-100">
+              {([
+                { id: "blocks" as Tab, label: "Blocos",    icon: <LayoutGrid size={13} /> },
+                { id: "header" as Tab, label: "Cabeçalho", icon: <Layout size={13} /> },
+                { id: "footer" as Tab, label: "Rodapé",    icon: <AlignLeft size={13} /> },
+              ] as { id: Tab; label: string; icon: React.ReactNode }[]).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold transition-colors border-b-2 ${
+                    tab === t.id
+                      ? "text-[#1a2448] border-[#1a2448]"
+                      : "text-gray-400 border-transparent hover:text-gray-600"
+                  }`}
+                >
+                  {t.icon}{t.label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Block list */}
-          <div className="flex-1 px-3 py-3 space-y-2">
-            {loading ? (
-              <div className="text-center py-16 text-gray-400 text-sm">Carregando…</div>
-            ) : (
-              blocks.map((block, idx) => {
-                const isEditing   = editingId === block.id;
-                const isDragging  = dragIdx === idx;
-                const isSpecial   = SPECIAL_BLOCKS.has(block.id);
-                const activeColor = block.color ?? BLOCK_DEFAULTS[block.id]?.color ?? "#6b7280";
-                const catLabel    = CATEGORIES.find(c => c.value === (block.category ?? BLOCK_DEFAULTS[block.id]?.category))?.label;
-                const layoutLabel = block.layout ?? BLOCK_DEFAULTS[block.id]?.layout ?? "grid";
+          {/* ── Tab: Blocks ── */}
+          {tab === "blocks" && (
+            <div className="flex-1 overflow-y-auto flex flex-col">
+              <div className="flex-1 px-3 py-3 space-y-2">
+                {loading ? (
+                  <div className="text-center py-16 text-gray-400 text-sm">Carregando…</div>
+                ) : (
+                  blocks.map((block, idx) => {
+                    const isEditing   = editingId === block.id;
+                    const isDragging  = dragIdx === idx;
+                    const isSpecial   = SPECIAL_BLOCKS.has(block.id);
+                    const activeColor = block.color ?? BLOCK_DEFAULTS[block.id]?.color ?? "#6b7280";
+                    const catLabel    = CATEGORIES.find(c => c.value === (block.category ?? BLOCK_DEFAULTS[block.id]?.category))?.label;
+                    const layoutLabel = block.layout ?? BLOCK_DEFAULTS[block.id]?.layout ?? "grid";
 
-                return (
-                  <div
-                    key={block.id}
-                    draggable={!isEditing}
-                    onDragStart={() => handleDragStart(idx)}
-                    onDragOver={(e) => handleDragOver(e, idx)}
-                    onDragEnd={handleDragEnd}
-                    className={`rounded-xl border bg-white transition-all select-none
-                      ${isDragging ? "border-[#F5A623] shadow-lg scale-[1.02] rotate-1" : "border-gray-200 shadow-sm"}
-                      ${!block.visible && !isEditing ? "opacity-40" : ""}
-                      ${isEditing ? "ring-2 ring-[#1a2448]/20" : ""}
-                    `}
-                  >
-                    {/* ── Block row ── */}
-                    <div
-                      className={`flex items-center gap-2 px-3 py-2.5 ${isEditing ? "cursor-default" : "cursor-pointer"}`}
-                      onClick={() => openEdit(block)}
-                    >
-                      {/* Drag handle */}
-                      <span
-                        className="text-gray-300 hover:text-gray-500 cursor-grab shrink-0"
-                        onClick={(e) => e.stopPropagation()}
+                    return (
+                      <div
+                        key={block.id}
+                        ref={(el) => { blockRefs.current[block.id] = el; }}
+                        draggable={!isEditing}
+                        onDragStart={() => handleDragStart(idx)}
+                        onDragOver={(e) => handleDragOver(e, idx)}
+                        onDragEnd={handleDragEnd}
+                        className={`rounded-xl border bg-white transition-all select-none
+                          ${isDragging ? "border-[#F5A623] shadow-lg scale-[1.02] rotate-1" : "border-gray-200 shadow-sm"}
+                          ${!block.visible && !isEditing ? "opacity-40" : ""}
+                          ${isEditing ? "ring-2 ring-[#1a2448]/20" : ""}
+                        `}
                       >
-                        <GripVertical size={16} />
-                      </span>
+                        <div
+                          className={`flex items-center gap-2 px-3 py-2.5 ${isEditing ? "cursor-default" : "cursor-pointer"}`}
+                          onClick={() => openEdit(block)}
+                        >
+                          <span className="text-gray-300 hover:text-gray-500 cursor-grab shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <GripVertical size={16} />
+                          </span>
 
-                      {/* Icon */}
-                      {block.custom ? (
-                        <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm shrink-0"
-                          style={{ backgroundColor: activeColor }} />
-                      ) : (
-                        <span className="text-base shrink-0 leading-none">{BLOCK_ICONS[block.id] ?? "📄"}</span>
-                      )}
+                          {block.custom ? (
+                            <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm shrink-0" style={{ backgroundColor: activeColor }} />
+                          ) : (
+                            <span className="text-base shrink-0 leading-none">{BLOCK_ICONS[block.id] ?? "📄"}</span>
+                          )}
 
-                      {/* Order */}
-                      <span className="text-[10px] text-gray-300 w-4 text-center font-mono shrink-0">{idx + 1}</span>
+                          <span className="text-[10px] text-gray-300 w-4 text-center font-mono shrink-0">{idx + 1}</span>
 
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-[13px] font-semibold leading-tight truncate ${block.visible ? "text-gray-800" : "text-gray-400"}`}>
-                          {block.name}
-                        </p>
-                        {!isSpecial && (
-                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
-                            {catLabel && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
-                                style={{ backgroundColor: activeColor + "20", color: activeColor }}>
-                                {catLabel}
-                              </span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[13px] font-semibold leading-tight truncate ${block.visible ? "text-gray-800" : "text-gray-400"}`}>
+                              {block.name}
+                            </p>
+                            {!isSpecial && (
+                              <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                {catLabel && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide"
+                                    style={{ backgroundColor: activeColor + "15", color: activeColor }}>
+                                    {catLabel}
+                                  </span>
+                                )}
+                                <span className="text-[9px] text-gray-400 uppercase font-semibold">{layoutLabel}</span>
+                              </div>
                             )}
-                            <span className="text-[9px] text-gray-400 uppercase tracking-wide">{layoutLabel}</span>
                           </div>
-                        )}
-                      </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        {/* Move up/down */}
-                        <div className="flex flex-col">
-                          <button onClick={() => moveBlock(idx, -1)} disabled={idx === 0}
-                            className="text-gray-300 hover:text-gray-600 disabled:opacity-0 p-0.5 leading-none">
-                            <ChevronUp size={12} />
-                          </button>
-                          <button onClick={() => moveBlock(idx, 1)} disabled={idx === blocks.length - 1}
-                            className="text-gray-300 hover:text-gray-600 disabled:opacity-0 p-0.5 leading-none">
-                            <ChevronDown size={12} />
-                          </button>
+                          <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                            <button onClick={() => toggleVisible(idx)}
+                              title={block.visible ? "Ocultar" : "Mostrar"}
+                              className={`p-1.5 rounded-lg transition-colors ${block.visible ? "text-blue-400 hover:bg-blue-50" : "text-gray-300 hover:bg-gray-50"}`}>
+                              {block.visible ? <Eye size={14} /> : <EyeOff size={14} />}
+                            </button>
+                            {block.custom ? (
+                              <button onClick={() => deleteBlock(block.id)}
+                                className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                <Trash2 size={13} />
+                              </button>
+                            ) : <span className="w-[29px]" />}
+                          </div>
+
+                          <span className={`text-gray-300 transition-transform ${isEditing ? "rotate-180" : ""}`}>
+                            <ChevronDown size={14} />
+                          </span>
                         </div>
 
-                        {/* Toggle visible */}
-                        <button
-                          onClick={() => toggleVisible(idx)}
-                          title={block.visible ? "Ocultar" : "Mostrar"}
-                          className={`p-1.5 rounded-lg transition-colors ${block.visible ? "text-blue-400 hover:bg-blue-50" : "text-gray-300 hover:bg-gray-50"}`}
-                        >
-                          {block.visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                        </button>
-
-                        {/* Delete (custom only) */}
-                        {block.custom ? (
-                          <button onClick={() => deleteBlock(block.id)}
-                            className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        ) : (
-                          <span className="w-[29px]" />
+                        {isEditing && (
+                          <SettingsPanel
+                            block={block}
+                            form={editForm}
+                            saving={saving}
+                            onChange={setEditField}
+                            onApply={() => applyAndSave(block.id)}
+                            onCancel={() => setEditingId(null)}
+                          />
                         )}
                       </div>
+                    );
+                  })
+                )}
 
-                      {/* Expand indicator */}
-                      <span className={`text-gray-300 transition-transform ${isEditing ? "rotate-180" : ""}`}>
-                        <ChevronDown size={14} />
-                      </span>
+                {showAdd ? (
+                  <AddPanel
+                    form={addForm}
+                    onChange={setAddField}
+                    onAdd={handleAddBlock}
+                    onClose={() => { setShowAdd(false); setAddForm(EMPTY_FORM); }}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setShowAdd(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-400 hover:border-[#1a2448] hover:text-[#1a2448] hover:bg-white transition-all"
+                  >
+                    <Plus size={15} /> Adicionar bloco
+                  </button>
+                )}
+              </div>
+
+              <div className="sticky bottom-0 px-3 py-3 bg-white border-t border-gray-200">
+                <button
+                  onClick={async () => {
+                    setSaving(true);
+                    const ordered = blocks.map((b, i) => ({ ...b, order: i }));
+                    try {
+                      await adminApi.updateSettings({ homeBlocks: ordered });
+                      invalidateSiteCache();
+                      setSaved(true);
+                      setPreviewKey((k) => k + 1);
+                      setTimeout(() => setSaved(false), 2000);
+                    } catch { } finally { setSaving(false); }
+                  }}
+                  disabled={saving || loading}
+                  className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50
+                    ${saved ? "bg-green-500 text-white" : "bg-[#1a2448] text-white hover:bg-[#243060]"}`}
+                >
+                  {saved ? <><CheckCircle size={15} /> Tudo salvo!</>
+                    : saving ? <><RefreshCw size={15} className="animate-spin" /> Salvando…</>
+                    : <><Save size={15} /> Salvar tudo</>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Tab: Header ── */}
+          {tab === "header" && (
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <p className="text-[11px] text-gray-500">Escolha um formato pré-salvo para o cabeçalho do portal.</p>
+              <div className="space-y-3">
+                {HEADER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={async () => {
+                      setHeaderStyle(preset.id);
+                      await saveHeaderFooter(preset.id, footerStyle);
+                    }}
+                    className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
+                      headerStyle === preset.id
+                        ? "border-[#1a2448] bg-[#1a2448]/5"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                  >
+                    <div className="mb-2">{preset.preview}</div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[13px] font-bold text-gray-800">{preset.label}</p>
+                        <p className="text-[11px] text-gray-500">{preset.desc}</p>
+                      </div>
+                      {headerStyle === preset.id && (
+                        <span className="flex items-center gap-1 text-[11px] text-[#1a2448] font-bold">
+                          <CheckCircle size={14} /> Ativo
+                        </span>
+                      )}
                     </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-                    {/* ── Settings panel ── */}
-                    {isEditing && (
-                      <SettingsPanel
-                        block={block}
-                        form={editForm}
-                        saving={saving}
-                        onChange={setEditField}
-                        onApply={() => applyAndSave(block.id)}
-                        onCancel={() => setEditingId(null)}
-                      />
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {/* Add block */}
-            {showAdd ? (
-              <AddPanel
-                form={addForm}
-                onChange={setAddField}
-                onAdd={handleAddBlock}
-                onClose={() => { setShowAdd(false); setAddForm(EMPTY_FORM); }}
-              />
-            ) : (
-              <button
-                onClick={() => setShowAdd(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-400 hover:border-[#1a2448] hover:text-[#1a2448] hover:bg-white transition-all"
-              >
-                <Plus size={15} /> Adicionar bloco
-              </button>
-            )}
-          </div>
-
-          {/* Save all button */}
-          <div className="sticky bottom-0 px-3 py-3 bg-white border-t border-gray-200">
-            <button
-              onClick={async () => {
-                setSaving(true);
-                const ordered = blocks.map((b, i) => ({ ...b, order: i }));
-                try {
-                  await adminApi.updateSettings({ homeBlocks: ordered });
-                  invalidateSiteCache();
-                  setSaved(true);
-                  setPreviewKey((k) => k + 1);
-                  setTimeout(() => setSaved(false), 2000);
-                } catch { } finally { setSaving(false); }
-              }}
-              disabled={saving || loading}
-              className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50
-                ${saved ? "bg-green-500 text-white" : "bg-[#1a2448] text-white hover:bg-[#243060]"}`}
-            >
-              {saved
-                ? <><CheckCircle size={15} /> Tudo salvo!</>
-                : saving
-                  ? <><RefreshCw size={15} className="animate-spin" /> Salvando…</>
-                  : <><Save size={15} /> Salvar tudo</>
-              }
-            </button>
-          </div>
+          {/* ── Tab: Footer ── */}
+          {tab === "footer" && (
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+              <p className="text-[11px] text-gray-500">Escolha um formato pré-salvo para o rodapé do portal.</p>
+              <div className="space-y-3">
+                {FOOTER_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={async () => {
+                      setFooterStyle(preset.id);
+                      await saveHeaderFooter(headerStyle, preset.id);
+                    }}
+                    className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
+                      footerStyle === preset.id
+                        ? "border-[#1a2448] bg-[#1a2448]/5"
+                        : "border-gray-200 hover:border-gray-300 bg-white"
+                    }`}
+                  >
+                    <div className="mb-2">{preset.preview}</div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[13px] font-bold text-gray-800">{preset.label}</p>
+                        <p className="text-[11px] text-gray-500">{preset.desc}</p>
+                      </div>
+                      {footerStyle === preset.id && (
+                        <span className="flex items-center gap-1 text-[11px] text-[#1a2448] font-bold">
+                          <CheckCircle size={14} /> Ativo
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ══ RIGHT PANEL — Live preview ══════════════════════════════════════════ */}
+        {/* ══ RIGHT PANEL — Live preview ══════════════════════════════════════ */}
         <div className="flex-1 flex flex-col bg-gray-100 overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Prévia ao vivo</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Prévia ao vivo</span>
+              <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                Passe o mouse sobre um bloco para editar ou arrastar
+              </span>
+            </div>
             <button
               onClick={() => setPreviewKey((k) => k + 1)}
               className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:border-[#1a2448] hover:text-[#1a2448] transition-colors"
@@ -629,7 +811,8 @@ export default function HomeBlocksManager() {
           <div className="flex-1 overflow-hidden">
             <iframe
               key={previewKey}
-              src="/"
+              ref={iframeRef}
+              src="/?adminPreview=1"
               className="w-full h-full border-0"
               title="Prévia da Home"
             />
