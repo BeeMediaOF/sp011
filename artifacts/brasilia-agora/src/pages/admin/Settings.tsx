@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings } from "../../lib/adminApi";
 import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard, UserCircle } from "lucide-react";
+import { saveAdminThemeToStorage } from "../../components/admin/AdminLayout";
 
 export default function Settings() {
   const [settings, setSettings] = useState<SiteSettings>({
@@ -34,14 +35,39 @@ export default function Settings() {
   }
 
   useEffect(() => {
+    // Pre-fill color fields from localStorage while API fetch is in progress (no ghost flash)
+    try {
+      const sidebar = localStorage.getItem("admin_sidebar_color");
+      const accent  = localStorage.getItem("admin_accent_color");
+      if (sidebar) setSettings((prev) => ({ ...prev, adminSidebarColor: sidebar }));
+      if (accent)  setSettings((prev) => ({ ...prev, adminAccentColor:  accent  }));
+    } catch {}
+
     adminApi.getSettings()
-      .then((r) => setSettings(r.settings))
+      .then((r) => {
+        setSettings(r.settings);
+        // Keep localStorage in sync with server values
+        saveAdminThemeToStorage(
+          r.settings.adminSidebarColor ?? "#1a2448",
+          r.settings.adminAccentColor  ?? "#c8102e",
+        );
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
   function setField<K extends keyof SiteSettings>(key: K, value: SiteSettings[K]) {
-    setSettings((prev) => ({ ...prev, [key]: value }));
+    setSettings((prev) => {
+      const next = { ...prev, [key]: value };
+      // Persist admin panel colors to localStorage immediately — no flash on reload
+      if (key === "adminSidebarColor" || key === "adminAccentColor") {
+        saveAdminThemeToStorage(
+          key === "adminSidebarColor" ? String(value) : (next.adminSidebarColor ?? "#1a2448"),
+          key === "adminAccentColor"  ? String(value) : (next.adminAccentColor  ?? "#c8102e"),
+        );
+      }
+      return next;
+    });
   }
 
   function handleImageFile(key: "ogImageBase64" | "faviconBase64", file: File) {

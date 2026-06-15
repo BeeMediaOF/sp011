@@ -36,23 +36,46 @@ interface PanelTheme {
   accentText: string;
 }
 
+const LS_SIDEBAR = "admin_sidebar_color";
+const LS_ACCENT  = "admin_accent_color";
+
+export function saveAdminThemeToStorage(sidebar: string, accent: string) {
+  try {
+    localStorage.setItem(LS_SIDEBAR, sidebar);
+    localStorage.setItem(LS_ACCENT,  accent);
+  } catch {}
+}
+
+function readAdminThemeFromStorage() {
+  try {
+    return {
+      sidebar: localStorage.getItem(LS_SIDEBAR) || "#1a2448",
+      accent:  localStorage.getItem(LS_ACCENT)  || "#c8102e",
+    };
+  } catch {
+    return { sidebar: "#1a2448", accent: "#c8102e" };
+  }
+}
+
 function usePanelTheme(): PanelTheme {
-  const [theme, setTheme] = useState<PanelTheme>({
-    logo: logoFallback,
-    sidebar: "#1a2448",
-    accent: "#F5A623",
-    accentText: "#1a2448",
+  // Lazy initializer — reads localStorage synchronously, zero flash
+  const [theme, setTheme] = useState<PanelTheme>(() => {
+    const { sidebar, accent } = readAdminThemeFromStorage();
+    return { logo: logoFallback, sidebar, accent, accentText: "#ffffff" };
   });
 
   useEffect(() => {
     fetch("/api/site")
       .then((r) => r.json())
       .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
+        const sidebar = data.adminSidebarColor || "#1a2448";
+        const accent  = data.adminAccentColor  || "#c8102e";
+        saveAdminThemeToStorage(sidebar, accent);
         setTheme({
           logo: data.adminLogoBase64 || data.logoBase64 || logoFallback,
-          sidebar: data.adminSidebarColor || "#1a2448",
-          accent: data.adminAccentColor || "#F5A623",
-          accentText: data.adminSidebarColor ? "#ffffff" : "#1a2448",
+          sidebar,
+          accent,
+          accentText: "#ffffff",
         });
       })
       .catch(() => {});
