@@ -122,17 +122,17 @@ export default function Header() {
           </button>
 
           {/* Logo */}
-          <Link href="/" className="shrink-0 mr-3" onClick={() => setMenu(false)}>
+          <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
             <img
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
               style={{ height: settings?.logoSize ?? 48 }}
-              className="w-auto object-contain"
+              className="w-auto object-contain block"
             />
           </Link>
 
           {/* Nav links — apenas desktop */}
-          <nav className="hidden lg:flex items-center gap-0 flex-1 overflow-x-auto no-scrollbar">
+          <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
             {navItems.map(({ label, path }) => (
               <Link
                 key={path}
