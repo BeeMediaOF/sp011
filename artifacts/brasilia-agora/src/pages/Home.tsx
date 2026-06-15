@@ -121,83 +121,69 @@ function CustomBlock({ block, getArticles }: {
   }
 }
 
+// ─── Default configs for predefined blocks ────────────────────────────────────
+const PREDEFINED_DEFAULTS: Record<string, {
+  category: string;
+  layout: "grid" | "featured" | "duplo" | "cultura";
+  color: string;
+  href: string;
+  reverse?: boolean;
+}> = {
+  brasil:     { category: "brasil",     layout: "grid",    color: "#16a34a", href: "/brasil" },
+  mundo:      { category: "mundo",      layout: "grid",    color: "#6b21a8", href: "/mundo" },
+  esporte:    { category: "esporte",    layout: "cultura", color: "#dc2626", href: "/esportes", reverse: true },
+  cultura:    { category: "cultura",    layout: "cultura", color: "#0d9488", href: "/cultura" },
+  df:         { category: "df",         layout: "duplo",   color: "#0b3d91", href: "/cidade" },
+  saude:      { category: "saude",      layout: "grid",    color: "#16a34a", href: "/saude" },
+  tecnologia: { category: "tecnologia", layout: "cultura", color: "#0284c7", href: "/tecnologia", reverse: true },
+};
+
+// ─── Configurable block renderer (predefined + custom) ────────────────────────
+function ConfigurableBlock({ block, getArticles }: {
+  block: HomeBlock;
+  getArticles: (cat: string) => SectionArticle[];
+}) {
+  const defaults = PREDEFINED_DEFAULTS[block.id];
+
+  const cat    = block.category ?? defaults?.category ?? "geral";
+  const color  = block.color    ?? defaults?.color    ?? "#6b7280";
+  const layout = block.layout   ?? defaults?.layout   ?? "grid";
+  const href   = `/${cat}`;
+  const title  = block.name;
+  const articles = getArticles(cat);
+
+  if (articles.length === 0) return null;
+
+  switch (layout) {
+    case "featured":
+      return <SectionBlockFeatured title={title} color={color} href={href} articles={articles} />;
+    case "duplo":
+      return <SectionBlockDuploDestaque title={title} color={color} href={href} articles={articles} />;
+    case "cultura":
+      return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} />;
+    case "grid":
+    default:
+      return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} />;
+  }
+}
+
 // ─── Predefined block renderer ────────────────────────────────────────────────
 function PredefinedBlock({ block, getArticles }: {
   block: HomeBlock;
   getArticles: (cat: string) => SectionArticle[];
 }) {
-  switch (block.id) {
-    case "hero":
-      return <HeroSection />;
+  // Special fixed blocks (no category makes sense)
+  if (block.id === "hero")       return <HeroSection />;
+  if (block.id === "mais-lidas") return <MostRead />;
+  if (block.id === "colunistas") return <ColumnistsSection limit={4} />;
+  if (block.id === "ultimas")    return <DestaquesListaBadge />;
 
-    case "brasil":
-      return (
-        <SectionBlock
-          title="Brasil" color={EDITORIA_COLORS.brasil} href="/brasil"
-          articles={getArticles("brasil")} pageSize={4}
-        />
-      );
-
-    case "mais-lidas":
-      return <MostRead />;
-
-    case "mundo":
-      return (
-        <SectionBlock
-          title="Mundo" color={EDITORIA_COLORS.mundo} href="/mundo"
-          articles={getArticles("mundo")}
-        />
-      );
-
-    case "esporte":
-      return (
-        <SectionBlockCulturaLayout
-          title="Esporte" color={EDITORIA_COLORS.esporte} href="/esportes"
-          articles={getArticles("esporte")} reverse
-        />
-      );
-
-    case "cultura":
-      return (
-        <SectionBlockCulturaLayout
-          title="Cultura" color={EDITORIA_COLORS.cultura} href="/cultura"
-          articles={getArticles("cultura")}
-        />
-      );
-
-    case "df":
-      return (
-        <SectionBlockDuploDestaque
-          title="DF" color={EDITORIA_COLORS.df} href="/cidade"
-          articles={getArticles("df")}
-        />
-      );
-
-    case "saude":
-      return (
-        <SectionBlock
-          title="Saúde" color={EDITORIA_COLORS.saude} href="/saude"
-          articles={getArticles("saude")} pageSize={4}
-        />
-      );
-
-    case "tecnologia":
-      return (
-        <SectionBlockCulturaLayout
-          title="Tecnologia" color={EDITORIA_COLORS.tecnologia} href="/tecnologia"
-          articles={getArticles("tecnologia")} reverse
-        />
-      );
-
-    case "colunistas":
-      return <ColumnistsSection limit={4} />;
-
-    case "ultimas":
-      return <DestaquesListaBadge />;
-
-    default:
-      return null;
+  // All other predefined blocks are fully configurable
+  if (PREDEFINED_DEFAULTS[block.id]) {
+    return <ConfigurableBlock block={block} getArticles={getArticles} />;
   }
+
+  return null;
 }
 
 // ─── Ads between blocks ───────────────────────────────────────────────────────
