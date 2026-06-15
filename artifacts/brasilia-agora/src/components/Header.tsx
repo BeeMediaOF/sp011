@@ -109,7 +109,7 @@ export default function Header() {
   return (
     <>
       {/* ── Barra principal ── */}
-      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200 mt-[14px] mb-[14px]">
+      <header className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-200 mt-[29px] mb-[29px]">
         <div className="max-w-[1280px] mx-auto px-3 h-16 flex items-center gap-2 mt-[13px] mb-[13px]">
 
           {/* Hamburger */}
@@ -127,7 +127,7 @@ export default function Header() {
               src={logoImg}
               alt={settings?.siteName ?? "Bee News"}
               style={{ height: settings?.logoSize ?? 101 }}
-              className="w-auto object-contain pt-[0px] pb-[14px] pr-[4px] pl-[16px]"
+              className="w-auto object-contain pt-[0px] pr-[4px] pl-[16px] pb-[23px]"
             />
           </Link>
 

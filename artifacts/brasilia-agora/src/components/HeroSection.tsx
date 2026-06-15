@@ -1,11 +1,11 @@
-import React from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
-import heroImg from "../assets/images/hero.webp";
-import trafficImg from "../assets/images/traffic.webp";
-import policeImg from "../assets/images/police.webp";
-import hospitalImg from "../assets/images/hospital.webp";
-import busImg from "../assets/images/bus.webp";
-import studentsImg from "../assets/images/students.webp";
+import heroImg        from "../assets/images/hero.webp";
+import trafficImg     from "../assets/images/traffic.webp";
+import policeImg      from "../assets/images/police.webp";
+import hospitalImg    from "../assets/images/hospital.webp";
+import busImg         from "../assets/images/bus.webp";
+import studentsImg    from "../assets/images/students.webp";
 import politicaFeatImg from "../assets/images/politica_feat.webp";
 
 const featured = [
@@ -16,7 +16,6 @@ const featured = [
     chapeuColor: "#1d4ed8",
     title: "Câmara Legislativa aprova projeto que cria o programa Morar DF",
     summary: "Iniciativa prevê subsídio para famílias de baixa renda adquirirem a casa própria no Distrito Federal.",
-    author: "Por Redação",
     time: "2 horas atrás",
   },
   {
@@ -26,8 +25,16 @@ const featured = [
     chapeuColor: "#b45309",
     title: "DF bate recorde de exportações no primeiro semestre e lidera crescimento nacional",
     summary: "Brasília é eleita melhor cidade para investir no Brasil em 2025 segundo ranking nacional.",
-    author: "Por Redação",
     time: "3 horas atrás",
+  },
+  {
+    id: "hero-3",
+    img: studentsImg,
+    chapeu: "Educação",
+    chapeuColor: "#0b3d91",
+    title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023",
+    summary: "Resultado coloca o Distrito Federal entre os três melhores sistemas educacionais do país.",
+    time: "5 horas atrás",
   },
 ];
 
@@ -38,47 +45,161 @@ const secondary = [
   { id: "df-4",  img: busImg,      chapeu: "DF",        chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
 ];
 
+// ─── Card de destaque (reutilizado desktop + mobile) ──────────────────────────
+function FeaturedCard({
+  item,
+  priority = false,
+  className = "",
+}: {
+  item: typeof featured[number];
+  priority?: boolean;
+  className?: string;
+}) {
+  return (
+    <Link
+      href={`/artigo/${item.id}`}
+      className={`group block relative overflow-hidden bg-gray-100 ${className}`}
+    >
+      <img
+        src={item.img}
+        alt={item.title}
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : "auto"}
+        decoding={priority ? "sync" : "async"}
+        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-5">
+        <span
+          className="inline-block text-white text-[10px] font-bold px-2.5 py-1 uppercase tracking-wider mb-2"
+          style={{ backgroundColor: item.chapeuColor }}
+        >
+          {item.chapeu}
+        </span>
+        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight line-clamp-3 mb-1.5 transition-colors group-hover:text-gray-200">
+          {item.title}
+        </h2>
+        <p className="text-white/65 text-[12px] line-clamp-2 mb-2 hidden sm:block">{item.summary}</p>
+        <div className="flex items-center gap-2 text-[11px] text-white/60">
+          <img src="/favicon.jpg" alt="SBC Agora" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
+          <span className="font-medium">Redação</span>
+          <span className="w-1 h-1 rounded-full bg-white/40" />
+          <span>{item.time}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// ─── Carrossel mobile ─────────────────────────────────────────────────────────
+function MobileCarousel() {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  const next = useCallback(() => setActive((i) => (i + 1) % featured.length), []);
+  const prev = useCallback(() => setActive((i) => (i - 1 + featured.length) % featured.length), []);
+
+  // Auto-advance every 5 s (pauses on touch)
+  useEffect(() => {
+    if (paused) return;
+    const t = setInterval(next, 5000);
+    return () => clearInterval(t);
+  }, [next, paused]);
+
+  // Swipe support
+  const touchStartX = React.useRef<number>(0);
+  function onTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0]!.clientX;
+    setPaused(true);
+  }
+  function onTouchEnd(e: React.TouchEvent) {
+    const dx = e.changedTouches[0]!.clientX - touchStartX.current;
+    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    setTimeout(() => setPaused(false), 3000);
+  }
+
+  return (
+    <div
+      className="relative overflow-hidden"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {/* Slides */}
+      <div
+        className="flex transition-transform duration-500 ease-in-out"
+        style={{ transform: `translateX(-${active * 100}%)` }}
+      >
+        {featured.map((item, idx) => (
+          <div key={item.id} className="w-full shrink-0">
+            <FeaturedCard item={item} priority={idx === 0} className="h-[320px]" />
+          </div>
+        ))}
+      </div>
+
+      {/* Dot indicators */}
+      <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 z-10">
+        {featured.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => { setActive(i); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
+            className={`rounded-full transition-all duration-300 ${i === active ? "bg-white w-5 h-1.5" : "bg-white/40 w-1.5 h-1.5"}`}
+            aria-label={`Slide ${i + 1}`}
+          />
+        ))}
+      </div>
+
+      {/* Prev / Next arrows (hidden on very small screens) */}
+      <button
+        onClick={() => { prev(); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
+        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-colors z-10 hidden sm:flex"
+        aria-label="Anterior"
+      >‹</button>
+      <button
+        onClick={() => { next(); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
+        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-colors z-10 hidden sm:flex"
+        aria-label="Próximo"
+      >›</button>
+    </div>
+  );
+}
+
+// ─── Layout desktop: 1 grande + 2 empilhados ─────────────────────────────────
+function DesktopGrid() {
+  return (
+    <div className="grid grid-cols-3 gap-1 h-[480px]">
+      {/* Destaque principal — ocupa 2 colunas */}
+      <div className="col-span-2">
+        <FeaturedCard
+          item={featured[0]!}
+          priority
+          className="h-full text-[22px]"
+        />
+      </div>
+
+      {/* Coluna direita — 2 cards empilhados */}
+      <div className="flex flex-col gap-1">
+        <FeaturedCard item={featured[1]!} className="flex-1" />
+        <FeaturedCard item={featured[2]!} className="flex-1" />
+      </div>
+    </div>
+  );
+}
+
+// ─── HeroSection principal ────────────────────────────────────────────────────
 export default function HeroSection() {
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
-      {/* Dois destaques grandes */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-        {featured.map((item, idx) => (
-          <Link key={item.id} href={`/artigo/${item.id}`} className="group block">
-            <div className="relative overflow-hidden bg-gray-100 h-[260px] sm:h-[340px] lg:h-[420px]">
-              <img
-                src={item.img}
-                alt={item.title}
-                width={640}
-                height={420}
-                loading={idx === 0 ? "eager" : "lazy"}
-                fetchPriority={idx === 0 ? "high" : "auto"}
-                decoding={idx === 0 ? "sync" : "async"}
-                className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-6">
-                <span
-                  className="inline-block text-white text-[11px] font-bold px-3 py-1 uppercase tracking-wider mb-3"
-                  style={{ backgroundColor: item.chapeuColor }}
-                >
-                  {item.chapeu}
-                </span>
-                <h2 className="font-serif font-black text-[26px] leading-tight line-clamp-3 mb-2 transition-colors text-[#ffffff]">
-                  {item.title}
-                </h2>
-                <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{item.summary}</p>
-                <div className="flex items-center gap-2 text-[11px] text-white/70">
-                  <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-90" loading="lazy" />
-                  <span className="font-medium">Bee News</span>
-                  <span className="w-1 h-1 rounded-full bg-white/40" />
-                  <span>{item.time}</span>
-                </div>
-              </div>
-            </div>
-          </Link>
-        ))}
+
+      {/* Mobile: carrossel rotativo */}
+      <div className="block lg:hidden mb-5">
+        <MobileCarousel />
       </div>
+
+      {/* Desktop: 1 grande + 2 empilhados */}
+      <div className="hidden lg:block mb-5">
+        <DesktopGrid />
+      </div>
+
       {/* Faixa de secundárias */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
         {secondary.map((item) => (
@@ -95,10 +216,13 @@ export default function HeroSection() {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-[11px] font-bold uppercase tracking-wider block mb-1" style={{ color: item.chapeuColor }}>
+              <span
+                className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+                style={{ color: item.chapeuColor }}
+              >
                 {item.chapeu}
               </span>
-              <h3 className="font-serif text-[15px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
+              <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
                 {item.title}
               </h3>
             </div>
