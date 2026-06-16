@@ -159,6 +159,11 @@ export interface RssSource {
   customPrompt?: string;
 }
 
+export interface RssPrompts {
+  global?: string;
+  categories?: Record<string, string>;
+}
+
 interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
@@ -167,6 +172,7 @@ interface StoreData {
   columnists: Columnist[];
   contactInfo: ContactInfo;
   rssSources: RssSource[];
+  rssPrompts?: RssPrompts;
 }
 
 // Persistent path relative to the built dist/ folder: dist/ → ../data/store.json
@@ -453,6 +459,14 @@ export const store = {
     const deleted = _store.rssSources.length < before;
     if (deleted) saveStore(_store);
     return deleted;
+  },
+
+  // RSS Prompts (hierarchy: source > category > global > DEFAULT_PROMPT_TEMPLATE)
+  getRssPrompts: (): RssPrompts => ({ ...(_store.rssPrompts ?? {}) }),
+  updateRssPrompts: (data: RssPrompts): RssPrompts => {
+    _store.rssPrompts = { ...(_store.rssPrompts ?? {}), ...data };
+    saveStore(_store);
+    return { ..._store.rssPrompts };
   },
 
   // Contact Info

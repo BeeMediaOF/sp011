@@ -89,6 +89,20 @@ export function buildPrompt(
   return applyPromptTemplate(DEFAULT_PROMPT_TEMPLATE, title, text, sourceName, giveCredit);
 }
 
+/**
+ * Resolve the best prompt for a source following the hierarchy:
+ * source.customPrompt > category prompt > global prompt > DEFAULT_PROMPT_TEMPLATE
+ */
+export function resolvePrompt(
+  source: { customPrompt?: string; category: string },
+  prompts?: { global?: string; categories?: Record<string, string> }
+): string {
+  if (source.customPrompt) return source.customPrompt;
+  if (prompts?.categories?.[source.category]) return prompts.categories[source.category]!;
+  if (prompts?.global) return prompts.global;
+  return DEFAULT_PROMPT_TEMPLATE;
+}
+
 // ─── AI rewrite ───────────────────────────────────────────────────────────────
 
 function getGeminiFree() {
@@ -518,7 +532,9 @@ export async function autoProcessArticle(
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
     try {
-      const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit, src.customPrompt);
+      const prompts = store.getRssPrompts();
+      const chosenPrompt = resolvePrompt(src, prompts);
+      const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit, chosenPrompt);
       content          = result.content;
       keywords         = result.keywords;
       slug             = result.slug;

@@ -48,6 +48,11 @@ interface AiSettings {
   provider: AiProvider; model: string; hasKey: boolean;
 }
 
+interface RssPrompts {
+  global?: string;
+  categories?: Record<string, string>;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CATEGORIES = [
@@ -233,6 +238,13 @@ export default function RSSManager() {
   const [sourceError, setSourceError] = useState("");
   const [runSuccess, setRunSuccess]   = useState<{ id: string; count: number } | null>(null);
 
+  // ── Prompts ──
+  const [prompts, setPrompts]             = useState<RssPrompts>({});
+  const [promptTab, setPromptTab]         = useState<string>("__global__");
+  const [promptSaving, setPromptSaving]   = useState(false);
+  const [promptSaved, setPromptSaved]     = useState(false);
+  const [promptDefaultLoading, setPromptDefaultLoading] = useState(false);
+
   // ── Dynamic categories from menu ──
   const [menuCategories, setMenuCategories] = useState<{ slug: string; label: string }[]>([]);
 
@@ -284,6 +296,13 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadPrompts = useCallback(async () => {
+    try {
+      const d = await apiFetch<RssPrompts>("/prompts");
+      setPrompts(d);
+    } catch { /* ignore */ }
+  }, []);
+
   const loadMenuCategories = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}api/admin/menu`, {
@@ -305,7 +324,8 @@ export default function RSSManager() {
     void loadSources();
     void loadMenuCategories();
     void loadRssStats();
-  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats]);
+    void loadPrompts();
+  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats, loadPrompts]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -335,6 +355,55 @@ export default function RSSManager() {
       setTimeout(() => setAiSaved(false), 2500);
     } catch (e) { setAiError(String(e)); }
     finally { setAiSaving(false); }
+  }
+
+  // ─── Prompts ─────────────────────────────────────────────────────────────────
+
+  async function savePrompts() {
+    setPromptSaving(true); setPromptSaved(false);
+    try {
+      await apiFetch<RssPrompts>("/prompts", {
+        method: "PUT",
+        body: JSON.stringify(prompts),
+      });
+      setPromptSaved(true);
+      setTimeout(() => setPromptSaved(false), 2500);
+    } catch { /* ignore */ }
+    finally { setPromptSaving(false); }
+  }
+
+  async function loadDefaultPromptInto(target: string) {
+    setPromptDefaultLoading(true);
+    try {
+      const d = await apiFetch<{ prompt: string }>("/default-prompt");
+      if (target === "__global__") {
+        setPrompts((p) => ({ ...p, global: d.prompt }));
+      } else {
+        setPrompts((p) => ({ ...p, categories: { ...(p.categories ?? {}), [target]: d.prompt } }));
+      }
+    } catch { /* ignore */ }
+    finally { setPromptDefaultLoading(false); }
+  }
+
+  function setTabPrompt(tab: string, value: string) {
+    if (tab === "__global__") {
+      setPrompts((p) => ({ ...p, global: value || undefined }));
+    } else {
+      setPrompts((p) => ({
+        ...p,
+        categories: { ...(p.categories ?? {}), [tab]: value || undefined as unknown as string },
+      }));
+    }
+  }
+
+  function clearTabPrompt(tab: string) {
+    if (tab === "__global__") {
+      setPrompts((p) => ({ ...p, global: undefined }));
+    } else {
+      const cats = { ...(prompts.categories ?? {}) };
+      delete cats[tab];
+      setPrompts((p) => ({ ...p, categories: cats }));
+    }
   }
 
   // ─── Sources ────────────────────────────────────────────────────────────────
@@ -729,6 +798,119 @@ export default function RSSManager() {
               </p>
             </div>
           </form>
+        </section>
+
+        {/* ══ PROMPTS ═════════════════════════════════════════════════════════ */}
+        <section className="bg-white rounded-xl shadow-sm border">
+          <div className="px-6 py-4 border-b flex items-center gap-2">
+            <Wand2 size={18} className="text-purple-600" />
+            <h2 className="font-semibold text-gray-800">Prompts de Reescrita</h2>
+            <span className="ml-1 text-[11px] text-gray-400 font-normal">
+              Hierarquia: fonte &gt; categoria &gt; geral
+            </span>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-xs text-gray-500">
+              Configure um prompt <strong>Geral</strong> (vale para todas as fontes) e/ou prompts <strong>por categoria</strong>.
+              O prompt da própria fonte tem prioridade sobre estes. Deixe em branco para usar o prompt padrão.
+            </p>
+
+            {/* Tab bar */}
+            <div className="flex flex-wrap gap-1 border-b pb-1">
+              <button
+                type="button"
+                onClick={() => setPromptTab("__global__")}
+                className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold border-b-2 transition-colors
+                  ${promptTab === "__global__"
+                    ? "border-purple-600 text-purple-700 bg-purple-50"
+                    : "border-transparent text-gray-500 hover:text-gray-700"}`}
+              >
+                🌐 Geral
+                {prompts.global && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />}
+              </button>
+              {allCategories.map(({ slug, label }) => {
+                const hasCustom = !!prompts.categories?.[slug];
+                return (
+                  <button
+                    key={slug}
+                    type="button"
+                    onClick={() => setPromptTab(slug)}
+                    className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold border-b-2 transition-colors
+                      ${promptTab === slug
+                        ? "border-purple-600 text-purple-700 bg-purple-50"
+                        : "border-transparent text-gray-500 hover:text-gray-700"}`}
+                  >
+                    {label}
+                    {hasCustom && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Textarea area */}
+            {(() => {
+              const isGlobal   = promptTab === "__global__";
+              const currentVal = isGlobal ? (prompts.global ?? "") : (prompts.categories?.[promptTab] ?? "");
+              const hasValue   = !!currentVal;
+              const tabLabel   = isGlobal ? "geral" : (allCategories.find((c) => c.slug === promptTab)?.label ?? promptTab);
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-[11px] text-gray-400">
+                      Variáveis disponíveis:{" "}
+                      {["{{TITULO}}", "{{TEXTO}}", "{{FONTE}}", "{{CREDITO}}"].map((v) => (
+                        <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>
+                      ))}
+                    </p>
+                    <div className="flex gap-3 items-center">
+                      <button
+                        type="button"
+                        onClick={() => { void loadDefaultPromptInto(promptTab); }}
+                        disabled={promptDefaultLoading}
+                        className="text-[11px] text-blue-500 hover:underline disabled:opacity-50"
+                      >
+                        {promptDefaultLoading ? "Carregando…" : "Carregar prompt padrão"}
+                      </button>
+                      {hasValue && (
+                        <button
+                          type="button"
+                          onClick={() => clearTabPrompt(promptTab)}
+                          className="text-[11px] text-red-400 hover:underline"
+                        >
+                          Limpar
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <textarea
+                    key={promptTab}
+                    value={currentVal}
+                    onChange={(e) => setTabPrompt(promptTab, e.target.value)}
+                    rows={14}
+                    placeholder={`Prompt de reescrita para ${tabLabel}.\nDeixe vazio para usar o prompt do nível superior ou o padrão.\n\nClique em "Carregar prompt padrão" para ver e editar o prompt base.`}
+                    className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-gray-50"
+                    spellCheck={false}
+                  />
+                </div>
+              );
+            })()}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => { void savePrompts(); }}
+                disabled={promptSaving}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50
+                  ${promptSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"}`}
+              >
+                {promptSaved
+                  ? <><CheckCircle size={15} /> Salvo!</>
+                  : <><Wand2 size={15} /> {promptSaving ? "Salvando…" : "Salvar Prompts"}</>}
+              </button>
+            </div>
+          </div>
         </section>
 
         {/* ══ SOURCES ════════════════════════════════════════════════════════ */}

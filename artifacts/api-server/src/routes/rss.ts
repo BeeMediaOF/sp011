@@ -3,7 +3,7 @@ import { authMiddleware } from "../middlewares/auth.js";
 import { store, type RssAutoMode } from "../lib/store.js";
 import {
   fetchSourceArticles, rewriteWithAI, scrapeArticle,
-  processDueSource, DEFAULT_PROMPT_TEMPLATE,
+  processDueSource, DEFAULT_PROMPT_TEMPLATE, resolvePrompt,
 } from "../lib/rssProcessor.js";
 
 const router = Router();
@@ -59,6 +59,23 @@ router.patch("/sources/:id", (req, res) => {
 /** GET /api/admin/rss/default-prompt — return the default journalist prompt template */
 router.get("/default-prompt", (_req, res) => {
   res.json({ prompt: DEFAULT_PROMPT_TEMPLATE });
+});
+
+/** GET /api/admin/rss/prompts — return global + category prompts */
+router.get("/prompts", (_req, res) => {
+  res.json(store.getRssPrompts());
+});
+
+/** PUT /api/admin/rss/prompts — save global + category prompts */
+router.put("/prompts", (req, res) => {
+  const { global: globalPrompt, categories } = req.body as {
+    global?: string; categories?: Record<string, string>;
+  };
+  const updated = store.updateRssPrompts({
+    global:     (globalPrompt === "" ? undefined : globalPrompt),
+    categories: categories ?? {},
+  });
+  res.json(updated);
 });
 
 /** DELETE /api/admin/rss/sources/:id */
