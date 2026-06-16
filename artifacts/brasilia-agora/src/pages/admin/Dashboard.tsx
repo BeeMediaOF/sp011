@@ -62,13 +62,13 @@ export default function Dashboard() {
     )
     .slice(0, 6);
 
-  const last7 = stats?.dailyChart.slice(-7).map((d) => ({
+  const last7 = stats?.dailyChart?.slice(-7).map((d) => ({
     date:  d.date.slice(5),
     views: d.views,
   })) ?? [];
 
-  const todayViews = stats?.totals.today   ?? 0;
-  const weekViews  = stats?.totals.week    ?? 0;
+  const todayViews = stats?.totals?.today   ?? 0;
+  const weekViews  = stats?.totals?.week    ?? 0;
   const hasData    = last7.some((d) => d.views > 0);
 
   return (
