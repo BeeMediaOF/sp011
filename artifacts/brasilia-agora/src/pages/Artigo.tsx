@@ -74,9 +74,9 @@ function ArticleSidebar() {
               >
                 {idx + 1}
               </span>
-              <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3">
-                {item.title}
-              </p>
+              <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
+                dangerouslySetInnerHTML={{ __html: item.title }}
+              />
             </Link>
           ))}
         </div>
@@ -476,9 +476,9 @@ export default function Artigo() {
                   {/* Subtítulo */}
                   {article.subtitle && (
                     <p className="text-[17px] text-gray-600 leading-relaxed mb-5 border-l-4 pl-4"
-                      style={{ borderColor: chapeuColor }}>
-                      {article.subtitle}
-                    </p>
+                      style={{ borderColor: chapeuColor }}
+                      dangerouslySetInnerHTML={{ __html: article.subtitle }}
+                    />
                   )}
 
                   {/* Autor + compartilhamento */}

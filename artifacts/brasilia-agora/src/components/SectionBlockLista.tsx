@@ -56,7 +56,7 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
               <div className="w-[80px] h-[58px] shrink-0 overflow-hidden bg-gray-100 rounded">
                 <img
                   src={imgSrc(item.image)}
-                  alt={item.title}
+                  alt={item.title.replace(/<[^>]*>/g, "")}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   loading="lazy"
                 />
@@ -68,9 +68,9 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
                 >
                   {item.chapeu}
                 </span>
-                <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                  {item.title}
-                </h4>
+                <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                  dangerouslySetInnerHTML={{ __html: item.title }}
+                />
                 <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
               </div>
             </Link>

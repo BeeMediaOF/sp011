@@ -81,7 +81,7 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
                 <div className="aspect-[16/9] overflow-hidden bg-gray-100 rounded-sm mb-3">
                   <img
                     src={imgSrc(item.image)}
-                    alt={item.title}
+                    alt={item.title.replace(/<[^>]*>/g, "")}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
                     loading="lazy"
                   />
@@ -89,9 +89,9 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
                 <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>
                   {item.chapeu}
                 </span>
-                <h4 className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                  {item.title}
-                </h4>
+                <h4 className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                  dangerouslySetInnerHTML={{ __html: item.title }}
+                />
                 <p className="text-[11px] text-gray-400 mt-1.5">{item.time}</p>
               </Link>
             ))}

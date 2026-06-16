@@ -187,12 +187,12 @@ export default function DestaquesListaBadge() {
                   <div className="flex gap-3 items-start min-w-0">
                     <img
                       src={item.img}
-                      alt={item.title}
+                      alt={item.title.replace(/<[^>]*>/g, "")}
                       className="w-16 h-12 object-cover rounded shrink-0"
                     />
-                    <h4 className="text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3">
-                      {item.title}
-                    </h4>
+                    <h4 className="text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
+                      dangerouslySetInnerHTML={{ __html: item.title }}
+                    />
                   </div>
                 </Link>
               ))}

@@ -145,9 +145,9 @@ export default function Articles() {
                   {filtered.map((a) => (
                     <tr key={a.id} className="hover:bg-gray-50 transition-colors group">
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-800 line-clamp-1 leading-snug">{a.title}</p>
+                        <p className="font-medium text-gray-800 line-clamp-1 leading-snug">{a.title.replace(/<[^>]*>/g, "")}</p>
                         {a.subtitle && (
-                          <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{a.subtitle}</p>
+                          <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{a.subtitle.replace(/<[^>]*>/g, "")}</p>
                         )}
                         {/* Origin badges */}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">

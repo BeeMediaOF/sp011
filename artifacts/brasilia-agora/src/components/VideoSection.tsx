@@ -34,7 +34,7 @@ export default function VideoSection() {
               <div className="relative overflow-hidden bg-gray-800 mb-2">
                 <img
                   src={item.thumb}
-                  alt={item.title}
+                  alt={item.title.replace(/<[^>]*>/g, "")}
                   className="w-full h-[130px] object-cover group-hover:scale-105 transition-transform duration-500 opacity-80 group-hover:opacity-100"
                 />
                 <div className="absolute inset-0 flex items-center justify-center">
@@ -46,9 +46,9 @@ export default function VideoSection() {
                   {item.duration}
                 </span>
               </div>
-              <h4 className="font-serif text-white text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                {item.title}
-              </h4>
+              <h4 className="font-serif text-white text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                dangerouslySetInnerHTML={{ __html: item.title }}
+              />
             </Link>
           ))}
         </div>

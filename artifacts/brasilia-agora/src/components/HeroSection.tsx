@@ -98,7 +98,7 @@ function FeaturedCard({
     >
       <img
         src={item.img}
-        alt={item.title}
+        alt={item.title.replace(/<[^>]*>/g, "")}
         loading={priority ? "eager" : "lazy"}
         fetchPriority={priority ? "high" : "auto"}
         decoding={priority ? "sync" : "async"}
@@ -112,9 +112,9 @@ function FeaturedCard({
         >
           {item.chapeu}
         </span>
-        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[18px] sm:text-[20px] line-clamp-4 mb-2 transition-colors group-hover:text-gray-200">
-          {item.title}
-        </h2>
+        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[18px] sm:text-[20px] line-clamp-4 mb-2 transition-colors group-hover:text-gray-200"
+          dangerouslySetInnerHTML={{ __html: item.title }}
+        />
         <div className="flex items-center gap-2 text-[11px] text-white/60">
           <img src="/favicon.jpg" alt="SBC Agora" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
           <span className="font-medium">{item.author || "Redação"}</span>
@@ -259,9 +259,9 @@ export default function HeroSection() {
               >
                 {item.chapeu}
               </span>
-              <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
-                {item.title}
-              </h3>
+              <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
+                dangerouslySetInnerHTML={{ __html: item.title }}
+              />
             </div>
           </Link>
         ))}

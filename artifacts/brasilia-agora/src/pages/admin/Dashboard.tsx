@@ -249,7 +249,7 @@ export default function Dashboard() {
                       style={{ backgroundColor: categoryColor(a.category) }}
                     />
                     <p className="flex-1 text-sm text-gray-700 truncate group-hover:text-[#1a2448] transition-colors">
-                      {a.title}
+                      {a.title.replace(/<[^>]*>/g, "")}
                     </p>
                     <span
                       className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 capitalize hidden sm:block"
@@ -278,7 +278,7 @@ export default function Dashboard() {
                   {stats.topArticles.slice(0, 3).map((a, i) => (
                     <div key={a.id} className="flex items-center gap-3 px-2 py-1.5">
                       <span className="text-[11px] font-bold text-gray-200 w-3 text-right">{i + 1}</span>
-                      <p className="flex-1 text-sm text-gray-600 truncate">{a.title}</p>
+                      <p className="flex-1 text-sm text-gray-600 truncate">{a.title.replace(/<[^>]*>/g, "")}</p>
                       <span className="text-xs text-gray-400 shrink-0">{a.views.toLocaleString("pt-BR")} views</span>
                     </div>
                   ))}

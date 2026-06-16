@@ -40,14 +40,14 @@ export default function MaisLidasSection() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Top 1 — card grande destaque */}
             <Link href={`/artigo/${maisLidas[0].id}`} className="sm:col-span-2 block group relative overflow-hidden bg-gray-900">
-              <img src={maisLidas[0].img} alt={maisLidas[0].title} className="w-full h-[220px] object-cover group-hover:scale-105 transition-transform duration-700" />
+              <img src={maisLidas[0].img} alt={maisLidas[0].title.replace(/<[^>]*>/g, "")} className="w-full h-[220px] object-cover group-hover:scale-105 transition-transform duration-700" />
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
               <div className="absolute top-3 left-3 bg-[#c8102e] text-white text-[10px] font-black px-2 py-0.5 uppercase tracking-wider">#1 Mais Lida</div>
               <div className="absolute bottom-0 left-0 p-5 w-full">
                 <span className="text-[10px] font-bold text-[#1d4ed8] uppercase">{maisLidas[0].tag}</span>
-                <h3 className="text-white font-black text-lg leading-snug mt-1 group-hover:text-blue-200 transition-colors">
-                  {maisLidas[0].title}
-                </h3>
+                <h3 className="text-white font-black text-lg leading-snug mt-1 group-hover:text-blue-200 transition-colors"
+                  dangerouslySetInnerHTML={{ __html: maisLidas[0].title }}
+                />
                 <span className="text-gray-400 text-xs mt-2 block">{maisLidas[0].time}</span>
               </div>
             </Link>
@@ -56,16 +56,16 @@ export default function MaisLidasSection() {
             {maisLidas.slice(1, 5).map((item) => (
               <Link key={item.id} href={`/artigo/${item.id}`} className="block group bg-white border border-gray-200 hover:border-[#c8102e] transition-colors">
                 <div className="overflow-hidden">
-                  <img src={item.img} alt={item.title} className="w-full h-[120px] object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <img src={item.img} alt={item.title.replace(/<[^>]*>/g, "")} className="w-full h-[120px] object-cover group-hover:scale-105 transition-transform duration-500" />
                 </div>
                 <div className="p-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-[10px] font-black text-[#c8102e] bg-[#c8102e]/10 px-1.5 py-0.5">#{item.rank}</span>
                     <span className="text-[10px] font-bold uppercase" style={{ color: item.tagColor }}>{item.tag}</span>
                   </div>
-                  <h4 className="font-bold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                    {item.title}
-                  </h4>
+                  <h4 className="font-bold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
+                  />
                   <span className="text-gray-400 text-xs mt-1 block">{item.time}</span>
                 </div>
               </Link>
@@ -92,9 +92,9 @@ export default function MaisLidasSection() {
                   <div className="flex gap-3 items-start">
                     <span className="text-[#c8102e] font-black text-xs min-w-[38px] pt-0.5 shrink-0">{item.time}</span>
                     <div>
-                      <h4 className="font-semibold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors">
-                        {item.title}
-                      </h4>
+                      <h4 className="font-semibold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors"
+                        dangerouslySetInnerHTML={{ __html: item.title }}
+                      />
                       {index === 0 && <span className="inline-block mt-1 bg-[#0d1633] text-white text-[10px] font-bold px-2 py-0.5 uppercase">Nova</span>}
                     </div>
                   </div>
