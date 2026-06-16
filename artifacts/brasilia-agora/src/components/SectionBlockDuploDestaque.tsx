@@ -81,9 +81,13 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
 
         {/* Faixa de 4 notícias menores */}
         {strip.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 -mx-4 px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:snap-none sm:mx-0 sm:px-0 sm:pb-0 sm:gap-4 lg:grid-cols-4 border-t border-gray-200 pt-5">
             {strip.map((art) => (
-              <Link key={art.id} href={`/artigo/${art.id}`} className="group flex gap-3 items-start">
+              <Link
+                key={art.id}
+                href={`/artigo/${art.id}`}
+                className="group flex gap-3 items-start snap-start shrink-0 w-[72vw] max-w-[260px] sm:w-auto sm:max-w-none sm:shrink-0"
+              >
                 <div className="w-[80px] h-[60px] shrink-0 overflow-hidden bg-gray-100">
                   <img
                     src={imgSrc(art.image)}
