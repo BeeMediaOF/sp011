@@ -3,7 +3,7 @@ import { authMiddleware } from "../middlewares/auth.js";
 import { store, type RssAutoMode } from "../lib/store.js";
 import {
   fetchSourceArticles, rewriteWithAI, scrapeArticle,
-  processDueSource,
+  processDueSource, DEFAULT_PROMPT_TEMPLATE,
 } from "../lib/rssProcessor.js";
 
 const router = Router();
@@ -40,14 +40,25 @@ router.post("/sources", (req, res) => {
 
 /** PATCH /api/admin/rss/sources/:id */
 router.patch("/sources/:id", (req, res) => {
-  const body = req.body as Partial<{
+  const raw = req.body as Partial<{
     name: string; url: string; category: string; active: boolean;
     scheduleHours: number; giveCredit: boolean; autoMode: RssAutoMode;
+    customPrompt: string | null;
   }>;
-  if (body.scheduleHours !== undefined) body.scheduleHours = Number(body.scheduleHours);
+  if (raw.scheduleHours !== undefined) raw.scheduleHours = Number(raw.scheduleHours);
+  // Normalize: null or empty string → undefined (removes custom prompt)
+  const body: Parameters<typeof store.updateRssSource>[1] = {
+    ...raw,
+    customPrompt: (raw.customPrompt === null || raw.customPrompt === "") ? undefined : raw.customPrompt,
+  };
   const updated = store.updateRssSource(req.params.id ?? "", body);
   if (!updated) { res.status(404).json({ error: "Source not found" }); return; }
   res.json({ source: updated });
+});
+
+/** GET /api/admin/rss/default-prompt — return the default journalist prompt template */
+router.get("/default-prompt", (_req, res) => {
+  res.json({ prompt: DEFAULT_PROMPT_TEMPLATE });
 });
 
 /** DELETE /api/admin/rss/sources/:id */

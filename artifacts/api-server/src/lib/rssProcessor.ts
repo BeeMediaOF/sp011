@@ -33,10 +33,7 @@ export const TAG_MAP: Record<string, string> = {
 
 // ─── SEO / AIO journalist prompt ──────────────────────────────────────────────
 
-export function buildPrompt(
-  title: string, text: string, sourceName: string, giveCredit: boolean
-): string {
-  return `Você é um jornalista sênior especialista em SEO e AIO (AI Overview) para portais de notícias brasileiros.
+export const DEFAULT_PROMPT_TEMPLATE = `Você é um jornalista sênior especialista em SEO e AIO (AI Overview) para portais de notícias brasileiros.
 
 Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
 
@@ -62,16 +59,34 @@ Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
 - NÃO inclua o título no corpo do texto
 - NÃO adicione notas, explicações ou comentários fora do artigo
 - Português brasileiro formal, mas acessível
-${giveCredit ? `- PENÚLTIMA LINHA OBRIGATÓRIA antes dos metadados: "Com informações de: ${sourceName}"` : ""}
+{{CREDITO}}
 
 **METADADOS SEO (sempre ao final, exatamente neste formato):**
 SLUG: [slug-seo-do-artigo-em-kebab-case-sem-acentos-max-60-chars]
 KEYWORDS: [palavra1, palavra2, palavra3, palavra4, palavra5, palavra6]
 
-Título original: ${title}
+Título original: {{TITULO}}
 
 Texto original a reescrever:
-${text.slice(0, 7000)}`;
+{{TEXTO}}`;
+
+export function applyPromptTemplate(
+  template: string, title: string, text: string, sourceName: string, giveCredit: boolean
+): string {
+  const creditLine = giveCredit
+    ? `- PENÚLTIMA LINHA OBRIGATÓRIA antes dos metadados: "Com informações de: ${sourceName}"`
+    : "";
+  return template
+    .replace(/\{\{TITULO\}\}/g, title)
+    .replace(/\{\{TEXTO\}\}/g, text.slice(0, 7000))
+    .replace(/\{\{FONTE\}\}/g, sourceName)
+    .replace(/\{\{CREDITO\}\}/g, creditLine);
+}
+
+export function buildPrompt(
+  title: string, text: string, sourceName: string, giveCredit: boolean
+): string {
+  return applyPromptTemplate(DEFAULT_PROMPT_TEMPLATE, title, text, sourceName, giveCredit);
 }
 
 // ─── AI rewrite ───────────────────────────────────────────────────────────────
@@ -103,11 +118,13 @@ function parseRewriteResult(raw: string): RewriteResult {
 }
 
 export async function rewriteWithAI(
-  title: string, text: string, sourceName: string, giveCredit: boolean
+  title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
   const settings = store.getSettings();
   const provider = settings.rssAiProvider ?? "gemini_free";
-  const prompt   = buildPrompt(title, text, sourceName, giveCredit);
+  const prompt   = customPrompt
+    ? applyPromptTemplate(customPrompt, title, text, sourceName, giveCredit)
+    : buildPrompt(title, text, sourceName, giveCredit);
 
   let raw = "";
 
@@ -501,7 +518,7 @@ export async function autoProcessArticle(
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
     try {
-      const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit);
+      const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit, src.customPrompt);
       content          = result.content;
       keywords         = result.keywords;
       slug             = result.slug;

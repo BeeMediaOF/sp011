@@ -156,6 +156,7 @@ export interface RssSource {
   giveCredit: boolean;
   autoMode: RssAutoMode;
   lastFetchedAt?: string;
+  customPrompt?: string;
 }
 
 interface StoreData {

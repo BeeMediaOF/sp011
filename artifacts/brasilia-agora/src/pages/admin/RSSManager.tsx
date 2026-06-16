@@ -21,6 +21,7 @@ interface RssSource {
   active: boolean; createdAt: string;
   scheduleHours: number; giveCredit: boolean;
   autoMode: AutoMode; lastFetchedAt?: string;
+  customPrompt?: string;
 }
 
 interface FetchedArticle {
@@ -121,6 +122,89 @@ function AutoModeBadge({ mode }: { mode: AutoMode }) {
   };
   const { label, cls } = map[mode] ?? map["none"];
   return <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cls}`}>{label}</span>;
+}
+
+// ─── Prompt Editor ────────────────────────────────────────────────────────────
+
+function PromptEditor({
+  value, onChange, apiFetch,
+}: {
+  value: string | undefined;
+  onChange: (v: string | undefined) => void;
+  apiFetch: (path: string, opts?: RequestInit) => Promise<unknown>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function loadDefault() {
+    setLoading(true);
+    try {
+      const data = await apiFetch("/default-prompt") as { prompt: string };
+      onChange(data.prompt);
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
+  }
+
+  const isCustom = !!value;
+
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <Wand2 size={12} className="text-purple-500"/>
+          Prompt do Jornalista (IA)
+          {isCustom && (
+            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded-full font-semibold">personalizado</span>
+          )}
+        </span>
+        {open ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
+      </button>
+
+      {open && (
+        <div className="p-3 border-t space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-gray-400">
+              Variáveis: <code className="bg-gray-100 px-1 rounded">{"{{TITULO}}"}</code>{" "}
+              <code className="bg-gray-100 px-1 rounded">{"{{TEXTO}}"}</code>{" "}
+              <code className="bg-gray-100 px-1 rounded">{"{{FONTE}}"}</code>{" "}
+              <code className="bg-gray-100 px-1 rounded">{"{{CREDITO}}"}</code>
+            </p>
+            <div className="flex gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => { void loadDefault(); }}
+                disabled={loading}
+                className="text-[10px] text-blue-500 hover:underline disabled:opacity-50"
+              >
+                {loading ? "Carregando…" : "Carregar padrão"}
+              </button>
+              {isCustom && (
+                <button
+                  type="button"
+                  onClick={() => onChange(undefined)}
+                  className="text-[10px] text-red-400 hover:underline"
+                >
+                  Remover personalização
+                </button>
+              )}
+            </div>
+          </div>
+          <textarea
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value || undefined)}
+            rows={12}
+            placeholder={"Deixe vazio para usar o prompt padrão.\n\nClique em 'Carregar padrão' para ver e editar o prompt atual."}
+            className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0b3d91] resize-y bg-gray-50"
+            spellCheck={false}
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -284,6 +368,7 @@ export default function RSSManager() {
           category:     editingSource.category, active: editingSource.active,
           scheduleHours: editingSource.scheduleHours, giveCredit: editingSource.giveCredit,
           autoMode:     editingSource.autoMode,
+          customPrompt: editingSource.customPrompt ?? null,
         }),
       });
       setEditingSource(null); setSourceError(""); await loadSources();
@@ -749,6 +834,16 @@ export default function RSSManager() {
                               onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
                             Dar crédito
                           </label>
+                        </div>
+
+                        {/* ── Prompt do Jornalista ── */}
+                        <PromptEditor
+                          value={editingSource.customPrompt}
+                          onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
+                          apiFetch={apiFetch}
+                        />
+
+                        <div className="flex gap-2">
                           <button onClick={() => { void saveEdit(); }}
                             className="bg-[#0b3d91] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
                             Salvar
