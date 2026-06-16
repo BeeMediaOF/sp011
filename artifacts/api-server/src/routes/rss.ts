@@ -103,15 +103,15 @@ router.post("/fetch", async (req, res) => {
 
 // ─── Rewrite ──────────────────────────────────────────────────────────────────
 
-/** POST /api/admin/rss/rewrite  { title, text, sourceName, giveCredit? } */
+/** POST /api/admin/rss/rewrite  { title, text, sourceName, giveCredit?, customPrompt? } */
 router.post("/rewrite", async (req, res) => {
-  const { title, text, sourceName, giveCredit } = req.body as {
-    title?: string; text?: string; sourceName?: string; giveCredit?: boolean;
+  const { title, text, sourceName, giveCredit, customPrompt } = req.body as {
+    title?: string; text?: string; sourceName?: string; giveCredit?: boolean; customPrompt?: string;
   };
   if (!text) { res.status(400).json({ error: "text é obrigatório" }); return; }
   try {
     const result = await rewriteWithAI(
-      title ?? "", text, sourceName ?? "fonte", giveCredit !== false
+      title ?? "", text, sourceName ?? "fonte", giveCredit !== false, customPrompt
     );
     res.json({ rewritten: result.content, keywords: result.keywords, slug: result.slug });
   } catch (err) {

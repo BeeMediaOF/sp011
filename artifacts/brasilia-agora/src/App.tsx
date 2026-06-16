@@ -44,6 +44,7 @@ import ContactSettings from "@/pages/admin/ContactSettings";
 import Analytics from "@/pages/admin/Analytics";
 import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
 import RSSManager from "@/pages/admin/RSSManager";
+import Pipeline from "@/pages/admin/Pipeline";
 
 const queryClient = new QueryClient();
 
@@ -134,6 +135,9 @@ function Router() {
       </Route>
       <Route path="/admin/home-blocos">
         <RequireAuth><HomeBlocksManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/pipeline">
+        <RequireAuth><Pipeline /></RequireAuth>
       </Route>
       <Route path="/admin/rss">
         <RequireAuth><RSSManager /></RequireAuth>
