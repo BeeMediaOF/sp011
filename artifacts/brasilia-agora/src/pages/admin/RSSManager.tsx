@@ -251,6 +251,10 @@ export default function RSSManager() {
   // ── Stats ──
   const [rssStats, setRssStats] = useState({ total: 0, rewritten: 0, manual: 0 });
 
+  // ── Source list UI ──
+  const [sourceSearch,    setSourceSearch]    = useState("");
+  const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
+
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
   const [fetching, setFetching]       = useState(false);
@@ -335,6 +339,46 @@ export default function RSSManager() {
       ...extra,
     ];
   }, [menuCategories]);
+
+  /** Extract publisher name: "Agência Brasil - Política" → "Agência Brasil" */
+  function extractPublisher(name: string): string {
+    const idx = name.search(/\s[–\-]\s/);
+    return idx > 0 ? name.slice(0, idx).trim() : name;
+  }
+
+  const groupedSources = useMemo(() => {
+    const q = sourceSearch.toLowerCase();
+    const filtered = q
+      ? sources.filter((s) =>
+          s.name.toLowerCase().includes(q) ||
+          (TAG_MAP[s.category] ?? s.category).toLowerCase().includes(q)
+        )
+      : sources;
+    const map = new Map<string, RssSource[]>();
+    for (const src of filtered) {
+      const pub = extractPublisher(src.name);
+      if (!map.has(pub)) map.set(pub, []);
+      map.get(pub)!.push(src);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+      .map(([publisher, srcs]) => ({ publisher, sources: srcs }));
+  }, [sources, sourceSearch]);
+
+  function toggleGroup(pub: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(pub)) next.delete(pub);
+      else next.add(pub);
+      return next;
+    });
+  }
+
+  async function toggleAllInGroup(srcs: RssSource[], toActive: boolean) {
+    for (const src of srcs) {
+      if (src.active !== toActive) await toggleSource(src);
+    }
+  }
 
   // ─── AI Settings ────────────────────────────────────────────────────────────
 
@@ -980,115 +1024,169 @@ export default function RSSManager() {
               </div>
             )}
 
-            {/* Source list */}
+            {/* Search bar */}
+            {sources.length > 0 && (
+              <div className="relative">
+                <input
+                  value={sourceSearch}
+                  onChange={(e) => setSourceSearch(e.target.value)}
+                  placeholder="Buscar por veículo ou categoria…"
+                  className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"
+                />
+                <Rss size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
+                {sourceSearch && (
+                  <button onClick={() => setSourceSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X size={13}/>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Grouped source list */}
             {sources.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">Nenhuma fonte cadastrada</p>
+            ) : groupedSources.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">Nenhuma fonte encontrada para "{sourceSearch}"</p>
             ) : (
-              <div className="rounded-xl border overflow-hidden divide-y">
-                {sources.map((src) => (
-                  <div key={src.id}>
-                    {editingSource?.id === src.id ? (
-                      /* ── Edit mode ── */
-                      <div className="p-4 bg-blue-50 space-y-3">
-                        <div className="flex flex-wrap gap-3">
-                          <input value={editingSource.name} onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
-                            className="flex-1 min-w-[150px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                          <input value={editingSource.url} onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
-                            className="flex-[2] min-w-[250px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                          <select value={editingSource.category} onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
-                            className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                            {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
-                          </select>
-                        </div>
-                        <div className="flex flex-wrap gap-3 items-center">
-                          <select value={editingSource.scheduleHours}
-                            onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
-                            className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                            {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                          <select value={editingSource.autoMode}
-                            onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
-                            className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                            {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                          <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                            <input type="checkbox" checked={editingSource.giveCredit}
-                              onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
-                            Dar crédito
-                          </label>
-                        </div>
+              <div className="space-y-2">
+                {groupedSources.map(({ publisher, sources: grpSources }) => {
+                  const isExpanded = expandedGroups.has(publisher);
+                  const activeCount = grpSources.filter((s) => s.active).length;
+                  const allOn = grpSources.every((s) => s.active);
+                  const anyOn = grpSources.some((s) => s.active);
 
-                        {/* ── Prompt do Jornalista ── */}
-                        <PromptEditor
-                          value={editingSource.customPrompt}
-                          onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
-                          apiFetch={apiFetch}
-                        />
-
-                        <div className="flex gap-2">
-                          <button onClick={() => { void saveEdit(); }}
-                            className="bg-[#0b3d91] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
-                            Salvar
-                          </button>
-                          <button onClick={() => setEditingSource(null)}
-                            className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors">
-                            Cancelar
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      /* ── View mode ── */
-                      <div className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-gray-50 transition-colors">
-                        {/* Toggle */}
-                        <button onClick={() => { void toggleSource(src); }}
-                          className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${src.active ? "bg-green-500" : "bg-gray-300"}`}>
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${src.active ? "translate-x-4" : "translate-x-0.5"}`}/>
+                  return (
+                    <div key={publisher} className="rounded-xl border overflow-hidden">
+                      {/* ── Group header ── */}
+                      <div
+                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b cursor-pointer select-none hover:bg-gray-100 transition-colors"
+                        onClick={() => toggleGroup(publisher)}
+                      >
+                        <span className="text-gray-400 flex-shrink-0">
+                          {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
+                        </span>
+                        <p className="font-semibold text-[#1a2448] text-sm flex-1 truncate">{publisher}</p>
+                        <span className="text-[11px] text-gray-500 flex-shrink-0">
+                          {grpSources.length} feed{grpSources.length !== 1 ? "s" : ""}
+                        </span>
+                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${activeCount === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
+                          {activeCount} ativo{activeCount !== 1 ? "s" : ""}
+                        </span>
+                        {/* Bulk toggle */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); void toggleAllInGroup(grpSources, !allOn); }}
+                          title={allOn ? "Desativar todos" : "Ativar todos"}
+                          className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${anyOn ? "bg-green-500" : "bg-gray-300"}`}
+                        >
+                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${anyOn ? "translate-x-4" : "translate-x-0.5"}`}/>
                         </button>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-semibold text-gray-800">{src.name}</p>
-                            <Badge label={TAG_MAP[src.category] ?? src.category} color="bg-gray-100 text-gray-600"/>
-                            <AutoModeBadge mode={src.autoMode}/>
-                            {src.giveCredit && (
-                              <span className="text-[10px] text-blue-500 font-medium">crédito ✓</span>
-                            )}
-                            {src.scheduleHours > 0 && (
-                              <span className="flex items-center gap-0.5 text-[10px] text-amber-600 font-medium">
-                                <Clock size={10}/>{src.scheduleHours}h
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-400 truncate">{src.url}</p>
-                          {src.lastFetchedAt && (
-                            <p className="text-[10px] text-gray-400">
-                              Última busca: {new Date(src.lastFetchedAt).toLocaleString("pt-BR")}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {src.autoMode !== "none" && (
-                            <button
-                              onClick={() => { void runSource(src.id); }}
-                              disabled={runningId === src.id}
-                              title="Executar agora"
-                              className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-50"
-                            >
-                              <Play size={15} className={runningId === src.id ? "animate-pulse" : ""}/>
-                            </button>
-                          )}
-                          <button onClick={() => setEditingSource(src)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-[#0b3d91] hover:bg-blue-50 transition-colors">
-                            <Settings size={15}/>
-                          </button>
-                          <button onClick={() => { void deleteSource(src.id); }}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                            <Trash2 size={15}/>
-                          </button>
-                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* ── Feed rows (collapsible) ── */}
+                      {isExpanded && (
+                        <div className="divide-y bg-white">
+                          {grpSources.map((src) => (
+                            <div key={src.id}>
+                              {editingSource?.id === src.id ? (
+                                /* ── Edit mode ── */
+                                <div className="p-4 bg-blue-50 space-y-3">
+                                  <div className="flex flex-wrap gap-3">
+                                    <input value={editingSource.name} onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
+                                      className="flex-1 min-w-[150px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                                    <input value={editingSource.url} onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
+                                      className="flex-[2] min-w-[250px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                                    <select value={editingSource.category} onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
+                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                                      {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="flex flex-wrap gap-3 items-center">
+                                    <select value={editingSource.scheduleHours}
+                                      onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
+                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                                      {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                    <select value={editingSource.autoMode}
+                                      onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
+                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                                      {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
+                                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
+                                      <input type="checkbox" checked={editingSource.giveCredit}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
+                                      Dar crédito
+                                    </label>
+                                  </div>
+                                  <PromptEditor
+                                    value={editingSource.customPrompt}
+                                    onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
+                                    apiFetch={apiFetch}
+                                  />
+                                  <div className="flex gap-2">
+                                    <button onClick={() => { void saveEdit(); }}
+                                      className="bg-[#0b3d91] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
+                                      Salvar
+                                    </button>
+                                    <button onClick={() => setEditingSource(null)}
+                                      className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors">
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* ── View mode ── */
+                                <div className="flex items-center gap-3 pl-8 pr-4 py-2.5 bg-white hover:bg-gray-50 transition-colors">
+                                  <button onClick={() => { void toggleSource(src); }}
+                                    className={`relative w-8 h-[18px] rounded-full flex-shrink-0 transition-colors ${src.active ? "bg-green-500" : "bg-gray-300"}`}>
+                                    <span className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${src.active ? "translate-x-[18px]" : "translate-x-0.5"}`}/>
+                                  </button>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <Badge label={TAG_MAP[src.category] ?? src.category} color="bg-gray-100 text-gray-600"/>
+                                      <AutoModeBadge mode={src.autoMode}/>
+                                      {src.giveCredit && <span className="text-[10px] text-blue-500 font-medium">crédito ✓</span>}
+                                      {src.scheduleHours > 0 && (
+                                        <span className="flex items-center gap-0.5 text-[10px] text-amber-600 font-medium">
+                                          <Clock size={10}/>{src.scheduleHours}h
+                                        </span>
+                                      )}
+                                      {src.customPrompt && (
+                                        <span className="text-[10px] text-purple-500 font-medium flex items-center gap-0.5"><Wand2 size={9}/>prompt próprio</span>
+                                      )}
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 truncate mt-0.5">{src.url}</p>
+                                    {src.lastFetchedAt && (
+                                      <p className="text-[10px] text-gray-300">
+                                        Última busca: {new Date(src.lastFetchedAt).toLocaleString("pt-BR")}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {src.autoMode !== "none" && (
+                                      <button onClick={() => { void runSource(src.id); }} disabled={runningId === src.id}
+                                        title="Executar agora"
+                                        className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-50">
+                                        <Play size={14} className={runningId === src.id ? "animate-pulse" : ""}/>
+                                      </button>
+                                    )}
+                                    <button onClick={() => setEditingSource(src)}
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-[#0b3d91] hover:bg-blue-50 transition-colors">
+                                      <Settings size={14}/>
+                                    </button>
+                                    <button onClick={() => { void deleteSource(src.id); }}
+                                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                      <Trash2 size={14}/>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
