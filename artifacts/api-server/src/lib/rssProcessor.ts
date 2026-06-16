@@ -25,7 +25,7 @@ export const rssParser = new Parser({
 // ─── Tag mapping ──────────────────────────────────────────────────────────────
 
 export const TAG_MAP: Record<string, string> = {
-  politica: "POLÍTICA", cidade: "CIDADE", seguranca: "SEGURANÇA",
+  politica: "POLÍTICA", mundo: "MUNDO", cidade: "CIDADE", seguranca: "SEGURANÇA",
   transporte: "TRANSPORTE", saude: "SAÚDE", educacao: "EDUCAÇÃO",
   cultura: "CULTURA", esportes: "ESPORTES", economia: "ECONOMIA",
   tecnologia: "TECNOLOGIA", geral: "GERAL",

@@ -173,7 +173,101 @@ interface StoreData {
   contactInfo: ContactInfo;
   rssSources: RssSource[];
   rssPrompts?: RssPrompts;
+  seedVersion?: number;
 }
+
+const RSS_SEED_VERSION = 1;
+
+const DEFAULT_RSS_SOURCES: Omit<RssSource, "id" | "createdAt">[] = [
+  // ── Política ──────────────────────────────────────────────────────────────
+  { name: "Agência Brasil – Política",        url: "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml",                          category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Brasil de Fato – Política",         url: "https://www.brasildefato.com.br/editoria/politica/feed/",                        category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Carta Capital – Política",          url: "https://www.cartacapital.com.br/politica/feed/",                                  category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Correio Braziliense – Política",    url: "https://www.correiobraziliense.com.br/politica/feed",                             category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Política",              url: "https://jovempan.com.br/noticias/politica/feed",                                  category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Notícias ao Minuto – Política",     url: "https://www.noticiasaominuto.com.br/rss/politica",                               category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Revista Oeste – Política",          url: "https://revistaoeste.com/politica/feed/",                                         category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Política",              url: "https://www.infomoney.com.br/politica/feed/",                                     category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Mundo ─────────────────────────────────────────────────────────────────
+  { name: "Agência Brasil – Internacional",    url: "https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml",                    category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Brasil de Fato – Internacional",    url: "https://www.brasildefato.com.br/editoria/interacional/feed/",                    category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Carta Capital – Mundo",             url: "https://www.cartacapital.com.br/mundo/feed/",                                     category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Correio Braziliense – Mundo",       url: "https://www.correiobraziliense.com.br/mundo/feed",                                category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jornal de Brasília – Mundo",        url: "https://jornaldebrasilia.com.br/noticias/mundo/feed/",                            category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Mundo",                 url: "https://jovempan.com.br/noticias/mundo/feed",                                     category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Mundo",                url: "https://www.metropoles.com/mundo/feed",                                           category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Notícias ao Minuto – Mundo",        url: "https://www.noticiasaominuto.com.br/rss/mundo",                                   category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Revista Oeste – Mundo",             url: "https://revistaoeste.com/mundo/feed/",                                            category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Mundo",                 url: "https://www.infomoney.com.br/mundo/feed/",                                        category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Economia ──────────────────────────────────────────────────────────────
+  { name: "Agência Brasil – Economia",         url: "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",                         category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Carta Capital – Economia",          url: "https://www.cartacapital.com.br/economia/feed/",                                  category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Correio Braziliense – Economia",    url: "https://www.correiobraziliense.com.br/economia/feed",                             category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jornal de Brasília – Economia",     url: "https://jornaldebrasilia.com.br/noticias/economia/feed/",                         category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Economia",              url: "https://jovempan.com.br/noticias/economia/feed",                                  category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Notícias ao Minuto – Economia",     url: "https://www.noticiasaominuto.com.br/rss/economia",                               category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Revista Oeste – Economia",          url: "https://revistaoeste.com/economia/feed/",                                         category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Economia",              url: "https://www.infomoney.com.br/economia/feed/",                                     category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Mercados",              url: "https://www.infomoney.com.br/mercados/feed/",                                     category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Consumo",               url: "https://www.infomoney.com.br/consumo/feed/",                                      category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Business",              url: "https://www.infomoney.com.br/business/feed/",                                     category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InvestNews – Economia",             url: "https://investnews.com.br/economia/feed/",                                        category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InvestNews – Finanças",             url: "https://investnews.com.br/financas/feed/",                                        category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InvestNews – Investimentos",        url: "https://investnews.com.br/investimentos/feed/",                                   category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InvestNews – Negócios",             url: "https://investnews.com.br/negocios/feed/",                                        category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Finsiders – Negócios em Fintechs",  url: "https://finsidersbrasil.com.br/negocios-em-fintechs/feed/",                      category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Finsiders – Economia Open",         url: "https://finsidersbrasil.com.br/economia-open/feed/",                             category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Negócios",             url: "https://www.metropoles.com/negocios/feed",                                        category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Esportes ──────────────────────────────────────────────────────────────
+  { name: "Agência Brasil – Esportes",         url: "https://agenciabrasil.ebc.com.br/rss/esportes/feed.xml",                         category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Brasil de Fato – Esportes",         url: "https://www.brasildefato.com.br/editoria/esportes/feed/",                        category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Esportes",              url: "https://jovempan.com.br/esportes/feed",                                           category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Esportes",             url: "https://www.metropoles.com/esportes/feed",                                        category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Notícias ao Minuto – Esportes",     url: "https://www.noticiasaominuto.com.br/rss/esporte",                                category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Esportes",              url: "https://www.infomoney.com.br/esportes/feed/",                                     category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Cultura ───────────────────────────────────────────────────────────────
+  { name: "Agência Brasil – Cultura",          url: "https://agenciabrasil.ebc.com.br/radioagencia-nacional/rss/cultura/feed.xml",    category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Notícias ao Minuto – Cultura",      url: "https://www.noticiasaominuto.com.br/rss/cultura",                                category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Correio Braziliense – Arte",        url: "https://www.correiobraziliense.com.br/diversao-e-arte/feed",                      category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Entretenimento",       url: "https://www.metropoles.com/entretenimento/feed",                                  category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Entretenimento",        url: "https://jovempan.com.br/entretenimento/feed",                                     category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Vida e Estilo",        url: "https://www.metropoles.com/vida-e-estilo/feed",                                   category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jornal de Brasília – Estilo",       url: "https://jornaldebrasilia.com.br/estilo-de-vida/feed/",                            category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Segurança / Justiça ───────────────────────────────────────────────────
+  { name: "Agência Brasil – Justiça",          url: "https://agenciabrasil.ebc.com.br/rss/justica/feed.xml",                          category: "seguranca",  active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Saúde ─────────────────────────────────────────────────────────────────
+  { name: "Correio Braziliense – Saúde",       url: "https://www.correiobraziliense.com.br/ciencia-e-saude/feed",                      category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Saúde",                url: "https://www.metropoles.com/saude/feed",                                           category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Saúde",                 url: "https://jovempan.com.br/saude/feed",                                              category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Saúde",                 url: "https://www.infomoney.com.br/saude/feed/",                                        category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Tecnologia ────────────────────────────────────────────────────────────
+  { name: "Notícias ao Minuto – Tech",         url: "https://www.noticiasaominuto.com.br/rss/tech",                                   category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Revista Oeste – Tecnologia",        url: "https://revistaoeste.com/tecnologia/feed/",                                       category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Ciência",              url: "https://www.metropoles.com/ciencia/feed",                                         category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Finsiders – Tecnologia FinTech",    url: "https://finsidersbrasil.com.br/tecnologia-para-fintechs/feed/",                  category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Finsiders – IA",                    url: "https://finsidersbrasil.com.br/ia/feed/",                                         category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InvestNews – Tecnologia",           url: "https://investnews.com.br/tecnologia/feed/",                                      category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Cidade / Brasília e DF ────────────────────────────────────────────────
+  { name: "Correio Braziliense (geral)",       url: "https://www.correiobraziliense.com.br/feed",                                      category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jornal de Brasília – DF",           url: "https://jornaldebrasilia.com.br/brasilia/feed/",                                  category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Distrito Federal",     url: "https://www.metropoles.com/distrito-federal/feed",                                category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+
+  // ── Geral / Brasil ────────────────────────────────────────────────────────
+  { name: "Correio Braziliense – Brasil",      url: "https://www.correiobraziliense.com.br/brasil/feed",                               category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jornal de Brasília – Brasil",       url: "https://jornaldebrasilia.com.br/noticias/brasil/feed/",                           category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Jovem Pan – Brasil",                url: "https://jovempan.com.br/noticias/brasil/feed",                                    category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – Brasil",               url: "https://www.metropoles.com/brasil/feed",                                          category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "InfoMoney – Brasil",                url: "https://www.infomoney.com.br/brasil/feed/",                                       category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+  { name: "Metrópoles – São Paulo",            url: "https://www.metropoles.com/sao-paulo/feed",                                       category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+];
 
 // Persistent path relative to the built dist/ folder: dist/ → ../data/store.json
 const _storeDir = join(dirname(fileURLToPath(import.meta.url)), "..", "data");
@@ -288,13 +382,30 @@ const defaultStore: StoreData = {
   },
 };
 
+function seedDefaultSources(data: StoreData): void {
+  if ((data.seedVersion ?? 0) >= RSS_SEED_VERSION) return;
+  if (!data.rssSources) data.rssSources = [];
+  const existingUrls = new Set(data.rssSources.map((s) => s.url));
+  for (const src of DEFAULT_RSS_SOURCES) {
+    if (!existingUrls.has(src.url)) {
+      data.rssSources.push({ ...src, id: randomUUID(), createdAt: new Date().toISOString() });
+    }
+  }
+  data.seedVersion = RSS_SEED_VERSION;
+  saveStore(data);
+}
+
 function loadStore(): StoreData {
   try {
     if (existsSync(STORE_FILE)) {
-      return JSON.parse(readFileSync(STORE_FILE, "utf-8")) as StoreData;
+      const data = JSON.parse(readFileSync(STORE_FILE, "utf-8")) as StoreData;
+      seedDefaultSources(data);
+      return data;
     }
   } catch { /* ignore */ }
-  return structuredClone(defaultStore);
+  const fresh = structuredClone(defaultStore);
+  seedDefaultSources(fresh);
+  return fresh;
 }
 
 function saveStore(data: StoreData): void {

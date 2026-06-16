@@ -56,11 +56,11 @@ interface RssPrompts {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CATEGORIES = [
-  "politica","cidade","seguranca","transporte","saude",
+  "politica","mundo","cidade","seguranca","transporte","saude",
   "educacao","cultura","esportes","economia","tecnologia","geral",
 ];
 const TAG_MAP: Record<string, string> = {
-  politica:"POLÍTICA", cidade:"CIDADE", seguranca:"SEGURANÇA",
+  politica:"POLÍTICA", mundo:"MUNDO", cidade:"CIDADE", seguranca:"SEGURANÇA",
   transporte:"TRANSPORTE", saude:"SAÚDE", educacao:"EDUCAÇÃO",
   cultura:"CULTURA", esportes:"ESPORTES", economia:"ECONOMIA",
   tecnologia:"TECNOLOGIA", geral:"GERAL",
