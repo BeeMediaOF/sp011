@@ -173,7 +173,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow-sm p-5">
             <h2 className="text-sm font-semibold text-gray-700 mb-1">Top categorias</h2>
             <p className="text-[10px] text-gray-400 mb-3">por acessos (barras) e artigos publicados</p>
-            {!stats || stats.topCategories.length === 0 ? (
+            {!stats || (stats.topCategories?.length ?? 0) === 0 ? (
               <div className="h-36 flex flex-col items-center justify-center text-gray-300 gap-2">
                 <FileText size={24} />
                 <p className="text-sm">Sem dados</p>
@@ -269,7 +269,7 @@ export default function Dashboard() {
               </div>
             )}
 
-            {stats && stats.topArticles.length > 0 && (
+            {stats && (stats.topArticles?.length ?? 0) > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-100">
                 <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
                   <TrendingUp size={11} /> Mais lidas

@@ -23,6 +23,14 @@ interface SocialConfig {
   templateGradientFrom?: string;
   templateGradientTo?: string;
   lastPublishedAt?: string;
+  templateTitleSizeScale?: number;
+  templateTitleOffsetX?: number;
+  templateTitleOffsetY?: number;
+  templateTitleFont?: string;
+  templateLogoScale?: number;
+  templateLogoPosition?: "top-right" | "top-left" | "bottom-left" | "bottom-right";
+  templateCategoryOffsetX?: number;
+  templateCategoryOffsetY?: number;
 }
 
 interface Article {
@@ -86,6 +94,8 @@ function renderCanvas(
 
   const doDraw = (bgImg?: HTMLImageElement, logoImg?: HTMLImageElement) => {
     ctx.clearRect(0, 0, W, H);
+    const PAD  = Math.round(W * 0.055);
+    const barH = Math.round(H * 0.052);
 
     // 1. Background
     if (bgImg) {
@@ -110,8 +120,6 @@ function renderCanvas(
     ov.addColorStop(1,    gTo);
     ctx.fillStyle = ov; ctx.fillRect(0, 0, W, H);
 
-    const PAD = Math.round(W * 0.055);
-
     // 3. Category badge
     if (cfg.templateShowCategory !== false && article?.category) {
       const badgeColor = CATEGORY_COLORS[article.category] ?? "#c8102e";
@@ -121,8 +129,10 @@ function renderCanvas(
       const tm  = ctx.measureText(badgeText);
       const bw  = tm.width + Math.round(W * 0.045);
       const bh  = Math.round(W * 0.058);
-      const bx  = PAD;
-      const by  = PAD;
+      const catOffX = cfg.templateCategoryOffsetX ?? 0;
+      const catOffY = cfg.templateCategoryOffsetY ?? 0;
+      const bx = PAD + Math.round(W * catOffX);
+      const by = PAD + Math.round(H * catOffY);
       ctx.fillStyle = badgeColor;
       ctx.beginPath();
       ctx.roundRect(bx, by, bw, bh, bh / 2);
@@ -132,28 +142,40 @@ function renderCanvas(
       ctx.fillText(badgeText, bx + Math.round(W * 0.022), by + bh / 2);
     }
 
-    // 4. Logo (top-right)
+    // 4. Logo (position configurable)
     if (cfg.templateShowLogo && logoImg) {
-      const lW = Math.round(W * 0.24);
+      const logoScale = cfg.templateLogoScale ?? 1.0;
+      const lW = Math.round(W * 0.24 * logoScale);
       const lH = Math.round(lW * (logoImg.height / logoImg.width));
-      const lx = W - PAD - lW;
-      const ly = PAD + Math.round(W * 0.005);
+      const logoPos = cfg.templateLogoPosition ?? "top-right";
+      let lx: number, ly: number;
+      if (logoPos === "top-left")     { lx = PAD;          ly = PAD; }
+      else if (logoPos === "bottom-left")  { lx = PAD;          ly = H - barH - lH - Math.round(PAD * 0.5); }
+      else if (logoPos === "bottom-right") { lx = W - PAD - lW; ly = H - barH - lH - Math.round(PAD * 0.5); }
+      else                                 { lx = W - PAD - lW; ly = PAD + Math.round(W * 0.005); }
       ctx.drawImage(logoImg, lx, ly, lW, lH);
     }
 
     // 5. Title
     if (article?.title) {
-      const fs = type === "feed" ? Math.round(W * 0.068) : Math.round(W * 0.072);
-      ctx.font  = `700 ${fs}px Merriweather, Georgia, serif`;
+      const sizeScale   = cfg.templateTitleSizeScale ?? 1.0;
+      const baseFs      = type === "feed" ? Math.round(W * 0.068) : Math.round(W * 0.072);
+      const fs          = Math.round(baseFs * sizeScale);
+      const fontFamily  = cfg.templateTitleFont ?? "Merriweather, Georgia, serif";
+      ctx.font  = `700 ${fs}px ${fontFamily}`;
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "left"; ctx.textBaseline = "bottom";
       ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 20;
-      const maxW = W - PAD * 2;
-      const lines = wrapText(ctx, article.title, maxW);
-      const lh    = fs * 1.22;
+      const offX   = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
+      const offY   = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
+      const titleX = PAD + offX;
+      const maxW   = W - PAD - offX - PAD;
+      const cleanTitle = article.title.replace(/<[^>]*>/g, "");
+      const lines  = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5));
+      const lh     = fs * 1.22;
       const totalH = lines.length * lh;
-      const baseline = H - Math.round(H * 0.068) - PAD;
-      lines.forEach((ln, i) => ctx.fillText(ln, PAD, baseline - totalH + (i + 1) * lh));
+      const baseline = H - Math.round(H * 0.068) - PAD - offY;
+      lines.forEach((ln, i) => ctx.fillText(ln, titleX, baseline - totalH + (i + 1) * lh));
       ctx.shadowBlur = 0;
     }
 
@@ -167,15 +189,15 @@ function renderCanvas(
       const lines = wrapText(ctx, article.subtitle, maxW).slice(0, 2);
       const lh    = fs * 1.4;
       const totalH = lines.length * lh;
-      const titleFs = Math.round(W * 0.072);
-      const titleLines = article.title ? wrapText(ctx, article.title, maxW).length : 0;
-      const titleH  = titleLines * titleFs * 1.22;
-      const baseline = H - Math.round(H * 0.068) - PAD - titleH - Math.round(W * 0.02);
+      const titleFs    = Math.round(W * 0.072 * (cfg.templateTitleSizeScale ?? 1.0));
+      const titleLines = article.title ? wrapText(ctx, article.title.replace(/<[^>]*>/g, ""), maxW).length : 0;
+      const titleH     = titleLines * titleFs * 1.22;
+      const offY       = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
+      const baseline   = H - Math.round(H * 0.068) - PAD - titleH - Math.round(W * 0.02) - offY;
       lines.forEach((ln, i) => ctx.fillText(ln, PAD, baseline - totalH + (i + 1) * lh));
     }
 
     // 7. Bottom bar
-    const barH = Math.round(H * 0.052);
     ctx.fillStyle = "#c8102e";
     ctx.fillRect(0, H - barH, W, barH);
     const label = siteName ?? window.location.hostname.replace("www.", "");
@@ -285,7 +307,7 @@ export default function SocialMedia() {
 
   // Load articles
   useEffect(() => {
-    if (tab !== "publicar") return;
+    if (tab !== "publicar" && tab !== "template") return;
     fetch("/api/articles?status=published&limit=50")
       .then(r => r.json())
       .then((data: Article[] | { articles?: Article[] }) => {
@@ -520,7 +542,8 @@ export default function SocialMedia() {
 
         {/* ── TEMPLATE ─────────────────────────────────────────────────────────── */}
         {tab === "template" && (
-          <div className="space-y-6">
+          <div className="space-y-5">
+            {/* Type toggle */}
             <div className="flex gap-2">
               {(["feed", "story"] as const).map(t => (
                 <button key={t} onClick={() => { setPreviewType(t); setTimeout(redrawCanvas, 50); }}
@@ -532,61 +555,222 @@ export default function SocialMedia() {
               ))}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Settings */}
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <ImageIcon size={15} /> Configurações do template
-                </h3>
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
+              {/* ── Controls ── */}
+              <div className="space-y-4">
 
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Exibir categoria</span>
-                  <input type="checkbox" className="w-4 h-4 accent-[#c8102e]"
-                    checked={cfg.templateShowCategory ?? true}
-                    onChange={e => { setCfg(p => ({ ...p, templateShowCategory: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
-                </label>
-                <label className="flex items-center justify-between">
-                  <span className="text-sm text-gray-700">Exibir logo do portal</span>
-                  <input type="checkbox" className="w-4 h-4 accent-[#c8102e]"
-                    checked={cfg.templateShowLogo ?? false}
-                    onChange={e => { setCfg(p => ({ ...p, templateShowLogo: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
-                </label>
-
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">Gradiente — topo</label>
-                  <div className="flex items-center gap-3">
-                    <input type="color" value="#000000"
+                {/* Article for preview */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
+                    <ImageIcon size={14} /> Artigo para prévia
+                  </h3>
+                  {articles.length === 0 ? (
+                    <p className="text-xs text-gray-400">Carregando artigos…</p>
+                  ) : (
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                      value={selArt?.id ?? ""}
                       onChange={e => {
-                        const hex = e.target.value;
-                        const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-                        setCfg(p => ({ ...p, templateGradientFrom: `rgba(${r},${g},${b},0)` }));
-                        setTimeout(redrawCanvas, 50);
-                      }}
-                      className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
-                    <span className="text-xs text-gray-400">Transparente por padrão (boa prática)</span>
+                        const found = articles.find(a => a.id === e.target.value) ?? null;
+                        setSelArt(found);
+                        setTimeout(redrawCanvas, 100);
+                      }}>
+                      <option value="">— sem artigo (fundo padrão) —</option>
+                      {articles.map(a => (
+                        <option key={a.id} value={a.id}>
+                          [{a.tag ?? a.category}] {a.title.replace(/<[^>]*>/g, "").slice(0, 55)}
+                          {a.title.length > 55 ? "…" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* Title controls */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-gray-800 text-sm">Título</h3>
+
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Fonte</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                      value={cfg.templateTitleFont ?? "Merriweather, Georgia, serif"}
+                      onChange={e => { setCfg(p => ({ ...p, templateTitleFont: e.target.value })); setTimeout(redrawCanvas, 50); }}>
+                      <option value="Merriweather, Georgia, serif">Merriweather (Serif elegante)</option>
+                      <option value="Georgia, serif">Georgia (Serif clássica)</option>
+                      <option value="'Times New Roman', serif">Times New Roman</option>
+                      <option value="Inter, Arial, sans-serif">Inter (Sans-serif moderna)</option>
+                      <option value="Arial, Helvetica, sans-serif">Arial (Sans-serif simples)</option>
+                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Tamanho</span>
+                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleSizeScale ?? 1.0) * 100)}%</span>
+                    </div>
+                    <input type="range" min="0.5" max="1.8" step="0.05"
+                      value={cfg.templateTitleSizeScale ?? 1.0}
+                      onChange={e => { setCfg(p => ({ ...p, templateTitleSizeScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                      className="w-full accent-[#c8102e]" />
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Pequeno</span><span>Grande</span></div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Posição horizontal</span>
+                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleOffsetX ?? 0) * 100)}%</span>
+                    </div>
+                    <input type="range" min="-0.15" max="0.15" step="0.01"
+                      value={cfg.templateTitleOffsetX ?? 0}
+                      onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                      className="w-full accent-[#c8102e]" />
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>← Esquerda</span><span>Direita →</span></div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Posição vertical</span>
+                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleOffsetY ?? 0) * 100)}%</span>
+                    </div>
+                    <input type="range" min="-0.25" max="0.35" step="0.01"
+                      value={cfg.templateTitleOffsetY ?? 0}
+                      onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                      className="w-full accent-[#c8102e]" />
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>↓ Mais baixo</span><span>↑ Mais alto</span></div>
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm text-gray-700 mb-1">Gradiente — base (opacidade)</label>
-                  <input type="range" min="0.4" max="1" step="0.05"
-                    value={parseFloat((cfg.templateGradientTo ?? "rgba(0,0,0,0.88)").match(/[\d.]+\)$/)?.[0]?.replace(")","") ?? "0.88")}
-                    onChange={e => { setCfg(p => ({ ...p, templateGradientTo: `rgba(0,0,0,${e.target.value})` })); setTimeout(redrawCanvas, 50); }}
-                    className="w-full accent-[#c8102e]" />
-                  <div className="flex justify-between text-xs text-gray-400 mt-0.5">
-                    <span>Transparente</span><span>Sólido</span>
+                {/* Category tag */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-800 text-sm">Tag de Categoria</h3>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                        checked={cfg.templateShowCategory ?? true}
+                        onChange={e => { setCfg(p => ({ ...p, templateShowCategory: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
+                      Exibir
+                    </label>
+                  </div>
+                  {(cfg.templateShowCategory ?? true) && (
+                    <>
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Posição horizontal</span>
+                          <span className="font-mono text-gray-500">{Math.round((cfg.templateCategoryOffsetX ?? 0) * 100)}%</span>
+                        </div>
+                        <input type="range" min="0" max="0.6" step="0.01"
+                          value={cfg.templateCategoryOffsetX ?? 0}
+                          onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                          className="w-full accent-[#c8102e]" />
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Borda esq.</span><span>Centro →</span></div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Posição vertical</span>
+                          <span className="font-mono text-gray-500">{Math.round((cfg.templateCategoryOffsetY ?? 0) * 100)}%</span>
+                        </div>
+                        <input type="range" min="0" max="0.4" step="0.01"
+                          value={cfg.templateCategoryOffsetY ?? 0}
+                          onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                          className="w-full accent-[#c8102e]" />
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Topo</span><span>↓ Mais baixo</span></div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Logo */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-800 text-sm">Logo</h3>
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                        checked={cfg.templateShowLogo ?? false}
+                        onChange={e => { setCfg(p => ({ ...p, templateShowLogo: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
+                      Exibir
+                    </label>
+                  </div>
+                  {(cfg.templateShowLogo ?? false) && (
+                    <>
+                      <div>
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Tamanho</span>
+                          <span className="font-mono text-gray-500">{Math.round((cfg.templateLogoScale ?? 1.0) * 100)}%</span>
+                        </div>
+                        <input type="range" min="0.4" max="2.0" step="0.1"
+                          value={cfg.templateLogoScale ?? 1.0}
+                          onChange={e => { setCfg(p => ({ ...p, templateLogoScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                          className="w-full accent-[#c8102e]" />
+                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menor</span><span>Maior</span></div>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-600 mb-2">Posição</p>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {([
+                            { key: "top-left",     label: "↖ Sup. Esq." },
+                            { key: "top-right",    label: "↗ Sup. Dir." },
+                            { key: "bottom-left",  label: "↙ Inf. Esq." },
+                            { key: "bottom-right", label: "↘ Inf. Dir." },
+                          ] as const).map(({ key, label }) => (
+                            <button key={key}
+                              onClick={() => { setCfg(p => ({ ...p, templateLogoPosition: key })); setTimeout(redrawCanvas, 50); }}
+                              className={`py-1.5 px-2 rounded text-xs font-medium border transition-colors ${
+                                (cfg.templateLogoPosition ?? "top-right") === key
+                                  ? "bg-[#c8102e] text-white border-[#c8102e]"
+                                  : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                              }`}>
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Gradient */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-gray-800 text-sm">Gradiente sobre a foto</h3>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Cor do gradiente — topo</label>
+                    <div className="flex items-center gap-3">
+                      <input type="color" value="#000000"
+                        onChange={e => {
+                          const hex = e.target.value;
+                          const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+                          setCfg(p => ({ ...p, templateGradientFrom: `rgba(${r},${g},${b},0)` }));
+                          setTimeout(redrawCanvas, 50);
+                        }}
+                        className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                      <span className="text-xs text-gray-400">Transparente por padrão (boa prática)</span>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Escurecimento da base</span>
+                      <span className="font-mono text-gray-500">
+                        {Math.round(parseFloat((cfg.templateGradientTo ?? "rgba(0,0,0,0.88)").match(/[\d.]+\)$/)?.[0]?.replace(")","") ?? "0.88") * 100)}%
+                      </span>
+                    </div>
+                    <input type="range" min="0.4" max="1" step="0.05"
+                      value={parseFloat((cfg.templateGradientTo ?? "rgba(0,0,0,0.88)").match(/[\d.]+\)$/)?.[0]?.replace(")","") ?? "0.88")}
+                      onChange={e => { setCfg(p => ({ ...p, templateGradientTo: `rgba(0,0,0,${e.target.value})` })); setTimeout(redrawCanvas, 50); }}
+                      className="w-full accent-[#c8102e]" />
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Claro</span><span>Escuro</span></div>
                   </div>
                 </div>
 
                 <button onClick={saveConfig} disabled={saving}
-                  className="w-full py-2 bg-[#c8102e] text-white rounded-lg text-sm font-medium hover:bg-[#a50d25] disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="w-full py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-medium hover:bg-[#a50d25] disabled:opacity-50 flex items-center justify-center gap-2">
                   {saving ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                   {saving ? "Salvando…" : "Salvar template"}
                 </button>
               </div>
 
-              {/* Canvas preview */}
-              <div className="flex flex-col items-center gap-3">
+              {/* ── Canvas preview ── */}
+              <div className="flex flex-col items-center gap-3 lg:sticky lg:top-4">
                 <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
                   Prévia — {previewType === "feed" ? "Feed 1080×1350" : "Story 1080×1920"}
                 </p>
@@ -595,7 +779,17 @@ export default function SocialMedia() {
                   <canvas ref={previewType === "feed" ? feedCanvasRef : storyCanvasRef}
                     style={{ width: "100%", height: "100%", display: "block" }} />
                 </div>
-                <p className="text-xs text-gray-400">Prévia com artigo de exemplo</p>
+                <button onClick={() => {
+                    const ref = previewType === "feed" ? feedCanvasRef.current : storyCanvasRef.current;
+                    if (!ref) return;
+                    const a = document.createElement("a");
+                    a.download = `${previewType}.jpg`;
+                    a.href = ref.toDataURL("image/jpeg", 0.92);
+                    a.click();
+                  }}
+                  className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                  <Eye size={11}/> Baixar prévia
+                </button>
               </div>
             </div>
           </div>
