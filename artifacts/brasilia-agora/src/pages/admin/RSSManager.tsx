@@ -133,7 +133,7 @@ function PromptEditor({
   onChange: (v: string | undefined) => void;
   apiFetch: (path: string, opts?: RequestInit) => Promise<unknown>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
   const [loading, setLoading] = useState(false);
 
   async function loadDefault() {
