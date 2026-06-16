@@ -5,7 +5,7 @@ import { store } from "../lib/store.js";
 const router = Router();
 
 export interface AnalyticsEvent {
-  type: "pageview" | "read" | "category";
+  type: "pageview" | "read" | "category" | "scroll" | "share";
   path: string;
   title?: string;
   category?: string;
@@ -15,6 +15,10 @@ export interface AnalyticsEvent {
   device: "mobile" | "desktop" | "tablet";
   ts: number;
   ua?: string;
+  // new fields
+  referrer?: string;      // "direto" | "busca" | "social" | "outro"
+  scrollDepth?: number;   // 25 | 50 | 75 | 100
+  platform?: string;      // "facebook" | "twitter" | "whatsapp" | "copy"
 }
 
 // In-memory circular buffer — max 50k events
@@ -34,20 +38,21 @@ function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
 
 /** POST /api/analytics/event — public, no auth */
 router.post("/event", (req, res) => {
-  const { type, path, title, category, articleId, sessionId, duration } = req.body as Partial<AnalyticsEvent>;
+  const {
+    type, path, title, category, articleId, sessionId, duration,
+    referrer, scrollDepth, platform,
+  } = req.body as Partial<AnalyticsEvent>;
   if (!type || !path || !sessionId) { res.status(400).json({ ok: false }); return; }
   const ua = req.headers["user-agent"] ?? "";
   pushEvent({
     type: type as AnalyticsEvent["type"],
-    path,
-    title,
-    category,
-    articleId,
-    sessionId,
-    duration,
+    path, title, category, articleId, sessionId, duration,
     device: detectDevice(ua),
     ts: Date.now(),
     ua,
+    referrer,
+    scrollDepth,
+    platform,
   });
   res.json({ ok: true });
 });
@@ -64,78 +69,129 @@ router.get("/stats", authMiddleware, (_req, res) => {
     byDay[d.toISOString().slice(0, 10)] = 0;
   }
 
-  // By hour (0-23)
-  const byHour: number[] = Array(24).fill(0);
+  const byHour: number[]                = Array(24).fill(0);
+  const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
+  const catMap:     Record<string, number> = {};
+  const deviceMap:  Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
+  const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
+  const scrollMap:  Record<number, number>  = { 25: 0, 50: 0, 75: 0, 100: 0 };
+  const shareMap:   Record<string, number>  = {};
+  const sessionPageviews: Record<string, number> = {};
 
-  // Top articles
-  const articleMap: Record<string, { title: string; views: number }> = {};
-
-  // Top categories
-  const catMap: Record<string, number> = {};
-
-  // Device breakdown
-  const deviceMap: Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
-
-  // Totals
   let today = 0, week = 0, month = 0;
+  let totalReadTime = 0, readCount = 0;
 
   for (const ev of events) {
-    if (ev.type !== "pageview") continue;
     const age = now - ev.ts;
-    const dayKey = new Date(ev.ts).toISOString().slice(0, 10);
-    const hour = new Date(ev.ts).getHours();
 
-    if (age <= 30 * DAY) {
-      if (byDay[dayKey] !== undefined) byDay[dayKey]++;
-      month++;
+    // ── pageview ──────────────────────────────────────────────────────
+    if (ev.type === "pageview") {
+      const dayKey = new Date(ev.ts).toISOString().slice(0, 10);
+      const hour   = new Date(ev.ts).getHours();
+
+      if (age <= 30 * DAY) {
+        if (byDay[dayKey] !== undefined) byDay[dayKey]++;
+        month++;
+      }
+      if (age <= 7 * DAY) week++;
+      if (age <= DAY)      today++;
+
+      byHour[hour]++;
+      deviceMap[ev.device]++;
+
+      // referrer
+      const ref = ev.referrer ?? "direto";
+      referrerMap[ref] = (referrerMap[ref] ?? 0) + 1;
+
+      // session bounce tracking
+      sessionPageviews[ev.sessionId] = (sessionPageviews[ev.sessionId] ?? 0) + 1;
+
+      // article
+      if (ev.articleId) {
+        if (!articleMap[ev.articleId]) {
+          articleMap[ev.articleId] = { title: ev.title ?? ev.articleId, views: 0, totalReadTime: 0, readSessions: 0 };
+        }
+        articleMap[ev.articleId]!.views++;
+      }
+
+      // category
+      if (ev.category) catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
     }
-    if (age <= 7 * DAY) week++;
-    if (age <= DAY) today++;
 
-    byHour[hour]++;
-    deviceMap[ev.device]++;
-
-    // Article
-    if (ev.articleId) {
-      if (!articleMap[ev.articleId]) articleMap[ev.articleId] = { title: ev.title ?? ev.articleId, views: 0 };
-      articleMap[ev.articleId]!.views++;
+    // ── read ──────────────────────────────────────────────────────────
+    if (ev.type === "read" && ev.duration) {
+      totalReadTime += ev.duration;
+      readCount++;
+      if (ev.articleId && articleMap[ev.articleId]) {
+        articleMap[ev.articleId]!.totalReadTime += ev.duration;
+        articleMap[ev.articleId]!.readSessions++;
+      }
     }
 
-    // Category
-    if (ev.category) {
-      catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
+    // ── scroll ────────────────────────────────────────────────────────
+    if (ev.type === "scroll" && ev.scrollDepth) {
+      scrollMap[ev.scrollDepth] = (scrollMap[ev.scrollDepth] ?? 0) + 1;
+    }
+
+    // ── share ─────────────────────────────────────────────────────────
+    if (ev.type === "share" && ev.platform) {
+      shareMap[ev.platform] = (shareMap[ev.platform] ?? 0) + 1;
     }
   }
+
+  // Derived stats
+  const uniqueSessions  = Object.keys(sessionPageviews).length;
+  const avgReadTime     = readCount > 0 ? Math.round(totalReadTime / readCount) : 0;
+  const bounceSessions  = Object.values(sessionPageviews).filter((v) => v === 1).length;
+  const bounceRate      = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
+  const readCompletions = scrollMap[100] ?? 0;
 
   const topArticles = Object.entries(articleMap)
     .sort((a, b) => b[1].views - a[1].views)
     .slice(0, 10)
-    .map(([id, { title, views }]) => ({ id, title, views }));
+    .map(([id, { title, views, totalReadTime: rt, readSessions: rs }]) => ({
+      id, title, views,
+      avgTime: rs > 0 ? Math.round(rt / rs) : undefined,
+    }));
 
-  // Merge analytics category views with article counts per category (fallback when no events yet)
-  const articles = store.getArticles().filter((a) => a.status === "published");
+  // Top categories with article counts
+  const publishedArticles = store.getArticles().filter((a) => a.status === "published");
   const articleCountByCategory: Record<string, number> = {};
-  for (const a of articles) {
+  for (const a of publishedArticles) {
     if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;
   }
-
-  // Union of all known categories
   const allCatNames = new Set([...Object.keys(catMap), ...Object.keys(articleCountByCategory)]);
   const topCategories = Array.from(allCatNames)
     .map((name) => ({ name, views: catMap[name] ?? 0, articles: articleCountByCategory[name] ?? 0 }))
     .sort((a, b) => (b.views || b.articles) - (a.views || a.articles))
     .slice(0, 10);
 
-  const dailyChart = Object.entries(byDay).map(([date, views]) => ({ date, views }));
+  const dailyChart  = Object.entries(byDay).map(([date, views]) => ({ date, views }));
   const hourlyChart = byHour.map((views, hour) => ({ hour, views }));
+
+  const scrollDepthChart = [25, 50, 75, 100].map((depth) => ({
+    depth, count: scrollMap[depth] ?? 0,
+  }));
+
+  const referrerChart = Object.entries(referrerMap)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
+  const shareChart = Object.entries(shareMap)
+    .map(([platform, count]) => ({ platform, count }))
+    .sort((a, b) => b.count - a.count);
 
   res.json({
     totals: { today, week, month, allTime: events.filter(e => e.type === "pageview").length },
+    engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
     dailyChart,
     hourlyChart,
     topArticles,
     topCategories,
     devices: deviceMap,
+    scrollDepthChart,
+    referrerChart,
+    shareChart,
   });
 });
 

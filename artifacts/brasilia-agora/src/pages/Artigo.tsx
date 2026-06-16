@@ -1,5 +1,6 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect } from "react";
 import { useParams, Link } from "wouter";
+import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
@@ -119,6 +120,8 @@ export default function Artigo() {
 
   const { article: apiArticle, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
+  const { trackArticle, trackShare } = useAnalytics();
+  useScrollDepth(slug);
 
   /* Usa API se disponível, senão converte o mock para o mesmo shape */
   const article = apiArticle
@@ -141,6 +144,14 @@ export default function Artigo() {
         publishedAt: new Date().toISOString(),
       }
     : null;
+
+  /* Track article once resolved */
+  useEffect(() => {
+    if (article) {
+      trackArticle(article.id, article.title, article.category ?? "");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article?.id]);
 
   /* Mostra skeleton apenas se não tem mock e a API ainda carrega */
   const showSkeleton = loading && !mockFallback;
@@ -487,16 +498,49 @@ export default function Artigo() {
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
                         Compartilhe:
                       </span>
-                      <button className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                      <button
+                        onClick={() => {
+                          const url = encodeURIComponent(window.location.href);
+                          window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank", "noopener");
+                          trackShare("facebook");
+                        }}
+                        className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                        title="Compartilhar no Facebook"
+                      >
                         <FaFacebook size={13} />
                       </button>
-                      <button className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                      <button
+                        onClick={() => {
+                          const url = encodeURIComponent(window.location.href);
+                          const text = encodeURIComponent(article?.title ?? "");
+                          window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, "_blank", "noopener");
+                          trackShare("twitter");
+                        }}
+                        className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                        title="Compartilhar no Twitter/X"
+                      >
                         <FaTwitter size={13} />
                       </button>
-                      <button className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                      <button
+                        onClick={() => {
+                          const url = encodeURIComponent(window.location.href);
+                          const text = encodeURIComponent((article?.title ?? "") + " ");
+                          window.open(`https://api.whatsapp.com/send?text=${text}${url}`, "_blank", "noopener");
+                          trackShare("whatsapp");
+                        }}
+                        className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                        title="Compartilhar no WhatsApp"
+                      >
                         <FaWhatsapp size={13} />
                       </button>
-                      <button className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors">
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.href).catch(() => {});
+                          trackShare("copy");
+                        }}
+                        className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                        title="Copiar link"
+                      >
                         <FaLink size={12} />
                       </button>
                     </div>

@@ -17,10 +17,16 @@ function getSessionId(): string {
   }
 }
 
+function classifyReferrer(ref: string): string {
+  if (!ref) return "direto";
+  if (/google\.|bing\.|yahoo\.|duckduckgo\.|baidu\./i.test(ref)) return "busca";
+  if (/facebook|instagram|twitter|x\.com|whatsapp|t\.me|telegram|linkedin|tiktok|youtube/i.test(ref)) return "social";
+  return "outro";
+}
+
 function send(payload: Record<string, unknown>) {
   if (getConsent() !== "accepted") return;
   const data = { ...payload, sessionId: getSessionId() };
-  // Use sendBeacon for reliability (especially on page unload)
   if (navigator.sendBeacon) {
     navigator.sendBeacon(
       "/api/analytics/event",
@@ -38,14 +44,15 @@ function send(payload: Record<string, unknown>) {
 
 export function useAnalytics() {
   const [location] = useLocation();
-  const enterRef = useRef<number>(Date.now());
+  const enterRef    = useRef<number>(Date.now());
   const prevPathRef = useRef<string>("");
+  const articleIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    // On consent change, enable tracking immediately
     const handler = () => {
       if (getConsent() === "accepted") {
-        send({ type: "pageview", path: location, title: document.title });
+        send({ type: "pageview", path: location, title: document.title,
+               referrer: classifyReferrer(document.referrer) });
       }
     };
     window.addEventListener("bee_consent_change", handler);
@@ -53,35 +60,68 @@ export function useAnalytics() {
   }, [location]);
 
   useEffect(() => {
-    // Send time-on-page for previous route
-    const prev = prevPathRef.current;
+    const prev    = prevPathRef.current;
     const elapsed = Math.round((Date.now() - enterRef.current) / 1000);
     if (prev && elapsed > 2) {
-      send({ type: "read", path: prev, duration: elapsed });
+      send({ type: "read", path: prev, duration: elapsed,
+             articleId: articleIdRef.current });
     }
 
-    // Track new pageview
-    prevPathRef.current = location;
-    enterRef.current = Date.now();
-    send({ type: "pageview", path: location, title: document.title });
+    articleIdRef.current = undefined;
+    prevPathRef.current  = location;
+    enterRef.current     = Date.now();
+    send({ type: "pageview", path: location, title: document.title,
+           referrer: classifyReferrer(document.referrer) });
 
-    // On unload: send final time-on-page
     const onUnload = () => {
       const dur = Math.round((Date.now() - enterRef.current) / 1000);
-      if (dur > 2) send({ type: "read", path: location, duration: dur });
+      if (dur > 2) {
+        send({ type: "read", path: location, duration: dur,
+               articleId: articleIdRef.current });
+      }
     };
     window.addEventListener("pagehide", onUnload);
     return () => window.removeEventListener("pagehide", onUnload);
   }, [location]);
 
-  // Track article category
   function trackCategory(category: string) {
     send({ type: "category", path: location, category });
   }
 
   function trackArticle(articleId: string, title: string, category: string) {
-    send({ type: "pageview", path: location, title, articleId, category });
+    articleIdRef.current = articleId;
+    send({ type: "pageview", path: location, title, articleId, category,
+           referrer: classifyReferrer(document.referrer) });
   }
 
-  return { trackCategory, trackArticle };
+  function trackShare(platform: string) {
+    send({ type: "share", path: location, platform,
+           articleId: articleIdRef.current });
+  }
+
+  return { trackCategory, trackArticle, trackShare };
+}
+
+/** Track scroll depth milestones (25/50/75/100%) on article pages. */
+export function useScrollDepth(articleId: string | undefined) {
+  const [location] = useLocation();
+  const milestones  = useRef(new Set<number>());
+
+  useEffect(() => {
+    milestones.current.clear();
+    const onScroll = () => {
+      const el = document.documentElement;
+      const total = el.scrollHeight - el.clientHeight;
+      if (total <= 0) return;
+      const pct = Math.floor((el.scrollTop / total) * 100);
+      for (const m of [25, 50, 75, 100]) {
+        if (pct >= m && !milestones.current.has(m)) {
+          milestones.current.add(m);
+          send({ type: "scroll", path: location, scrollDepth: m, articleId });
+        }
+      }
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [location, articleId]);
 }
