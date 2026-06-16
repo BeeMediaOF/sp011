@@ -54,14 +54,14 @@ export default function DestaquesSection() {
           <Link key={index} href={`/artigo/${item.id}`} className="block">
             <div className="group cursor-pointer flex flex-col bg-white h-full">
               <div className="relative overflow-hidden aspect-[16/10] mb-3">
-                <img src={item.img} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={item.img} alt={item.title.replace(/<[^>]*>/g, "")} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                 <div className={`absolute top-0 left-0 ${item.color} text-white text-[10px] font-bold px-2 py-1`}>
                   {item.tag}
                 </div>
               </div>
-              <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors flex-grow">
-                {item.title}
-              </h3>
+              <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors flex-grow"
+                dangerouslySetInnerHTML={{ __html: item.title }}
+              />
               <span className="text-gray-500 text-xs">{item.time}</span>
             </div>
           </Link>

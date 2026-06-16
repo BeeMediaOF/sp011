@@ -66,7 +66,7 @@ export default function NewsSection({
                 <div className="relative overflow-hidden aspect-[16/10] mb-3">
                   <img
                     src={item.img}
-                    alt={item.title}
+                    alt={item.title.replace(/<[^>]*>/g, "")}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div
@@ -76,9 +76,9 @@ export default function NewsSection({
                     {label}
                   </div>
                 </div>
-                <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-1 group-hover:text-[#c8102e] transition-colors flex-grow">
-                  {item.title}
-                </h3>
+                <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-1 group-hover:text-[#c8102e] transition-colors flex-grow"
+                  dangerouslySetInnerHTML={{ __html: item.title }}
+                />
                 <span className="text-gray-500 text-xs">{item.time}</span>
               </Link>
             ))}
@@ -94,7 +94,7 @@ export default function NewsSection({
               <div className="relative h-[220px] overflow-hidden bg-gray-900">
                 <img
                   src={featuredArticle.img}
-                  alt={featuredArticle.title}
+                  alt={featuredArticle.title.replace(/<[^>]*>/g, "")}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent"></div>
@@ -105,9 +105,9 @@ export default function NewsSection({
                   >
                     {label}
                   </span>
-                  <h3 className="text-white font-bold text-[15px] leading-snug group-hover:opacity-80 transition-opacity">
-                    {featuredArticle.title}
-                  </h3>
+                  <h3 className="text-white font-bold text-[15px] leading-snug group-hover:opacity-80 transition-opacity"
+                    dangerouslySetInnerHTML={{ __html: featuredArticle.title }}
+                  />
                   <span className="text-gray-400 text-xs mt-1 block">{featuredArticle.time}</span>
                 </div>
               </div>
@@ -124,7 +124,7 @@ export default function NewsSection({
                   <div className="w-[100px] h-[68px] shrink-0 overflow-hidden">
                     <img
                       src={item.img}
-                      alt={item.title}
+                      alt={item.title.replace(/<[^>]*>/g, "")}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
@@ -135,9 +135,9 @@ export default function NewsSection({
                     >
                       {label}
                     </span>
-                    <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                      {item.title}
-                    </h4>
+                    <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                      dangerouslySetInnerHTML={{ __html: item.title }}
+                    />
                     <span className="text-gray-500 text-xs mt-1">{item.time}</span>
                   </div>
                 </Link>

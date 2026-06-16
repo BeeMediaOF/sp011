@@ -17,16 +17,16 @@ export default function NewsCard({ id, title, summary, image, chapeu, chapeuColo
       <div className="overflow-hidden bg-gray-100 mb-3">
         <img
           src={image}
-          alt={title}
+          alt={title.replace(/<[^>]*>/g, "")}
           className="w-full h-[180px] object-cover group-hover:scale-105 transition-transform duration-500"
         />
       </div>
       <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: chapeuColor }}>
         {chapeu}
       </span>
-      <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#c8102e] transition-colors line-clamp-3">
-        {title}
-      </h3>
+      <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#c8102e] transition-colors line-clamp-3"
+        dangerouslySetInnerHTML={{ __html: title }}
+      />
       <p className="text-gray-500 text-sm leading-relaxed mt-1.5 line-clamp-2">
         {summary}
       </p>

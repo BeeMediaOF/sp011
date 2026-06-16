@@ -53,7 +53,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
             <div className="relative overflow-hidden w-full h-full min-h-[340px] bg-gray-100">
               <img
                 src={imgSrc(featured.image)}
-                alt={featured.title}
+                alt={featured.title.replace(/<[^>]*>/g, "")}
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 loading="lazy"
               />
@@ -65,9 +65,9 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 >
                   {featured.chapeu}
                 </span>
-                <h3 className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2">
-                  {featured.title}
-                </h3>
+                <h3 className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
+                  dangerouslySetInnerHTML={{ __html: featured.title }}
+                />
                 <p className="text-white/70 text-[13px] line-clamp-2">{featured.summary}</p>
                 <div className="flex items-center gap-2 mt-3 text-[11px] text-white/60">
                   <span>{featured.author}</span>
@@ -89,15 +89,15 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 <div className="w-[90px] h-[68px] sm:w-[160px] sm:h-[107px] shrink-0 overflow-hidden bg-gray-100">
                   <img
                     src={imgSrc(item.image)}
-                    alt={item.title}
+                    alt={item.title.replace(/<[^>]*>/g, "")}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
                     loading="lazy"
                   />
                 </div>
                 <div className="flex-1 min-w-0 py-1">
-                  <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 text-[15px] sm:text-[19px]">
-                    {item.title}
-                  </h4>
+                  <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 text-[15px] sm:text-[19px]"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
+                  />
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">
                     <span>Escrito por <strong className="font-bold text-[#1a1a1a]">{item.author || "Redação"}</strong></span>
                     <span className="text-gray-300">|</span>

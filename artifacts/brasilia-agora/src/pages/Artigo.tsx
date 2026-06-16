@@ -249,6 +249,16 @@ export default function Artigo() {
   }
 
   function renderContent(raw: string): React.ReactNode[] {
+    // Handle JSON-wrapped content (AI rewrite saved full JSON response instead of just HTML)
+    const stripped = raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
+    if (stripped.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(stripped) as Record<string, unknown>;
+        const html = (parsed.content_html ?? parsed.contentHtml ?? parsed.content ?? "") as string;
+        if (html) return renderContent(html);
+      } catch {}
+    }
+
     // HTML content (from AI JSON rewrite) — render directly with styles
     if (isHtmlContent(raw)) {
       return [
@@ -445,7 +455,7 @@ export default function Artigo() {
                     </Link>
                     <span>/</span>
                     <span className="text-gray-300 truncate max-w-[240px]">
-                      {article.title}
+                      {article.title.replace(/<[^>]*>/g, "")}
                     </span>
                   </nav>
 
@@ -459,9 +469,9 @@ export default function Artigo() {
 
                   {/* Título */}
                   <h1 className="font-black text-[#1a2448] leading-tight mb-3 tracking-tight"
-                    style={{ fontSize: "clamp(1.6rem, 3vw, 2.6rem)" }}>
-                    {article.title}
-                  </h1>
+                    style={{ fontSize: "clamp(1.6rem, 3vw, 2.6rem)" }}
+                    dangerouslySetInnerHTML={{ __html: article.title }}
+                  />
 
                   {/* Subtítulo */}
                   {article.subtitle && (

@@ -61,7 +61,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
             <div className="relative overflow-hidden aspect-[16/9] bg-gray-100">
               <img
                 src={imgSrc}
-                alt={featured.title}
+                alt={featured.title.replace(/<[^>]*>/g, "")}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 loading="lazy"
               />
@@ -73,9 +73,9 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                 >
                   {featured.chapeu}
                 </span>
-                <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px] group-hover:text-red-300 transition-colors">
-                  {featured.title}
-                </h3>
+                <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px] group-hover:text-red-300 transition-colors"
+                  dangerouslySetInnerHTML={{ __html: featured.title }}
+                />
               </div>
             </div>
             <div className="pt-3">
@@ -107,7 +107,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                   <div className="w-[96px] h-[68px] shrink-0 overflow-hidden bg-gray-100">
                     <img
                       src={src}
-                      alt={item.title}
+                      alt={item.title.replace(/<[^>]*>/g, "")}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
                       loading="lazy"
                     />
@@ -119,9 +119,9 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                     >
                       {item.chapeu}
                     </span>
-                    <h4 className="text-[16px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-                      {item.title}
-                    </h4>
+                    <h4 className="text-[16px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                      dangerouslySetInnerHTML={{ __html: item.title }}
+                    />
                     <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
                   </div>
                 </Link>

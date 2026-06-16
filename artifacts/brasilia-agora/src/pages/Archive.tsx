@@ -28,7 +28,7 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
       <div className="relative overflow-hidden bg-gray-100 aspect-[16/10]">
         <img
           src={imgFallback(article.imageUrl || "")}
-          alt={article.title}
+          alt={article.title.replace(/<[^>]*>/g, "")}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -40,9 +40,9 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
           >
             {article.tag || article.category}
           </span>
-          <h3 className="font-serif text-white font-black text-[16px] leading-snug line-clamp-2">
-            {article.title}
-          </h3>
+          <h3 className="font-serif text-white font-black text-[16px] leading-snug line-clamp-2"
+            dangerouslySetInnerHTML={{ __html: article.title }}
+          />
           <p className="text-white/50 text-[11px] mt-1">
             {new Date(article.publishedAt).toLocaleDateString("pt-BR")}
           </p>
@@ -58,7 +58,7 @@ function ListCard({ article, color }: { article: Article; color: string }) {
       <div className="w-[96px] h-[64px] shrink-0 overflow-hidden bg-gray-100">
         <img
           src={imgFallback(article.imageUrl || "")}
-          alt={article.title}
+          alt={article.title.replace(/<[^>]*>/g, "")}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
           loading="lazy"
         />
@@ -70,9 +70,9 @@ function ListCard({ article, color }: { article: Article; color: string }) {
         >
           {article.tag || article.category}
         </span>
-        <h4 className="font-serif text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2">
-          {article.title}
-        </h4>
+        <h4 className="font-serif text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+          dangerouslySetInnerHTML={{ __html: article.title }}
+        />
         <p className="text-[11px] text-gray-400 mt-1">
           {new Date(article.publishedAt).toLocaleDateString("pt-BR")}
         </p>

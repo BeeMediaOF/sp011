@@ -68,15 +68,15 @@ export default function EsportesSection() {
                 <div className="w-28 h-20 shrink-0 overflow-hidden rounded-sm">
                   <img
                     src={item.img}
-                    alt={item.title}
+                    alt={item.title.replace(/<[^>]*>/g, "")}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 </div>
                 <div className="flex flex-col justify-center">
                   <span className="text-[#b45309] text-[10px] font-bold mb-1">ESPORTES</span>
-                  <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#b45309] transition-colors">
-                    {item.title}
-                  </h4>
+                  <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#b45309] transition-colors"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
+                  />
                   <span className="text-gray-500 text-xs mt-1">{item.time}</span>
                 </div>
               </Link>
