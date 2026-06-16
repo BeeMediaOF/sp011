@@ -124,7 +124,7 @@ function renderCanvas(
     const cropY       = cfg.templatePhotoCropY   ?? "center";
     const vigStrength = cfg.templatePhotoVignette ?? 0.40;
     const maxLines    = cfg.templateTitleMaxLines ?? 4;
-    const showSub     = cfg.templateShowSubtitle  ?? true;
+    const showSub     = cfg.templateShowSubtitle  ?? false;
     const { r: pr, g: pg, b: pb } = hexToRgb(panelColor);
 
     // 1. Photo area — cover crop with vertical alignment
