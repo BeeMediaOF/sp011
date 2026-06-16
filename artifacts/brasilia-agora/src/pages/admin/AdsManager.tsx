@@ -3,7 +3,7 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import {
   Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink,
-  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal,
+  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal, FileText,
 } from "lucide-react";
 
 function toBase64(file: File): Promise<string> {
@@ -77,6 +77,26 @@ const SLOTS: {
     icon:     <Newspaper size={14} />,
     accent:   "#0d9488",
     bg:       "bg-teal-50 border-teal-200",
+  },
+  {
+    key:      "slot_06",
+    label:    "Espaço 6 — Artigo: Banner Horizontal",
+    location: "Após o corpo do artigo (acima do rodapé)",
+    hint:     "Banner largo. Ex: 970×90 ou 728×90 px",
+    pagePos:  "top-[65%]",
+    icon:     <FileText size={14} />,
+    accent:   "#7c3aed",
+    bg:       "bg-violet-50 border-violet-200",
+  },
+  {
+    key:      "slot_07",
+    label:    "Espaço 7 — Artigo: Sidebar Direita",
+    location: "Coluna lateral direita do artigo (sticky)",
+    hint:     "Retângulo vertical. Ex: 300×250 ou 300×600 px",
+    pagePos:  "top-[35%]",
+    icon:     <FileText size={14} />,
+    accent:   "#ea580c",
+    bg:       "bg-orange-50 border-orange-200",
   },
 ];
 
@@ -245,102 +265,92 @@ function AdCard({ ad, accent, onToggle, onDelete }: AdCardProps) {
 }
 
 // ─── Page map visual ──────────────────────────────────────────────────────────
+function SlotStatus({ slotKey, label, accent, adsBySlot }: { slotKey: string; label: string; accent: string; adsBySlot: Record<string, Ad[]> }) {
+  const count = adsBySlot[slotKey]?.length ?? 0;
+  const active = adsBySlot[slotKey]?.filter((a) => a.active).length ?? 0;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ backgroundColor: accent }}>
+        {slotKey.replace("slot_0", "")}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-gray-700 truncate">{label}</p>
+      </div>
+      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${count === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
+        {count === 0 ? "Vazio" : `${active} ativo${active !== 1 ? "s" : ""}`}
+      </span>
+    </div>
+  );
+}
+
 function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
-  const homeSlots = SLOTS.filter((s) => s.key !== "slot_05");
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
       <div className="flex items-center gap-2 mb-4">
         <LayoutTemplate size={16} className="text-gray-500" />
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mapa da página</h3>
-        <span className="text-[11px] text-gray-400 ml-1">— onde cada espaço aparece na home</span>
+        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mapa de espaços</h3>
+        <span className="text-[11px] text-gray-400 ml-1">— onde cada espaço publicitário aparece</span>
       </div>
-      <div className="flex gap-6 items-start">
-        {/* Visual page mockup */}
-        <div className="shrink-0 relative w-[140px] h-[320px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
-          {/* Header bar */}
-          <div className="h-7 bg-gray-300 border-b border-gray-300 flex items-center px-2 gap-1">
-            <div className="w-14 h-3 bg-gray-400 rounded-sm" />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* ── Home ─────────────────────────────────────────── */}
+        <div className="flex gap-4 items-start">
+          <div className="shrink-0 relative w-[120px] h-[280px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+            <div className="h-6 bg-gray-300 border-b border-gray-300 flex items-center px-2">
+              <div className="w-10 h-2.5 bg-gray-400 rounded-sm" />
+            </div>
+            <div className="p-1.5 space-y-1">
+              <div className="h-12 bg-gray-300 rounded-sm" />
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[0].accent }}>AD 1</div>
+              <div className="h-8 bg-gray-200 rounded-sm" />
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[1].accent }}>AD 2</div>
+              <div className="h-8 bg-gray-200 rounded-sm" />
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[2].accent }}>AD 3</div>
+              <div className="h-6 bg-gray-200 rounded-sm" />
+              <div className="h-6 bg-gray-200 rounded-sm" />
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[3].accent }}>AD 4</div>
+            </div>
           </div>
-          {/* Content area */}
-          <div className="p-1.5 space-y-1">
-            {/* Hero */}
-            <div className="h-14 bg-gray-300 rounded-sm" />
-            {/* Slot 01 */}
-            <div
-              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
-              style={{ backgroundColor: SLOTS[0].accent }}
-            >
-              AD 1
-            </div>
-            {/* Block */}
-            <div className="h-10 bg-gray-200 rounded-sm" />
-            {/* Slot 02 */}
-            <div
-              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
-              style={{ backgroundColor: SLOTS[1].accent }}
-            >
-              AD 2
-            </div>
-            {/* Block */}
-            <div className="h-10 bg-gray-200 rounded-sm" />
-            {/* Block */}
-            <div className="h-8 bg-gray-200 rounded-sm" />
-            {/* Slot 03 */}
-            <div
-              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
-              style={{ backgroundColor: SLOTS[2].accent }}
-            >
-              AD 3
-            </div>
-            {/* Block */}
-            <div className="h-8 bg-gray-200 rounded-sm" />
-            {/* Block */}
-            <div className="h-8 bg-gray-200 rounded-sm" />
-            {/* Block */}
-            <div className="h-8 bg-gray-200 rounded-sm" />
-            {/* Slot 04 */}
-            <div
-              className="h-3 rounded-sm flex items-center justify-center text-[8px] font-bold text-white"
-              style={{ backgroundColor: SLOTS[3].accent }}
-            >
-              AD 4
-            </div>
+          <div className="flex-1 space-y-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Home size={11}/> Home</p>
+            {SLOTS.slice(0, 4).map((s) => (
+              <SlotStatus key={s.key} slotKey={s.key} label={s.location} accent={s.accent} adsBySlot={adsBySlot} />
+            ))}
           </div>
         </div>
 
-        {/* Slot legend */}
-        <div className="flex-1 space-y-2">
-          {homeSlots.map((s) => {
-            const count = adsBySlot[s.key]?.length ?? 0;
-            const active = adsBySlot[s.key]?.filter((a) => a.active).length ?? 0;
-            return (
-              <div key={s.key} className="flex items-center gap-3">
-                <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0"
-                  style={{ backgroundColor: s.accent }}>
-                  {s.key.replace("slot_0", "")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold text-gray-700 truncate">{s.location}</p>
-                </div>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${count === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
-                  {count === 0 ? "Vazio" : `${active} ativo${active !== 1 ? "s" : ""}`}
-                </span>
+        {/* ── Artigo + Editoria ─────────────────────────────── */}
+        <div className="flex gap-4 items-start">
+          <div className="shrink-0 relative w-[120px] h-[280px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
+            <div className="h-6 bg-gray-300 border-b border-gray-300 flex items-center px-2">
+              <div className="w-10 h-2.5 bg-gray-400 rounded-sm" />
+            </div>
+            <div className="p-1.5 space-y-1 flex gap-1">
+              {/* Article body */}
+              <div className="flex-1 space-y-1">
+                <div className="h-4 bg-gray-300 rounded-sm" />
+                <div className="h-2 bg-gray-200 rounded-sm" />
+                <div className="h-20 bg-gray-200 rounded-sm" />
+                <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[5].accent }}>AD 6</div>
+                <div className="h-2 bg-gray-200 rounded-sm" />
               </div>
-            );
-          })}
-          <div className="flex items-center gap-3 pt-1 border-t border-gray-100 mt-2">
-            <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0"
-              style={{ backgroundColor: SLOTS[4].accent }}>
-              5
+              {/* Sidebar */}
+              <div className="w-[28px] shrink-0 space-y-1 mt-4">
+                <div className="h-2.5 rounded-sm flex items-center justify-center text-[6px] font-bold text-white" style={{ backgroundColor: SLOTS[6].accent }}>7</div>
+                <div className="h-16 bg-gray-200 rounded-sm" />
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-gray-700 truncate">Páginas de editoria</p>
-            </div>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${(adsBySlot["slot_05"]?.length ?? 0) === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
-              {(adsBySlot["slot_05"]?.length ?? 0) === 0 ? "Vazio" : `${adsBySlot["slot_05"]?.filter((a) => a.active).length ?? 0} ativo${(adsBySlot["slot_05"]?.filter((a) => a.active).length ?? 0) !== 1 ? "s" : ""}`}
-            </span>
+          </div>
+          <div className="flex-1 space-y-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><FileText size={11}/> Artigo</p>
+            <SlotStatus slotKey="slot_06" label="Banner após o artigo" accent={SLOTS[5].accent} adsBySlot={adsBySlot} />
+            <SlotStatus slotKey="slot_07" label="Sidebar direita (sticky)" accent={SLOTS[6].accent} adsBySlot={adsBySlot} />
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 pt-1 border-t border-gray-100 mt-1"><Newspaper size={11}/> Editoria / Arquivo</p>
+            <SlotStatus slotKey="slot_05" label="Banner nas editorias" accent={SLOTS[4].accent} adsBySlot={adsBySlot} />
           </div>
         </div>
+
       </div>
     </div>
   );

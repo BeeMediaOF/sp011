@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import { useParams, Link } from "wouter";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
@@ -7,6 +7,7 @@ import Footer from "../components/Footer";
 import { useArticle } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
 import { categoryRoute } from "../lib/categoryRoute";
+import AdBanner from "../components/ads/AdBanner";
 import {
   brasilArticles,
   mundoArticles,
@@ -33,70 +34,6 @@ const ALL_MOCK = [
 
 const MAIS_LIDAS = ALL_MOCK.slice(0, 8);
 
-const AD_SLOTS = [
-  { label: "Anuncie aqui", size: "300 \u00d7 250", bg: "#f0f4ff", accent: "#0b3d91" },
-  { label: "Publicidade", size: "300 \u00d7 250", bg: "#fff4f4", accent: "#c8102e" },
-  { label: "Espa\u00e7o publicit\u00e1rio", size: "300 \u00d7 250", bg: "#f0fff8", accent: "#16a34a" },
-];
-
-const AD_FOOTER = [
-  { label: "Anuncie aqui", size: "970 \u00d7 90", bg: "#f0f4ff", accent: "#0b3d91" },
-  { label: "Publicidade", size: "970 \u00d7 90", bg: "#fff4f4", accent: "#c8102e" },
-  { label: "Espa\u00e7o publicit\u00e1rio", size: "970 \u00d7 90", bg: "#f0fff8", accent: "#16a34a" },
-];
-
-function RotatingAd({
-  slots,
-  height,
-  intervalMs = 5000,
-}: {
-  slots: typeof AD_SLOTS;
-  height: string;
-  intervalMs?: number;
-}) {
-  const [idx, setIdx] = useState(0);
-  const [fade, setFade] = useState(true);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setIdx((i) => (i + 1) % slots.length);
-        setFade(true);
-      }, 300);
-    }, intervalMs);
-    return () => clearInterval(timer);
-  }, [slots.length, intervalMs]);
-
-  const slot = slots[idx];
-
-  return (
-    <div
-      className="w-full rounded-sm border border-gray-100 flex flex-col items-center justify-center gap-2 transition-opacity duration-300"
-      style={{ height, backgroundColor: slot.bg, opacity: fade ? 1 : 0 }}
-    >
-      <div
-        className="w-10 h-10 rounded-full flex items-center justify-center"
-        style={{ backgroundColor: slot.accent + "22" }}
-      >
-        <span className="text-xs font-black" style={{ color: slot.accent }}>AD</span>
-      </div>
-      <p className="text-[10px] font-bold tracking-widest uppercase" style={{ color: slot.accent }}>
-        {slot.label}
-      </p>
-      <p className="text-[9px] text-gray-400">{slot.size}</p>
-      <div className="flex gap-1 mt-1">
-        {slots.map((_, i) => (
-          <div
-            key={i}
-            className="w-1.5 h-1.5 rounded-full transition-colors"
-            style={{ backgroundColor: i === idx ? slot.accent : "#d1d5db" }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 const editoriaColor: Record<string, string> = {
   brasil: "#16a34a",
@@ -144,12 +81,10 @@ function ArticleSidebar() {
         </div>
       </div>
 
-      {/* Propaganda Toyota */}
+      {/* Propaganda sidebar — gerenciada pelo painel */}
       <div className="sticky top-24">
         <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
-        <a href="https://www.toyota.com.br/modelos/rav4" target="_blank" rel="noreferrer" className="block overflow-hidden rounded group">
-          <img src="/ad-toyota-rav4.jpg" alt="Toyota RAV4 — A Vida É Uma Aventura" className="w-full h-auto object-cover group-hover:scale-[1.02] transition-transform duration-300" />
-        </a>
+        <AdBanner slot="slot_07" placeholder="Publicidade" />
       </div>
     </aside>
   );
@@ -634,14 +569,12 @@ export default function Artigo() {
                     </div>
                   </div>
 
-                  {/* Propaganda Zé Delivery — rodapé do artigo */}
+                  {/* Banner horizontal — gerenciado pelo painel */}
                   <div className="mt-8">
                     <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">
                       Publicidade
                     </p>
-                    <a href="https://www.zedelivery.com.br" target="_blank" rel="noreferrer" className="block w-full overflow-hidden rounded group">
-                      <img src="/ad-ze-delivery.jpg" alt="Zé Delivery — Entrega Grátis de Segunda a Sexta" className="w-full h-auto object-cover group-hover:scale-[1.01] transition-transform duration-300" />
-                    </a>
+                    <AdBanner slot="slot_06" placeholder="Publicidade" />
                   </div>
                 </>
               )}

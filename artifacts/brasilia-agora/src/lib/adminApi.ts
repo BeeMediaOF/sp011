@@ -154,7 +154,7 @@ export interface Ad {
   name: string;
   imageBase64: string;
   link: string;
-  position: "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
+  position: "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07" | "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
 
   active: boolean;
   clicks: number;

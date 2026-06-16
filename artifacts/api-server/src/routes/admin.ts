@@ -186,7 +186,7 @@ router.post("/ads", (req, res) => {
     res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
   }
   const VALID_POSITIONS = [
-    "slot_01","slot_02","slot_03","slot_04","slot_05",
+    "slot_01","slot_02","slot_03","slot_04","slot_05","slot_06","slot_07",
     "banner","sidebar","central","topo","centro","lateral","rodape",
     "slidebar_250","slidebar_500",
   ];

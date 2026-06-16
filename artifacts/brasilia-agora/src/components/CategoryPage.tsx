@@ -4,9 +4,7 @@ import ArticleCard from "./ArticleCard";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
-import AdSidebar from "./ads/AdSidebar";
 import AdBanner from "./ads/AdBanner";
-import AdCentral from "./ads/AdCentral";
 
 export interface Article {
   id: string;
@@ -93,7 +91,8 @@ export default function CategoryPage({
           </div>
 
           <div className="mb-8">
-            <AdCentral />
+            <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
+            <AdBanner slot="slot_05" placeholder="Publicidade" />
           </div>
 
           {/* Divider */}

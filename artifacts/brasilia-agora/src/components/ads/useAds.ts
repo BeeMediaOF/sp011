@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05";
+export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07";
 
 export interface AdItem {
   id: string;
