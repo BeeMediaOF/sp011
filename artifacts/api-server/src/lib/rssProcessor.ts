@@ -33,42 +33,56 @@ export const TAG_MAP: Record<string, string> = {
 
 // ─── SEO / AIO journalist prompt ──────────────────────────────────────────────
 
-export const DEFAULT_PROMPT_TEMPLATE = `Você é um jornalista sênior especialista em SEO e AIO (AI Overview) para portais de notícias brasileiros.
+export const DEFAULT_PROMPT_TEMPLATE = `Você é um jornalista sênior especialista em SEO, Google Discover e jornalismo digital para portais de notícias brasileiros.
 
-Reescreva o artigo abaixo seguindo RIGOROSAMENTE estas diretrizes:
+Com base na pauta e no conteúdo abaixo, produza uma matéria jornalística original em Português do Brasil.
 
-**ESTRUTURA JORNALÍSTICA:**
-1. Primeiro parágrafo: responda às perguntas Quem, O quê, Quando, Onde e Por quê (pirâmide invertida)
-2. Desenvolvimento: detalhe os fatos em ordem decrescente de importância
-3. Use intertítulos com ## para seções principais (H2) e ### para subseções (H3) — obrigatório quando houver 3+ parágrafos sobre o mesmo tema
-4. Use listas com marcadores (-) para enumerações ou sequências de dados
-
-**SEO (ranqueamento em buscadores):**
-- Insira o tema central naturalmente no primeiro parágrafo
-- Varie os termos relacionados ao longo do texto (sinônimos, contexto)
-- Parágrafos curtos (máx. 3-4 frases)
-- Linguagem clara e acessível ao público geral
-
-**AIO (para ser citado por respostas de IA como ChatGPT e Google):**
-- Responda perguntas de forma explícita no texto (ex: "O que é X? Trata-se de...")
-- Seja factual e completo — não omita dados relevantes do original
-- Inclua todos os dados do texto original: números, datas, nomes, locais, percentuais
-
-**REGRAS ABSOLUTAS:**
-- NUNCA invente informações — use apenas os dados do texto original
-- NÃO inclua o título no corpo do texto
-- NÃO adicione notas, explicações ou comentários fora do artigo
-- Português brasileiro formal, mas acessível
+Título / Pauta: {{TITULO}}
+Fonte: {{FONTE}}
 {{CREDITO}}
 
-**METADADOS SEO (sempre ao final, exatamente neste formato):**
-SLUG: [slug-seo-do-artigo-em-kebab-case-sem-acentos-max-60-chars]
-KEYWORDS: [palavra1, palavra2, palavra3, palavra4, palavra5, palavra6]
+Conteúdo da fonte:
+{{TEXTO}}
 
-Título original: {{TITULO}}
+## INSTRUÇÕES
 
-Texto original a reescrever:
-{{TEXTO}}`;
+**TÍTULO:** Elabore um título de cauda longa de cerca de 150 caracteres, altamente chamativo, otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes. NÃO repita o título dentro do content_html.
+
+**SUBTÍTULO:** Crie um subtítulo de cerca de 150 caracteres que complemente o título e introduza o texto, ele será o primeiro <h2> dentro do content_html.
+
+**CONTEÚDO (content_html):**
+- Comece com o subtítulo como primeiro <h2> dentro do content_html
+- Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto e fazendo um gancho para o que o leitor irá encontrar
+- Cite a fonte ao final da lead: por exemplo, "conforme informação divulgada por {{FONTE}}"
+- Use até 4 subtítulos <h3> para organizar o restante do texto
+- Parágrafos curtos: 150 a 250 caracteres cada — faça muitos parágrafos curtos
+- Use <b> para negritos em palavras e frases importantes, NUNCA use ** ou outras marcações markdown
+- Prefira texto corrido; use <ul><li> apenas quando necessário para a didática do conteúdo
+- NUNCA coloque <h1> dentro do content_html
+- NUNCA use travessões (—), use sempre vírgula
+- NUNCA escreva códigos de idioma como "pt-BR", "en-US" ou similares em nenhuma parte da resposta
+- Distribua a palavra-chave principal (extraída do título) ao longo do texto
+- Linguagem clara, acessível e fácil de entender pelo público brasileiro
+- Somente use informações presentes no conteúdo da fonte, nunca invente dados
+
+**METADADOS:**
+- slug: kebab-case sem acentos, máximo 60 caracteres
+- keywords: 6 palavras-chave relevantes separadas por vírgula
+
+## REGRAS ABSOLUTAS
+- Retorne EXCLUSIVAMENTE JSON válido, sem markdown, sem \`\`\`json, sem explicações antes ou depois
+- O content_html deve conter HTML pronto para WordPress (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), sem <html>, <body> ou <script>
+- O subtítulo <h2> deve estar DENTRO do content_html
+- Comece o título e o subtítulo diretamente com o conteúdo, sem prefixos
+
+## RESPOSTA (apenas JSON, direto, sem delimitadores de código):
+{
+  "title": "...",
+  "subtitle": "...",
+  "content_html": "<h2>...</h2><p>...</p>...",
+  "slug": "titulo-seo-kebab-case",
+  "keywords": "palavra1, palavra2, palavra3, palavra4, palavra5, palavra6"
+}`;
 
 export function applyPromptTemplate(
   template: string, title: string, text: string, sourceName: string, giveCredit: boolean
@@ -116,19 +130,42 @@ export interface RewriteResult {
   content: string;
   keywords: string;
   slug: string;
+  title?: string;
+  subtitle?: string;
 }
 
 function parseRewriteResult(raw: string): RewriteResult {
-  const slugMatch    = raw.match(/^SLUG:\s*(.+)$/m);
-  const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
-  const slug     = (slugMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "").slice(0, 80);
-  const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
-  const content  = raw
-    .replace(/^SLUG:\s*.+$/m, "")
-    .replace(/^KEYWORDS:\s*.+$/m, "")
-    .replace(/\n{3,}/g, "\n\n")
+  // Strip markdown code fences if the model wraps output in ```json ... ```
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
     .trim();
-  return { content, keywords, slug };
+
+  // Try to parse as JSON (new format)
+  try {
+    const parsed = JSON.parse(stripped) as {
+      title?: string; subtitle?: string;
+      content_html?: string; slug?: string; keywords?: string;
+    };
+    const content  = (parsed.content_html ?? "").trim();
+    const keywords = (parsed.keywords ?? "").trim();
+    const slug     = (parsed.slug ?? "").trim().slice(0, 80);
+    const title    = (parsed.title ?? "").trim();
+    const subtitle = (parsed.subtitle ?? "").trim();
+    return { content, keywords, slug, title, subtitle };
+  } catch {
+    // Fallback: old plain-text format with SLUG:/KEYWORDS: markers
+    const slugMatch     = raw.match(/^SLUG:\s*(.+)$/m);
+    const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
+    const slug     = (slugMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "").slice(0, 80);
+    const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
+    const content  = raw
+      .replace(/^SLUG:\s*.+$/m, "")
+      .replace(/^KEYWORDS:\s*.+$/m, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    return { content, keywords, slug };
+  }
 }
 
 export async function rewriteWithAI(
@@ -528,6 +565,8 @@ export async function autoProcessArticle(
   let keywords        = "";
   let slug            = "";
   let aiRewriteSuccess = false;
+  let aiTitle:    string | undefined;
+  let aiSubtitle: string | undefined;
   let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
@@ -538,6 +577,8 @@ export async function autoProcessArticle(
       content          = result.content;
       keywords         = result.keywords;
       slug             = result.slug;
+      aiTitle          = result.title    || undefined;
+      aiSubtitle       = result.subtitle || undefined;
       aiRewriteSuccess = true;
     } catch (err) {
       logger.warn({ err, sourceId: src.id }, "AI rewrite failed — using original text");
@@ -548,8 +589,8 @@ export async function autoProcessArticle(
     ? "published" : "draft";
 
   store.createArticle({
-    title:         art.title,
-    subtitle:      art.excerpt.slice(0, 160),
+    title:         aiTitle    ?? art.title,
+    subtitle:      aiSubtitle ?? art.excerpt.slice(0, 160),
     content,
     category,
     tag:           TAG_MAP[category] ?? "GERAL",

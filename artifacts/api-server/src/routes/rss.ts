@@ -130,7 +130,13 @@ router.post("/rewrite", async (req, res) => {
     const result = await rewriteWithAI(
       title ?? "", text, sourceName ?? "fonte", giveCredit !== false, customPrompt
     );
-    res.json({ rewritten: result.content, keywords: result.keywords, slug: result.slug });
+    res.json({
+      rewritten: result.content,
+      keywords:  result.keywords,
+      slug:      result.slug,
+      title:     result.title    ?? "",
+      subtitle:  result.subtitle ?? "",
+    });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

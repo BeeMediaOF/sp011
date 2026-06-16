@@ -200,3 +200,67 @@
     scrollbar-width: none;
   }
 }
+
+/* ── Article HTML body (AI rewrite output with WordPress HTML) ─────────────── */
+.article-body {
+  --chapeu: #c8102e;
+}
+
+.article-body h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a2448;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.35;
+  border-left: 4px solid var(--chapeu);
+  padding-left: 0.75rem;
+}
+
+.article-body h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a2448;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.35;
+}
+
+.article-body p {
+  font-size: 1.03rem;
+  line-height: 1.75;
+  color: #2a2a2a;
+  margin-bottom: 1.1rem;
+}
+
+.article-body b,
+.article-body strong {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.article-body em {
+  font-style: italic;
+}
+
+.article-body ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.article-body li {
+  font-size: 1.03rem;
+  line-height: 1.75;
+  color: #2a2a2a;
+  margin-bottom: 0.4rem;
+}
+
+.article-body a {
+  color: #0b3d91;
+  text-decoration: underline;
+}
+
+.article-body a:hover {
+  color: #c8102e;
+}

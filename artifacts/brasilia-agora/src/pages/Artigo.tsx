@@ -214,8 +214,12 @@ export default function Artigo() {
     editoriaColor[article?.category?.toLowerCase() ?? ""] ?? "#c8102e";
 
   // ── Content renderer ─────────────────────────────────────────────────────
-  // Handles: ## headings, - bullet lists, **bold**, \n\n paragraphs
-  // Also splits walls of text into readable paragraphs intelligently
+  // Handles: HTML content (from AI rewrite) and legacy markdown format
+
+  /** Detect if content is HTML (AI rewrite output) */
+  function isHtmlContent(s: string): boolean {
+    return /^\s*<[hpbuol]/i.test(s.trimStart());
+  }
 
   function renderInline(text: string): React.ReactNode[] {
     const parts = text.split(/(\*\*[^*]+\*\*|\*[^*\n]+\*|\[[^\]]+\]\([^)]+\))/g);
@@ -299,6 +303,18 @@ export default function Artigo() {
   }
 
   function renderContent(raw: string): React.ReactNode[] {
+    // HTML content (from AI JSON rewrite) — render directly with styles
+    if (isHtmlContent(raw)) {
+      return [
+        <div
+          key="html-body"
+          className="article-body"
+          style={{ "--chapeu": chapeuColor } as React.CSSProperties}
+          dangerouslySetInnerHTML={{ __html: raw }}
+        />,
+      ];
+    }
+
     // 1. Clean noise first (works on both old stored articles and new ones)
     const cleaned = cleanContent(raw);
 

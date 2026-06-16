@@ -25,6 +25,7 @@ interface PipelineArticle {
   selected: boolean;
   status: ArticleStatus;
   rewritten?: string; keywords?: string; slug?: string;
+  aiTitle?: string; aiSubtitle?: string;
   error?: string;
 }
 
@@ -162,7 +163,7 @@ export default function Pipeline() {
 
       try {
         const src = sources.find((s) => s.id === art.sourceId);
-        const data = await api<{ rewritten: string; keywords: string; slug: string }>("/rewrite", {
+        const data = await api<{ rewritten: string; keywords: string; slug: string; title: string; subtitle: string }>("/rewrite", {
           method: "POST",
           body: JSON.stringify({
             title: art.title, text: art.fullText,
@@ -170,7 +171,7 @@ export default function Pipeline() {
             customPrompt: src?.customPrompt,
           }),
         });
-        working[idx] = { ...working[idx], status: "rewritten", rewritten: data.rewritten, keywords: data.keywords, slug: data.slug };
+        working[idx] = { ...working[idx], status: "rewritten", rewritten: data.rewritten, keywords: data.keywords, slug: data.slug, aiTitle: data.title || undefined, aiSubtitle: data.subtitle || undefined };
         setArticles([...working]);
         log(`✓ Reescrito: "${art.title.slice(0, 55)}"`, "success");
       } catch (err) {
@@ -205,7 +206,9 @@ export default function Pipeline() {
         await api("/import", {
           method: "POST",
           body: JSON.stringify({
-            title: art.title, content: art.rewritten ?? art.fullText,
+            title:    art.aiTitle    ?? art.title,
+            subtitle: art.aiSubtitle ?? art.excerpt,
+            content: art.rewritten ?? art.fullText,
             category: art.category, imageUrl: art.imageUrl,
             author: `Redação (via ${art.sourceName})`,
             status: "published", aiRewritten: true,
