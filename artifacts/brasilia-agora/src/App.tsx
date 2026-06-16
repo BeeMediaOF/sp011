@@ -45,6 +45,7 @@ import Analytics from "@/pages/admin/Analytics";
 import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
 import RSSManager from "@/pages/admin/RSSManager";
 import Pipeline from "@/pages/admin/Pipeline";
+import SocialMedia from "@/pages/admin/SocialMedia";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +142,9 @@ function Router() {
       </Route>
       <Route path="/admin/rss">
         <RequireAuth><RSSManager /></RequireAuth>
+      </Route>
+      <Route path="/admin/redes-sociais">
+        <RequireAuth><SocialMedia /></RequireAuth>
       </Route>
       <Route path="/admin">
         <RequireAuth><Dashboard /></RequireAuth>

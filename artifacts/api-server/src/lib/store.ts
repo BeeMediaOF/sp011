@@ -165,6 +165,22 @@ export interface RssPrompts {
   categories?: Record<string, string>;
 }
 
+export interface SocialConfig {
+  instagramUserId?: string;
+  facebookPageId?: string;
+  pageAccessToken?: string;
+  feedCaption?: string;
+  storyCaption?: string;
+  autoPublishFeed?: boolean;
+  autoPublishStory?: boolean;
+  autoPublishFacebook?: boolean;
+  templateShowLogo?: boolean;
+  templateShowCategory?: boolean;
+  templateGradientFrom?: string;
+  templateGradientTo?: string;
+  lastPublishedAt?: string;
+}
+
 interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
@@ -174,6 +190,7 @@ interface StoreData {
   contactInfo: ContactInfo;
   rssSources: RssSource[];
   rssPrompts?: RssPrompts;
+  socialConfig?: SocialConfig;
   seedVersion?: number;
 }
 
@@ -587,5 +604,13 @@ export const store = {
     _store.contactInfo = { ..._store.contactInfo, ...data };
     saveStore(_store);
     return { ..._store.contactInfo };
+  },
+
+  // Social Config
+  getSocialConfig: (): SocialConfig => ({ ...(_store.socialConfig ?? {}) }),
+  updateSocialConfig: (data: Partial<SocialConfig>): SocialConfig => {
+    _store.socialConfig = { ...(_store.socialConfig ?? {}), ...data };
+    saveStore(_store);
+    return { ..._store.socialConfig };
   },
 };

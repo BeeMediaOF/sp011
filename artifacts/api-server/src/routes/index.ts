@@ -12,6 +12,7 @@ import quotesRouter from "./quotes";
 import sitemapRouter from "./sitemap";
 import analyticsRouter from "./analytics";
 import rssRouter from "./rss";
+import socialRouter from "./social";
 
 const router: IRouter = Router();
 
@@ -27,5 +28,6 @@ router.use(siteRouter);
 router.use(sitemapRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/admin/rss", rssRouter);
+router.use("/admin/social", socialRouter);
 
 export default router;
