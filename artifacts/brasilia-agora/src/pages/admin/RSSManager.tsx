@@ -19,7 +19,7 @@ type AiProvider = "gemini_free" | "gemini_paid" | "openai";
 interface RssSource {
   id: string; name: string; url: string; category: string;
   active: boolean; createdAt: string;
-  scheduleHours: number; giveCredit: boolean;
+  scheduleHours: number; fetchLimit?: number; giveCredit: boolean;
   autoMode: AutoMode; lastFetchedAt?: string;
   customPrompt?: string;
 }
@@ -73,6 +73,14 @@ const SCHEDULE_OPTS = [
   { label: "A cada 6 horas", value: 6 },
   { label: "A cada 12 horas", value: 12 },
   { label: "A cada 24 horas", value: 24 },
+];
+const FETCH_LIMIT_OPTS = [
+  { label: "1 notícia",   value: 1 },
+  { label: "3 notícias",  value: 3 },
+  { label: "5 notícias",  value: 5 },
+  { label: "10 notícias", value: 10 },
+  { label: "15 notícias", value: 15 },
+  { label: "20 notícias", value: 20 },
 ];
 const AUTO_MODE_OPTS: { label: string; value: AutoMode; desc: string }[] = [
   { value: "none",             label: "Manual",                    desc: "Sem automação" },
@@ -477,11 +485,11 @@ export default function RSSManager() {
       await apiFetch(`/sources/${editingSource.id}`, {
         method: "PATCH",
         body: JSON.stringify({
-          name:         editingSource.name, url: editingSource.url,
-          category:     editingSource.category, active: editingSource.active,
-          scheduleHours: editingSource.scheduleHours, giveCredit: editingSource.giveCredit,
-          autoMode:     editingSource.autoMode,
-          customPrompt: editingSource.customPrompt ?? null,
+          name:          editingSource.name,          url:      editingSource.url,
+          category:      editingSource.category,      active:   editingSource.active,
+          scheduleHours: editingSource.scheduleHours, fetchLimit: editingSource.fetchLimit ?? 3,
+          giveCredit:    editingSource.giveCredit,    autoMode: editingSource.autoMode,
+          customPrompt:  editingSource.customPrompt ?? null,
         }),
       });
       setEditingSource(null); setSourceError(""); await loadSources();
@@ -1088,35 +1096,67 @@ export default function RSSManager() {
                           {grpSources.map((src) => (
                             <div key={src.id}>
                               {editingSource?.id === src.id ? (
-                                /* ── Edit mode ── */
-                                <div className="p-4 bg-blue-50 space-y-3">
-                                  <div className="flex flex-wrap gap-3">
-                                    <input value={editingSource.name} onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
-                                      className="flex-1 min-w-[150px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                                    <input value={editingSource.url} onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
-                                      className="flex-[2] min-w-[250px] border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
-                                    <select value={editingSource.category} onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
-                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                                      {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
-                                    </select>
+                                /* ── Edit mode: 3-section grid ── */
+                                <div className="p-4 bg-blue-50 space-y-3 border-l-4 border-[#0b3d91]">
+                                  {/* Row 1: nome + url + categoria */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nome / Veículo</label>
+                                      <input value={editingSource.name}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
+                                    </div>
+                                    <div className="flex flex-col gap-1 sm:col-span-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Editoria</label>
+                                      <select value={editingSource.category}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">URL do Feed</label>
+                                      <input value={editingSource.url}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
+                                    </div>
                                   </div>
-                                  <div className="flex flex-wrap gap-3 items-center">
-                                    <select value={editingSource.scheduleHours}
-                                      onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
-                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                                      {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
-                                    <select value={editingSource.autoMode}
-                                      onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
-                                      className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                                      {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                    </select>
-                                    <label className="flex items-center gap-1.5 text-sm cursor-pointer">
-                                      <input type="checkbox" checked={editingSource.giveCredit}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
-                                      Dar crédito
-                                    </label>
+                                  {/* Row 2: agendamento + modo + limite + crédito */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Agendamento</label>
+                                      <select value={editingSource.scheduleHours}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Modo de coleta</label>
+                                      <select value={editingSource.autoMode}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Notícias por coleta</label>
+                                      <select value={editingSource.fetchLimit ?? 3}
+                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, fetchLimit: Number(e.target.value) }))}
+                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                      </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1 justify-end">
+                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Crédito</label>
+                                      <label className="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer bg-white h-[34px]">
+                                        <input type="checkbox" checked={editingSource.giveCredit}
+                                          onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
+                                        Dar crédito à fonte
+                                      </label>
+                                    </div>
                                   </div>
+                                  {/* Row 3: prompt */}
                                   <PromptEditor
                                     value={editingSource.customPrompt}
                                     onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
@@ -1124,58 +1164,72 @@ export default function RSSManager() {
                                   />
                                   <div className="flex gap-2">
                                     <button onClick={() => { void saveEdit(); }}
-                                      className="bg-[#0b3d91] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
+                                      className="bg-[#0b3d91] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
                                       Salvar
                                     </button>
                                     <button onClick={() => setEditingSource(null)}
-                                      className="bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors">
+                                      className="bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors">
                                       Cancelar
                                     </button>
                                   </div>
                                 </div>
                               ) : (
-                                /* ── View mode ── */
-                                <div className="flex items-center gap-3 pl-8 pr-4 py-2.5 bg-white hover:bg-gray-50 transition-colors">
-                                  <button onClick={() => { void toggleSource(src); }}
-                                    className={`relative w-8 h-[18px] rounded-full flex-shrink-0 transition-colors ${src.active ? "bg-green-500" : "bg-gray-300"}`}>
-                                    <span className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${src.active ? "translate-x-[18px]" : "translate-x-0.5"}`}/>
-                                  </button>
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <Badge label={TAG_MAP[src.category] ?? src.category} color="bg-gray-100 text-gray-600"/>
+                                /* ── View mode: 3 colunas ── */
+                                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 pl-6 pr-3 py-2.5 bg-white hover:bg-gray-50 transition-colors">
+
+                                  {/* Col 1: toggle + editoria */}
+                                  <div className="flex items-center gap-2.5">
+                                    <button onClick={() => { void toggleSource(src); }}
+                                      className={`relative w-8 h-[18px] rounded-full flex-shrink-0 transition-colors ${src.active ? "bg-green-500" : "bg-gray-300"}`}>
+                                      <span className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${src.active ? "translate-x-[18px]" : "translate-x-0.5"}`}/>
+                                    </button>
+                                    <Badge label={TAG_MAP[src.category] ?? src.category} color="bg-gray-100 text-gray-600"/>
+                                  </div>
+
+                                  {/* Col 2: config summary */}
+                                  <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
                                       <AutoModeBadge mode={src.autoMode}/>
-                                      {src.giveCredit && <span className="text-[10px] text-blue-500 font-medium">crédito ✓</span>}
-                                      {src.scheduleHours > 0 && (
-                                        <span className="flex items-center gap-0.5 text-[10px] text-amber-600 font-medium">
-                                          <Clock size={10}/>{src.scheduleHours}h
+                                      {src.scheduleHours > 0 ? (
+                                        <span className="flex items-center gap-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                                          <Clock size={9}/>{src.scheduleHours}h
                                         </span>
+                                      ) : (
+                                        <span className="text-[10px] text-gray-400">sem agend.</span>
                                       )}
+                                      <span className="flex items-center gap-0.5 text-[10px] font-medium text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
+                                        {src.fetchLimit ?? 3} notícia{(src.fetchLimit ?? 3) !== 1 ? "s" : ""}/coleta
+                                      </span>
+                                      {src.giveCredit && <span className="text-[10px] text-blue-500 font-medium">crédito ✓</span>}
                                       {src.customPrompt && (
-                                        <span className="text-[10px] text-purple-500 font-medium flex items-center gap-0.5"><Wand2 size={9}/>prompt próprio</span>
+                                        <span className="flex items-center gap-0.5 text-[10px] text-purple-500 font-medium"><Wand2 size={9}/>prompt próprio</span>
                                       )}
                                     </div>
-                                    <p className="text-[11px] text-gray-400 truncate mt-0.5">{src.url}</p>
                                     {src.lastFetchedAt && (
-                                      <p className="text-[10px] text-gray-300">
-                                        Última busca: {new Date(src.lastFetchedAt).toLocaleString("pt-BR")}
+                                      <p className="text-[10px] text-gray-300 mt-0.5">
+                                        Última coleta: {new Date(src.lastFetchedAt).toLocaleString("pt-BR")}
                                       </p>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    {src.autoMode !== "none" && (
-                                      <button onClick={() => { void runSource(src.id); }} disabled={runningId === src.id}
-                                        title="Executar agora"
-                                        className="p-1.5 rounded-lg text-amber-500 hover:bg-amber-50 transition-colors disabled:opacity-50">
-                                        <Play size={14} className={runningId === src.id ? "animate-pulse" : ""}/>
-                                      </button>
-                                    )}
+
+                                  {/* Col 3: actions */}
+                                  <div className="flex items-center gap-0.5 flex-shrink-0">
+                                    <button onClick={() => { void runSource(src.id); }} disabled={runningId === src.id}
+                                      title="Executar agora"
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50 border border-transparent hover:border-amber-200">
+                                      <Play size={12} className={runningId === src.id ? "animate-pulse" : ""}/>
+                                      Coletar
+                                    </button>
                                     <button onClick={() => setEditingSource(src)}
-                                      className="p-1.5 rounded-lg text-gray-400 hover:text-[#0b3d91] hover:bg-blue-50 transition-colors">
-                                      <Settings size={14}/>
+                                      title="Configurar"
+                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-500 hover:text-[#0b3d91] hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200">
+                                      <Settings size={12}/>
+                                      Config
                                     </button>
                                     <button onClick={() => { void deleteSource(src.id); }}
-                                      className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                      <Trash2 size={14}/>
+                                      title="Remover fonte"
+                                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                      <Trash2 size={13}/>
                                     </button>
                                   </div>
                                 </div>

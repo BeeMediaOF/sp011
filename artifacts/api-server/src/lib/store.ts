@@ -153,6 +153,7 @@ export interface RssSource {
   active: boolean;
   createdAt: string;
   scheduleHours: number;
+  fetchLimit?: number;
   giveCredit: boolean;
   autoMode: RssAutoMode;
   lastFetchedAt?: string;

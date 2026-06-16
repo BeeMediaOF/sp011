@@ -521,7 +521,7 @@ export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticl
     // RSS/Atom parsing failed — fall back to HTML web scraping
     return scrapeNewsHomepage(src);
   }
-  const items = feed.items.slice(0, 3); // max 3 por rodada
+  const items = feed.items.slice(0, src.fetchLimit ?? 3);
 
   const results: FetchedArticle[] = [];
   await Promise.allSettled(items.map(async (item) => {

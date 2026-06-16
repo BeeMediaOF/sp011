@@ -20,10 +20,10 @@ router.get("/sources", (_req, res) => {
 router.post("/sources", (req, res) => {
   const {
     name, url, category, active,
-    scheduleHours, giveCredit, autoMode,
+    scheduleHours, fetchLimit, giveCredit, autoMode,
   } = req.body as {
     name?: string; url?: string; category?: string; active?: boolean;
-    scheduleHours?: number; giveCredit?: boolean; autoMode?: string;
+    scheduleHours?: number; fetchLimit?: number; giveCredit?: boolean; autoMode?: string;
   };
   if (!name || !url) { res.status(400).json({ error: "name e url são obrigatórios" }); return; }
   const source = store.createRssSource({
@@ -32,6 +32,7 @@ router.post("/sources", (req, res) => {
     category:     (category ?? "geral").trim(),
     active:       active !== false,
     scheduleHours: Number(scheduleHours ?? 0),
+    fetchLimit:   Number(fetchLimit ?? 3),
     giveCredit:   giveCredit !== false,
     autoMode:     (autoMode ?? "none") as RssAutoMode,
   });
@@ -42,10 +43,11 @@ router.post("/sources", (req, res) => {
 router.patch("/sources/:id", (req, res) => {
   const raw = req.body as Partial<{
     name: string; url: string; category: string; active: boolean;
-    scheduleHours: number; giveCredit: boolean; autoMode: RssAutoMode;
+    scheduleHours: number; fetchLimit: number; giveCredit: boolean; autoMode: RssAutoMode;
     customPrompt: string | null;
   }>;
   if (raw.scheduleHours !== undefined) raw.scheduleHours = Number(raw.scheduleHours);
+  if (raw.fetchLimit    !== undefined) raw.fetchLimit    = Number(raw.fetchLimit);
   // Normalize: null or empty string → undefined (removes custom prompt)
   const body: Parameters<typeof store.updateRssSource>[1] = {
     ...raw,

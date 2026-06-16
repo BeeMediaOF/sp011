@@ -195,17 +195,24 @@
       "visible": true
     },
     {
-      "id": "10",
-      "label": "COLUNAS",
-      "path": "/colunas",
+      "id": "e8c24914-db87-42ac-b007-c770f03b0298",
+      "label": "ECONOMIA",
+      "path": "/economia",
       "order": 5,
       "visible": true
     },
     {
-      "id": "e8c24914-db87-42ac-b007-c770f03b0298",
-      "label": "ECONOMIA",
-      "path": "/economia",
+      "id": "7920676d-39e2-40a1-996c-73c36f75db70",
+      "label": "MUNDO",
+      "path": "/mundo",
       "order": 6,
+      "visible": true
+    },
+    {
+      "id": "10",
+      "label": "COLUNAS",
+      "path": "/colunas",
+      "order": 7,
       "visible": true
     }
   ],
@@ -297,7 +304,7 @@
   },
   "rssSources": [
     {
-      "name": "Agência Br - Esporte",
+      "name": "Agência Brasil - Esporte",
       "url": "https://agenciabrasil.ebc.com.br/rss/esporte/feed.xml",
       "category": "esportes",
       "active": true,
@@ -306,7 +313,7 @@
       "autoMode": "rewrite_publish",
       "id": "60ca8e43-8b82-4afc-af3a-31ec63e7054c",
       "createdAt": "2026-06-15T22:28:35.591Z",
-      "lastFetchedAt": "2026-06-16T13:29:26.350Z"
+      "lastFetchedAt": "2026-06-16T14:35:17.340Z"
     },
     {
       "name": "Agência Brasil - Economia",
@@ -318,7 +325,7 @@
       "autoMode": "rewrite_publish",
       "id": "f3e13620-f45a-4223-967b-51a5159f6bed",
       "createdAt": "2026-06-15T22:29:09.321Z",
-      "lastFetchedAt": "2026-06-16T13:30:08.126Z"
+      "lastFetchedAt": "2026-06-16T14:35:18.370Z"
     },
     {
       "name": "Agência Brasil – Política",
@@ -330,7 +337,7 @@
       "autoMode": "rewrite_publish",
       "id": "fe6ce31d-2d2c-410b-8bad-76c839e89d9a",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-16T13:32:34.178Z"
+      "lastFetchedAt": "2026-06-16T14:35:19.674Z"
     },
     {
       "name": "Brasil de Fato – Política",
@@ -342,7 +349,7 @@
       "autoMode": "rewrite_publish",
       "id": "2bf26a57-1058-4723-b7b3-1159a8ee12f9",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-16T13:35:49.222Z"
+      "lastFetchedAt": "2026-06-16T14:35:20.518Z"
     },
     {
       "name": "Carta Capital – Política",
@@ -353,7 +360,8 @@
       "giveCredit": true,
       "autoMode": "none",
       "id": "0d204475-6992-417a-adc1-30882d08cd32",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:21.026Z"
     },
     {
       "name": "Correio Braziliense – Política",
@@ -386,7 +394,8 @@
       "giveCredit": true,
       "autoMode": "none",
       "id": "e03d66f6-4b27-461f-98b0-ce47f48b6baa",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:25.300Z"
     },
     {
       "name": "Revista Oeste – Política",
@@ -397,7 +406,8 @@
       "giveCredit": true,
       "autoMode": "none",
       "id": "1ca4508c-2587-4a22-a98f-b85d59ad326a",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:25.866Z"
     },
     {
       "name": "InfoMoney – Política",
@@ -409,18 +419,20 @@
       "autoMode": "rewrite_publish",
       "id": "dfb17c69-6003-4c3b-bd32-f10c94bcd3c5",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-16T13:36:33.971Z"
+      "lastFetchedAt": "2026-06-16T14:35:26.528Z"
     },
     {
       "name": "Agência Brasil – Internacional",
       "url": "https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml",
       "category": "mundo",
       "active": true,
-      "scheduleHours": 0,
+      "scheduleHours": 2,
       "giveCredit": true,
-      "autoMode": "none",
+      "autoMode": "rewrite_publish",
       "id": "efb051d3-b19c-4a27-b170-c860f1990585",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:27.203Z",
+      "fetchLimit": 3
     },
     {
       "name": "Brasil de Fato – Internacional",
@@ -431,7 +443,8 @@
       "giveCredit": true,
       "autoMode": "none",
       "id": "74be6c5b-d92e-4c4a-a6b8-2055d6131d58",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:28.523Z"
     },
     {
       "name": "Carta Capital – Mundo",
@@ -442,7 +455,8 @@
       "giveCredit": true,
       "autoMode": "none",
       "id": "e5875032-77ed-4244-9a21-dd811b7f608f",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:28.986Z"
     },
     {
       "name": "Correio Braziliense – Mundo",
@@ -465,7 +479,7 @@
       "autoMode": "rewrite_publish",
       "id": "4273e63a-711f-4e6f-be20-f4d09e273357",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-16T13:47:17.175Z"
+      "lastFetchedAt": "2026-06-16T14:35:30.045Z"
     },
     {
       "name": "Jovem Pan – Mundo",
@@ -482,12 +496,13 @@
       "name": "Metrópoles – Mundo",
       "url": "https://www.metropoles.com/mundo/feed",
       "category": "mundo",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "ce8aa13f-79a8-4c49-bd4a-f364a8871cd1",
-      "createdAt": "2026-06-16T13:29:06.164Z"
+      "createdAt": "2026-06-16T13:29:06.164Z",
+      "lastFetchedAt": "2026-06-16T14:35:31.445Z"
     },
     {
       "name": "Notícias ao Minuto – Mundo",
@@ -636,89 +651,85 @@
       "name": "InvestNews – Economia",
       "url": "https://investnews.com.br/economia/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "048ee987-03fa-450c-bb1c-0a4715752b9d",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:33.112Z"
     },
     {
       "name": "InvestNews – Finanças",
       "url": "https://investnews.com.br/financas/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "0903d139-652a-475b-9996-0babe38e0669",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:34.849Z"
     },
     {
       "name": "InvestNews – Investimentos",
       "url": "https://investnews.com.br/investimentos/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "5209bbe5-9430-412e-abcb-bc2929da9d5f",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:36.206Z"
     },
     {
       "name": "InvestNews – Negócios",
       "url": "https://investnews.com.br/negocios/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "33973143-3e84-40c4-acc7-7f9a6215240d",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:37.769Z"
     },
     {
       "name": "Finsiders – Negócios em Fintechs",
       "url": "https://finsidersbrasil.com.br/negocios-em-fintechs/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "5f0d05e9-6570-4b32-8408-b06154a936cc",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:42.481Z"
     },
     {
       "name": "Finsiders – Economia Open",
       "url": "https://finsidersbrasil.com.br/economia-open/feed/",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "ff71d8f1-56c2-42c5-aaad-0d678e38a530",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:45.786Z"
     },
     {
       "name": "Metrópoles – Negócios",
       "url": "https://www.metropoles.com/negocios/feed",
       "category": "economia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "e3dc7dc9-18e6-4c36-9b57-f92ea90c1ecc",
-      "createdAt": "2026-06-16T13:29:06.165Z"
-    },
-    {
-      "name": "Agência Brasil – Esportes",
-      "url": "https://agenciabrasil.ebc.com.br/rss/esportes/feed.xml",
-      "category": "esportes",
-      "active": false,
-      "scheduleHours": 0,
-      "giveCredit": true,
-      "autoMode": "none",
-      "id": "cacead86-54f5-43c1-a86a-1653a8d8959f",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:47.394Z"
     },
     {
       "name": "Brasil de Fato – Esportes",
@@ -746,12 +757,13 @@
       "name": "Metrópoles – Esportes",
       "url": "https://www.metropoles.com/esportes/feed",
       "category": "esportes",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "3ec2ca71-8c36-4e2d-91f6-a43c0525c28a",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:48.502Z"
     },
     {
       "name": "Notícias ao Minuto – Esportes",
@@ -779,12 +791,13 @@
       "name": "Agência Brasil – Cultura",
       "url": "https://agenciabrasil.ebc.com.br/radioagencia-nacional/rss/cultura/feed.xml",
       "category": "cultura",
-      "active": false,
-      "scheduleHours": 0,
+      "active": true,
+      "scheduleHours": 2,
       "giveCredit": true,
-      "autoMode": "none",
+      "autoMode": "rewrite_publish",
       "id": "b667791a-6101-40ee-85e9-ec91a7e0cf65",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "fetchLimit": 3
     },
     {
       "name": "Notícias ao Minuto – Cultura",
@@ -812,12 +825,13 @@
       "name": "Metrópoles – Entretenimento",
       "url": "https://www.metropoles.com/entretenimento/feed",
       "category": "cultura",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "02e999e8-6af2-4013-989a-38c99b57ce21",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:49.341Z"
     },
     {
       "name": "Jovem Pan – Entretenimento",
@@ -834,12 +848,13 @@
       "name": "Metrópoles – Vida e Estilo",
       "url": "https://www.metropoles.com/vida-e-estilo/feed",
       "category": "cultura",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "ca38abc8-54b3-4bb5-916b-397c13614ee6",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:50.213Z"
     },
     {
       "name": "Jornal de Brasília – Estilo",
@@ -856,12 +871,13 @@
       "name": "Agência Brasil – Justiça",
       "url": "https://agenciabrasil.ebc.com.br/rss/justica/feed.xml",
       "category": "seguranca",
-      "active": false,
-      "scheduleHours": 0,
+      "active": true,
+      "scheduleHours": 2,
       "giveCredit": true,
-      "autoMode": "none",
+      "autoMode": "rewrite_publish",
       "id": "2fa4b7ee-2a4c-4a49-8618-ca1c35d72a10",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "fetchLimit": 3
     },
     {
       "name": "Correio Braziliense – Saúde",
@@ -878,12 +894,13 @@
       "name": "Metrópoles – Saúde",
       "url": "https://www.metropoles.com/saude/feed",
       "category": "saude",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "ef604be2-61d7-455b-9256-d0b31c0450eb",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:51.097Z"
     },
     {
       "name": "Jovem Pan – Saúde",
@@ -933,45 +950,49 @@
       "name": "Metrópoles – Ciência",
       "url": "https://www.metropoles.com/ciencia/feed",
       "category": "tecnologia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "d3b820f3-ac9f-4042-8e0c-a49e7b7b5713",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:52.021Z"
     },
     {
       "name": "Finsiders – Tecnologia FinTech",
       "url": "https://finsidersbrasil.com.br/tecnologia-para-fintechs/feed/",
       "category": "tecnologia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "e952a24d-f4c5-48e9-b4c6-7b509d83b738",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:55.826Z"
     },
     {
       "name": "Finsiders – IA",
       "url": "https://finsidersbrasil.com.br/ia/feed/",
       "category": "tecnologia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "a75cbb8f-edcc-44a5-a83b-ac7383521388",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:35:58.828Z"
     },
     {
       "name": "InvestNews – Tecnologia",
       "url": "https://investnews.com.br/tecnologia/feed/",
       "category": "tecnologia",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "43788d01-c651-4745-bf45-0cf326ccaa5b",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:36:01.002Z"
     },
     {
       "name": "Correio Braziliense (geral)",
@@ -999,12 +1020,13 @@
       "name": "Metrópoles – Distrito Federal",
       "url": "https://www.metropoles.com/distrito-federal/feed",
       "category": "cidade",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "0aaf6413-cb92-4234-82a3-9818045578f8",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:36:03.093Z"
     },
     {
       "name": "Correio Braziliense – Brasil",
@@ -1043,12 +1065,13 @@
       "name": "Metrópoles – Brasil",
       "url": "https://www.metropoles.com/brasil/feed",
       "category": "geral",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "4344bd7f-ff60-4890-bcef-8807b4471333",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:36:04.046Z"
     },
     {
       "name": "InfoMoney – Brasil",
@@ -1065,36 +1088,17 @@
       "name": "Metrópoles – São Paulo",
       "url": "https://www.metropoles.com/sao-paulo/feed",
       "category": "geral",
-      "active": false,
+      "active": true,
       "scheduleHours": 0,
       "giveCredit": true,
       "autoMode": "none",
       "id": "8f9785c6-1025-4bdd-9561-b5e546d1712f",
-      "createdAt": "2026-06-16T13:29:06.165Z"
+      "createdAt": "2026-06-16T13:29:06.165Z",
+      "lastFetchedAt": "2026-06-16T14:36:05.195Z"
     }
   ],
   "ads": [],
   "columnists": [
-    {
-      "id": "c1",
-      "name": "Ana Paula Mendes",
-      "specialty": "Política",
-      "bio": "Jornalista com 15 anos de cobertura do Congresso Nacional e Palácio do Planalto. Especialista em política externa e relações institucionais.",
-      "avatarBase64": "",
-      "active": true,
-      "createdAt": "2026-06-15T22:18:47.219Z",
-      "updatedAt": "2026-06-15T22:18:47.219Z"
-    },
-    {
-      "id": "c2",
-      "name": "Carlos Eduardo Rocha",
-      "specialty": "Esporte",
-      "bio": "Cronista esportivo, ex-atleta e comentarista. Cobertura de futebol, atletismo e esportes olímpicos há mais de 10 anos.",
-      "avatarBase64": "",
-      "active": true,
-      "createdAt": "2026-06-15T22:18:47.219Z",
-      "updatedAt": "2026-06-15T22:18:47.219Z"
-    },
     {
       "id": "c3",
       "name": "Beatriz Fonseca",
