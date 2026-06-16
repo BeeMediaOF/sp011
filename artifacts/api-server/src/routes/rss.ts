@@ -4,6 +4,7 @@ import { store, type RssAutoMode } from "../lib/store.js";
 import {
   fetchSourceArticles, rewriteWithAI, scrapeArticle,
   processDueSource, DEFAULT_PROMPT_TEMPLATE, resolvePrompt,
+  getRssLog,
 } from "../lib/rssProcessor.js";
 
 const router = Router();
@@ -78,6 +79,11 @@ router.put("/prompts", (req, res) => {
     categories: categories ?? {},
   });
   res.json(updated);
+});
+
+/** GET /api/admin/rss/logs — in-memory event log */
+router.get("/logs", (_req, res) => {
+  res.json({ logs: getRssLog() });
 });
 
 /** DELETE /api/admin/rss/sources/:id */

@@ -9,6 +9,31 @@ import { GoogleGenAI } from "@google/genai";
 import { store, type RssSource, type RssAutoMode } from "./store.js";
 import { logger } from "./logger.js";
 
+// ─── Event log ────────────────────────────────────────────────────────────────
+
+export interface RssLogEntry {
+  id: string;
+  ts: string;
+  type: "fetch" | "rewrite" | "publish" | "draft" | "skip" | "error" | "duplicate";
+  sourceName: string;
+  articleTitle: string;
+  message?: string;
+}
+
+const MAX_LOG = 300;
+const _rssEventLog: RssLogEntry[] = [];
+
+function addLog(entry: Omit<RssLogEntry, "id" | "ts">) {
+  _rssEventLog.unshift({
+    id: Math.random().toString(36).slice(2),
+    ts: new Date().toISOString(),
+    ...entry,
+  });
+  if (_rssEventLog.length > MAX_LOG) _rssEventLog.pop();
+}
+
+export function getRssLog(): RssLogEntry[] { return [..._rssEventLog]; }
+
 // ─── RSS parser ───────────────────────────────────────────────────────────────
 
 export const rssParser = new Parser({
@@ -557,9 +582,12 @@ export async function autoProcessArticle(
 
   // Skip duplicates — check by title or source URL
   if (store.isDuplicateArticle(art.title, art.link)) {
+    addLog({ type: "duplicate", sourceName, articleTitle: art.title, message: "Artigo duplicado — ignorado" });
     logger.info({ title: art.title }, "Skipping duplicate RSS article");
     return;
   }
+
+  addLog({ type: "fetch", sourceName, articleTitle: art.title });
 
   let content         = art.fullText;
   let keywords        = "";
@@ -580,8 +608,12 @@ export async function autoProcessArticle(
       aiTitle          = result.title    || undefined;
       aiSubtitle       = result.subtitle || undefined;
       aiRewriteSuccess = true;
+      addLog({ type: "rewrite", sourceName, articleTitle: aiTitle ?? art.title });
     } catch (err) {
-      logger.warn({ err, sourceId: src.id }, "AI rewrite failed — using original text");
+      // Feature: skip articles that fail rewrite instead of saving raw text
+      addLog({ type: "error", sourceName, articleTitle: art.title, message: `Reescrita falhou: ${String(err)}` });
+      logger.warn({ err, sourceId: src.id }, "AI rewrite failed — skipping article");
+      return;
     }
   }
 
@@ -605,6 +637,13 @@ export async function autoProcessArticle(
     aiRewritten:   aiRewriteSuccess,
     keywords:      keywords || undefined,
     slug:          slug || undefined,
+  });
+
+  addLog({
+    type:          status === "published" ? "publish" : "draft",
+    sourceName,
+    articleTitle:  aiTitle ?? art.title,
+    message:       status === "published" ? "Publicado" : "Salvo como rascunho",
   });
 }
 

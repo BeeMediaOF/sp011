@@ -53,6 +53,12 @@ interface RssPrompts {
   categories?: Record<string, string>;
 }
 
+interface RssLogEntry {
+  id: string; ts: string;
+  type: "fetch" | "rewrite" | "publish" | "draft" | "skip" | "error" | "duplicate";
+  sourceName: string; articleTitle: string; message?: string;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CATEGORIES = [
@@ -263,6 +269,24 @@ export default function RSSManager() {
   const [sourceSearch,    setSourceSearch]    = useState("");
   const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
 
+  // ── Prompts panel ──
+  const [promptsOpen, setPromptsOpen] = useState(false);
+
+  // ── Logs ──
+  const [logs,       setLogs]       = useState<RssLogEntry[]>([]);
+  const [logsOpen,   setLogsOpen]   = useState(false);
+  const logPollRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const runStartRef = useRef<string>("");
+
+  // ── Global defaults ──
+  const [defAutoMode,   setDefAutoMode]   = useState<AutoMode>("rewrite_publish");
+  const [defSchedule,   setDefSchedule]   = useState(4);
+  const [defFetchLimit, setDefFetchLimit] = useState(3);
+  const [defCredit,     setDefCredit]     = useState(true);
+  const [applyingDefs,  setApplyingDefs]  = useState(false);
+  const [defsApplied,   setDefsApplied]   = useState(false);
+  const [runningAll,    setRunningAll]    = useState(false);
+
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
   const [fetching, setFetching]       = useState(false);
@@ -315,6 +339,13 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadLogs = useCallback(async () => {
+    try {
+      const d = await apiFetch<{ logs: RssLogEntry[] }>("/logs");
+      setLogs(d.logs);
+    } catch { /* ignore */ }
+  }, []);
+
   const loadMenuCategories = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}api/admin/menu`, {
@@ -337,7 +368,8 @@ export default function RSSManager() {
     void loadMenuCategories();
     void loadRssStats();
     void loadPrompts();
-  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats, loadPrompts]);
+    void loadLogs();
+  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -372,6 +404,14 @@ export default function RSSManager() {
       .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
       .map(([publisher, srcs]) => ({ publisher, sources: srcs }));
   }, [sources, sourceSearch]);
+
+  // Prompt tab derived vars — used in render, computed here to avoid IIFE in JSX
+  const promptIsGlobal   = promptTab === "__global__";
+  const promptCurrentVal = promptIsGlobal ? (prompts.global ?? "") : (prompts.categories?.[promptTab] ?? "");
+  const promptHasValue   = !!promptCurrentVal;
+  const promptTabLabel   = promptIsGlobal
+    ? "geral"
+    : (allCategories.find((c) => c.slug === promptTab)?.label ?? promptTab);
 
   function toggleGroup(pub: string) {
     setExpandedGroups((prev) => {
@@ -518,6 +558,10 @@ export default function RSSManager() {
 
   async function runSource(id: string) {
     setRunningId(id); setRunSuccess(null); setSourceError("");
+    runStartRef.current = new Date().toISOString();
+    setLogsOpen(true);
+    if (logPollRef.current) clearInterval(logPollRef.current);
+    logPollRef.current = setInterval(() => { void loadLogs(); }, 1000);
     try {
       const d = await apiFetch<{ processed: number }>("/run", {
         method: "POST", body: JSON.stringify({ sourceId: id }),
@@ -525,7 +569,53 @@ export default function RSSManager() {
       setRunSuccess({ id, count: d.processed });
       await loadSources();
     } catch (e) { setSourceError(String(e)); }
-    finally { setRunningId(null); }
+    finally {
+      setRunningId(null);
+      if (logPollRef.current) { clearInterval(logPollRef.current); logPollRef.current = null; }
+      void loadLogs();
+    }
+  }
+
+  async function applyDefaultsToAll() {
+    setApplyingDefs(true); setDefsApplied(false);
+    const active = sources.filter((s) => s.active);
+    for (const src of active) {
+      await apiFetch(`/sources/${src.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          autoMode: defAutoMode, scheduleHours: defSchedule,
+          fetchLimit: defFetchLimit, giveCredit: defCredit,
+        }),
+      });
+    }
+    await loadSources();
+    setApplyingDefs(false); setDefsApplied(true);
+    setTimeout(() => setDefsApplied(false), 3000);
+  }
+
+  async function runAllActive() {
+    const active = sources.filter((s) => s.active);
+    if (!active.length) return;
+    setRunningAll(true); setRunSuccess(null); setSourceError("");
+    runStartRef.current = new Date().toISOString();
+    setLogsOpen(true);
+    if (logPollRef.current) clearInterval(logPollRef.current);
+    logPollRef.current = setInterval(() => { void loadLogs(); }, 1000);
+    let total = 0;
+    for (const src of active) {
+      setRunningId(src.id);
+      try {
+        const d = await apiFetch<{ processed: number }>("/run", {
+          method: "POST", body: JSON.stringify({ sourceId: src.id }),
+        });
+        total += d.processed;
+      } catch { /* continue with next */ }
+    }
+    setRunningId(null); setRunningAll(false);
+    setRunSuccess({ id: "all", count: total });
+    if (logPollRef.current) { clearInterval(logPollRef.current); logPollRef.current = null; }
+    void loadLogs();
+    void loadSources();
   }
 
   // ─── Fetch / Preview ────────────────────────────────────────────────────────
@@ -854,14 +944,24 @@ export default function RSSManager() {
 
         {/* ══ PROMPTS ═════════════════════════════════════════════════════════ */}
         <section className="bg-white rounded-xl shadow-sm border">
-          <div className="px-6 py-4 border-b flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPromptsOpen((v) => !v)}
+            className="w-full px-6 py-4 flex items-center gap-2 hover:bg-gray-50 transition-colors text-left"
+          >
             <Wand2 size={18} className="text-purple-600" />
             <h2 className="font-semibold text-gray-800">Prompts de Reescrita</h2>
             <span className="ml-1 text-[11px] text-gray-400 font-normal">
               Hierarquia: fonte &gt; categoria &gt; geral
             </span>
-          </div>
-          <div className="p-6 space-y-4">
+            <span className="ml-auto flex items-center gap-2 text-[11px] text-gray-400">
+              {(prompts.global || Object.keys(prompts.categories ?? {}).length > 0) && (
+                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block"/>
+              )}
+              {promptsOpen ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+            </span>
+          </button>
+          {promptsOpen && (<div className="border-t p-6 space-y-4">
             <p className="text-xs text-gray-500">
               Configure um prompt <strong>Geral</strong> (vale para todas as fontes) e/ou prompts <strong>por categoria</strong>.
               O prompt da própria fonte tem prioridade sobre estes. Deixe em branco para usar o prompt padrão.
@@ -900,54 +1000,45 @@ export default function RSSManager() {
             </div>
 
             {/* Textarea area */}
-            {(() => {
-              const isGlobal   = promptTab === "__global__";
-              const currentVal = isGlobal ? (prompts.global ?? "") : (prompts.categories?.[promptTab] ?? "");
-              const hasValue   = !!currentVal;
-              const tabLabel   = isGlobal ? "geral" : (allCategories.find((c) => c.slug === promptTab)?.label ?? promptTab);
-
-              return (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <p className="text-[11px] text-gray-400">
-                      Variáveis disponíveis:{" "}
-                      {["{{TITULO}}", "{{TEXTO}}", "{{FONTE}}", "{{CREDITO}}"].map((v) => (
-                        <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>
-                      ))}
-                    </p>
-                    <div className="flex gap-3 items-center">
-                      <button
-                        type="button"
-                        onClick={() => { void loadDefaultPromptInto(promptTab); }}
-                        disabled={promptDefaultLoading}
-                        className="text-[11px] text-blue-500 hover:underline disabled:opacity-50"
-                      >
-                        {promptDefaultLoading ? "Carregando…" : "Carregar prompt padrão"}
-                      </button>
-                      {hasValue && (
-                        <button
-                          type="button"
-                          onClick={() => clearTabPrompt(promptTab)}
-                          className="text-[11px] text-red-400 hover:underline"
-                        >
-                          Limpar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <textarea
-                    key={promptTab}
-                    value={currentVal}
-                    onChange={(e) => setTabPrompt(promptTab, e.target.value)}
-                    rows={14}
-                    placeholder={`Prompt de reescrita para ${tabLabel}.\nDeixe vazio para usar o prompt do nível superior ou o padrão.\n\nClique em "Carregar prompt padrão" para ver e editar o prompt base.`}
-                    className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-gray-50"
-                    spellCheck={false}
-                  />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-[11px] text-gray-400">
+                  Variáveis disponíveis:{" "}
+                  {["{{TITULO}}", "{{TEXTO}}", "{{FONTE}}", "{{CREDITO}}"].map((v) => (
+                    <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>
+                  ))}
+                </p>
+                <div className="flex gap-3 items-center">
+                  <button
+                    type="button"
+                    onClick={() => { void loadDefaultPromptInto(promptTab); }}
+                    disabled={promptDefaultLoading}
+                    className="text-[11px] text-blue-500 hover:underline disabled:opacity-50"
+                  >
+                    {promptDefaultLoading ? "Carregando…" : "Carregar prompt padrão"}
+                  </button>
+                  {promptHasValue && (
+                    <button
+                      type="button"
+                      onClick={() => clearTabPrompt(promptTab)}
+                      className="text-[11px] text-red-400 hover:underline"
+                    >
+                      Limpar
+                    </button>
+                  )}
                 </div>
-              );
-            })()}
+              </div>
+
+              <textarea
+                key={promptTab}
+                value={promptCurrentVal}
+                onChange={(e) => setTabPrompt(promptTab, e.target.value)}
+                rows={14}
+                placeholder={`Prompt de reescrita para ${promptTabLabel}.\nDeixe vazio para usar o prompt do nível superior ou o padrão.\n\nClique em "Carregar prompt padrão" para ver e editar o prompt base.`}
+                className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-gray-50"
+                spellCheck={false}
+              />
+            </div>
 
             <div className="flex items-center gap-3">
               <button
@@ -962,7 +1053,7 @@ export default function RSSManager() {
                   : <><Wand2 size={15} /> {promptSaving ? "Salvando…" : "Salvar Prompts"}</>}
               </button>
             </div>
-          </div>
+          </div>)}
         </section>
 
         {/* ══ SOURCES ════════════════════════════════════════════════════════ */}
@@ -1015,6 +1106,67 @@ export default function RSSManager() {
               </div>
               {addError && <p className="text-sm text-red-500">{addError}</p>}
             </form>
+
+            {/* ── Global Defaults panel ── */}
+            <div className="rounded-xl border bg-gray-50 overflow-hidden">
+              <div className="px-4 py-3 border-b bg-white flex items-center gap-2">
+                <Zap size={15} className="text-amber-500"/>
+                <span className="text-sm font-semibold text-gray-800">Configurações Padrão para Fontes Ativas</span>
+                <span className="ml-auto text-[11px] text-gray-400">{sources.filter((s) => s.active).length} ativas</span>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Modo de reescrita</label>
+                    <select value={defAutoMode} onChange={(e) => setDefAutoMode(e.target.value as AutoMode)}
+                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                      {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Agendamento</label>
+                    <select value={defSchedule} onChange={(e) => setDefSchedule(Number(e.target.value))}
+                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                      {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Notícias/coleta</label>
+                    <select value={defFetchLimit} onChange={(e) => setDefFetchLimit(Number(e.target.value))}
+                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
+                      {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1 justify-end">
+                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Crédito</label>
+                    <label className="flex items-center gap-2 border rounded-lg px-2.5 py-1.5 text-xs cursor-pointer bg-white h-[30px]">
+                      <input type="checkbox" checked={defCredit} onChange={(e) => setDefCredit(e.target.checked)} className="rounded"/>
+                      Dar crédito
+                    </label>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => { void applyDefaultsToAll(); }}
+                    disabled={applyingDefs || sources.filter((s) => s.active).length === 0}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${defsApplied ? "bg-green-500 text-white" : "bg-[#0b3d91] text-white hover:bg-[#0b3d91]/90"}`}
+                  >
+                    {defsApplied ? <><CheckCircle size={12}/>Aplicado!</> : applyingDefs ? <><Loader2 size={12} className="animate-spin"/>Aplicando…</> : <><Settings size={12}/>Aplicar a todos os feeds ativos</>}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void runAllActive(); }}
+                    disabled={runningAll || runningId !== null || sources.filter((s) => s.active).length === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
+                  >
+                    {runningAll
+                      ? <><Loader2 size={12} className="animate-spin"/>Coletando todos…</>
+                      : <><Play size={12}/>Coletar todos agora</>}
+                  </button>
+                </div>
+              </div>
+            </div>
 
             {/* Inline feedback for source operations */}
             {sourceError && (
@@ -1156,12 +1308,25 @@ export default function RSSManager() {
                                       </label>
                                     </div>
                                   </div>
-                                  {/* Row 3: prompt */}
-                                  <PromptEditor
-                                    value={editingSource.customPrompt}
-                                    onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
-                                    apiFetch={apiFetch}
-                                  />
+                                  {/* Row 3: prompt — collapsible */}
+                                  <details className="group">
+                                    <summary className="cursor-pointer flex items-center gap-2 text-xs font-semibold text-purple-600 py-1 select-none list-none">
+                                      <Wand2 size={12}/>
+                                      Prompt personalizado desta fonte
+                                      {editingSource.customPrompt && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>
+                                      )}
+                                      <ChevronDown size={12} className="ml-auto group-open:hidden"/>
+                                      <ChevronUp   size={12} className="ml-auto hidden group-open:block"/>
+                                    </summary>
+                                    <div className="pt-2">
+                                      <PromptEditor
+                                        value={editingSource.customPrompt}
+                                        onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
+                                        apiFetch={apiFetch}
+                                      />
+                                    </div>
+                                  </details>
                                   <div className="flex gap-2">
                                     <button onClick={() => { void saveEdit(); }}
                                       className="bg-[#0b3d91] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
@@ -1594,6 +1759,82 @@ export default function RSSManager() {
             })}
           </section>
         )}
+
+        {/* ══ LOGS ════════════════════════════════════════════════════════════ */}
+        <section className="bg-white rounded-xl shadow-sm border">
+          <button
+            type="button"
+            onClick={() => { setLogsOpen((v) => !v); if (!logsOpen) void loadLogs(); }}
+            className="w-full px-6 py-4 flex items-center gap-2 hover:bg-gray-50 transition-colors text-left"
+          >
+            <BookOpen size={18} className="text-[#0b3d91]"/>
+            <h2 className="font-semibold text-gray-800">Log de Coleta</h2>
+            {logs.length > 0 && (
+              <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                {logs.length} event{logs.length !== 1 ? "os" : "o"}
+              </span>
+            )}
+            {runningId !== null && (
+              <span className="flex items-center gap-1 text-[11px] text-amber-600 animate-pulse">
+                <Loader2 size={11} className="animate-spin"/> coletando…
+              </span>
+            )}
+            <span className="ml-auto text-gray-400">
+              {logsOpen ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+            </span>
+          </button>
+
+          {logsOpen && (
+            <div className="border-t">
+              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b">
+                <span className="text-[11px] text-gray-400">Últimas {logs.length} entradas — mais recentes primeiro</span>
+                <button
+                  type="button"
+                  onClick={() => { void loadLogs(); }}
+                  className="flex items-center gap-1 text-[11px] text-[#0b3d91] hover:underline"
+                >
+                  <RefreshCw size={10}/> Atualizar
+                </button>
+              </div>
+              {logs.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-8">Nenhum evento ainda. Execute uma coleta para ver os logs.</p>
+              ) : (
+                <div className="divide-y max-h-[420px] overflow-y-auto">
+                  {logs
+                    .filter((e) => !runStartRef.current || e.ts >= runStartRef.current || runStartRef.current === "")
+                    .map((entry) => {
+                    const icons: Record<RssLogEntry["type"], string> = {
+                      fetch:     "🔍", rewrite:   "✨", publish:   "📢",
+                      draft:     "📝", skip:      "⏭", error:     "❌", duplicate: "♻",
+                    };
+                    const colors: Record<RssLogEntry["type"], string> = {
+                      fetch:     "text-blue-600", rewrite:   "text-purple-600", publish:   "text-green-600",
+                      draft:     "text-amber-600", skip:     "text-gray-400",   error:     "text-red-600",
+                      duplicate: "text-gray-400",
+                    };
+                    const time = new Date(entry.ts).toLocaleTimeString("pt-BR");
+                    return (
+                      <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
+                        <span className="text-sm shrink-0 mt-0.5">{icons[entry.type]}</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className={`text-[10px] font-bold uppercase tracking-wide ${colors[entry.type]}`}>{entry.type}</span>
+                            <span className="text-[11px] text-gray-500 font-medium">{entry.sourceName}</span>
+                            <span className="text-[10px] text-gray-300 ml-auto shrink-0">{time}</span>
+                          </div>
+                          <p className="text-xs text-gray-700 truncate">{entry.articleTitle}</p>
+                          {entry.message && (
+                            <p className="text-[11px] text-gray-400 mt-0.5">{entry.message}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
 
       </div>
     </AdminLayout>
