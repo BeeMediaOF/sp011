@@ -67,15 +67,16 @@ export default function Analytics() {
       .catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  const deviceTotal = stats
-    ? (stats.devices.mobile + stats.devices.desktop + stats.devices.tablet) || 1
-    : 1;
+  const devMobile  = stats?.devices?.mobile  ?? 0;
+  const devDesktop = stats?.devices?.desktop ?? 0;
+  const devTablet  = stats?.devices?.tablet  ?? 0;
+  const deviceTotal = (devMobile + devDesktop + devTablet) || 1;
 
   const deviceData = stats
     ? [
-        { name: "Desktop", value: stats.devices.desktop, pct: Math.round(stats.devices.desktop / deviceTotal * 100) },
-        { name: "Mobile",  value: stats.devices.mobile,  pct: Math.round(stats.devices.mobile  / deviceTotal * 100) },
-        { name: "Tablet",  value: stats.devices.tablet,  pct: Math.round(stats.devices.tablet  / deviceTotal * 100) },
+        { name: "Desktop", value: devDesktop, pct: Math.round(devDesktop / deviceTotal * 100) },
+        { name: "Mobile",  value: devMobile,  pct: Math.round(devMobile  / deviceTotal * 100) },
+        { name: "Tablet",  value: devTablet,  pct: Math.round(devTablet  / deviceTotal * 100) },
       ]
     : [];
 
@@ -104,10 +105,10 @@ export default function Analytics() {
           {/* ── Pageviews ─────────────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Hoje",        value: stats.totals.today,   icon: Eye,       color: "bg-[#c8102e]" },
-              { label: "Esta semana", value: stats.totals.week,    icon: TrendingUp, color: "bg-[#0b3d91]" },
-              { label: "Este mês",    value: stats.totals.month,   icon: Clock,      color: "bg-green-600" },
-              { label: "Total geral", value: stats.totals.allTime, icon: Smartphone, color: "bg-amber-500" },
+              { label: "Hoje",        value: stats.totals?.today   ?? 0, icon: Eye,       color: "bg-[#c8102e]" },
+              { label: "Esta semana", value: stats.totals?.week    ?? 0, icon: TrendingUp, color: "bg-[#0b3d91]" },
+              { label: "Este mês",    value: stats.totals?.month   ?? 0, icon: Clock,      color: "bg-green-600" },
+              { label: "Total geral", value: stats.totals?.allTime ?? 0, icon: Smartphone, color: "bg-amber-500" },
             ].map(({ label, value, icon: Icon, color }) => (
               <div key={label} className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
                 <div className={`${color} text-white p-3 rounded-lg shrink-0`}>
@@ -124,10 +125,10 @@ export default function Analytics() {
           {/* ── Engajamento ───────────────────────────────────────────── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { label: "Sessões únicas",    value: stats.engagement.uniqueSessions.toLocaleString("pt-BR"),   icon: Users,      color: "bg-violet-600",  sub: "visitantes distintos"   },
-              { label: "Tempo médio leitura", value: fmtSecs(stats.engagement.avgReadTime), icon: BookOpen, color: "bg-sky-600",    sub: "por sessão de leitura"  },
-              { label: "Taxa de rejeição",  value: `${stats.engagement.bounceRate}%`,       icon: RotateCcw,  color: "bg-orange-500", sub: "sessões com 1 só página" },
-              { label: "Leituras completas", value: stats.engagement.readCompletions.toLocaleString("pt-BR"), icon: ArrowDownUp, color: "bg-teal-600",   sub: "artigos lidos 100%"    },
+              { label: "Sessões únicas",    value: (stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR"),   icon: Users,      color: "bg-violet-600",  sub: "visitantes distintos"   },
+              { label: "Tempo médio leitura", value: fmtSecs(stats.engagement?.avgReadTime ?? 0), icon: BookOpen, color: "bg-sky-600",    sub: "por sessão de leitura"  },
+              { label: "Taxa de rejeição",  value: `${stats.engagement?.bounceRate ?? 0}%`,       icon: RotateCcw,  color: "bg-orange-500", sub: "sessões com 1 só página" },
+              { label: "Leituras completas", value: (stats.engagement?.readCompletions ?? 0).toLocaleString("pt-BR"), icon: ArrowDownUp, color: "bg-teal-600",   sub: "artigos lidos 100%"    },
             ].map(({ label, value, icon: Icon, color, sub }) => (
               <div key={label} className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
                 <div className={`${color} text-white p-3 rounded-lg shrink-0`}>
@@ -147,13 +148,13 @@ export default function Analytics() {
             <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
               Pageviews — últimos 30 dias
             </h2>
-            {stats.dailyChart.every(d => d.views === 0) ? (
+            {(stats.dailyChart ?? []).every(d => d.views === 0) ? (
               <p className="text-gray-400 text-sm text-center py-8">
                 Nenhum dado ainda. Acesse o site para gerar eventos.
               </p>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={stats.dailyChart}>
+                <AreaChart data={stats.dailyChart ?? []}>
                   <defs>
                     <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%"  stopColor="#c8102e" stopOpacity={0.3} />
@@ -177,7 +178,7 @@ export default function Analytics() {
                 Pico de acessos por hora
               </h2>
               <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stats.hourlyChart}>
+                <BarChart data={stats.hourlyChart ?? []}>
                   <XAxis dataKey="hour" tickFormatter={fmtHour} tick={{ fontSize: 9 }} interval={2} />
                   <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
                   <Tooltip formatter={(v: number) => [v, "Views"]} labelFormatter={fmtHour} />
@@ -220,11 +221,11 @@ export default function Analytics() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
                 Origens do tráfego
               </h2>
-              {stats.referrerChart.every(r => r.value === 0) ? (
+              {(stats.referrerChart ?? []).every(r => r.value === 0) ? (
                 <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
               ) : (
                 <div className="space-y-3">
-                  {stats.referrerChart.map(({ name, value }) => (
+                  {(stats.referrerChart ?? []).map(({ name, value }) => (
                     <div key={name} className="flex items-center gap-3">
                       <span className="text-xs font-semibold text-gray-500 w-28 shrink-0">
                         {REFERRER_LABELS[name] ?? name}
@@ -247,13 +248,13 @@ export default function Analytics() {
               )}
 
               {/* Compartilhamentos */}
-              {stats.shareChart.length > 0 && (
+              {(stats.shareChart?.length ?? 0) > 0 && (
                 <>
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-2 flex items-center gap-1.5">
                     <Share2 size={11}/> Compartilhamentos
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {stats.shareChart.map(({ platform, count }) => (
+                    {(stats.shareChart ?? []).map(({ platform, count }) => (
                       <span key={platform} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full font-medium">
                         {SHARE_LABELS[platform] ?? platform}: <strong>{count}</strong>
                       </span>
@@ -268,13 +269,13 @@ export default function Analytics() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
                 Profundidade de leitura
               </h2>
-              {stats.scrollDepthChart.every(d => d.count === 0) ? (
+              {(stats.scrollDepthChart ?? []).every(d => d.count === 0) ? (
                 <p className="text-gray-400 text-sm text-center py-6">
                   Sem dados ainda. Os dados aparecem quando leitores rolam os artigos.
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {stats.scrollDepthChart.map(({ depth, count }) => {
+                  {(stats.scrollDepthChart ?? []).map(({ depth, count }) => {
                     const colors: Record<number, string> = {
                       25:  "#16a34a",
                       50:  "#0b3d91",
@@ -307,7 +308,7 @@ export default function Analytics() {
                   })}
                   {maxScroll > 0 && (
                     <p className="text-[11px] text-gray-400 mt-2">
-                      {Math.round((stats.scrollDepthChart.find(d => d.depth === 100)?.count ?? 0) / (stats.scrollDepthChart.find(d => d.depth === 25)?.count || 1) * 100)}% dos leitores que começaram terminaram o artigo.
+                      {Math.round(((stats.scrollDepthChart ?? []).find(d => d.depth === 100)?.count ?? 0) / ((stats.scrollDepthChart ?? []).find(d => d.depth === 25)?.count || 1) * 100)}% dos leitores que começaram terminaram o artigo.
                     </p>
                   )}
                 </div>
@@ -322,11 +323,11 @@ export default function Analytics() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
                 Categorias mais acessadas
               </h2>
-              {stats.topCategories.length === 0 ? (
+              {(stats.topCategories?.length ?? 0) === 0 ? (
                 <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
               ) : (
                 <div className="space-y-2">
-                  {stats.topCategories.map(({ name, views }, i) => {
+                  {(stats.topCategories ?? []).map(({ name, views }, i) => {
                     const max = stats.topCategories[0]?.views ?? 1;
                     return (
                       <div key={name} className="flex items-center gap-3">
@@ -355,11 +356,11 @@ export default function Analytics() {
               <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
                 Notícias mais lidas
               </h2>
-              {stats.topArticles.length === 0 ? (
+              {(stats.topArticles?.length ?? 0) === 0 ? (
                 <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
               ) : (
                 <ol className="space-y-3">
-                  {stats.topArticles.map(({ title, views, avgTime }, i) => (
+                  {(stats.topArticles ?? []).map(({ title, views, avgTime }, i) => (
                     <li key={i} className="flex items-start gap-3">
                       <span className="text-[22px] font-black leading-none text-[#c8102e] w-6 shrink-0">{i + 1}</span>
                       <div className="flex-1 min-w-0">
