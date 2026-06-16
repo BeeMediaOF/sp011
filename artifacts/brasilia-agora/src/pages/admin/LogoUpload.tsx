@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi } from "../../lib/adminApi";
+import { invalidateSiteCache } from "../../hooks/useSite";
 import { Upload, CheckCircle, AlertCircle, Minus, Plus } from "lucide-react";
 
 export default function LogoUpload() {
@@ -41,6 +42,7 @@ export default function LogoUpload() {
         setCurrentLogo(preview);
       }
       await adminApi.updateSettings({ logoSize });
+      invalidateSiteCache();
       setStatus("success");
       setPreview(null);
     } catch {

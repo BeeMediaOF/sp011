@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings } from "../../lib/adminApi";
+import { invalidateSiteCache } from "../../hooks/useSite";
 import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard, UserCircle } from "lucide-react";
 import { saveAdminThemeToStorage } from "../../components/admin/AdminLayout";
 
@@ -81,6 +82,7 @@ export default function Settings() {
     try {
       const { settings: updated } = await adminApi.updateSettings(settings);
       setSettings(updated);
+      invalidateSiteCache();
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch {
