@@ -88,8 +88,8 @@ export function applyPromptTemplate(
   template: string, title: string, text: string, sourceName: string, giveCredit: boolean
 ): string {
   const creditLine = giveCredit
-    ? `- PENÚLTIMA LINHA OBRIGATÓRIA antes dos metadados: "Com informações de: ${sourceName}"`
-    : "";
+    ? `- Ao final da lead/introdução, cite obrigatoriamente a fonte com a frase: "conforme informação divulgada por ${sourceName}".`
+    : `- Não é necessário citar a fonte original no texto.`;
   return template
     .replace(/\{\{TITULO\}\}/g, title)
     .replace(/\{\{TEXTO\}\}/g, text.slice(0, 7000))

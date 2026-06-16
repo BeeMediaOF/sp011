@@ -794,7 +794,7 @@ export default function RSSManager() {
                 {aiSaved ? <><CheckCircle size={15}/> Salvo!</> : <><Settings size={15}/> {aiSaving ? "Salvando…" : "Salvar Configuração"}</>}
               </button>
               <p className="text-[11px] text-gray-400">
-                Prompt padrão: jornalista sênior com foco em SEO e AIO
+                Saída padrão: JSON com <code className="bg-gray-100 px-0.5 rounded">title</code>, <code className="bg-gray-100 px-0.5 rounded">subtitle</code>, <code className="bg-gray-100 px-0.5 rounded">content_html</code>, <code className="bg-gray-100 px-0.5 rounded">slug</code>, <code className="bg-gray-100 px-0.5 rounded">keywords</code> · SEO/Discover
               </p>
             </div>
           </form>
