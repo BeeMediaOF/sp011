@@ -28,6 +28,8 @@ export interface SiteSettings {
   desktopEnabled: boolean;
   seoDescription?: string;
   seoKeywords?: string;
+  facebookPixelId?: string;
+  ga4MeasurementId?: string;
   ogImageBase64?: string;
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];

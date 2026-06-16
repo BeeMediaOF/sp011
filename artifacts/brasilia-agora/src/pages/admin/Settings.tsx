@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
-import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard, UserCircle } from "lucide-react";
+import { Save, Monitor, Smartphone, CheckCircle, Globe, Tag, Image, FileSearch, Palette, LayoutDashboard, UserCircle, BarChart2 } from "lucide-react";
 import { saveAdminThemeToStorage } from "../../components/admin/AdminLayout";
 
 export default function Settings() {
@@ -448,6 +448,61 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Tracking */}
+            <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
+              <div className="flex items-center gap-2">
+                <BarChart2 size={16} className="text-[#1a2448]" />
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rastreamento &amp; Analytics</h3>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Google Analytics 4 — Measurement ID
+                </label>
+                <input
+                  value={settings.ga4MeasurementId ?? ""}
+                  onChange={(e) => setField("ga4MeasurementId", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  placeholder="G-XXXXXXXXXX"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Encontre em GA4 → Admin → Data Streams → Web → Measurement ID
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">
+                  Facebook Pixel ID
+                </label>
+                <input
+                  value={settings.facebookPixelId ?? ""}
+                  onChange={(e) => setField("facebookPixelId", e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  placeholder="123456789012345"
+                />
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Encontre em Meta Business Suite → Events Manager → Pixels
+                </p>
+              </div>
+
+              {(settings.ga4MeasurementId || settings.facebookPixelId) && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {settings.ga4MeasurementId && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                      GA4 ativo — {settings.ga4MeasurementId}
+                    </span>
+                  )}
+                  {settings.facebookPixelId && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Pixel ativo — {settings.facebookPixelId}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Device visibility */}
