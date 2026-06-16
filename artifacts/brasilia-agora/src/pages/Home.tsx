@@ -330,6 +330,7 @@ export default function Home() {
         {visibleBlocks.map((block, idx) => {
           const content = (
             <>
+              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" /></div>}
               {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
               {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
               {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
@@ -362,6 +363,12 @@ export default function Home() {
             </div>
           );
         })}
+
+        {/* slot_09 — Rodapé da Home */}
+        <div className="max-w-[1280px] mx-auto px-4 py-6">
+          <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
+          <AdBanner slot="slot_09" />
+        </div>
       </main>
 
       <Footer />

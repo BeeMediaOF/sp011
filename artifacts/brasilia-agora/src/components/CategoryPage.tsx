@@ -117,6 +117,12 @@ export default function CategoryPage({
 
             {/* Right: Sidebar */}
             <div className="w-full lg:w-1/3 space-y-8">
+              {/* Propaganda sidebar — gerenciada pelo painel */}
+              <div>
+                <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
+                <AdBanner slot="slot_11" />
+              </div>
+
               {/* Mais Lidas */}
               <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
                 <h3 className="font-bold text-[#1a2448] text-lg mb-4 flex items-center gap-2">

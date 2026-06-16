@@ -3,7 +3,7 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import {
   Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink,
-  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal, FileText,
+  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal, FileText, PanelBottom, PanelTop, PanelLeft,
 } from "lucide-react";
 
 function toBase64(file: File): Promise<string> {
@@ -97,6 +97,46 @@ const SLOTS: {
     icon:     <FileText size={14} />,
     accent:   "#ea580c",
     bg:       "bg-orange-50 border-orange-200",
+  },
+  {
+    key:      "slot_08",
+    label:    "Espaço 8 — Home: Topo",
+    location: "Logo antes do primeiro bloco de notícias",
+    hint:     "Billboard / Leaderboard. Ex: 970×250 ou 728×90 px",
+    pagePos:  "top-[10%]",
+    icon:     <PanelTop size={14} />,
+    accent:   "#0284c7",
+    bg:       "bg-sky-50 border-sky-200",
+  },
+  {
+    key:      "slot_09",
+    label:    "Espaço 9 — Home: Rodapé",
+    location: "Após todos os blocos, antes do rodapé",
+    hint:     "Banner horizontal. Ex: 970×90 ou 728×90 px",
+    pagePos:  "top-[88%]",
+    icon:     <PanelBottom size={14} />,
+    accent:   "#14b8a6",
+    bg:       "bg-teal-50 border-teal-200",
+  },
+  {
+    key:      "slot_10",
+    label:    "Espaço 10 — Artigo: In-content",
+    location: "Entre a imagem principal e o corpo do artigo",
+    hint:     "Banner horizontal ou retângulo. Ex: 728×90 ou 300×250 px",
+    pagePos:  "top-[18%]",
+    icon:     <FileText size={14} />,
+    accent:   "#7c3aed",
+    bg:       "bg-violet-50 border-violet-200",
+  },
+  {
+    key:      "slot_11",
+    label:    "Espaço 11 — Archive: Sidebar",
+    location: "Coluna lateral direita das páginas de editoria",
+    hint:     "Retângulo. Ex: 300×250 ou 300×600 px",
+    pagePos:  "top-[25%]",
+    icon:     <PanelLeft size={14} />,
+    accent:   "#16a34a",
+    bg:       "bg-green-50 border-green-200",
   },
 ];
 
@@ -301,22 +341,25 @@ function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
               <div className="w-10 h-2.5 bg-gray-400 rounded-sm" />
             </div>
             <div className="p-1.5 space-y-1">
-              <div className="h-12 bg-gray-300 rounded-sm" />
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[7].accent }}>AD 8</div>
+              <div className="h-10 bg-gray-300 rounded-sm" />
               <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[0].accent }}>AD 1</div>
-              <div className="h-8 bg-gray-200 rounded-sm" />
+              <div className="h-6 bg-gray-200 rounded-sm" />
               <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[1].accent }}>AD 2</div>
-              <div className="h-8 bg-gray-200 rounded-sm" />
+              <div className="h-6 bg-gray-200 rounded-sm" />
               <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[2].accent }}>AD 3</div>
-              <div className="h-6 bg-gray-200 rounded-sm" />
-              <div className="h-6 bg-gray-200 rounded-sm" />
+              <div className="h-4 bg-gray-200 rounded-sm" />
               <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[3].accent }}>AD 4</div>
+              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[8].accent }}>AD 9</div>
             </div>
           </div>
           <div className="flex-1 space-y-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Home size={11}/> Home</p>
+            <SlotStatus key="slot_08" slotKey="slot_08" label="Topo (antes do 1º bloco)" accent={SLOTS[7].accent} adsBySlot={adsBySlot} />
             {SLOTS.slice(0, 4).map((s) => (
               <SlotStatus key={s.key} slotKey={s.key} label={s.location} accent={s.accent} adsBySlot={adsBySlot} />
             ))}
+            <SlotStatus key="slot_09" slotKey="slot_09" label="Rodapé (antes do footer)" accent={SLOTS[8].accent} adsBySlot={adsBySlot} />
           </div>
         </div>
 
@@ -331,9 +374,9 @@ function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
               <div className="flex-1 space-y-1">
                 <div className="h-4 bg-gray-300 rounded-sm" />
                 <div className="h-2 bg-gray-200 rounded-sm" />
-                <div className="h-20 bg-gray-200 rounded-sm" />
+                <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[9].accent }}>10</div>
+                <div className="h-16 bg-gray-200 rounded-sm" />
                 <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[5].accent }}>AD 6</div>
-                <div className="h-2 bg-gray-200 rounded-sm" />
               </div>
               {/* Sidebar */}
               <div className="w-[28px] shrink-0 space-y-1 mt-4">
@@ -344,10 +387,12 @@ function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
           </div>
           <div className="flex-1 space-y-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><FileText size={11}/> Artigo</p>
+            <SlotStatus slotKey="slot_10" label="In-content (entre imagem e corpo)" accent={SLOTS[9].accent} adsBySlot={adsBySlot} />
             <SlotStatus slotKey="slot_06" label="Banner após o artigo" accent={SLOTS[5].accent} adsBySlot={adsBySlot} />
             <SlotStatus slotKey="slot_07" label="Sidebar direita (sticky)" accent={SLOTS[6].accent} adsBySlot={adsBySlot} />
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 pt-1 border-t border-gray-100 mt-1"><Newspaper size={11}/> Editoria / Arquivo</p>
             <SlotStatus slotKey="slot_05" label="Banner nas editorias" accent={SLOTS[4].accent} adsBySlot={adsBySlot} />
+            <SlotStatus slotKey="slot_11" label="Sidebar das editorias" accent={SLOTS[10].accent} adsBySlot={adsBySlot} />
           </div>
         </div>
 
