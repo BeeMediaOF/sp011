@@ -31,6 +31,9 @@ interface SocialConfig {
   templateLogoPosition?: "top-right" | "top-left" | "bottom-left" | "bottom-right";
   templateCategoryOffsetX?: number;
   templateCategoryOffsetY?: number;
+  templatePhotoRatio?: number;
+  templatePanelColor?: string;
+  templateAccentColor?: string;
 }
 
 interface Article {
@@ -94,135 +97,141 @@ function renderCanvas(
 
   const doDraw = (bgImg?: HTMLImageElement, logoImg?: HTMLImageElement) => {
     ctx.clearRect(0, 0, W, H);
-    const PAD  = Math.round(W * 0.055);
-    const barH = Math.round(H * 0.052);
+    ctx.shadowBlur = 0;
 
-    // 1. Background
+    const PAD          = Math.round(W * 0.058);
+    const photoRatio   = cfg.templatePhotoRatio ?? 0.54;
+    const PHOTO_H      = Math.round(H * photoRatio);
+    const panelColor   = cfg.templatePanelColor  ?? "#1a2448";
+    const accentColor  = cfg.templateAccentColor ?? "#f59e0b";
+    const fontFamily   = cfg.templateTitleFont   ?? "Inter, Arial, sans-serif";
+
+    // 1. Photo area (top portion) — cover crop
     if (bgImg) {
-      const ar = bgImg.width / bgImg.height;
-      const car = W / H;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, W, PHOTO_H);
+      ctx.clip();
+      const ar  = bgImg.width / bgImg.height;
+      const car = W / PHOTO_H;
       let sx = 0, sy = 0, sw = bgImg.width, sh = bgImg.height;
       if (ar > car) { sw = bgImg.height * car; sx = (bgImg.width - sw) / 2; }
-      else          { sh = bgImg.width / car;  sy = (bgImg.height - sh) / 2; }
-      ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
+      else          { sh = bgImg.width  / car; sy = (bgImg.height - sh) / 2; }
+      ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
+      ctx.restore();
     } else {
-      const g = ctx.createLinearGradient(0, 0, W, H);
-      g.addColorStop(0, "#1a2448"); g.addColorStop(1, "#0b1232");
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const g = ctx.createLinearGradient(0, 0, W, PHOTO_H);
+      g.addColorStop(0, "#2a3a5e"); g.addColorStop(1, "#1a2448");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, PHOTO_H);
     }
 
-    // 2. Gradient overlay
-    const gFrom = cfg.templateGradientFrom ?? "rgba(0,0,0,0)";
-    const gTo   = cfg.templateGradientTo   ?? "rgba(0,0,0,0.88)";
-    const ov = ctx.createLinearGradient(0, 0, 0, H);
-    ov.addColorStop(0,    gFrom);
-    ov.addColorStop(0.42, "rgba(0,0,0,0.08)");
-    ov.addColorStop(1,    gTo);
-    ctx.fillStyle = ov; ctx.fillRect(0, 0, W, H);
+    // 2. Dark panel (bottom portion)
+    ctx.fillStyle = panelColor;
+    ctx.fillRect(0, PHOTO_H, W, H - PHOTO_H);
 
-    // 3. Category badge
-    if (cfg.templateShowCategory !== false && article?.category) {
-      const badgeColor = CATEGORY_COLORS[article.category] ?? "#c8102e";
-      const badgeText  = (article.tag ?? article.category).toUpperCase();
-      const fs = Math.round(W * 0.032);
-      ctx.font = `700 ${fs}px Inter, Arial, sans-serif`;
-      const tm  = ctx.measureText(badgeText);
-      const bw  = tm.width + Math.round(W * 0.045);
-      const bh  = Math.round(W * 0.058);
-      const catOffX = cfg.templateCategoryOffsetX ?? 0;
-      const catOffY = cfg.templateCategoryOffsetY ?? 0;
-      const bx = PAD + Math.round(W * catOffX);
-      const by = PAD + Math.round(H * catOffY);
-      ctx.fillStyle = badgeColor;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bw, bh, bh / 2);
-      ctx.fill();
-      ctx.fillStyle = "#fff";
-      ctx.textAlign = "left"; ctx.textBaseline = "middle";
-      ctx.fillText(badgeText, bx + Math.round(W * 0.022), by + bh / 2);
-    }
-
-    // 4. Logo (position configurable)
+    // 3. Logo (overlaid on photo)
     if (cfg.templateShowLogo && logoImg) {
       const logoScale = cfg.templateLogoScale ?? 1.0;
-      const lW = Math.round(W * 0.24 * logoScale);
+      const lW = Math.round(W * 0.20 * logoScale);
       const lH = Math.round(lW * (logoImg.height / logoImg.width));
       const logoPos = cfg.templateLogoPosition ?? "top-right";
       let lx: number, ly: number;
-      if (logoPos === "top-left")     { lx = PAD;          ly = PAD; }
-      else if (logoPos === "bottom-left")  { lx = PAD;          ly = H - barH - lH - Math.round(PAD * 0.5); }
-      else if (logoPos === "bottom-right") { lx = W - PAD - lW; ly = H - barH - lH - Math.round(PAD * 0.5); }
-      else                                 { lx = W - PAD - lW; ly = PAD + Math.round(W * 0.005); }
+      if      (logoPos === "top-left")     { lx = PAD;          ly = PAD; }
+      else if (logoPos === "bottom-left")  { lx = PAD;          ly = PHOTO_H - lH - Math.round(PAD * 0.6); }
+      else if (logoPos === "bottom-right") { lx = W - PAD - lW; ly = PHOTO_H - lH - Math.round(PAD * 0.6); }
+      else                                 { lx = W - PAD - lW; ly = PAD; }
       ctx.drawImage(logoImg, lx, ly, lW, lH);
     }
 
-    // 5. Title
-    if (article?.title) {
-      const sizeScale   = cfg.templateTitleSizeScale ?? 1.0;
-      const baseFs      = type === "feed" ? Math.round(W * 0.068) : Math.round(W * 0.072);
-      const fs          = Math.round(baseFs * sizeScale);
-      const fontFamily  = cfg.templateTitleFont ?? "Merriweather, Georgia, serif";
-      ctx.font  = `700 ${fs}px ${fontFamily}`;
-      ctx.fillStyle = "#ffffff";
-      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 20;
-      const offX   = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
-      const offY   = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
+    // 4. Category badge — top of dark panel
+    const panelPad = Math.round(H * 0.030);
+    let curY = PHOTO_H + panelPad;
+
+    if (cfg.templateShowCategory !== false && article?.category) {
+      const catOffX   = cfg.templateCategoryOffsetX ?? 0;
+      const catOffY   = cfg.templateCategoryOffsetY ?? 0;
+      const badgeText = (article.tag ?? article.category).toUpperCase();
+      const fs  = Math.round(W * 0.030);
+      ctx.font  = `700 ${fs}px Inter, Arial, sans-serif`;
+      const tm  = ctx.measureText(badgeText);
+      const bh  = Math.round(W * 0.052);
+      const bw  = tm.width + Math.round(W * 0.042);
+      const bx  = PAD + Math.round(W * catOffX);
+      const by  = curY + Math.round(H * catOffY);
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      ctx.roundRect(bx, by, bw, bh, 8);
+      ctx.fill();
+      ctx.fillStyle   = "#1a2448";
+      ctx.textAlign   = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillText(badgeText, bx + Math.round(W * 0.018), by + bh / 2);
+      curY = by + bh + Math.round(H * 0.022);
+    }
+
+    // 5. Title — white bold
+    const cleanTitle = (article?.title ?? "").replace(/<[^>]*>/g, "");
+    if (cleanTitle) {
+      const sizeScale = cfg.templateTitleSizeScale ?? 1.0;
+      const baseFs    = type === "feed" ? Math.round(W * 0.074) : Math.round(W * 0.070);
+      const fs        = Math.round(baseFs * sizeScale);
+      ctx.font        = `800 ${fs}px ${fontFamily}`;
+      ctx.fillStyle   = "#ffffff";
+      ctx.textAlign   = "left";
+      ctx.textBaseline = "top";
+      const offX  = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
+      const offY  = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
       const titleX = PAD + offX;
-      const maxW   = W - PAD - offX - PAD;
-      const cleanTitle = article.title.replace(/<[^>]*>/g, "");
-      const lines  = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5));
-      const lh     = fs * 1.22;
-      const totalH = lines.length * lh;
-      const baseline = H - Math.round(H * 0.068) - PAD - offY;
-      lines.forEach((ln, i) => ctx.fillText(ln, titleX, baseline - totalH + (i + 1) * lh));
-      ctx.shadowBlur = 0;
+      const maxW  = W - PAD - offX - PAD;
+      const lines = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5));
+      const lh    = fs * 1.18;
+      lines.forEach((ln, i) => ctx.fillText(ln, titleX, curY + offY + i * lh));
+      curY += lines.length * lh + Math.round(H * 0.012) + offY;
     }
 
-    // 6. Subtitle (story only, small)
-    if (type === "story" && article?.subtitle) {
-      const fs = Math.round(W * 0.035);
-      ctx.font  = `400 ${fs}px Inter, Arial, sans-serif`;
-      ctx.fillStyle = "rgba(255,255,255,0.8)";
-      ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-      const maxW = W - PAD * 2;
-      const lines = wrapText(ctx, article.subtitle, maxW).slice(0, 2);
-      const lh    = fs * 1.4;
-      const totalH = lines.length * lh;
-      const titleFs    = Math.round(W * 0.072 * (cfg.templateTitleSizeScale ?? 1.0));
-      const titleLines = article.title ? wrapText(ctx, article.title.replace(/<[^>]*>/g, ""), maxW).length : 0;
-      const titleH     = titleLines * titleFs * 1.22;
-      const offY       = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
-      const baseline   = H - Math.round(H * 0.068) - PAD - titleH - Math.round(W * 0.02) - offY;
-      lines.forEach((ln, i) => ctx.fillText(ln, PAD, baseline - totalH + (i + 1) * lh));
+    // 6. Subtitle — accent color italic
+    const cleanSub = (article?.subtitle ?? "").replace(/<[^>]*>/g, "");
+    if (cleanSub) {
+      const sizeScale = cfg.templateTitleSizeScale ?? 1.0;
+      const baseFs    = type === "feed" ? Math.round(W * 0.064) : Math.round(W * 0.060);
+      const fs        = Math.round(baseFs * sizeScale);
+      ctx.font        = `700 italic ${fs}px ${fontFamily}`;
+      ctx.fillStyle   = accentColor;
+      ctx.textAlign   = "left";
+      ctx.textBaseline = "top";
+      const maxW  = W - PAD * 2;
+      const lines = wrapText(ctx, cleanSub, maxW).slice(0, 3);
+      const lh    = fs * 1.18;
+      lines.forEach((ln, i) => ctx.fillText(ln, PAD, curY + i * lh));
     }
 
-    // 7. Bottom bar
-    ctx.fillStyle = "#c8102e";
-    ctx.fillRect(0, H - barH, W, barH);
-    const label = siteName ?? window.location.hostname.replace("www.", "");
-    ctx.font = `700 ${Math.round(barH * 0.44)}px Inter, Arial, sans-serif`;
-    ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.shadowBlur = 0;
-    ctx.fillText(label, W / 2, H - barH / 2);
+    // 7. URL — bottom of panel, muted
+    const hostname = typeof window !== "undefined"
+      ? window.location.hostname.replace("www.", "")
+      : "sbcagora.com.br";
+    const urlLabel = siteName ? siteName.toLowerCase().replace(/\s+/g, "") + ".com.br" : `www.${hostname}`;
+    const urlFs = Math.round(W * 0.026);
+    ctx.font        = `400 ${urlFs}px Inter, Arial, sans-serif`;
+    ctx.fillStyle   = "rgba(255,255,255,0.40)";
+    ctx.textAlign   = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(urlLabel, PAD, H - Math.round(H * 0.022));
   };
 
   // Load images
-  let bgLoaded = false;
+  let bgLoaded   = false;
   let logoLoaded = false;
+  let _bgImg:   HTMLImageElement | null = null;
+  let _logoImg: HTMLImageElement | null = null;
   const maybeRender = () => {
     if (bgLoaded && logoLoaded) doDraw(_bgImg ?? undefined, _logoImg ?? undefined);
   };
-
-  let _bgImg: HTMLImageElement | null = null;
-  let _logoImg: HTMLImageElement | null = null;
 
   if (article?.imageUrl && article.imageUrl.startsWith("http")) {
     const img = new Image();
     img.crossOrigin = "anonymous";
     img.onload  = () => { _bgImg = img; bgLoaded = true; maybeRender(); };
-    img.onerror = () => { bgLoaded = true; maybeRender(); };
+    img.onerror = () => {                bgLoaded = true; maybeRender(); };
     img.src = article.imageUrl;
   } else {
     bgLoaded = true;
@@ -231,7 +240,7 @@ function renderCanvas(
   if (cfg.templateShowLogo && logoBase64) {
     const img = new Image();
     img.onload  = () => { _logoImg = img; logoLoaded = true; maybeRender(); };
-    img.onerror = () => { logoLoaded = true; maybeRender(); };
+    img.onerror = () => {                  logoLoaded = true; maybeRender(); };
     img.src = logoBase64;
   } else {
     logoLoaded = true;
@@ -594,14 +603,15 @@ export default function SocialMedia() {
                     <label className="block text-xs text-gray-600 mb-1">Fonte</label>
                     <select
                       className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
-                      value={cfg.templateTitleFont ?? "Merriweather, Georgia, serif"}
+                      value={cfg.templateTitleFont ?? "Inter, Arial, sans-serif"}
                       onChange={e => { setCfg(p => ({ ...p, templateTitleFont: e.target.value })); setTimeout(redrawCanvas, 50); }}>
+                      <option value="Inter, Arial, sans-serif">Inter (Sans-serif moderna)</option>
+                      <option value="Arial Black, Arial, sans-serif">Arial Black (impacto)</option>
+                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                      <option value="Arial, Helvetica, sans-serif">Arial (Sans-serif simples)</option>
                       <option value="Merriweather, Georgia, serif">Merriweather (Serif elegante)</option>
                       <option value="Georgia, serif">Georgia (Serif clássica)</option>
                       <option value="'Times New Roman', serif">Times New Roman</option>
-                      <option value="Inter, Arial, sans-serif">Inter (Sans-serif moderna)</option>
-                      <option value="Arial, Helvetica, sans-serif">Arial (Sans-serif simples)</option>
-                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
                     </select>
                   </div>
 
@@ -730,35 +740,44 @@ export default function SocialMedia() {
                   )}
                 </div>
 
-                {/* Gradient */}
+                {/* Layout */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800 text-sm">Gradiente sobre a foto</h3>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Cor do gradiente — topo</label>
-                    <div className="flex items-center gap-3">
-                      <input type="color" value="#000000"
-                        onChange={e => {
-                          const hex = e.target.value;
-                          const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
-                          setCfg(p => ({ ...p, templateGradientFrom: `rgba(${r},${g},${b},0)` }));
-                          setTimeout(redrawCanvas, 50);
-                        }}
-                        className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
-                      <span className="text-xs text-gray-400">Transparente por padrão (boa prática)</span>
-                    </div>
-                  </div>
+                  <h3 className="font-semibold text-gray-800 text-sm">Layout</h3>
+
                   <div>
                     <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Escurecimento da base</span>
-                      <span className="font-mono text-gray-500">
-                        {Math.round(parseFloat((cfg.templateGradientTo ?? "rgba(0,0,0,0.88)").match(/[\d.]+\)$/)?.[0]?.replace(")","") ?? "0.88") * 100)}%
-                      </span>
+                      <span>Altura da foto</span>
+                      <span className="font-mono text-gray-500">{Math.round((cfg.templatePhotoRatio ?? 0.54) * 100)}%</span>
                     </div>
-                    <input type="range" min="0.4" max="1" step="0.05"
-                      value={parseFloat((cfg.templateGradientTo ?? "rgba(0,0,0,0.88)").match(/[\d.]+\)$/)?.[0]?.replace(")","") ?? "0.88")}
-                      onChange={e => { setCfg(p => ({ ...p, templateGradientTo: `rgba(0,0,0,${e.target.value})` })); setTimeout(redrawCanvas, 50); }}
+                    <input type="range" min="0.35" max="0.72" step="0.01"
+                      value={cfg.templatePhotoRatio ?? 0.54}
+                      onChange={e => { setCfg(p => ({ ...p, templatePhotoRatio: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
                       className="w-full accent-[#c8102e]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Claro</span><span>Escuro</span></div>
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menos foto</span><span>Mais foto</span></div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1.5">Cor do painel</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color"
+                          value={cfg.templatePanelColor ?? "#1a2448"}
+                          onChange={e => { setCfg(p => ({ ...p, templatePanelColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
+                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                        <span className="text-xs text-gray-400 font-mono">{cfg.templatePanelColor ?? "#1a2448"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1.5">Cor de destaque</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color"
+                          value={cfg.templateAccentColor ?? "#f59e0b"}
+                          onChange={e => { setCfg(p => ({ ...p, templateAccentColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
+                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                        <span className="text-xs text-gray-400 font-mono">{cfg.templateAccentColor ?? "#f59e0b"}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-400 mt-1">Badge + subtítulo</p>
+                    </div>
                   </div>
                 </div>
 
