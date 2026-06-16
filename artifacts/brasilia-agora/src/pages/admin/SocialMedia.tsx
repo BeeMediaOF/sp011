@@ -32,8 +32,14 @@ interface SocialConfig {
   templateCategoryOffsetX?: number;
   templateCategoryOffsetY?: number;
   templatePhotoRatio?: number;
+  templatePhotoCropY?: "top" | "center" | "bottom";
+  templatePhotoVignette?: number;
   templatePanelColor?: string;
   templateAccentColor?: string;
+  templateTitleColor?: string;
+  templateTitleMaxLines?: number;
+  templateShowSubtitle?: boolean;
+  templateSiteUrl?: string;
 }
 
 interface Article {
@@ -68,6 +74,15 @@ const DEFAULT_STORY_CAPTION =
   "{{titulo}}\n\n{{tags}}\n\nLeia mais no link da bio! 🚀";
 
 // ─── Canvas rendering ─────────────────────────────────────────────────────────
+function hexToRgb(hex: string) {
+  const c = (hex ?? "#1a2448").replace("#", "");
+  return {
+    r: parseInt(c.slice(0, 2), 16) || 26,
+    g: parseInt(c.slice(2, 4), 16) || 36,
+    b: parseInt(c.slice(4, 6), 16) || 72,
+  };
+}
+
 function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
   const words = text.split(" ");
   const lines: string[] = [];
@@ -99,14 +114,20 @@ function renderCanvas(
     ctx.clearRect(0, 0, W, H);
     ctx.shadowBlur = 0;
 
-    const PAD          = Math.round(W * 0.058);
-    const photoRatio   = cfg.templatePhotoRatio ?? 0.54;
-    const PHOTO_H      = Math.round(H * photoRatio);
-    const panelColor   = cfg.templatePanelColor  ?? "#1a2448";
-    const accentColor  = cfg.templateAccentColor ?? "#f59e0b";
-    const fontFamily   = cfg.templateTitleFont   ?? "Inter, Arial, sans-serif";
+    const PAD         = Math.round(W * 0.058);
+    const photoRatio  = cfg.templatePhotoRatio   ?? 0.54;
+    const PHOTO_H     = Math.round(H * photoRatio);
+    const panelColor  = cfg.templatePanelColor   ?? "#1a2448";
+    const accentColor = cfg.templateAccentColor  ?? "#f59e0b";
+    const titleColor  = cfg.templateTitleColor   ?? "#ffffff";
+    const fontFamily  = cfg.templateTitleFont    ?? "Inter, Arial, sans-serif";
+    const cropY       = cfg.templatePhotoCropY   ?? "center";
+    const vigStrength = cfg.templatePhotoVignette ?? 0.40;
+    const maxLines    = cfg.templateTitleMaxLines ?? 4;
+    const showSub     = cfg.templateShowSubtitle  ?? true;
+    const { r: pr, g: pg, b: pb } = hexToRgb(panelColor);
 
-    // 1. Photo area (top portion) — cover crop
+    // 1. Photo area — cover crop with vertical alignment
     if (bgImg) {
       ctx.save();
       ctx.beginPath();
@@ -115,13 +136,29 @@ function renderCanvas(
       const ar  = bgImg.width / bgImg.height;
       const car = W / PHOTO_H;
       let sx = 0, sy = 0, sw = bgImg.width, sh = bgImg.height;
-      if (ar > car) { sw = bgImg.height * car; sx = (bgImg.width - sw) / 2; }
-      else          { sh = bgImg.width  / car; sy = (bgImg.height - sh) / 2; }
+      if (ar > car) {
+        sw = bgImg.height * car;
+        sx = (bgImg.width - sw) / 2;
+      } else {
+        sh = bgImg.width / car;
+        const extra = bgImg.height - sh;
+        sy = cropY === "top" ? 0 : cropY === "bottom" ? extra : extra / 2;
+      }
       ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
       ctx.restore();
+
+      // Vignette — bottom of photo bleeds into panel
+      if (vigStrength > 0) {
+        const vigH = Math.round(PHOTO_H * 0.55);
+        const vg   = ctx.createLinearGradient(0, PHOTO_H - vigH, 0, PHOTO_H);
+        vg.addColorStop(0, `rgba(${pr},${pg},${pb},0)`);
+        vg.addColorStop(1, `rgba(${pr},${pg},${pb},${vigStrength})`);
+        ctx.fillStyle = vg;
+        ctx.fillRect(0, PHOTO_H - vigH, W, vigH);
+      }
     } else {
       const g = ctx.createLinearGradient(0, 0, W, PHOTO_H);
-      g.addColorStop(0, "#2a3a5e"); g.addColorStop(1, "#1a2448");
+      g.addColorStop(0, "#2a3a5e"); g.addColorStop(1, panelColor);
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, PHOTO_H);
     }
 
@@ -158,62 +195,67 @@ function renderCanvas(
       const bw  = tm.width + Math.round(W * 0.042);
       const bx  = PAD + Math.round(W * catOffX);
       const by  = curY + Math.round(H * catOffY);
-      ctx.fillStyle = accentColor;
+      ctx.fillStyle    = accentColor;
       ctx.beginPath();
       ctx.roundRect(bx, by, bw, bh, 8);
       ctx.fill();
-      ctx.fillStyle   = "#1a2448";
-      ctx.textAlign   = "left";
+      ctx.fillStyle    = "#1a2448";
+      ctx.textAlign    = "left";
       ctx.textBaseline = "middle";
       ctx.fillText(badgeText, bx + Math.round(W * 0.018), by + bh / 2);
       curY = by + bh + Math.round(H * 0.022);
     }
 
-    // 5. Title — white bold
+    // 5. Title — configurable color + max lines
     const cleanTitle = (article?.title ?? "").replace(/<[^>]*>/g, "");
     if (cleanTitle) {
-      const sizeScale = cfg.templateTitleSizeScale ?? 1.0;
-      const baseFs    = type === "feed" ? Math.round(W * 0.074) : Math.round(W * 0.070);
-      const fs        = Math.round(baseFs * sizeScale);
-      ctx.font        = `800 ${fs}px ${fontFamily}`;
-      ctx.fillStyle   = "#ffffff";
-      ctx.textAlign   = "left";
+      const sizeScale  = cfg.templateTitleSizeScale ?? 1.0;
+      const baseFs     = type === "feed" ? Math.round(W * 0.074) : Math.round(W * 0.070);
+      const fs         = Math.round(baseFs * sizeScale);
+      ctx.font         = `800 ${fs}px ${fontFamily}`;
+      ctx.fillStyle    = titleColor;
+      ctx.textAlign    = "left";
       ctx.textBaseline = "top";
-      const offX  = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
-      const offY  = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
+      const offX   = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
+      const offY   = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
       const titleX = PAD + offX;
-      const maxW  = W - PAD - offX - PAD;
-      const lines = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5));
-      const lh    = fs * 1.18;
+      const maxW   = W - PAD - offX - PAD;
+      const lines  = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5)).slice(0, maxLines);
+      const lh     = fs * 1.16;
       lines.forEach((ln, i) => ctx.fillText(ln, titleX, curY + offY + i * lh));
-      curY += lines.length * lh + Math.round(H * 0.012) + offY;
+      curY += lines.length * lh + Math.round(H * 0.014) + offY;
     }
 
-    // 6. Subtitle — accent color italic
-    const cleanSub = (article?.subtitle ?? "").replace(/<[^>]*>/g, "");
-    if (cleanSub) {
-      const sizeScale = cfg.templateTitleSizeScale ?? 1.0;
-      const baseFs    = type === "feed" ? Math.round(W * 0.064) : Math.round(W * 0.060);
-      const fs        = Math.round(baseFs * sizeScale);
-      ctx.font        = `700 italic ${fs}px ${fontFamily}`;
-      ctx.fillStyle   = accentColor;
-      ctx.textAlign   = "left";
-      ctx.textBaseline = "top";
-      const maxW  = W - PAD * 2;
-      const lines = wrapText(ctx, cleanSub, maxW).slice(0, 3);
-      const lh    = fs * 1.18;
-      lines.forEach((ln, i) => ctx.fillText(ln, PAD, curY + i * lh));
+    // 6. Subtitle — accent italic, toggleable
+    if (showSub) {
+      const cleanSub = (article?.subtitle ?? "").replace(/<[^>]*>/g, "");
+      if (cleanSub) {
+        const sizeScale  = cfg.templateTitleSizeScale ?? 1.0;
+        const baseFs     = type === "feed" ? Math.round(W * 0.063) : Math.round(W * 0.059);
+        const fs         = Math.round(baseFs * sizeScale);
+        ctx.font         = `700 italic ${fs}px ${fontFamily}`;
+        ctx.fillStyle    = accentColor;
+        ctx.textAlign    = "left";
+        ctx.textBaseline = "top";
+        const maxW = W - PAD * 2;
+        const lines = wrapText(ctx, cleanSub, maxW).slice(0, 3);
+        const lh    = fs * 1.18;
+        lines.forEach((ln, i) => ctx.fillText(ln, PAD, curY + i * lh));
+      }
     }
 
-    // 7. URL — bottom of panel, muted
+    // 7. URL — custom or auto-generated, bottom of panel
     const hostname = typeof window !== "undefined"
       ? window.location.hostname.replace("www.", "")
-      : "sbcagora.com.br";
-    const urlLabel = siteName ? siteName.toLowerCase().replace(/\s+/g, "") + ".com.br" : `www.${hostname}`;
-    const urlFs = Math.round(W * 0.026);
-    ctx.font        = `400 ${urlFs}px Inter, Arial, sans-serif`;
-    ctx.fillStyle   = "rgba(255,255,255,0.40)";
-    ctx.textAlign   = "left";
+      : "portal.com.br";
+    const autoUrl  = siteName
+      ? `www.${siteName.toLowerCase().replace(/\s+/g, "")}.com.br`
+      : `www.${hostname}`;
+    const urlLabel = cfg.templateSiteUrl?.trim() || autoUrl;
+    const urlFs    = Math.round(W * 0.026);
+    ctx.font         = `400 ${urlFs}px Inter, Arial, sans-serif`;
+    ctx.fillStyle    = "rgba(255,255,255,0.38)";
+    ctx.textAlign    = "left";
     ctx.textBaseline = "bottom";
     ctx.fillText(urlLabel, PAD, H - Math.round(H * 0.022));
   };
@@ -597,7 +639,17 @@ export default function SocialMedia() {
 
                 {/* Title controls */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800 text-sm">Título</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-800 text-sm">Título</h3>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
+                        <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                          checked={cfg.templateShowSubtitle ?? true}
+                          onChange={e => { setCfg(p => ({ ...p, templateShowSubtitle: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
+                        Subtítulo
+                      </label>
+                    </div>
+                  </div>
 
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Fonte</label>
@@ -613,6 +665,33 @@ export default function SocialMedia() {
                       <option value="Georgia, serif">Georgia (Serif clássica)</option>
                       <option value="'Times New Roman', serif">Times New Roman</option>
                     </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1.5">Cor do título</label>
+                      <div className="flex items-center gap-2">
+                        <input type="color"
+                          value={cfg.templateTitleColor ?? "#ffffff"}
+                          onChange={e => { setCfg(p => ({ ...p, templateTitleColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
+                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
+                        <span className="text-xs text-gray-400 font-mono">{cfg.templateTitleColor ?? "#ffffff"}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Máx. linhas</label>
+                      <div className="flex items-center gap-1">
+                        {[2, 3, 4, 5].map(n => (
+                          <button key={n}
+                            onClick={() => { setCfg(p => ({ ...p, templateTitleMaxLines: n })); setTimeout(redrawCanvas, 50); }}
+                            className={`flex-1 py-1.5 rounded text-xs font-semibold border transition-colors ${
+                              (cfg.templateTitleMaxLines ?? 4) === n
+                                ? "bg-[#c8102e] text-white border-[#c8102e]"
+                                : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                            }`}>{n}</button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -742,7 +821,7 @@ export default function SocialMedia() {
 
                 {/* Layout */}
                 <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800 text-sm">Layout</h3>
+                  <h3 className="font-semibold text-gray-800 text-sm">Foto</h3>
 
                   <div>
                     <div className="flex justify-between text-xs text-gray-600 mb-1">
@@ -756,6 +835,41 @@ export default function SocialMedia() {
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menos foto</span><span>Mais foto</span></div>
                   </div>
 
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1.5">Recorte vertical</p>
+                    <div className="flex gap-1.5">
+                      {([
+                        { key: "top",    label: "⬆ Topo"   },
+                        { key: "center", label: "◎ Centro" },
+                        { key: "bottom", label: "⬇ Base"   },
+                      ] as const).map(({ key, label }) => (
+                        <button key={key}
+                          onClick={() => { setCfg(p => ({ ...p, templatePhotoCropY: key })); setTimeout(redrawCanvas, 50); }}
+                          className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
+                            (cfg.templatePhotoCropY ?? "center") === key
+                              ? "bg-[#c8102e] text-white border-[#c8102e]"
+                              : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
+                          }`}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Vinheta (foto→painel)</span>
+                      <span className="font-mono text-gray-500">{Math.round((cfg.templatePhotoVignette ?? 0.40) * 100)}%</span>
+                    </div>
+                    <input type="range" min="0" max="1" step="0.05"
+                      value={cfg.templatePhotoVignette ?? 0.40}
+                      onChange={e => { setCfg(p => ({ ...p, templatePhotoVignette: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                      className="w-full accent-[#c8102e]" />
+                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Sem vinheta</span><span>Intensa</span></div>
+                  </div>
+                </div>
+
+                {/* Colors */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+                  <h3 className="font-semibold text-gray-800 text-sm">Cores</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs text-gray-600 mb-1.5">Cor do painel</label>
@@ -779,6 +893,19 @@ export default function SocialMedia() {
                       <p className="text-[10px] text-gray-400 mt-1">Badge + subtítulo</p>
                     </div>
                   </div>
+                </div>
+
+                {/* URL personalizada */}
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
+                  <h3 className="font-semibold text-gray-800 text-sm">URL do rodapé</h3>
+                  <input
+                    type="text"
+                    placeholder="Ex: brasilia.com.br  (deixe vazio para automático)"
+                    value={cfg.templateSiteUrl ?? ""}
+                    onChange={e => { setCfg(p => ({ ...p, templateSiteUrl: e.target.value })); setTimeout(redrawCanvas, 80); }}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                  />
+                  <p className="text-[10px] text-gray-400">Aparece discreto no canto inferior esquerdo da máscara.</p>
                 </div>
 
                 <button onClick={saveConfig} disabled={saving}
