@@ -39,6 +39,10 @@ interface PanelTheme {
 const LS_SIDEBAR = "admin_sidebar_color";
 const LS_ACCENT  = "admin_accent_color";
 
+// Module-level cache — survives component remounts, prevents logo flash on navigation
+let _cachedLogo: string | null = null;
+let _fetchPromise: Promise<void> | null = null;
+
 export function saveAdminThemeToStorage(sidebar: string, accent: string) {
   try {
     localStorage.setItem(LS_SIDEBAR, sidebar);
@@ -58,27 +62,31 @@ function readAdminThemeFromStorage() {
 }
 
 function usePanelTheme(): PanelTheme {
-  // Lazy initializer — reads localStorage synchronously, zero flash
   const [theme, setTheme] = useState<PanelTheme>(() => {
     const { sidebar, accent } = readAdminThemeFromStorage();
-    return { logo: logoFallback, sidebar, accent, accentText: "#ffffff" };
+    // Use cached logo immediately on remount — no flash
+    return { logo: _cachedLogo || logoFallback, sidebar, accent, accentText: "#ffffff" };
   });
 
   useEffect(() => {
-    fetch("/api/site")
-      .then((r) => r.json())
-      .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
-        const sidebar = data.adminSidebarColor || "#1a2448";
-        const accent  = data.adminAccentColor  || "#c8102e";
-        saveAdminThemeToStorage(sidebar, accent);
-        setTheme({
-          logo: data.adminLogoBase64 || data.logoBase64 || logoFallback,
-          sidebar,
-          accent,
-          accentText: "#ffffff",
-        });
-      })
-      .catch(() => {});
+    // Re-use in-flight or already-resolved promise so we only ever fetch once
+    if (!_fetchPromise) {
+      _fetchPromise = fetch("/api/site")
+        .then((r) => r.json())
+        .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
+          const sidebar = data.adminSidebarColor || "#1a2448";
+          const accent  = data.adminAccentColor  || "#c8102e";
+          _cachedLogo   = data.adminLogoBase64 || data.logoBase64 || logoFallback;
+          saveAdminThemeToStorage(sidebar, accent);
+          setTheme({ logo: _cachedLogo, sidebar, accent, accentText: "#ffffff" });
+        })
+        .catch(() => { _fetchPromise = null; });
+    } else {
+      // Promise already resolved — just sync state with the cached logo
+      if (_cachedLogo) {
+        setTheme((prev) => ({ ...prev, logo: _cachedLogo! }));
+      }
+    }
   }, []);
 
   return theme;
@@ -100,13 +108,15 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
         className={`flex flex-col text-white transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
         style={{ backgroundColor: theme.sidebar }}
       >
-        <div className="flex items-center justify-between px-3 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-3 py-4 border-b border-white/10 min-h-[56px]">
           {!collapsed && (
-            <img
-              src={theme.logo}
-              alt="Logo"
-              className="h-9 w-auto object-contain max-w-[160px]"
-            />
+            <div className="h-9 flex items-center shrink-0">
+              <img
+                src={theme.logo}
+                alt="Logo"
+                className="h-9 w-auto object-contain max-w-[152px]"
+              />
+            </div>
           )}
           <button
             onClick={() => setCollapsed((c) => !c)}
