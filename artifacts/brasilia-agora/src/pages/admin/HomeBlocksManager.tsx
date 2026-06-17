@@ -8,7 +8,7 @@ import {
   Upload, Minus, ImageIcon, Monitor, Tablet, Smartphone, ExternalLink,
   Undo2, Redo2, FileText, Image, GalleryHorizontal, Play, Megaphone,
   List, Radio, Mail, FolderOpen, CloudSun, CircleDollarSign, Share2,
-  Code, Frame, Map, Settings, Info, RotateCcw, Pencil, Copy,
+  Code, Frame, Map as MapIcon, Settings, Info, RotateCcw, Pencil, Copy,
   Newspaper, Users, Hash, AlignJustify, Globe, Flame,
   Trophy, Tv2, Building2, Heart, Cpu, Star, Zap, BarChart3,
   Type, Palette, Eye as EyeIcon, Calendar, User, FileImage,
@@ -61,7 +61,7 @@ const OTHER_MODULES = [
   { type: "counter" as BlockType, name: "Contador",          desc: "Estatísticas em números.",  Icon: Hash },
   { type: "sep" as BlockType,     name: "Separador",         desc: "Divisor entre seções.",     Icon: Minus },
   { type: "html" as BlockType,    name: "HTML Personalizado",desc: "Código HTML livre.",        Icon: Code },
-  { type: "map" as BlockType,     name: "Mapa",              desc: "Google Maps.",              Icon: Map },
+  { type: "map" as BlockType,     name: "Mapa",              desc: "Google Maps.",              Icon: MapIcon },
   { type: "embed" as BlockType,   name: "Embed",             desc: "Conteúdo externo.",         Icon: Frame },
 ];
 
@@ -597,6 +597,8 @@ export default function HomeBlocksManager() {
     if (editingId === block.id) { setEditingId(null); return; }
     setEditingId(block.id);
     setEditForm(blockToForm(block));
+    // Notify iframe to highlight + scroll to this block
+    iframeRef.current?.contentWindow?.postMessage({ type: "block:select", blockId: block.id }, "*");
   }
 
   // Live debounced form change
@@ -1042,7 +1044,7 @@ export default function HomeBlocksManager() {
                 <div className="flex-1 overflow-auto bg-[#F1F5F9] p-4">
                   <div className="mx-auto transition-all duration-300 h-full" style={{ maxWidth: previewWidth, minHeight: "100%" }}>
                     <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-white" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.08)" }}>
-                      <iframe key={previewKey} ref={iframeRef} src="/" title="Prévia da Home"
+                      <iframe key={previewKey} ref={iframeRef} src="/?adminPreview=1" title="Prévia da Home"
                         className="w-full h-full border-0" style={{ minHeight: "600px" }} />
                     </div>
                   </div>

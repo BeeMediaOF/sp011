@@ -197,11 +197,12 @@ function PredefinedBlock({ block, getArticles }: {
 }
 
 // ─── Admin preview overlay ────────────────────────────────────────────────────
-function AdminBar({
-  block, idx, total, dragOver,
+function AdminBlockWrapper({
+  block, idx, total, dragOver, isSelected, children,
   onEdit, onDragStart, onDragOver, onDragEnd, isDragging,
 }: {
-  block: HomeBlock; idx: number; total: number; dragOver: boolean;
+  block: HomeBlock; idx: number; total: number; dragOver: boolean; isSelected: boolean;
+  children: React.ReactNode;
   onEdit: () => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
@@ -210,28 +211,55 @@ function AdminBar({
 }) {
   return (
     <div
-      className={`group relative transition-all ${isDragging ? "opacity-40 scale-[0.99]" : ""} ${dragOver ? "ring-2 ring-[#c8102e] ring-inset" : ""}`}
+      className={`group relative cursor-pointer transition-all duration-150
+        ${isDragging ? "opacity-40 scale-[0.99]" : ""}
+        ${isSelected
+          ? "outline outline-2 outline-offset-[-2px] outline-[#2563EB]"
+          : "outline outline-2 outline-offset-[-2px] outline-transparent hover:outline-[#2563EB]/50"}
+        ${dragOver ? "outline-[#E71D36]" : ""}
+      `}
+      onClick={onEdit}
       draggable
-      onDragStart={onDragStart}
+      onDragStart={(e) => { e.stopPropagation(); onDragStart(); }}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
     >
-      {/* Hover handle bar */}
-      <div className="flex items-center gap-2 px-4 py-1.5 bg-[#1a2448] text-white text-[11px] font-bold select-none cursor-grab opacity-0 group-hover:opacity-100 transition-opacity">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" className="opacity-50 shrink-0">
-          <circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
-          <circle cx="3" cy="6" r="1.2"/><circle cx="9" cy="6" r="1.2"/>
-          <circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/>
-        </svg>
-        <span className="flex-1 truncate">{block.name}</span>
-        <span className="text-white/40 text-[10px]">{idx + 1}/{total}</span>
+      {/* Block content */}
+      {children}
+
+      {/* Floating toolbar — appears on hover or when selected */}
+      <div
+        className={`absolute top-2 right-3 z-50 flex items-center gap-1 transition-all duration-150
+          ${isSelected ? "opacity-100 translate-y-0" : "opacity-0 group-hover:opacity-100 -translate-y-1 group-hover:translate-y-0"}
+        `}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Name badge */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0B2A66] text-white text-[11px] font-bold rounded-full shadow-lg select-none">
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="currentColor" className="opacity-60 cursor-grab shrink-0"
+            onMouseDown={(e) => { e.stopPropagation(); onDragStart(); }}>
+            <circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/>
+            <circle cx="3" cy="6" r="1.2"/><circle cx="9" cy="6" r="1.2"/>
+            <circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/>
+          </svg>
+          <span className="max-w-[120px] truncate">{block.name}</span>
+          <span className="text-white/40 text-[9px] shrink-0">{idx + 1}/{total}</span>
+        </div>
+        {/* Edit button */}
         <button
-          onClick={(e) => { e.stopPropagation(); onEdit(); }}
-          className="flex items-center gap-1 px-2 py-0.5 bg-white/15 hover:bg-white/30 rounded text-[10px] cursor-pointer"
+          onClick={onEdit}
+          className="flex items-center gap-1 px-2.5 py-1 bg-[#2563EB] hover:bg-[#1d4ed8] text-white text-[11px] font-bold rounded-full shadow-lg transition-colors"
         >
           ✏️ Editar
         </button>
       </div>
+
+      {/* Selected indicator — blue corner tag */}
+      {isSelected && (
+        <div className="absolute top-0 left-0 bg-[#2563EB] text-white text-[9px] font-bold px-2 py-0.5 rounded-br-lg select-none pointer-events-none z-50">
+          Selecionado
+        </div>
+      )}
     </div>
   );
 }
@@ -251,10 +279,26 @@ export default function Home() {
   const [previewBlocks, setPreviewBlocks] = React.useState<HomeBlock[]>([]);
   const [dragIdx, setDragIdx] = React.useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = React.useState<number | null>(null);
+  const [selectedBlockId, setSelectedBlockId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setPreviewBlocks(baseBlocks.filter((b) => b.visible));
   }, [settings]);
+
+  // Listen for block selection from admin panel
+  React.useEffect(() => {
+    if (!isAdminPreview) return;
+    function onMessage(e: MessageEvent) {
+      if (!e.data || typeof e.data !== "object") return;
+      if (e.data.type === "block:select" && e.data.blockId) {
+        setSelectedBlockId(e.data.blockId);
+        const el = document.getElementById(`block-${e.data.blockId}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [isAdminPreview]);
 
   const visibleBlocks = isAdminPreview ? previewBlocks : baseBlocks.filter((b) => b.visible);
 
@@ -308,6 +352,7 @@ export default function Home() {
   }
 
   function handleEditBlock(blockId: string) {
+    setSelectedBlockId(blockId);
     if (isAdminPreview) {
       window.parent.postMessage({ type: "block:edit", blockId }, "*");
     }
@@ -319,8 +364,9 @@ export default function Home() {
       <Header />
 
       {isAdminPreview && (
-        <div className="bg-[#c8102e] text-white text-[11px] font-bold text-center py-1 px-4">
-          ✏️ Modo de edição — passe o mouse sobre um bloco para editar ou arrastar
+        <div className="sticky top-0 z-[100] bg-[#0B2A66] text-white text-[11px] font-semibold flex items-center justify-center gap-2 py-1.5 px-4 shadow-md">
+          <span className="w-2 h-2 rounded-full bg-[#E71D36] animate-pulse shrink-0" />
+          Modo de edição — clique em qualquer bloco para editar
         </div>
       )}
 
@@ -347,20 +393,21 @@ export default function Home() {
           }
 
           return (
-            <div key={block.id}>
-              <AdminBar
-                block={block}
-                idx={idx}
-                total={visibleBlocks.length}
-                dragOver={dragOverIdx === idx}
-                isDragging={dragIdx === idx}
-                onEdit={() => handleEditBlock(block.id)}
-                onDragStart={() => handlePreviewDragStart(idx)}
-                onDragOver={(e) => handlePreviewDragOver(e, idx)}
-                onDragEnd={handlePreviewDragEnd}
-              />
-              {content}
-            </div>
+            <AdminBlockWrapper
+              key={block.id}
+              block={block}
+              idx={idx}
+              total={visibleBlocks.length}
+              dragOver={dragOverIdx === idx}
+              isDragging={dragIdx === idx}
+              isSelected={selectedBlockId === block.id}
+              onEdit={() => handleEditBlock(block.id)}
+              onDragStart={() => handlePreviewDragStart(idx)}
+              onDragOver={(e) => handlePreviewDragOver(e, idx)}
+              onDragEnd={handlePreviewDragEnd}
+            >
+              <div id={`block-${block.id}`}>{content}</div>
+            </AdminBlockWrapper>
           );
         })}
 

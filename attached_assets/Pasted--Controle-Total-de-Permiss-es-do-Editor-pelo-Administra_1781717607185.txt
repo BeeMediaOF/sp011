@@ -1,0 +1,180 @@
+## Controle Total de Permissões do Editor pelo Administrador
+
+O perfil **Administrador** precisa conseguir controlar, de forma visual e flexível, tudo o que o perfil **Editor** pode ou não acessar dentro da plataforma.
+
+Criar dentro de **Configurações > Usuários e Permissões** uma área chamada:
+
+**Permissões do Editor**
+
+Nessa área, o Administrador poderá ligar ou desligar os acessos do Editor por módulo, usando botões de ativar/desativar, switches ou checkboxes.
+
+## Permissões configuráveis pelo Administrador
+
+O Administrador deve conseguir permitir ou bloquear o acesso do Editor a:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+* Artigos
+* Editar Artigos
+* Excluir Artigos
+* Publicar Artigos
+* Fontes RSS
+* Colunistas
+* Redes Sociais
+* Blocos Home
+* Configurações
+* Logs
+* Segurança
+* Upload de imagens
+* Alteração de menus
+* Alteração de propagandas
+* Alteração de templates
+* Publicação automática
+* Qualquer outro módulo existente ou futuro da plataforma
+
+## Regra principal
+
+O Editor não deve ter permissões fixas no código.
+
+As permissões do Editor precisam vir do banco de dados e serem controladas pelo Administrador.
+
+Ou seja:
+
+* Se o Admin ligar uma permissão, o Editor passa a ver e acessar aquele módulo.
+* Se o Admin desligar uma permissão, o Editor perde acesso imediatamente.
+* O menu lateral deve atualizar automaticamente conforme as permissões ativas.
+* O backend também deve bloquear qualquer rota cuja permissão esteja desligada.
+
+## Interface de permissões
+
+Criar uma tela organizada por grupos:
+
+### Conteúdo
+
+* Ver artigos
+* Criar novo artigo
+* Editar artigos
+* Excluir artigos
+* Publicar artigos
+* Upload de imagens
+
+### Plataforma
+
+* Dashboard
+* Analytics
+* Menu
+* Propaganda
+* Blocos Home
+
+### Automações
+
+* Fontes RSS
+* Redes Sociais
+* Publicação automática
+* Templates
+* Legendas automáticas
+
+### Administração
+
+* Configurações
+* Usuários
+* Logs
+* Segurança
+
+Por padrão, o Editor começa com acesso apenas a:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+
+Mas o Administrador pode alterar isso a qualquer momento.
+
+## Banco de dados para permissões dinâmicas
+
+A estrutura de permissões deve ser totalmente dinâmica.
+
+Usar as tabelas:
+
+* roles
+* permissions
+* role_permissions
+
+Ou criar uma estrutura equivalente que permita controlar permissões por perfil.
+
+Cada permissão precisa ter uma chave única, por exemplo:
+
+* dashboard.view
+* analytics.view
+* ads.view
+* menu.view
+* menu.edit
+* articles.create
+* articles.edit
+* articles.delete
+* articles.publish
+* rss.view
+* rss.manage
+* columnists.view
+* columnists.manage
+* social.view
+* social.manage
+* home_blocks.view
+* home_blocks.manage
+* settings.view
+* users.manage
+* logs.view
+* security.view
+
+## Validação obrigatória
+
+As permissões precisam ser validadas em três camadas:
+
+1. Menu lateral
+   O Editor só vê os menus que o Admin liberou.
+
+2. Frontend
+   Botões, páginas e ações bloqueadas não devem aparecer ou devem ficar indisponíveis.
+
+3. Backend
+   Mesmo digitando a URL ou tentando chamar a API diretamente, o Editor não pode executar ações sem permissão.
+
+## Logs de alteração de permissões
+
+Toda alteração feita pelo Administrador nas permissões do Editor deve gerar log.
+
+Registrar:
+
+* Qual administrador alterou
+* Qual permissão foi ligada ou desligada
+* Data e hora
+* IP
+* Navegador
+* Perfil afetado
+* Valor anterior
+* Novo valor
+
+## Mensagem de acesso bloqueado
+
+Quando o Editor tentar acessar algo sem permissão, exibir:
+
+**“Acesso restrito. O administrador não liberou esta função para o seu perfil.”**
+
+## Critérios finais
+
+Testar obrigatoriamente:
+
+1. Admin consegue ligar permissões do Editor.
+2. Admin consegue desligar permissões do Editor.
+3. Menu do Editor muda conforme permissões ativas.
+4. Editor não acessa módulos desligados.
+5. Backend bloqueia rotas sem permissão.
+6. Alterações de permissão são registradas nos logs.
+7. As permissões continuam funcionando após logout/login.
+8. As permissões vêm do banco de dados, não fixas no código.
+9. Novas permissões podem ser adicionadas no futuro sem refazer toda a estrutura.
+10. O sistema mantém o Administrador sempre com controle total.
