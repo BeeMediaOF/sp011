@@ -19,6 +19,7 @@ export const usersTable = pgTable("users", {
   lockedUntil: timestamp("locked_until"),
   passwordChangedAt: timestamp("password_changed_at"),
   mustChangePassword: integer("must_change_password").notNull().default(0),
+  avatarBase64: text("avatar_base64"),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({

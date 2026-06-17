@@ -5,10 +5,16 @@ export function getStoredRole(): string {
   return localStorage.getItem("admin_role") ?? "";
 }
 
-export function getStoredUser(): { email: string; name: string; role: string } | null {
+export interface StoredUser { email: string; name: string; role: string; avatarBase64?: string; }
+
+export function getStoredUser(): StoredUser | null {
   const raw = localStorage.getItem("admin_user");
   if (!raw) return null;
-  try { return JSON.parse(raw) as { email: string; name: string; role: string }; } catch { return null; }
+  try { return JSON.parse(raw) as StoredUser; } catch { return null; }
+}
+
+export function setStoredUser(u: StoredUser): void {
+  localStorage.setItem("admin_user", JSON.stringify(u));
 }
 
 export function clearAuth(): void {

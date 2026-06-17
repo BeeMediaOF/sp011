@@ -6,11 +6,12 @@ import {
   Users, BarChart2, LayoutGrid, Rss, Share2, Zap,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, KeyRound, Eye, AlertCircle, CheckCircle, Info,
-  ShieldCheck, ClipboardList,
+  ShieldCheck, ClipboardList, Camera, Pencil,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
-import { getStoredUser, clearAuth } from "../../pages/Admin";
+import { getStoredUser, setStoredUser, clearAuth } from "../../pages/Admin";
 import { adminApi } from "../../lib/adminApi";
+import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 // permKey: null  → admin-only, never shown to editors
@@ -52,13 +53,6 @@ const LS_PERMS   = "editor_permissions_cache";
 
 let _cachedLogo: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
-
-export function saveAdminThemeToStorage(sidebar: string, accent: string) {
-  try {
-    localStorage.setItem(LS_SIDEBAR, sidebar);
-    localStorage.setItem(LS_ACCENT,  accent);
-  } catch {}
-}
 
 function usePanelTheme() {
   const [accent, setAccent] = useState(() => {
@@ -238,12 +232,103 @@ function NotificationBell({ accent }: { accent: string }) {
   );
 }
 
+function Avatar({ src, initials, size = 9 }: { src?: string | null; initials: string; size?: number }) {
+  const dim = `w-${size} h-${size}`;
+  if (src) return <img src={src} alt="avatar" className={`${dim} rounded-full object-cover shrink-0 border-2 border-white/30`} />;
+  return <div className={`${dim} rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-[#0B2A66]`}>{initials}</div>;
+}
+
+function ProfileModal({ onClose, onSaved }: { onClose: () => void; onSaved: (name: string, avatar: string | null) => void }) {
+  const stored  = getStoredUser();
+  const [name, setName]       = useState(stored?.name ?? "");
+  const [preview, setPreview] = useState<string | null>(stored?.avatarBase64 ?? null);
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState("");
+  const fileRef               = useRef<HTMLInputElement>(null);
+
+  function pickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setPreview(ev.target?.result as string);
+    reader.readAsDataURL(f);
+  }
+
+  async function save() {
+    setSaving(true); setError("");
+    try {
+      const res = await adminApi.updateMyProfile({ name: name.trim() || undefined, avatarBase64: preview });
+      onSaved(res.user.name, res.user.avatarBase64 ?? null);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar");
+    } finally { setSaving(false); }
+  }
+
+  const initials = name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "AD";
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.45)" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-800">Meu Perfil</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+
+        <div className="flex flex-col items-center gap-3">
+          <div className="relative">
+            <Avatar src={preview} initials={initials} size={20} />
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-[#0B2A66] text-white flex items-center justify-center shadow-md hover:bg-[#0a2255] transition-colors"
+            ><Camera size={13}/></button>
+          </div>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickFile}/>
+          {preview && (
+            <button onClick={() => setPreview(null)} className="text-[11px] text-red-400 hover:text-red-600 underline">
+              Remover foto
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <label className="block text-xs font-medium text-slate-500">Nome de exibição</label>
+          <div className="relative">
+            <Pencil size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30"
+              placeholder="Seu nome"
+            />
+          </div>
+        </div>
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+            Cancelar
+          </button>
+          <button
+            onClick={save} disabled={saving}
+            className="flex-1 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-medium hover:bg-[#0a2255] disabled:opacity-60 transition-colors"
+          >
+            {saving ? "Salvando…" : "Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function UserMenu({ onLogout }: { onLogout: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref             = useRef<HTMLDivElement>(null);
-  const user            = getStoredUser();
-  const initials        = user?.name?.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() ?? "AD";
-  const roleLabel       = user?.role === "admin" ? "Administrador" : "Editor";
+  const [open, setOpen]         = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [localUser, setLocalUser]     = useState(getStoredUser);
+  const ref                     = useRef<HTMLDivElement>(null);
+  const initials = (localUser?.name ?? "AD").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+  const roleLabel = localUser?.role === "admin" ? "Administrador" : "Editor";
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -253,51 +338,63 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-slate-100 transition-colors">
-        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-[#0B2A66]">
-          {initials}
-        </div>
-        <div className="hidden lg:block text-left">
-          <p className="text-sm font-semibold text-slate-800 leading-none">{user?.name ?? "Usuário"}</p>
-          <p className="text-[11px] text-slate-400 mt-0.5">{roleLabel}</p>
-        </div>
-        <ChevronDown size={13} className={`text-slate-400 transition-transform hidden lg:block ${open ? "rotate-180" : ""}`} />
-      </button>
+  function handleProfileSaved(name: string, avatar: string | null) {
+    const updated = { ...(localUser ?? { email: "", role: "editor" }), name, avatarBase64: avatar ?? undefined };
+    setStoredUser(updated);
+    setLocalUser(updated);
+  }
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-[220px] bg-white rounded-2xl border border-slate-200 z-50 overflow-hidden py-1.5"
-          style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.12)" }}>
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#0B2A66] flex items-center justify-center text-white text-sm font-bold shrink-0">{initials}</div>
-              <div>
-                <p className="text-[13px] font-bold text-slate-800 leading-none">{user?.name ?? "Usuário"}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">{user?.email ?? ""}</p>
+  return (
+    <>
+      {showProfile && (
+        <ProfileModal
+          onClose={() => setShowProfile(false)}
+          onSaved={handleProfileSaved}
+        />
+      )}
+      <div ref={ref} className="relative">
+        <button onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-slate-100 transition-colors">
+          <Avatar src={localUser?.avatarBase64} initials={initials} size={9} />
+          <div className="hidden lg:block text-left">
+            <p className="text-sm font-semibold text-slate-800 leading-none">{localUser?.name ?? "Usuário"}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{roleLabel}</p>
+          </div>
+          <ChevronDown size={13} className={`text-slate-400 transition-transform hidden lg:block ${open ? "rotate-180" : ""}`} />
+        </button>
+
+        {open && (
+          <div className="absolute right-0 top-full mt-2 w-[220px] bg-white rounded-2xl border border-slate-200 z-50 overflow-hidden py-1.5"
+            style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.12)" }}>
+            <div className="px-4 py-3 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <Avatar src={localUser?.avatarBase64} initials={initials} size={10} />
+                <div>
+                  <p className="text-[13px] font-bold text-slate-800 leading-none">{localUser?.name ?? "Usuário"}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{localUser?.email ?? ""}</p>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="py-1">
-            {[
-              { Icon: Eye, label: "Ver portal", onClick: () => window.open("/", "_blank") },
-            ].map(({ Icon, label, onClick }) => (
-              <button key={label} onClick={() => { onClick(); setOpen(false); }}
+            <div className="py-1">
+              <button onClick={() => { setShowProfile(true); setOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-[#0B2A66] transition-colors text-left">
-                <Icon size={15} className="text-slate-400" /> {label}
+                <UserCircle size={15} className="text-slate-400"/> Meu Perfil
               </button>
-            ))}
+              <button onClick={() => { window.open("/", "_blank"); setOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-[#0B2A66] transition-colors text-left">
+                <Eye size={15} className="text-slate-400"/> Ver portal
+              </button>
+            </div>
+            <div className="border-t border-slate-100 py-1">
+              <button onClick={() => { onLogout(); setOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50 transition-colors text-left">
+                <LogOut size={15} /> Sair
+              </button>
+            </div>
           </div>
-          <div className="border-t border-slate-100 py-1">
-            <button onClick={() => { onLogout(); setOpen(false); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50 transition-colors text-left">
-              <LogOut size={15} /> Sair
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
 

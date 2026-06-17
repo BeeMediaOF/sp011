@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings, type ContactInfo } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
-import { saveAdminThemeToStorage } from "../../components/admin/AdminLayout";
+import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { useToast } from "@/hooks/use-toast";
 import {
   Save, Globe, FileSearch, UserCircle, Image, LayoutDashboard, BarChart2,

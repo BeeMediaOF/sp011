@@ -58,6 +58,8 @@ export const adminApi = {
   getSettings: () => req<{ settings: SiteSettings }>("GET", "/settings"),
   updateSettings: (settings: Partial<SiteSettings>) => req<{ settings: SiteSettings }>("PUT", "/settings", settings),
   uploadLogo: (logoBase64: string) => req<{ settings: SiteSettings }>("POST", "/logo", { logoBase64 }),
+  updateMyProfile: (data: { name?: string; avatarBase64?: string | null }) =>
+    req<{ user: { id: number; name: string; email: string; role: string; avatarBase64?: string | null } }>("PUT", "/me", data),
 
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),

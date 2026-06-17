@@ -97,7 +97,7 @@ router.post("/login", async (req, res) => {
         ipAddress: ip, userAgent: ua,
       });
       const token = generateToken(user.id, user.role);
-      res.json({ token, email: user.email, role: user.role, name: user.name });
+      res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null });
       return;
     }
 
@@ -122,11 +122,37 @@ router.get("/me", authMiddleware, async (req, res) => {
       id: usersTable.id, name: usersTable.name, email: usersTable.email,
       role: usersTable.role, status: usersTable.status,
       lastLogin: usersTable.lastLogin, mustChangePassword: usersTable.mustChangePassword,
+      avatarBase64: usersTable.avatarBase64,
     }).from(usersTable).where(eq(usersTable.id, req.userId));
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
     res.json({ user });
   } catch (err) {
     req.log.error({ err }, "Error fetching current user");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/** PUT /api/admin/me — update own name and avatar */
+router.put("/me", authMiddleware, async (req, res) => {
+  if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+  const { name, avatarBase64 } = req.body as { name?: string; avatarBase64?: string | null };
+  try {
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (typeof name === "string" && name.trim()) updates["name"] = name.trim();
+    if (avatarBase64 !== undefined) updates["avatarBase64"] = avatarBase64 ?? null;
+    await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId));
+    const [updated] = await db.select({
+      id: usersTable.id, name: usersTable.name, email: usersTable.email,
+      role: usersTable.role, avatarBase64: usersTable.avatarBase64,
+    }).from(usersTable).where(eq(usersTable.id, req.userId));
+    await logAudit({
+      userId: req.userId, action: "update_profile", module: "auth",
+      description: "Perfil atualizado",
+      ipAddress: getClientIp(req), userAgent: req.headers["user-agent"],
+    });
+    res.json({ user: updated });
+  } catch (err) {
+    req.log.error({ err }, "Error updating profile");
     res.status(500).json({ error: "Erro interno" });
   }
 });

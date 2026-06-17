@@ -37,6 +37,7 @@ export default function Login() {
         email: res.email ?? email,
         name: res.name ?? "Usuário",
         role: res.role ?? "editor",
+        avatarBase64: res.avatarBase64 ?? undefined,
       }));
       navigate("/admin");
     } catch (err: unknown) {
