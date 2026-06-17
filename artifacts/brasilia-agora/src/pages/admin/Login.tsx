@@ -107,9 +107,6 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-xs text-gray-400 text-center mt-4">
-            Padrão: <span className="font-mono">brasilia@2024</span>
-          </p>
         </div>
       </div>
     </div>

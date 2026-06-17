@@ -1,0 +1,703 @@
+{
+  "project": "SBC Agora",
+  "screen": "Blocos da Home",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "objective": "Criar uma página funcional para gerenciar, ordenar, editar, ocultar, visualizar e publicar em tempo real os blocos da página inicial do portal.",
+  "functionalRequirement": "Esta tela não deve ser apenas visual. Todos os blocos precisam ser editáveis, reordenáveis por drag and drop, ativáveis/desativáveis, configuráveis individualmente e refletidos em tempo real na prévia da home.",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "dangerColor": "#EF4444",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "240px",
+      "background": "#FFFFFF",
+      "activeItem": "Blocos Home",
+      "menu": [
+        "Dashboard",
+        "Analytics",
+        "Artigos",
+        "Novo Artigo",
+        "Menu",
+        "Blocos Home",
+        "Propagandas",
+        "Colunistas",
+        "Fontes RSS",
+        "Perplexity",
+        "Redes Sociais",
+        "Configurações"
+      ]
+    },
+    "topbar": {
+      "title": "Blocos da Home",
+      "subtitle": "Gerencie os blocos que exibem conteúdo na página inicial do portal.",
+      "search": {
+        "enabled": true,
+        "placeholder": "Buscar no portal..."
+      },
+      "date": "23 de maio de 2025",
+      "notifications": true,
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin"
+      }
+    },
+    "contentGrid": {
+      "columns": "320px 1fr",
+      "gap": "24px"
+    }
+  },
+  "mainFeatures": {
+    "livePreview": true,
+    "dragAndDrop": true,
+    "inlineEditing": true,
+    "autosaveDraft": true,
+    "manualSave": true,
+    "undoRedo": true,
+    "responsivePreview": true,
+    "visibilityToggle": true,
+    "blockDuplication": true,
+    "blockDeletion": true,
+    "blockScheduling": true,
+    "blockAnalytics": true
+  },
+  "tabs": [
+    {
+      "label": "Blocos",
+      "active": true,
+      "description": "Gerenciar os blocos principais da página inicial."
+    },
+    {
+      "label": "Cabeçalho",
+      "active": false,
+      "description": "Configurar logo, menu, barra de busca, ticker e área superior."
+    },
+    {
+      "label": "Rodapé",
+      "active": false,
+      "description": "Configurar links, colunas, redes sociais e informações institucionais."
+    },
+    {
+      "label": "Configurações",
+      "active": false,
+      "description": "Configurações gerais da home, cache, SEO e atualização automática."
+    }
+  ],
+  "pageActions": [
+    {
+      "label": "Desfazer",
+      "icon": "undo",
+      "action": "undo_last_change",
+      "enabled": true
+    },
+    {
+      "label": "Refazer",
+      "icon": "redo",
+      "action": "redo_last_change",
+      "enabled": false
+    },
+    {
+      "label": "Salvar alterações",
+      "icon": "save",
+      "style": "solid_primary",
+      "action": "save_home_blocks"
+    }
+  ],
+  "leftPanel": {
+    "title": "Blocos da Home",
+    "subtitle": "11 visíveis · 14 total",
+    "actions": [
+      {
+        "label": "Adicionar bloco",
+        "icon": "plus",
+        "style": "solid_red",
+        "action": "open_add_block_modal"
+      }
+    ],
+    "filters": [
+      {
+        "label": "Todos",
+        "active": true
+      },
+      {
+        "label": "Visíveis",
+        "active": false
+      },
+      {
+        "label": "Ocultos",
+        "active": false
+      }
+    ],
+    "blockList": [
+      {
+        "id": "hero-destaques",
+        "order": 1,
+        "title": "Hero / Destaques",
+        "type": "hero",
+        "tag": "DESTAQUE",
+        "icon": "trophy",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "mais-lidas",
+        "order": 2,
+        "title": "Mais Lidas",
+        "type": "carousel",
+        "tag": "CARROSSEL",
+        "icon": "flame",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "editorias",
+        "order": 3,
+        "title": "Editorias",
+        "type": "grid",
+        "tag": "GRADE",
+        "icon": "grid",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "ultimas-noticias",
+        "order": 4,
+        "title": "Últimas Notícias",
+        "type": "list",
+        "tag": "LISTA",
+        "icon": "newspaper",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "banner-principal",
+        "order": 5,
+        "title": "Banner Principal",
+        "type": "advertising",
+        "tag": "PROPAGANDA",
+        "icon": "megaphone",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "dupla-noticias",
+        "order": 6,
+        "title": "Dupla de Notícias",
+        "type": "double_news",
+        "tag": "DUPLO",
+        "icon": "columns",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "colunistas",
+        "order": 7,
+        "title": "Colunistas",
+        "type": "columnists",
+        "tag": "CARROSSEL",
+        "icon": "users",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "videos",
+        "order": 8,
+        "title": "Notícias em Vídeo",
+        "type": "video",
+        "tag": "MÍDIA",
+        "icon": "play-circle",
+        "visible": false,
+        "status": "hidden",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      },
+      {
+        "id": "newsletter",
+        "order": 9,
+        "title": "Newsletter",
+        "type": "newsletter",
+        "tag": "CAPTAÇÃO",
+        "icon": "mail",
+        "visible": true,
+        "status": "active",
+        "actions": ["drag", "preview", "edit", "delete", "expand"]
+      }
+    ],
+    "footerHint": "Arraste os blocos para reordenar"
+  },
+  "availableModules": [
+    {
+      "type": "content",
+      "name": "Conteúdo",
+      "description": "Exibe artigos em diferentes formatos e layouts.",
+      "icon": "file-text",
+      "layouts": ["grid", "list", "hero", "carousel", "masonry"]
+    },
+    {
+      "type": "image",
+      "name": "Imagem",
+      "description": "Banners, imagens editoriais ou chamadas visuais.",
+      "icon": "image",
+      "layouts": ["full_width", "card", "split", "background_overlay"]
+    },
+    {
+      "type": "carousel",
+      "name": "Carrossel",
+      "description": "Vários itens roláveis em destaque.",
+      "icon": "gallery-horizontal",
+      "layouts": ["news_cards", "image_cards", "columnists", "ads"]
+    },
+    {
+      "type": "video",
+      "name": "Vídeo",
+      "description": "Destaque para vídeos do YouTube, Vimeo ou upload próprio.",
+      "icon": "play",
+      "layouts": ["single_video", "video_grid", "video_carousel"]
+    },
+    {
+      "type": "advertising",
+      "name": "Propaganda",
+      "description": "Exibe anúncios em diferentes formatos.",
+      "icon": "megaphone",
+      "layouts": ["728x90", "970x90", "300x250", "native", "full_banner"]
+    },
+    {
+      "type": "list",
+      "name": "Lista",
+      "description": "Lista simplificada de artigos.",
+      "icon": "list",
+      "layouts": ["ranked", "compact", "with_thumbnail", "text_only"]
+    },
+    {
+      "type": "ticker",
+      "name": "Ticker",
+      "description": "Faixa de notícias rolando em tempo real.",
+      "icon": "radio",
+      "layouts": ["breaking_news", "currency", "latest_news"]
+    },
+    {
+      "type": "newsletter",
+      "name": "Newsletter",
+      "description": "Formulário para captura de e-mails.",
+      "icon": "mail",
+      "layouts": ["simple", "banner", "inline", "modal"]
+    },
+    {
+      "type": "categories",
+      "name": "Categorias",
+      "description": "Navegação rápida por editorias.",
+      "icon": "folder",
+      "layouts": ["chips", "cards", "icons", "grid"]
+    },
+    {
+      "type": "weather",
+      "name": "Clima",
+      "description": "Widget de clima da cidade.",
+      "icon": "cloud-sun",
+      "layouts": ["compact", "card", "horizontal"]
+    },
+    {
+      "type": "quotes",
+      "name": "Cotações",
+      "description": "Moedas, criptomoedas ou índices.",
+      "icon": "circle-dollar-sign",
+      "layouts": ["ticker", "cards", "compact"]
+    },
+    {
+      "type": "social_links",
+      "name": "Redes Sociais",
+      "description": "Links para perfis sociais.",
+      "icon": "share-2",
+      "layouts": ["icons", "cards", "follow_bar"]
+    },
+    {
+      "type": "html_custom",
+      "name": "HTML Personalizado",
+      "description": "Bloco livre com código HTML personalizado.",
+      "icon": "code",
+      "layouts": ["custom"]
+    },
+    {
+      "type": "embed",
+      "name": "Embed",
+      "description": "Conteúdo incorporado externo.",
+      "icon": "frame",
+      "layouts": ["iframe", "script", "oembed"]
+    },
+    {
+      "type": "map",
+      "name": "Mapa",
+      "description": "Mapa do Google Maps ou localização editorial.",
+      "icon": "map",
+      "layouts": ["full_width", "card"]
+    },
+    {
+      "type": "separator",
+      "name": "Separador",
+      "description": "Divisor visual entre seções.",
+      "icon": "minus",
+      "layouts": ["line", "space", "label"]
+    },
+    {
+      "type": "counter",
+      "name": "Contador",
+      "description": "Estatísticas em números.",
+      "icon": "counter",
+      "layouts": ["cards", "inline", "grid"]
+    }
+  ],
+  "livePreview": {
+    "title": "Prévia ao vivo",
+    "status": "Ao vivo",
+    "helper": "Clique em qualquer elemento para editar",
+    "responsiveModes": [
+      {
+        "label": "Desktop",
+        "icon": "monitor",
+        "active": true
+      },
+      {
+        "label": "Tablet",
+        "icon": "tablet",
+        "active": false
+      },
+      {
+        "label": "Mobile",
+        "icon": "smartphone",
+        "active": false
+      }
+    ],
+    "actions": [
+      {
+        "label": "Atualizar",
+        "icon": "refresh-cw",
+        "action": "refresh_preview"
+      },
+      {
+        "label": "Abrir site",
+        "icon": "external-link",
+        "action": "open_public_home"
+      }
+    ],
+    "editableElements": {
+      "selectionBorder": "#2563EB",
+      "hoverBorder": "#E71D36",
+      "floatingToolbar": true,
+      "toolbarActions": ["move", "edit", "preview", "duplicate", "delete"]
+    },
+    "previewBlocks": [
+      {
+        "id": "hero-destaques",
+        "label": "Bloco 1",
+        "title": "Hero / Destaques",
+        "selected": true,
+        "layout": "3 cards",
+        "items": [
+          {
+            "title": "Caso Master: Denunciante Vladimir Timerman e Nelson Tanure da Gafisa trocam farpas acaloradas após acesso do...",
+            "category": "Geral",
+            "source": "Redação Via Metrópoles - São Paulo",
+            "time": "3 min atrás"
+          },
+          {
+            "title": "STJ Anula Empréstimos de Analfabeto em Caixa Eletrônico: Banco Mercantil Condenado por Formalidades Ausentes",
+            "category": "Geral",
+            "source": "Redação Via Metrópoles - Brasil",
+            "time": "4 min atrás"
+          },
+          {
+            "title": "Família de advogada do DF aguarda há 20 dias repatriamento do corpo após trágico acidente em safári na Namíbia",
+            "category": "Cidade",
+            "source": "Redação Via Metrópoles - DF",
+            "time": "4 min atrás"
+          }
+        ]
+      },
+      {
+        "id": "mais-lidas",
+        "label": "Bloco 2",
+        "title": "Mais Lidas",
+        "layout": "ranking horizontal",
+        "items": 5
+      }
+    ]
+  },
+  "selectedBlockSettings": {
+    "title": "Configurações do bloco selecionado",
+    "selectedBlock": {
+      "id": "hero-destaques",
+      "name": "Hero / Destaques"
+    },
+    "fields": [
+      {
+        "label": "Tipo de bloco",
+        "type": "select",
+        "value": "Hero / Destaques",
+        "options": [
+          "Hero / Destaques",
+          "Grade de Notícias",
+          "Lista de Notícias",
+          "Carrossel",
+          "Propaganda",
+          "Vídeo",
+          "Newsletter",
+          "HTML Personalizado"
+        ]
+      },
+      {
+        "label": "Título do bloco",
+        "type": "text",
+        "value": "Destaques"
+      },
+      {
+        "label": "Fonte dos artigos",
+        "type": "select",
+        "value": "Categoria",
+        "options": ["Categoria", "Tag", "Manual", "Mais lidas", "Últimas notícias", "RSS", "Perplexity"]
+      },
+      {
+        "label": "Categoria",
+        "type": "select",
+        "value": "Todas as categorias"
+      },
+      {
+        "label": "Quantidade de itens",
+        "type": "number",
+        "value": 3,
+        "min": 1,
+        "max": 12
+      },
+      {
+        "label": "Ordem",
+        "type": "select",
+        "value": "Mais recentes",
+        "options": ["Mais recentes", "Mais lidas", "Mais comentadas", "Manual", "Aleatória"]
+      },
+      {
+        "label": "Intervalo de atualização",
+        "type": "select",
+        "value": "5 minutos",
+        "options": ["Tempo real", "1 minuto", "5 minutos", "15 minutos", "30 minutos", "Manual"]
+      }
+    ],
+    "toggles": [
+      {
+        "label": "Exibir título",
+        "enabled": true
+      },
+      {
+        "label": "Exibir categoria",
+        "enabled": true
+      },
+      {
+        "label": "Exibir autor e data",
+        "enabled": true
+      },
+      {
+        "label": "Exibir resumo",
+        "enabled": false
+      },
+      {
+        "label": "Exibir imagem",
+        "enabled": true
+      },
+      {
+        "label": "Abrir links em nova aba",
+        "enabled": false
+      },
+      {
+        "label": "Ativar bloco",
+        "enabled": true
+      }
+    ],
+    "styleOptions": [
+      {
+        "label": "Layout",
+        "type": "select",
+        "value": "3 cards"
+      },
+      {
+        "label": "Cor de destaque",
+        "type": "color",
+        "value": "#E71D36"
+      },
+      {
+        "label": "Espaçamento",
+        "type": "range",
+        "value": "Médio"
+      },
+      {
+        "label": "Borda arredondada",
+        "type": "range",
+        "value": "12px"
+      }
+    ],
+    "actions": [
+      {
+        "label": "Duplicar bloco",
+        "icon": "copy",
+        "action": "duplicate_block"
+      },
+      {
+        "label": "Remover bloco",
+        "icon": "trash",
+        "style": "danger_outline",
+        "action": "delete_block"
+      }
+    ]
+  },
+  "dataModel": {
+    "home_blocks_table": {
+      "description": "Tabela principal para armazenar blocos da home.",
+      "fields": [
+        "id",
+        "title",
+        "type",
+        "position",
+        "is_visible",
+        "status",
+        "source_type",
+        "source_value",
+        "layout",
+        "settings_json",
+        "style_json",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "block_items_table": {
+      "description": "Tabela opcional para itens manuais dentro de um bloco.",
+      "fields": [
+        "id",
+        "block_id",
+        "article_id",
+        "ad_id",
+        "image_url",
+        "custom_title",
+        "custom_link",
+        "position",
+        "created_at"
+      ]
+    },
+    "home_layout_versions_table": {
+      "description": "Tabela para histórico, desfazer/refazer e versões publicadas.",
+      "fields": [
+        "id",
+        "version_name",
+        "layout_json",
+        "published",
+        "created_by",
+        "created_at"
+      ]
+    }
+  },
+  "backendBehavior": {
+    "onDragBlock": {
+      "action": "update_block_position",
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/reorder",
+      "payload": {
+        "orderedIds": ["hero-destaques", "mais-lidas", "editorias"]
+      },
+      "result": "Atualiza a posição dos blocos e reflete imediatamente na prévia ao vivo."
+    },
+    "onToggleVisibility": {
+      "action": "toggle_block_visibility",
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/{id}/visibility",
+      "payload": {
+        "is_visible": true
+      },
+      "result": "Mostra ou oculta o bloco na home."
+    },
+    "onEditBlock": {
+      "action": "update_block_settings",
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/{id}",
+      "payload": {
+        "title": "Destaques",
+        "type": "hero",
+        "source_type": "category",
+        "source_value": "all",
+        "layout": "three_cards",
+        "settings_json": {
+          "quantity": 3,
+          "showCategory": true,
+          "showAuthorDate": true,
+          "showSummary": false,
+          "order": "latest",
+          "refreshInterval": "5_minutes"
+        }
+      },
+      "result": "Atualiza o bloco selecionado."
+    },
+    "onAddBlock": {
+      "action": "create_block",
+      "method": "POST",
+      "endpoint": "/api/admin/home-blocks",
+      "payload": {
+        "type": "content",
+        "title": "Novo bloco",
+        "position": 12,
+        "is_visible": true,
+        "layout": "grid"
+      },
+      "result": "Cria um novo bloco na home."
+    },
+    "onDeleteBlock": {
+      "action": "delete_block",
+      "method": "DELETE",
+      "endpoint": "/api/admin/home-blocks/{id}",
+      "confirmation": true,
+      "result": "Remove o bloco da home."
+    },
+    "onSaveChanges": {
+      "action": "publish_home_layout",
+      "method": "POST",
+      "endpoint": "/api/admin/home-blocks/publish",
+      "result": "Publica oficialmente a nova estrutura da home."
+    }
+  },
+  "permissions": {
+    "admin": {
+      "canView": true,
+      "canCreate": true,
+      "canEdit": true,
+      "canDelete": true,
+      "canPublish": true
+    },
+    "editor": {
+      "canView": true,
+      "canCreate": true,
+      "canEdit": true,
+      "canDelete": false,
+      "canPublish": false
+    }
+  },
+  "promptForAIBuilder": "Crie uma página funcional chamada Blocos da Home para o painel administrativo do portal SBC Agora. A tela deve permitir gerenciar ao vivo os blocos exibidos na página inicial. A interface deve ter sidebar branca com Blocos Home ativo em vermelho, topbar com busca, data, notificações e perfil do administrador. Na área principal, crie uma coluna lateral com a lista de blocos existentes, botão Adicionar bloco, filtros Todos, Visíveis e Ocultos, suporte a drag and drop para reordenar, botão de olho para exibir/ocultar, botão de editar, duplicar e excluir. No centro, crie uma prévia ao vivo da home do portal, com modo desktop, tablet e mobile, onde o usuário pode clicar em um bloco e editar diretamente. A prévia deve destacar o bloco selecionado com borda azul e toolbar flutuante. Na parte inferior ou lateral, crie um painel de configurações do bloco selecionado com campos para tipo de bloco, título, fonte dos artigos, categoria, quantidade de itens, ordem, intervalo de atualização, toggles para exibir título, categoria, autor, data, resumo e imagem. Inclua ações de desfazer, refazer e salvar alterações. A tela deve ser realmente funcional, com estrutura preparada para CRUD, atualização ao vivo, drag and drop, histórico de versões, responsividade e integração com notícias, propagandas, imagens, vídeos, newsletter, RSS e HTML personalizado."
+}
