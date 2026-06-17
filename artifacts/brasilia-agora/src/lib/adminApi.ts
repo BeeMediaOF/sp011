@@ -17,6 +17,11 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401) {
+      localStorage.removeItem("admin_token");
+      window.location.href = "/admin/login";
+      throw new Error("Sessão expirada. Redirecionando para o login...");
+    }
     throw new Error((err as { error?: string }).error ?? res.statusText);
   }
   return res.json() as Promise<T>;

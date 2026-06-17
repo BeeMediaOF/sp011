@@ -25,7 +25,7 @@ export function verifyToken(token: string): boolean {
     const tsStr = payload.split(":")[1];
     if (!tsStr) return false;
     const age = Date.now() - Number(tsStr);
-    if (age > 86_400_000) return false; // 24 h
+    if (age > 604_800_000) return false; // 7 days
     return sig === expected;
   } catch {
     return false;
