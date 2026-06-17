@@ -3,11 +3,11 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
-  Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap,
+  Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap, ChevronDown,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 
-const NAV = [
+const NAV_MAIN = [
   { label: "Dashboard",    icon: LayoutDashboard, path: "/admin" },
   { label: "Analytics",    icon: BarChart2,        path: "/admin/analytics" },
   { label: "Artigos",      icon: FileText,         path: "/admin/artigos" },
@@ -19,10 +19,13 @@ const NAV = [
   { label: "Fontes RSS",   icon: Rss,              path: "/admin/rss" },
   { label: "Perplexity",   icon: Zap,              path: "/admin/perplexity" },
   { label: "Redes Sociais",icon: Share2,           path: "/admin/redes-sociais" },
-  { label: "Logo",         icon: Image,            path: "/admin/logo" },
-  { label: "Contato",      icon: Mail,             path: "/admin/contato" },
-  { label: "Webhook",      icon: Webhook,          path: "/admin/webhook" },
-  { label: "Config.",      icon: Settings,         path: "/admin/configuracoes" },
+];
+
+const NAV_CONFIG = [
+  { label: "Webhook",           icon: Webhook,  path: "/admin/webhook" },
+  { label: "Logo do Painel",    icon: Image,    path: "/admin/logo" },
+  { label: "Informações do Site", icon: Globe,  path: "/admin/configuracoes" },
+  { label: "Contato",           icon: Mail,     path: "/admin/contato" },
 ];
 
 interface AdminLayoutProps {
@@ -41,7 +44,6 @@ interface PanelTheme {
 const LS_SIDEBAR = "admin_sidebar_color";
 const LS_ACCENT  = "admin_accent_color";
 
-// Module-level cache — survives component remounts, prevents logo flash on navigation
 let _cachedLogo: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
 
@@ -66,12 +68,10 @@ function readAdminThemeFromStorage() {
 function usePanelTheme(): PanelTheme {
   const [theme, setTheme] = useState<PanelTheme>(() => {
     const { sidebar, accent } = readAdminThemeFromStorage();
-    // Use cached logo immediately on remount — no flash
     return { logo: _cachedLogo || logoFallback, sidebar, accent, accentText: "#ffffff" };
   });
 
   useEffect(() => {
-    // Re-use in-flight or already-resolved promise so we only ever fetch once
     if (!_fetchPromise) {
       _fetchPromise = fetch("/api/site")
         .then((r) => r.json())
@@ -84,7 +84,6 @@ function usePanelTheme(): PanelTheme {
         })
         .catch(() => { _fetchPromise = null; });
     } else {
-      // Promise already resolved — just sync state with the cached logo
       if (_cachedLogo) {
         setTheme((prev) => ({ ...prev, logo: _cachedLogo! }));
       }
@@ -96,12 +95,38 @@ function usePanelTheme(): PanelTheme {
 
 export default function AdminLayout({ children, title, noPadding }: AdminLayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   const [location, navigate] = useLocation();
   const theme = usePanelTheme();
+
+  const inConfig = NAV_CONFIG.some((i) => location.startsWith(i.path));
+
+  // Auto-open config group when on a config page
+  useEffect(() => {
+    if (inConfig) setConfigOpen(true);
+  }, [inConfig]);
 
   function handleLogout() {
     localStorage.removeItem("admin_token");
     navigate("/admin/login");
+  }
+
+  function navLink(label: string, Icon: React.ElementType, path: string) {
+    const active = path === "/admin"
+      ? location === "/admin"
+      : location.startsWith(path) && path !== "/admin";
+    return (
+      <Link
+        key={path}
+        href={path}
+        className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors cursor-pointer
+          ${active ? "font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
+        style={active ? { backgroundColor: theme.accent, color: theme.accentText } : {}}
+      >
+        <Icon size={18} className="shrink-0" />
+        {!collapsed && <span>{label}</span>}
+      </Link>
+    );
   }
 
   return (
@@ -110,14 +135,11 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
         className={`flex flex-col text-white transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
         style={{ backgroundColor: theme.sidebar }}
       >
+        {/* Header */}
         <div className="flex items-center justify-between px-3 py-4 border-b border-white/10 min-h-[56px]">
           {!collapsed && (
             <div className="h-9 flex items-center shrink-0">
-              <img
-                src={theme.logo}
-                alt="Logo"
-                className="h-9 w-auto object-contain max-w-[152px]"
-              />
+              <img src={theme.logo} alt="Logo" className="h-9 w-auto object-contain max-w-[152px]" />
             </div>
           )}
           <button
@@ -128,24 +150,41 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
           </button>
         </div>
 
+        {/* Nav */}
         <nav className="flex-1 py-4 space-y-0.5 overflow-y-auto">
-          {NAV.map(({ label, icon: Icon, path }) => {
-            const active = path === "/admin" ? location === "/admin" : location.startsWith(path) && path !== "/admin";
-            return (
-              <Link
-                key={path}
-                href={path}
-                className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors cursor-pointer
-                  ${active ? "font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
-                style={active ? { backgroundColor: theme.accent, color: theme.accentText } : {}}
-              >
-                <Icon size={18} className="shrink-0" />
-                {!collapsed && <span>{label}</span>}
-              </Link>
-            );
-          })}
+          {NAV_MAIN.map(({ label, icon: Icon, path }) => navLink(label, Icon, path))}
+
+          {/* Configurações group */}
+          <div className="pt-2">
+            <button
+              onClick={() => !collapsed && setConfigOpen((o) => !o)}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors
+                ${inConfig ? "text-white font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}
+                ${collapsed ? "cursor-default" : "cursor-pointer"}`}
+              style={{ width: collapsed ? undefined : "calc(100% - 16px)" }}
+            >
+              <Settings size={18} className="shrink-0" />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 text-left">Configurações</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform shrink-0 ${configOpen ? "rotate-180" : ""}`}
+                  />
+                </>
+              )}
+            </button>
+
+            {/* Sub-items */}
+            {(configOpen || collapsed) && (
+              <div className={`mt-0.5 ${collapsed ? "" : "pl-3"}`}>
+                {NAV_CONFIG.map(({ label, icon: Icon, path }) => navLink(label, Icon, path))}
+              </div>
+            )}
+          </div>
         </nav>
 
+        {/* Footer */}
         <div className="border-t border-white/10 p-4 space-y-2">
           <a
             href="/"
