@@ -162,12 +162,12 @@ export default function Webhook() {
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Senha do admin"
-                className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
               />
               <button
                 onClick={handleGenerate}
                 disabled={generating}
-                className="flex items-center gap-1.5 bg-[#1a2448] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#243060] transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 bg-[#0B2A66] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#0a2255] transition-colors disabled:opacity-60"
               >
                 <RefreshCw size={14} className={generating ? "animate-spin" : ""} />
                 {generating ? "Gerando..." : "Gerar"}
@@ -213,7 +213,7 @@ export default function Webhook() {
         </div>
 
         {/* Make / Zapier / n8n */}
-        <div className="bg-[#1a2448] text-white rounded-xl p-6 space-y-3">
+        <div className="bg-[#0B2A66] text-white rounded-2xl p-6 space-y-3">
           <h2 className="font-bold text-base">Integração com Make, Zapier, n8n</h2>
           <p className="text-sm text-white/70">Use o módulo <strong className="text-white">HTTP / Webhook</strong> da plataforma de automação:</p>
           <ol className="text-sm text-white/80 space-y-1 list-decimal list-inside">

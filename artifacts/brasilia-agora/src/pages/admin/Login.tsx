@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [logoSrc, setLogoSrc] = useState(logoFallback);
-  const [sidebarColor, setSidebarColor] = useState("#1a2448");
+  const [sidebarColor, setSidebarColor] = useState("#0B2A66");
 
   useEffect(() => {
     fetch("/api/site")

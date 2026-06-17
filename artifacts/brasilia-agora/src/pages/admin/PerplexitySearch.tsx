@@ -567,7 +567,7 @@ function ArticleCard({ s, idx, onPatch, onRewrite, onRewriteAndPublish, onPublis
               Reescrever
             </button>
             <button onClick={() => onRewriteAndPublish(idx)} disabled={busy}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[#c8102e] text-white hover:bg-[#c8102e]/90 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[#E71D36] text-white hover:bg-[#c8102e] disabled:opacity-50 transition-colors"
             >
               {busy ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
               {s.rewriting ? "Reescrevendo..." : s.publishing ? "Publicando..." : "Reescrever e Publicar"}

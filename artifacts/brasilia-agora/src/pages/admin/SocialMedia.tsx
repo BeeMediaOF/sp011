@@ -456,7 +456,7 @@ export default function SocialMedia() {
 
   return (
     <AdminLayout title="Redes Sociais">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="space-y-6">
 
         {/* Header */}
         <div className="flex items-center gap-3">
@@ -481,7 +481,7 @@ export default function SocialMedia() {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
                   tab === t.id
-                    ? "border-[#c8102e] text-[#c8102e]"
+                    ? "border-[#E71D36] text-[#E71D36]"
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}>
                 {t.label}
@@ -574,7 +574,7 @@ export default function SocialMedia() {
                   <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
                     {icon} {label} <span className="text-xs text-gray-400">{sub}</span>
                   </span>
-                  <input type="checkbox" className="w-4 h-4 accent-[#c8102e]"
+                  <input type="checkbox" className="w-4 h-4 accent-[#E71D36]"
                     checked={!!(cfg as Record<string, unknown>)[key]}
                     onChange={e => setCfg(p => ({ ...p, [key]: e.target.checked }))} />
                 </label>
@@ -583,7 +583,7 @@ export default function SocialMedia() {
 
             <div className="flex justify-end">
               <button onClick={saveConfig} disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-medium hover:bg-[#a50d25] disabled:opacity-50">
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50">
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                 {saving ? "Salvando…" : "Salvar credenciais"}
               </button>
@@ -599,7 +599,7 @@ export default function SocialMedia() {
               {(["feed", "story"] as const).map(t => (
                 <button key={t} onClick={() => { setPreviewType(t); setTimeout(redrawCanvas, 50); }}
                   className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    previewType === t ? "bg-[#c8102e] text-white border-[#c8102e]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                    previewType === t ? "bg-[#E71D36] text-white border-[#E71D36]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
                   }`}>
                   {t === "feed" ? "Feed 1080×1350" : "Story 1080×1920"}
                 </button>
@@ -619,7 +619,7 @@ export default function SocialMedia() {
                     <p className="text-xs text-gray-400">Carregando artigos…</p>
                   ) : (
                     <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
                       value={selArt?.id ?? ""}
                       onChange={e => {
                         const found = articles.find(a => a.id === e.target.value) ?? null;
@@ -643,7 +643,7 @@ export default function SocialMedia() {
                     <h3 className="font-semibold text-gray-800 text-sm">Título</h3>
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                        <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
                           checked={cfg.templateShowSubtitle ?? true}
                           onChange={e => { setCfg(p => ({ ...p, templateShowSubtitle: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
                         Subtítulo
@@ -654,7 +654,7 @@ export default function SocialMedia() {
                   <div>
                     <label className="block text-xs text-gray-600 mb-1">Fonte</label>
                     <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
                       value={cfg.templateTitleFont ?? "Inter, Arial, sans-serif"}
                       onChange={e => { setCfg(p => ({ ...p, templateTitleFont: e.target.value })); setTimeout(redrawCanvas, 50); }}>
                       <option value="Inter, Arial, sans-serif">Inter (Sans-serif moderna)</option>
@@ -686,7 +686,7 @@ export default function SocialMedia() {
                             onClick={() => { setCfg(p => ({ ...p, templateTitleMaxLines: n })); setTimeout(redrawCanvas, 50); }}
                             className={`flex-1 py-1.5 rounded text-xs font-semibold border transition-colors ${
                               (cfg.templateTitleMaxLines ?? 4) === n
-                                ? "bg-[#c8102e] text-white border-[#c8102e]"
+                                ? "bg-[#E71D36] text-white border-[#E71D36]"
                                 : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
                             }`}>{n}</button>
                         ))}
@@ -702,7 +702,7 @@ export default function SocialMedia() {
                     <input type="range" min="0.5" max="1.8" step="0.05"
                       value={cfg.templateTitleSizeScale ?? 1.0}
                       onChange={e => { setCfg(p => ({ ...p, templateTitleSizeScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#c8102e]" />
+                      className="w-full accent-[#E71D36]" />
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Pequeno</span><span>Grande</span></div>
                   </div>
 
@@ -714,7 +714,7 @@ export default function SocialMedia() {
                     <input type="range" min="-0.15" max="0.15" step="0.01"
                       value={cfg.templateTitleOffsetX ?? 0}
                       onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#c8102e]" />
+                      className="w-full accent-[#E71D36]" />
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>← Esquerda</span><span>Direita →</span></div>
                   </div>
 
@@ -726,7 +726,7 @@ export default function SocialMedia() {
                     <input type="range" min="-0.25" max="0.35" step="0.01"
                       value={cfg.templateTitleOffsetY ?? 0}
                       onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#c8102e]" />
+                      className="w-full accent-[#E71D36]" />
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>↓ Mais baixo</span><span>↑ Mais alto</span></div>
                   </div>
                 </div>
@@ -736,7 +736,7 @@ export default function SocialMedia() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-gray-800 text-sm">Tag de Categoria</h3>
                     <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
                         checked={cfg.templateShowCategory ?? true}
                         onChange={e => { setCfg(p => ({ ...p, templateShowCategory: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
                       Exibir
@@ -752,7 +752,7 @@ export default function SocialMedia() {
                         <input type="range" min="0" max="0.6" step="0.01"
                           value={cfg.templateCategoryOffsetX ?? 0}
                           onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#c8102e]" />
+                          className="w-full accent-[#E71D36]" />
                         <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Borda esq.</span><span>Centro →</span></div>
                       </div>
                       <div>
@@ -763,7 +763,7 @@ export default function SocialMedia() {
                         <input type="range" min="0" max="0.4" step="0.01"
                           value={cfg.templateCategoryOffsetY ?? 0}
                           onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#c8102e]" />
+                          className="w-full accent-[#E71D36]" />
                         <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Topo</span><span>↓ Mais baixo</span></div>
                       </div>
                     </>
@@ -775,7 +775,7 @@ export default function SocialMedia() {
                   <div className="flex items-center justify-between">
                     <h3 className="font-semibold text-gray-800 text-sm">Logo</h3>
                     <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#c8102e]"
+                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
                         checked={cfg.templateShowLogo ?? false}
                         onChange={e => { setCfg(p => ({ ...p, templateShowLogo: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
                       Exibir
@@ -791,7 +791,7 @@ export default function SocialMedia() {
                         <input type="range" min="0.4" max="2.0" step="0.1"
                           value={cfg.templateLogoScale ?? 1.0}
                           onChange={e => { setCfg(p => ({ ...p, templateLogoScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#c8102e]" />
+                          className="w-full accent-[#E71D36]" />
                         <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menor</span><span>Maior</span></div>
                       </div>
                       <div>
@@ -807,7 +807,7 @@ export default function SocialMedia() {
                               onClick={() => { setCfg(p => ({ ...p, templateLogoPosition: key })); setTimeout(redrawCanvas, 50); }}
                               className={`py-1.5 px-2 rounded text-xs font-medium border transition-colors ${
                                 (cfg.templateLogoPosition ?? "top-right") === key
-                                  ? "bg-[#c8102e] text-white border-[#c8102e]"
+                                  ? "bg-[#E71D36] text-white border-[#E71D36]"
                                   : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
                               }`}>
                               {label}
@@ -831,7 +831,7 @@ export default function SocialMedia() {
                     <input type="range" min="0.35" max="0.72" step="0.01"
                       value={cfg.templatePhotoRatio ?? 0.54}
                       onChange={e => { setCfg(p => ({ ...p, templatePhotoRatio: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#c8102e]" />
+                      className="w-full accent-[#E71D36]" />
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menos foto</span><span>Mais foto</span></div>
                   </div>
 
@@ -847,7 +847,7 @@ export default function SocialMedia() {
                           onClick={() => { setCfg(p => ({ ...p, templatePhotoCropY: key })); setTimeout(redrawCanvas, 50); }}
                           className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
                             (cfg.templatePhotoCropY ?? "center") === key
-                              ? "bg-[#c8102e] text-white border-[#c8102e]"
+                              ? "bg-[#E71D36] text-white border-[#E71D36]"
                               : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
                           }`}>{label}</button>
                       ))}
@@ -862,7 +862,7 @@ export default function SocialMedia() {
                     <input type="range" min="0" max="1" step="0.05"
                       value={cfg.templatePhotoVignette ?? 0.40}
                       onChange={e => { setCfg(p => ({ ...p, templatePhotoVignette: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#c8102e]" />
+                      className="w-full accent-[#E71D36]" />
                     <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Sem vinheta</span><span>Intensa</span></div>
                   </div>
                 </div>
@@ -903,13 +903,13 @@ export default function SocialMedia() {
                     placeholder="Ex: brasilia.com.br  (deixe vazio para automático)"
                     value={cfg.templateSiteUrl ?? ""}
                     onChange={e => { setCfg(p => ({ ...p, templateSiteUrl: e.target.value })); setTimeout(redrawCanvas, 80); }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c8102e]"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
                   />
                   <p className="text-[10px] text-gray-400">Aparece discreto no canto inferior esquerdo da máscara.</p>
                 </div>
 
                 <button onClick={saveConfig} disabled={saving}
-                  className="w-full py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-medium hover:bg-[#a50d25] disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="w-full py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50 flex items-center justify-center gap-2">
                   {saving ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
                   {saving ? "Salvando…" : "Salvar template"}
                 </button>
@@ -987,7 +987,7 @@ export default function SocialMedia() {
 
             <div className="flex justify-end">
               <button onClick={saveConfig} disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-medium hover:bg-[#a50d25] disabled:opacity-50">
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50">
                 {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                 {saving ? "Salvando…" : "Salvar legendas"}
               </button>
@@ -1042,7 +1042,7 @@ export default function SocialMedia() {
                       <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
                         {icon} {label} <span className="text-xs text-gray-400">{sub}</span>
                       </span>
-                      <input type="checkbox" className="w-4 h-4 accent-[#c8102e]"
+                      <input type="checkbox" className="w-4 h-4 accent-[#E71D36]"
                         checked={get} onChange={e => set(e.target.checked)} />
                     </label>
                   ))}

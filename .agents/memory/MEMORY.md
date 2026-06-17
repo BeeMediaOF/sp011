@@ -3,3 +3,4 @@
 - [Estrutura de dados mock](mock-data.md) — Dados organizados por editoria em arrays estruturados para consumo nos componentes
 - [Layout responsivo do portal](responsive-layout.md) — Grid de 4 colunas desktop, 2 colunas tablet, 1 coluna mobile; hero 60/38 split
 - [Footer com newsletter](footer-newsletter.md) — Newsletter inline com input + botão OK; 4 colunas de links
+- [Admin design system completo](admin-design-system.md) — Todas as páginas admin redesenhadas; tokens: bg #F7F9FC, primary #0B2A66, accent #E71D36, card shadow 0 8px 24px rgba(15,23,42,0.06), rounded-2xl

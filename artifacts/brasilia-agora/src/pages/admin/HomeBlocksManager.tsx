@@ -147,7 +147,7 @@ const HEADER_PRESETS: { id: HeaderStyle; label: string; desc: string; preview: R
         <div className="flex items-center justify-center px-1.5 py-1 bg-white rounded-sm">
           <div className="w-10 h-4 bg-gray-300 rounded-sm" />
         </div>
-        <div className="flex items-center justify-center gap-1 px-1.5 py-1 bg-[#1a2448] rounded-sm">
+        <div className="flex items-center justify-center gap-1 px-1.5 py-1 bg-[#0B2A66] rounded-sm">
           {[0,1,2,3,4].map(i=><div key={i} className="h-1.5 bg-white/30 rounded w-5"/>)}
         </div>
       </div>
@@ -170,7 +170,7 @@ const FOOTER_PRESETS: { id: FooterStyle; label: string; desc: string; preview: R
   {
     id: "light", label: "Claro", desc: "Fundo branco, colunas com links, borda vermelha",
     preview: (
-      <div className="w-full border-t-2 border-[#c8102e] space-y-1 px-1.5 py-2 bg-gray-50 rounded-sm">
+      <div className="w-full border-t-2 border-[#E71D36] space-y-1 px-1.5 py-2 bg-gray-50 rounded-sm">
         <div className="flex gap-1.5">{[0,1,2,3].map(i=><div key={i} className="flex-1 space-y-0.5">{[0,1,2].map(j=><div key={j} className="h-1 bg-gray-300 rounded"/>)}</div>)}</div>
         <div className="h-px bg-gray-200"/>
         <div className="h-1 bg-gray-200 rounded w-2/3 mx-auto"/>
@@ -207,7 +207,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: Set
         <input
           value={form.name}
           onChange={(e) => onChange("name", e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#1a2448]/30 focus:border-[#1a2448]"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 focus:border-[#0B2A66]"
           placeholder="Nome exibido na home"
         />
       </div>
@@ -260,7 +260,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onCancel }: Set
         </button>
         <button type="button" onClick={onApply}
           disabled={saving || !form.name.trim()}
-          className="flex-[2] flex items-center justify-center gap-2 px-4 py-2 bg-[#1a2448] text-white text-sm font-semibold rounded-lg hover:bg-[#243060] disabled:opacity-50 transition-colors">
+          className="flex-[2] flex items-center justify-center gap-2 px-4 py-2 bg-[#0B2A66] text-white text-sm font-semibold rounded-lg hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
           {saving
             ? <><RefreshCw size={13} className="animate-spin" /> Salvando…</>
             : <><CheckCircle size={13} /> Aplicar e Salvar</>
@@ -281,9 +281,9 @@ interface AddPanelProps {
 
 function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
   return (
-    <div className="border-2 border-dashed border-[#1a2448]/30 rounded-xl p-4 space-y-4 bg-white">
+    <div className="border-2 border-dashed border-[#0B2A66]/30 rounded-xl p-4 space-y-4 bg-white">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-bold text-[#1a2448] flex items-center gap-2">
+        <span className="text-sm font-bold text-[#0B2A66] flex items-center gap-2">
           <LayoutGrid size={15} /> Novo bloco personalizado
         </span>
         <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
@@ -292,7 +292,7 @@ function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
       <div>
         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1">Nome</label>
         <input value={form.name} onChange={(e) => onChange("name", e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]/30 focus:border-[#1a2448]"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 focus:border-[#0B2A66]"
           placeholder="Ex: Política, Esporte..." autoFocus
         />
       </div>
@@ -331,7 +331,7 @@ function AddPanel({ form, onChange, onAdd, onClose }: AddPanelProps) {
       </div>
 
       <button type="button" onClick={onAdd} disabled={!form.name.trim()}
-        className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#c8102e] text-white rounded-lg text-sm font-semibold hover:bg-[#a00d24] disabled:opacity-40 transition-colors">
+        className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-semibold hover:bg-[#a00d24] disabled:opacity-40 transition-colors">
         <Plus size={14} /> Adicionar à home
       </button>
     </div>
@@ -586,7 +586,7 @@ export default function HomeBlocksManager() {
           <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
             <div className="px-4 py-3 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-black text-[#1a2448]">Blocos da Home</h2>
+                <h2 className="text-sm font-black text-[#0B2A66]">Blocos da Home</h2>
                 <p className="text-[11px] text-gray-400 mt-0.5">
                   {loading ? "Carregando…" : `${visibleCount} visível${visibleCount !== 1 ? "s" : ""} · ${blocks.length} total`}
                 </p>
@@ -609,7 +609,7 @@ export default function HomeBlocksManager() {
                   onClick={() => setTab(t.id)}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-semibold transition-colors border-b-2 ${
                     tab === t.id
-                      ? "text-[#1a2448] border-[#1a2448]"
+                      ? "text-[#0B2A66] border-[#0B2A66]"
                       : "text-gray-400 border-transparent hover:text-gray-600"
                   }`}
                 >
@@ -645,7 +645,7 @@ export default function HomeBlocksManager() {
                         className={`rounded-xl border bg-white transition-all select-none
                           ${isDragging ? "border-[#F5A623] shadow-lg scale-[1.02] rotate-1" : "border-gray-200 shadow-sm"}
                           ${!block.visible && !isEditing ? "opacity-40" : ""}
-                          ${isEditing ? "ring-2 ring-[#1a2448]/20" : ""}
+                          ${isEditing ? "ring-2 ring-[#0B2A66]/20" : ""}
                         `}
                       >
                         <div
@@ -725,7 +725,7 @@ export default function HomeBlocksManager() {
                 ) : (
                   <button
                     onClick={() => setShowAdd(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-400 hover:border-[#1a2448] hover:text-[#1a2448] hover:bg-white transition-all"
+                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm font-semibold text-gray-400 hover:border-[#0B2A66] hover:text-[#0B2A66] hover:bg-white transition-all"
                   >
                     <Plus size={15} /> Adicionar bloco
                   </button>
@@ -747,7 +747,7 @@ export default function HomeBlocksManager() {
                   }}
                   disabled={saving || loading}
                   className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-colors disabled:opacity-50
-                    ${saved ? "bg-green-500 text-white" : "bg-[#1a2448] text-white hover:bg-[#243060]"}`}
+                    ${saved ? "bg-green-500 text-white" : "bg-[#0B2A66] text-white hover:bg-[#0a2255]"}`}
                 >
                   {saved ? <><CheckCircle size={15} /> Tudo salvo!</>
                     : saving ? <><RefreshCw size={15} className="animate-spin" /> Salvando…</>
@@ -773,7 +773,7 @@ export default function HomeBlocksManager() {
                     }}
                     className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
                       headerStyle === preset.id
-                        ? "border-[#1a2448] bg-[#1a2448]/5"
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5"
                         : "border-gray-200 hover:border-gray-300 bg-white"
                     }`}
                   >
@@ -784,7 +784,7 @@ export default function HomeBlocksManager() {
                         <p className="text-[11px] text-gray-500">{preset.desc}</p>
                       </div>
                       {headerStyle === preset.id && (
-                        <span className="flex items-center gap-1 text-[11px] text-[#1a2448] font-bold">
+                        <span className="flex items-center gap-1 text-[11px] text-[#0B2A66] font-bold">
                           <CheckCircle size={14} /> Ativo
                         </span>
                       )}
@@ -807,7 +807,7 @@ export default function HomeBlocksManager() {
                     type="text"
                     value={headerBgColor}
                     onChange={(e) => setHeaderBgColor(e.target.value)}
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
                     placeholder="#ffffff"
                   />
                   <button
@@ -815,7 +815,7 @@ export default function HomeBlocksManager() {
                     onClick={async () => {
                       await saveHeaderFooter(headerStyle, footerStyle, headerBgColor, undefined);
                     }}
-                    className="px-3 py-1.5 bg-[#1a2448] text-white text-xs font-semibold rounded-lg hover:bg-[#243060] transition-colors"
+                    className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-lg hover:bg-[#0a2255] transition-colors"
                   >
                     Salvar
                   </button>
@@ -827,11 +827,11 @@ export default function HomeBlocksManager() {
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {["#ffffff", "#f8fafc", "#f1f5f9", "#1a2448", "#0b3d91", "#c8102e", "#18181b"].map((c) => (
+                  {["#ffffff", "#f8fafc", "#f1f5f9", "#0B2A66", "#0b3d91", "#E71D36", "#18181b"].map((c) => (
                     <button key={c} type="button"
                       onClick={() => setHeaderBgColor(c)}
                       title={c}
-                      className={`w-6 h-6 rounded border-2 transition-all ${headerBgColor === c ? "border-[#1a2448] scale-110" : "border-transparent hover:border-gray-300"}`}
+                      className={`w-6 h-6 rounded border-2 transition-all ${headerBgColor === c ? "border-[#0B2A66] scale-110" : "border-transparent hover:border-gray-300"}`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
@@ -869,7 +869,7 @@ export default function HomeBlocksManager() {
                 }}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={() => logoInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-xl py-4 px-3 flex flex-col items-center gap-2 cursor-pointer hover:border-[#1a2448] hover:bg-white transition-colors"
+                className="border-2 border-dashed border-gray-200 rounded-xl py-4 px-3 flex flex-col items-center gap-2 cursor-pointer hover:border-[#0B2A66] hover:bg-white transition-colors"
               >
                 <Upload size={22} className="text-gray-300" />
                 <p className="text-xs text-gray-500 text-center">
@@ -896,7 +896,7 @@ export default function HomeBlocksManager() {
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Tamanho</span>
-                  <span className="text-sm font-bold text-[#1a2448]">{logoSize}px</span>
+                  <span className="text-sm font-bold text-[#0B2A66]">{logoSize}px</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -910,7 +910,7 @@ export default function HomeBlocksManager() {
                     type="range" min={32} max={160} step={4}
                     value={logoSize}
                     onChange={(e) => setLogoSize(Number(e.target.value))}
-                    className="flex-1 accent-[#1a2448]"
+                    className="flex-1 accent-[#0B2A66]"
                   />
                   <button
                     type="button"
@@ -937,7 +937,7 @@ export default function HomeBlocksManager() {
                 type="button"
                 onClick={saveLogo}
                 disabled={logoSaving}
-                className="w-full py-2 rounded-lg bg-[#1a2448] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0d1730] disabled:opacity-50 transition-colors"
+                className="w-full py-2 rounded-lg bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0d1730] disabled:opacity-50 transition-colors"
               >
                 {logoSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
                 {logoSaving ? "Salvando…" : "Salvar logo"}
@@ -961,7 +961,7 @@ export default function HomeBlocksManager() {
                     }}
                     className={`w-full text-left rounded-xl border-2 p-3 transition-all ${
                       footerStyle === preset.id
-                        ? "border-[#1a2448] bg-[#1a2448]/5"
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5"
                         : "border-gray-200 hover:border-gray-300 bg-white"
                     }`}
                   >
@@ -972,7 +972,7 @@ export default function HomeBlocksManager() {
                         <p className="text-[11px] text-gray-500">{preset.desc}</p>
                       </div>
                       {footerStyle === preset.id && (
-                        <span className="flex items-center gap-1 text-[11px] text-[#1a2448] font-bold">
+                        <span className="flex items-center gap-1 text-[11px] text-[#0B2A66] font-bold">
                           <CheckCircle size={14} /> Ativo
                         </span>
                       )}
@@ -995,7 +995,7 @@ export default function HomeBlocksManager() {
                     type="text"
                     value={footerBgColor}
                     onChange={(e) => setFooterBgColor(e.target.value)}
-                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                    className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
                     placeholder="#000000"
                   />
                   <button
@@ -1003,7 +1003,7 @@ export default function HomeBlocksManager() {
                     onClick={async () => {
                       await saveHeaderFooter(headerStyle, footerStyle, undefined, footerBgColor);
                     }}
-                    className="px-3 py-1.5 bg-[#1a2448] text-white text-xs font-semibold rounded-lg hover:bg-[#243060] transition-colors"
+                    className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-lg hover:bg-[#0a2255] transition-colors"
                   >
                     Salvar
                   </button>
@@ -1013,11 +1013,11 @@ export default function HomeBlocksManager() {
                   Pré-visualização
                 </div>
                 <div className="flex flex-wrap gap-1.5 mt-2">
-                  {["#000000", "#18181b", "#1a2448", "#0b3d91", "#1a3a2a", "#3b1f6e", "#1e293b", "#ffffff"].map((c) => (
+                  {["#000000", "#18181b", "#0B2A66", "#0b3d91", "#1a3a2a", "#3b1f6e", "#1e293b", "#ffffff"].map((c) => (
                     <button key={c} type="button"
                       onClick={() => setFooterBgColor(c)}
                       title={c}
-                      className={`w-6 h-6 rounded border-2 transition-all ${footerBgColor === c ? "border-[#1a2448] scale-110" : "border-transparent hover:border-gray-300"}`}
+                      className={`w-6 h-6 rounded border-2 transition-all ${footerBgColor === c ? "border-[#0B2A66] scale-110" : "border-transparent hover:border-gray-300"}`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
@@ -1038,7 +1038,7 @@ export default function HomeBlocksManager() {
             </div>
             <button
               onClick={() => setPreviewKey((k) => k + 1)}
-              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:border-[#1a2448] hover:text-[#1a2448] transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-500 hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors"
             >
               <RefreshCw size={11} /> Atualizar
             </button>

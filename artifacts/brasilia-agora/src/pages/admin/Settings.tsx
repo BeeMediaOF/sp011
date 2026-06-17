@@ -49,8 +49,8 @@ export default function Settings() {
         setSettings(r.settings);
         // Keep localStorage in sync with server values
         saveAdminThemeToStorage(
-          r.settings.adminSidebarColor ?? "#1a2448",
-          r.settings.adminAccentColor  ?? "#c8102e",
+          r.settings.adminSidebarColor ?? "#0B2A66",
+          r.settings.adminAccentColor  ?? "#E71D36",
         );
       })
       .catch(() => {})
@@ -63,8 +63,8 @@ export default function Settings() {
       // Persist admin panel colors to localStorage immediately — no flash on reload
       if (key === "adminSidebarColor" || key === "adminAccentColor") {
         saveAdminThemeToStorage(
-          key === "adminSidebarColor" ? String(value) : (next.adminSidebarColor ?? "#1a2448"),
-          key === "adminAccentColor"  ? String(value) : (next.adminAccentColor  ?? "#c8102e"),
+          key === "adminSidebarColor" ? String(value) : (next.adminSidebarColor ?? "#0B2A66"),
+          key === "adminAccentColor"  ? String(value) : (next.adminAccentColor  ?? "#E71D36"),
         );
       }
       return next;
@@ -102,7 +102,7 @@ export default function Settings() {
             {/* Site info */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <Globe size={16} className="text-[#1a2448]" />
+                <Globe size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Informações do site</h3>
               </div>
 
@@ -111,7 +111,7 @@ export default function Settings() {
                 <input
                   value={settings.siteName}
                   onChange={(e) => setField("siteName", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder="Ex: SBC Agora"
                 />
               </div>
@@ -121,7 +121,7 @@ export default function Settings() {
                 <input
                   value={settings.tagline}
                   onChange={(e) => setField("tagline", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder="Ex: Notícia. Agora. Sempre."
                 />
               </div>
@@ -130,7 +130,7 @@ export default function Settings() {
             {/* SEO */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <FileSearch size={16} className="text-[#1a2448]" />
+                <FileSearch size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">SEO</h3>
               </div>
 
@@ -141,7 +141,7 @@ export default function Settings() {
                   onChange={(e) => setField("seoDescription", e.target.value)}
                   rows={3}
                   maxLength={160}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] resize-none"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] resize-none"
                   placeholder="Descrição exibida nos resultados do Google (máx. 160 caracteres)"
                 />
                 <p className="text-[11px] text-gray-400 mt-1 text-right">{(settings.seoDescription ?? "").length}/160</p>
@@ -152,7 +152,7 @@ export default function Settings() {
                 <input
                   value={settings.seoKeywords ?? ""}
                   onChange={(e) => setField("seoKeywords", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder="brasília, notícias, df, política (separadas por vírgula)"
                 />
               </div>
@@ -161,7 +161,7 @@ export default function Settings() {
             {/* Byline dos artigos */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <UserCircle size={16} className="text-[#1a2448]" />
+                <UserCircle size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Assinatura dos artigos ("Por…")</h3>
               </div>
               <p className="text-[11px] text-gray-400">Foto e nome que aparecem no cabeçalho de cada artigo publicado.</p>
@@ -171,7 +171,7 @@ export default function Settings() {
                 <input
                   value={settings.bylineName ?? ""}
                   onChange={(e) => setField("bylineName", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder={`Padrão: ${settings.siteName || "nome do portal"}`}
                 />
               </div>
@@ -212,7 +212,7 @@ export default function Settings() {
             {/* OG Image + Favicon */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
               <div className="flex items-center gap-2">
-                <Image size={16} className="text-[#1a2448]" />
+                <Image size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Imagens do site</h3>
               </div>
 
@@ -284,7 +284,7 @@ export default function Settings() {
             {/* Admin panel appearance */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-5">
               <div className="flex items-center gap-2">
-                <LayoutDashboard size={16} className="text-[#1a2448]" />
+                <LayoutDashboard size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Aparência do Painel Administrativo</h3>
               </div>
 
@@ -308,7 +308,7 @@ export default function Settings() {
                     Selecionar logo
                   </button>
                   {settings.adminLogoBase64 && (
-                    <div className="relative bg-[#1a2448] rounded-lg p-2">
+                    <div className="relative bg-[#0B2A66] rounded-lg p-2">
                       <img src={settings.adminLogoBase64} alt="Admin logo" className="h-8 max-w-[120px] object-contain" />
                       <button
                         type="button"
@@ -330,20 +330,20 @@ export default function Settings() {
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.adminSidebarColor ?? "#1a2448"}
+                      value={settings.adminSidebarColor ?? "#0B2A66"}
                       onChange={(e) => setField("adminSidebarColor", e.target.value)}
                       className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={settings.adminSidebarColor ?? "#1a2448"}
+                      value={settings.adminSidebarColor ?? "#0B2A66"}
                       onChange={(e) => setField("adminSidebarColor", e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
-                      placeholder="#1a2448"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
+                      placeholder="#0B2A66"
                     />
                   </div>
                   <div className="mt-2 rounded-lg overflow-hidden h-8 flex items-center px-3 text-white text-xs font-semibold"
-                    style={{ backgroundColor: settings.adminSidebarColor ?? "#1a2448" }}>
+                    style={{ backgroundColor: settings.adminSidebarColor ?? "#0B2A66" }}>
                     Pré-visualização
                   </div>
                 </div>
@@ -352,20 +352,20 @@ export default function Settings() {
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
-                      value={settings.adminAccentColor ?? "#c8102e"}
+                      value={settings.adminAccentColor ?? "#E71D36"}
                       onChange={(e) => setField("adminAccentColor", e.target.value)}
                       className="w-10 h-8 rounded border border-gray-200 cursor-pointer"
                     />
                     <input
                       type="text"
-                      value={settings.adminAccentColor ?? "#c8102e"}
+                      value={settings.adminAccentColor ?? "#E71D36"}
                       onChange={(e) => setField("adminAccentColor", e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
-                      placeholder="#c8102e"
+                      className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
+                      placeholder="#E71D36"
                     />
                   </div>
                   <div className="mt-2 rounded-lg overflow-hidden h-8 flex items-center px-3 text-white text-xs font-semibold"
-                    style={{ backgroundColor: settings.adminAccentColor ?? "#c8102e" }}>
+                    style={{ backgroundColor: settings.adminAccentColor ?? "#E71D36" }}>
                     Pré-visualização
                   </div>
                 </div>
@@ -376,7 +376,7 @@ export default function Settings() {
                 <label className="block text-xs font-semibold text-gray-600 mb-2">Temas prontos</label>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: "SBC Agora (padrão)", sidebar: "#1a2448", accent: "#c8102e" },
+                    { label: "SBC Agora (padrão)", sidebar: "#0B2A66", accent: "#E71D36" },
                     { label: "Oceano", sidebar: "#0b3d91", accent: "#e8a020" },
                     { label: "Floresta", sidebar: "#1a3a2a", accent: "#22c55e" },
                     { label: "Grafite", sidebar: "#18181b", accent: "#f59e0b" },
@@ -398,7 +398,7 @@ export default function Settings() {
               {/* Portal colors */}
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <Globe size={14} className="text-[#1a2448]" />
+                  <Globe size={14} className="text-[#0B2A66]" />
                   <label className="text-xs font-semibold text-gray-600">Cores do portal público</label>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -415,7 +415,7 @@ export default function Settings() {
                         type="text"
                         value={settings.headerBgColor ?? "#ffffff"}
                         onChange={(e) => setField("headerBgColor", e.target.value)}
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
                         placeholder="#ffffff"
                       />
                     </div>
@@ -437,7 +437,7 @@ export default function Settings() {
                         type="text"
                         value={settings.footerBgColor ?? "#000000"}
                         onChange={(e) => setField("footerBgColor", e.target.value)}
-                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#1a2448] font-mono"
+                        className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66] font-mono"
                         placeholder="#000000"
                       />
                     </div>
@@ -453,7 +453,7 @@ export default function Settings() {
             {/* Tracking */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <BarChart2 size={16} className="text-[#1a2448]" />
+                <BarChart2 size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Rastreamento &amp; Analytics</h3>
               </div>
 
@@ -464,7 +464,7 @@ export default function Settings() {
                 <input
                   value={settings.ga4MeasurementId ?? ""}
                   onChange={(e) => setField("ga4MeasurementId", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder="G-XXXXXXXXXX"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
@@ -479,7 +479,7 @@ export default function Settings() {
                 <input
                   value={settings.facebookPixelId ?? ""}
                   onChange={(e) => setField("facebookPixelId", e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a2448]"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]"
                   placeholder="123456789012345"
                 />
                 <p className="text-[11px] text-gray-400 mt-1">
@@ -508,14 +508,14 @@ export default function Settings() {
             {/* Device visibility */}
             <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
               <div className="flex items-center gap-2">
-                <Tag size={16} className="text-[#1a2448]" />
+                <Tag size={16} className="text-[#0B2A66]" />
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Visibilidade por dispositivo</h3>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setField("desktopEnabled", !settings.desktopEnabled)}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
-                    ${settings.desktopEnabled ? "border-[#1a2448] bg-[#1a2448]/5 text-[#1a2448]" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+                    ${settings.desktopEnabled ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
                 >
                   <Monitor size={24} />
                   <span className="text-xs font-semibold">Desktop</span>
@@ -526,7 +526,7 @@ export default function Settings() {
                 <button
                   onClick={() => setField("mobileEnabled", !settings.mobileEnabled)}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all
-                    ${settings.mobileEnabled ? "border-[#1a2448] bg-[#1a2448]/5 text-[#1a2448]" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
+                    ${settings.mobileEnabled ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]" : "border-gray-200 text-gray-400 hover:border-gray-300"}`}
                 >
                   <Smartphone size={24} />
                   <span className="text-xs font-semibold">Mobile</span>
@@ -555,7 +555,7 @@ export default function Settings() {
               onClick={handleSave}
               disabled={saving}
               className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-colors disabled:opacity-60
-                ${saved ? "bg-green-500 text-white" : "bg-[#1a2448] text-white hover:bg-[#243060]"}`}
+                ${saved ? "bg-green-500 text-white" : "bg-[#0B2A66] text-white hover:bg-[#0a2255]"}`}
             >
               {saved ? <><CheckCircle size={16} /> Salvo!</> : <><Save size={16} /> {saving ? "Salvando..." : "Salvar Configurações"}</>}
             </button>
