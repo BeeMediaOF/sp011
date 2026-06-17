@@ -287,6 +287,10 @@ export default function RSSManager() {
   const [defsApplied,   setDefsApplied]   = useState(false);
   const [runningAll,    setRunningAll]    = useState(false);
 
+  // ── Table UI ──
+  const [currentPage,  setCurrentPage]  = useState(1);
+  const [statusFilter, setStatusFilter] = useState("Todos");
+
   // ── Fetch & Preview ──
   const [selectedSource, setSelectedSource] = useState("all");
   const [fetching, setFetching]       = useState(false);
@@ -794,8 +798,9 @@ export default function RSSManager() {
 
   // ─── Render ──────────────────────────────────────────────────────────────────
 
+  const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
+  const ITEMS_PER_PAGE = 7;
   const needsKey = aiSettings.provider !== "gemini_free";
-  const modelList = aiSettings.provider === "openai" ? OPENAI_MODELS : GEMINI_MODELS;
 
   // ── Queue derived stats ──
   const queueStats = useMemo(() => {
@@ -820,504 +825,253 @@ export default function RSSManager() {
     ));
   }
 
+  // ── Filtered / paginated sources ─────────────────────────────────────────────
+  const filteredSources = useMemo(() => {
+    const q = sourceSearch.toLowerCase();
+    let list = q
+      ? sources.filter((s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.url.toLowerCase().includes(q) ||
+          (TAG_MAP[s.category] ?? s.category).toLowerCase().includes(q)
+        )
+      : [...sources];
+    if (statusFilter === "Ativo")   list = list.filter((s) => s.active);
+    if (statusFilter === "Pausado") list = list.filter((s) => !s.active);
+    return list;
+  }, [sources, sourceSearch, statusFilter]);
+
+  const totalPages   = Math.max(1, Math.ceil(filteredSources.length / ITEMS_PER_PAGE));
+  const pagedSources = filteredSources.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE,
+  );
+
+  function srcInitials(name: string): string {
+    const words = name.replace(/[^a-zA-ZÀ-ÿ\s]/g, "").trim().split(/\s+/);
+    if (words.length === 0) return "?";
+    if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
+    return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toUpperCase();
+  }
+
+  const SRC_PALETTE = ["#E71D36","#0B2A66","#2563EB","#16A34A","#F97316","#9333EA","#0EA5E9","#DC2626"];
+  function srcColor(id: string): string {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = id.charCodeAt(i) + ((h << 5) - h);
+    return SRC_PALETTE[Math.abs(h) % SRC_PALETTE.length] ?? "#0B2A66";
+  }
+
+  function fmtFetch(ts?: string): string {
+    if (!ts) return "—";
+    return new Date(ts).toLocaleString("pt-BR", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  }
+
   return (
-    <AdminLayout title="Importar via RSS">
-      <div className="max-w-5xl mx-auto space-y-6">
+    <AdminLayout title="Fontes RSS">
 
-        {/* ══ STATS ══════════════════════════════════════════════════════════ */}
-        <section className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Coletados via RSS</span>
-            <span className="text-3xl font-bold text-[#1a2448]">{rssStats.total}</span>
-            <span className="text-[11px] text-gray-400">artigos importados</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Escritos manualmente</span>
-            <span className="text-3xl font-bold text-[#0b3d91]">{rssStats.manual}</span>
-            <span className="text-[11px] text-gray-400">artigos próprios</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Reescritos com IA</span>
-            <span className="text-3xl font-bold text-purple-600">{rssStats.rewritten}</span>
-            <span className="text-[11px] text-gray-400">com SEO/AIO aplicado</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border p-4 flex flex-col gap-1">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Taxa de reescrita</span>
-            <span className="text-3xl font-bold text-[#c8102e]">
-              {rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%
-            </span>
-            <div className="w-full bg-gray-100 rounded-full h-1.5 mt-2">
-              <div
-                className="bg-purple-500 h-1.5 rounded-full transition-all"
-                style={{ width: `${rssStats.total > 0 ? Math.round((rssStats.rewritten / rssStats.total) * 100) : 0}%` }}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* ══ AI SETTINGS ════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-xl shadow-sm border">
-          <div className="px-6 py-4 border-b flex items-center gap-2">
-            <Brain size={18} className="text-purple-600" />
-            <h2 className="font-semibold text-gray-800">Configuração de IA para Reescrita</h2>
-          </div>
-          <form onSubmit={(e) => { void saveAiSettings(e); }} className="p-6 space-y-4">
-            {/* Provider */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 mb-2">Provedor de IA</label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {AI_PROVIDERS.map((p) => (
-                  <button
-                    key={p.value} type="button"
-                    onClick={() => setAiSettings((a) => ({ ...a, provider: p.value, model: "" }))}
-                    className={`flex flex-col gap-1 p-3 rounded-xl border-2 text-left transition-all ${
-                      aiSettings.provider === p.value
-                        ? "border-purple-500 bg-purple-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <span className="text-sm font-semibold text-gray-800">{p.label}</span>
-                    <span className="text-[11px] text-gray-500">{p.desc}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Model */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1">Modelo</label>
-                <select
-                  value={aiSettings.model}
-                  onChange={(e) => setAiSettings((a) => ({ ...a, model: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Padrão (recomendado)</option>
-                  {modelList.map((m) => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </div>
-
-              {/* API Key */}
-              {needsKey && (
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1">
-                    API Key {aiSettings.hasKey && <span className="text-green-600 ml-1">✓ Configurada</span>}
-                  </label>
-                  <div className="relative">
-                    <Key size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      value={aiApiKey}
-                      onChange={(e) => setAiApiKey(e.target.value)}
-                      placeholder={aiSettings.hasKey ? "••••••• (manter atual)" : "Insira sua API Key"}
-                      className="w-full pl-8 pr-8 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey((s) => !s)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {aiError && <p className="text-sm text-red-500 flex items-center gap-1"><AlertCircle size={14}/>{aiError}</p>}
-
-            <div className="flex items-center gap-3">
-              <button
-                type="submit" disabled={aiSaving}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50 ${
-                  aiSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
-                }`}
-              >
-                {aiSaved ? <><CheckCircle size={15}/> Salvo!</> : <><Settings size={15}/> {aiSaving ? "Salvando…" : "Salvar Configuração"}</>}
-              </button>
-              <p className="text-[11px] text-gray-400">
-                Saída padrão: JSON com <code className="bg-gray-100 px-0.5 rounded">title</code>, <code className="bg-gray-100 px-0.5 rounded">subtitle</code>, <code className="bg-gray-100 px-0.5 rounded">content_html</code>, <code className="bg-gray-100 px-0.5 rounded">slug</code>, <code className="bg-gray-100 px-0.5 rounded">keywords</code> · SEO/Discover
-              </p>
-            </div>
-          </form>
-        </section>
-
-        {/* ══ PROMPTS ═════════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-xl shadow-sm border">
-          <button
-            type="button"
-            onClick={() => setPromptsOpen((v) => !v)}
-            className="w-full px-6 py-4 flex items-center gap-2 hover:bg-gray-50 transition-colors text-left"
-          >
-            <Wand2 size={18} className="text-purple-600" />
-            <h2 className="font-semibold text-gray-800">Prompts de Reescrita</h2>
-            <span className="ml-1 text-[11px] text-gray-400 font-normal">
-              Hierarquia: fonte &gt; categoria &gt; geral
-            </span>
-            <span className="ml-auto flex items-center gap-2 text-[11px] text-gray-400">
-              {(prompts.global || Object.keys(prompts.categories ?? {}).length > 0) && (
-                <span className="w-2 h-2 rounded-full bg-purple-500 inline-block"/>
-              )}
-              {promptsOpen ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
-            </span>
-          </button>
-          {promptsOpen && (<div className="border-t p-6 space-y-4">
-            <p className="text-xs text-gray-500">
-              Configure um prompt <strong>Geral</strong> (vale para todas as fontes) e/ou prompts <strong>por categoria</strong>.
-              O prompt da própria fonte tem prioridade sobre estes. Deixe em branco para usar o prompt padrão.
-            </p>
-
-            {/* Tab bar */}
-            <div className="flex flex-wrap gap-1 border-b pb-1">
-              <button
-                type="button"
-                onClick={() => setPromptTab("__global__")}
-                className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold border-b-2 transition-colors
-                  ${promptTab === "__global__"
-                    ? "border-purple-600 text-purple-700 bg-purple-50"
-                    : "border-transparent text-gray-500 hover:text-gray-700"}`}
-              >
-                🌐 Geral
-                {prompts.global && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />}
-              </button>
-              {allCategories.map(({ slug, label }) => {
-                const hasCustom = !!prompts.categories?.[slug];
-                return (
-                  <button
-                    key={slug}
-                    type="button"
-                    onClick={() => setPromptTab(slug)}
-                    className={`px-3 py-1.5 rounded-t-lg text-xs font-semibold border-b-2 transition-colors
-                      ${promptTab === slug
-                        ? "border-purple-600 text-purple-700 bg-purple-50"
-                        : "border-transparent text-gray-500 hover:text-gray-700"}`}
-                  >
-                    {label}
-                    {hasCustom && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-500 inline-block" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Textarea area */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <p className="text-[11px] text-gray-400">
-                  Variáveis disponíveis:{" "}
-                  {["{{TITULO}}", "{{TEXTO}}", "{{FONTE}}", "{{CREDITO}}"].map((v) => (
-                    <code key={v} className="bg-gray-100 px-1 rounded mr-1">{v}</code>
-                  ))}
-                </p>
-                <div className="flex gap-3 items-center">
-                  <button
-                    type="button"
-                    onClick={() => { void loadDefaultPromptInto(promptTab); }}
-                    disabled={promptDefaultLoading}
-                    className="text-[11px] text-blue-500 hover:underline disabled:opacity-50"
-                  >
-                    {promptDefaultLoading ? "Carregando…" : "Carregar prompt padrão"}
-                  </button>
-                  {promptHasValue && (
-                    <button
-                      type="button"
-                      onClick={() => clearTabPrompt(promptTab)}
-                      className="text-[11px] text-red-400 hover:underline"
-                    >
-                      Limpar
-                    </button>
-                  )}
+        {/* ══ STAT CARDS ══════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-5 mb-6">
+          {([
+            {
+              label: "Fontes ativas",
+              value: sources.filter((s) => s.active).length,
+              sub:   `${sources.length} total cadastradas`,
+              icon:  Rss,
+              ib: "#DCFCE7", ic: "#16A34A",
+            },
+            {
+              label: "Total importados",
+              value: rssStats.total,
+              sub:   "artigos via RSS",
+              icon:  RefreshCw,
+              ib: "#FFF7ED", ic: "#F97316",
+            },
+            {
+              label: "Reescritos com IA",
+              value: rssStats.rewritten,
+              sub:   rssStats.total > 0
+                       ? `${Math.round((rssStats.rewritten / rssStats.total) * 100)}% do total`
+                       : "0%",
+              icon:  Wand2,
+              ib: "#F3E8FF", ic: "#9333EA",
+            },
+            {
+              label: "Fontes pausadas",
+              value: sources.filter((s) => !s.active).length,
+              sub:   "inativas no momento",
+              icon:  AlertCircle,
+              ib: "#FEF2F2", ic: "#EF4444",
+            },
+          ] as const).map(({ label, value, sub, icon: Icon, ib, ic }) => (
+            <div key={label} className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{ background: ib }}>
+                  <Icon size={20} style={{ color: ic }} />
                 </div>
               </div>
-
-              <textarea
-                key={promptTab}
-                value={promptCurrentVal}
-                onChange={(e) => setTabPrompt(promptTab, e.target.value)}
-                rows={14}
-                placeholder={`Prompt de reescrita para ${promptTabLabel}.\nDeixe vazio para usar o prompt do nível superior ou o padrão.\n\nClique em "Carregar prompt padrão" para ver e editar o prompt base.`}
-                className="w-full border rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y bg-gray-50"
-                spellCheck={false}
-              />
+              <p className="text-2xl font-bold text-[#0F172A]">{value}</p>
+              <p className="text-xs font-semibold text-slate-600 mt-0.5">{label}</p>
+              <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>
             </div>
+          ))}
+        </div>
 
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => { void savePrompts(); }}
-                disabled={promptSaving}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-colors disabled:opacity-50
-                  ${promptSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"}`}
-              >
-                {promptSaved
-                  ? <><CheckCircle size={15} /> Salvo!</>
-                  : <><Wand2 size={15} /> {promptSaving ? "Salvando…" : "Salvar Prompts"}</>}
-              </button>
-            </div>
-          </div>)}
-        </section>
+        {/* ══ 2-COLUMN GRID ═══════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5 items-start">
 
-        {/* ══ SOURCES ════════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-xl shadow-sm border">
-          <div className="px-6 py-4 border-b flex items-center gap-2">
-            <Rss size={18} className="text-[#c8102e]" />
-            <h2 className="font-semibold text-gray-800">Fontes RSS</h2>
-          </div>
-          <div className="p-6 space-y-5">
+          {/* ── LEFT: sources table ───────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
 
-            {/* Add form */}
-            <form onSubmit={(e) => { void addSource(e); }} className="space-y-3 bg-gray-50 rounded-xl p-4 border">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nova Fonte</p>
-              <div className="flex flex-wrap gap-3">
-                <input value={newName} onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Nome da fonte" className="flex-1 min-w-[150px] border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
-                <input value={newUrl} onChange={(e) => setNewUrl(e.target.value)}
-                  placeholder="URL do feed RSS" className="flex-[2] min-w-[250px] border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
-                <select value={newCat} onChange={(e) => setNewCat(e.target.value)}
-                  className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
-                  {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
-                </select>
-              </div>
-              <div className="flex flex-wrap gap-3 items-center">
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-[11px] font-semibold text-gray-500 mb-1 flex items-center gap-1"><Clock size={11}/>Agendamento</label>
-                  <select value={newSchedule} onChange={(e) => setNewSchedule(Number(e.target.value))}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
-                    {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-[11px] font-semibold text-gray-500 mb-1 flex items-center gap-1"><Zap size={11}/>Automação</label>
-                  <select value={newAutoMode} onChange={(e) => setNewAutoMode(e.target.value as AutoMode)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
-                    {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 pt-4">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                    <input type="checkbox" checked={newCredit} onChange={(e) => setNewCredit(e.target.checked)}
-                      className="rounded text-[#0b3d91]"/>
-                    <BadgeCheck size={15} className="text-[#0b3d91]"/> Dar crédito à fonte
-                  </label>
-                </div>
-                <button type="submit" disabled={adding}
-                  className="flex items-center gap-2 bg-[#0b3d91] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#0b3d91]/90 disabled:opacity-50 transition-colors mt-4">
-                  <Plus size={16}/> {adding ? "Adicionando…" : "Adicionar"}
-                </button>
-              </div>
-              {addError && <p className="text-sm text-red-500">{addError}</p>}
-            </form>
-
-            {/* ── Global Defaults panel ── */}
-            <div className="rounded-xl border bg-gray-50 overflow-hidden">
-              <div className="px-4 py-3 border-b bg-white flex items-center gap-2">
-                <Zap size={15} className="text-amber-500"/>
-                <span className="text-sm font-semibold text-gray-800">Configurações Padrão para Fontes Ativas</span>
-                <span className="ml-auto text-[11px] text-gray-400">{sources.filter((s) => s.active).length} ativas</span>
-              </div>
-              <div className="p-4 space-y-3">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Modo de reescrita</label>
-                    <select value={defAutoMode} onChange={(e) => setDefAutoMode(e.target.value as AutoMode)}
-                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                      {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Agendamento</label>
-                    <select value={defSchedule} onChange={(e) => setDefSchedule(Number(e.target.value))}
-                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                      {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Notícias/coleta</label>
-                    <select value={defFetchLimit} onChange={(e) => setDefFetchLimit(Number(e.target.value))}
-                      className="border rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                      {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1 justify-end">
-                    <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Crédito</label>
-                    <label className="flex items-center gap-2 border rounded-lg px-2.5 py-1.5 text-xs cursor-pointer bg-white h-[30px]">
-                      <input type="checkbox" checked={defCredit} onChange={(e) => setDefCredit(e.target.checked)} className="rounded"/>
-                      Dar crédito
-                    </label>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => { void applyDefaultsToAll(); }}
-                    disabled={applyingDefs || sources.filter((s) => s.active).length === 0}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 ${defsApplied ? "bg-green-500 text-white" : "bg-[#0b3d91] text-white hover:bg-[#0b3d91]/90"}`}
-                  >
-                    {defsApplied ? <><CheckCircle size={12}/>Aplicado!</> : applyingDefs ? <><Loader2 size={12} className="animate-spin"/>Aplicando…</> : <><Settings size={12}/>Aplicar a todos os feeds ativos</>}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { void runAllActive(); }}
-                    disabled={runningAll || runningId !== null || sources.filter((s) => s.active).length === 0}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50"
-                  >
-                    {runningAll
-                      ? <><Loader2 size={12} className="animate-spin"/>Coletando todos…</>
-                      : <><Play size={12}/>Coletar todos agora</>}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Inline feedback for source operations */}
-            {sourceError && (
-              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm text-red-700">
-                <AlertCircle size={15} className="flex-shrink-0"/>
-                <span className="flex-1">{sourceError}</span>
-                <button onClick={() => setSourceError("")} className="text-red-400 hover:text-red-600 ml-2">✕</button>
-              </div>
-            )}
-            {runSuccess && (
-              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm text-green-700">
-                <CheckCircle size={15} className="flex-shrink-0"/>
-                <span className="flex-1">✅ {runSuccess.count} artigo(s) processado(s) com sucesso</span>
-                <button onClick={() => setRunSuccess(null)} className="text-green-400 hover:text-green-600 ml-2">✕</button>
-              </div>
-            )}
-
-            {/* Search bar */}
-            {sources.length > 0 && (
-              <div className="relative">
+            {/* Filters row */}
+            <div className="flex items-center gap-3 mb-5 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   value={sourceSearch}
-                  onChange={(e) => setSourceSearch(e.target.value)}
-                  placeholder="Buscar por veículo ou categoria…"
-                  className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"
+                  onChange={(e) => { setSourceSearch(e.target.value); setCurrentPage(1); }}
+                  placeholder="Buscar fontes..."
+                  className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
                 />
-                <Rss size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
                 {sourceSearch && (
-                  <button onClick={() => setSourceSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                    <X size={13}/>
+                  <button onClick={() => setSourceSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                    <X size={13} />
                   </button>
                 )}
               </div>
+              <div className="relative">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
+                  className="pl-4 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700 min-w-[130px]"
+                >
+                  {["Todos", "Ativo", "Pausado"].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+              <button
+                type="button"
+                onClick={() => { void runAllActive(); }}
+                disabled={runningAll || runningId !== null || sources.filter((s) => s.active).length === 0}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-colors disabled:opacity-50 whitespace-nowrap"
+              >
+                {runningAll ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                {runningAll ? "Coletando…" : "Coletar todos"}
+              </button>
+            </div>
+
+            {/* Feedback banners */}
+            {sourceError && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-sm text-red-700 mb-4">
+                <AlertCircle size={14} className="shrink-0" />
+                <span className="flex-1">{sourceError}</span>
+                <button onClick={() => setSourceError("")} className="text-red-400 hover:text-red-600 ml-2"><X size={13} /></button>
+              </div>
+            )}
+            {runSuccess && (
+              <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 text-sm text-green-700 mb-4">
+                <CheckCircle size={14} className="shrink-0" />
+                <span className="flex-1">✅ {runSuccess.count} artigo(s) processado(s)</span>
+                <button onClick={() => setRunSuccess(null)} className="text-green-400 hover:text-green-600 ml-2"><X size={13} /></button>
+              </div>
             )}
 
-            {/* Grouped source list */}
+            {/* Table */}
             {sources.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">Nenhuma fonte cadastrada</p>
-            ) : groupedSources.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-4">Nenhuma fonte encontrada para "{sourceSearch}"</p>
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Rss size={28} className="text-slate-300" />
+                </div>
+                <p className="text-sm text-slate-500 font-medium">Nenhuma fonte cadastrada</p>
+                <p className="text-xs text-slate-400 mt-1">Use o painel à direita para adicionar a primeira fonte RSS</p>
+              </div>
             ) : (
-              <div className="space-y-2">
-                {groupedSources.map(({ publisher, sources: grpSources }) => {
-                  const isExpanded = expandedGroups.has(publisher);
-                  const activeCount = grpSources.filter((s) => s.active).length;
-                  const allOn = grpSources.every((s) => s.active);
-                  const anyOn = grpSources.some((s) => s.active);
-
-                  return (
-                    <div key={publisher} className="rounded-xl border overflow-hidden">
-                      {/* ── Group header ── */}
-                      <div
-                        className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b cursor-pointer select-none hover:bg-gray-100 transition-colors"
-                        onClick={() => toggleGroup(publisher)}
-                      >
-                        <span className="text-gray-400 flex-shrink-0">
-                          {isExpanded ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}
-                        </span>
-                        <p className="font-semibold text-[#1a2448] text-sm flex-1 truncate">{publisher}</p>
-                        <span className="text-[11px] text-gray-500 flex-shrink-0">
-                          {grpSources.length} feed{grpSources.length !== 1 ? "s" : ""}
-                        </span>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${activeCount === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
-                          {activeCount} ativo{activeCount !== 1 ? "s" : ""}
-                        </span>
-                        {/* Bulk toggle */}
-                        <button
-                          onClick={(e) => { e.stopPropagation(); void toggleAllInGroup(grpSources, !allOn); }}
-                          title={allOn ? "Desativar todos" : "Ativar todos"}
-                          className={`relative w-9 h-5 rounded-full flex-shrink-0 transition-colors ${anyOn ? "bg-green-500" : "bg-gray-300"}`}
-                        >
-                          <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${anyOn ? "translate-x-4" : "translate-x-0.5"}`}/>
-                        </button>
-                      </div>
-
-                      {/* ── Feed rows (collapsible) ── */}
-                      {isExpanded && (
-                        <div className="divide-y bg-white">
-                          {grpSources.map((src) => (
-                            <div key={src.id}>
-                              {editingSource?.id === src.id ? (
-                                /* ── Edit mode: 3-section grid ── */
-                                <div className="p-4 bg-blue-50 space-y-3 border-l-4 border-[#0b3d91]">
-                                  {/* Row 1: nome + url + categoria */}
+              <>
+                <div className="overflow-x-auto -mx-6 px-6">
+                  <table className="w-full min-w-[640px]">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        {["Fonte", "Categoria", "Última coleta", "Status", "Modo", "Ações"].map((h) => (
+                          <th key={h} className="pb-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide pr-4 last:pr-0">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {pagedSources.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-10 text-center text-sm text-slate-400">
+                            Nenhuma fonte encontrada
+                          </td>
+                        </tr>
+                      ) : pagedSources.map((src) => {
+                        if (editingSource?.id === src.id) {
+                          return (
+                            <tr key={src.id}>
+                              <td colSpan={6} className="py-4">
+                                <div className="bg-[#EEF2FF] rounded-xl p-4 border border-[#C7D2FE] space-y-3">
                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Nome / Veículo</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Nome</label>
                                       <input value={editingSource.name}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
                                     </div>
-                                    <div className="flex flex-col gap-1 sm:col-span-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Editoria</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Categoria</label>
                                       <select value={editingSource.category}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
                                         {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">URL do Feed</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">URL do Feed</label>
                                       <input value={editingSource.url}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white"/>
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
                                     </div>
                                   </div>
-                                  {/* Row 2: agendamento + modo + limite + crédito */}
                                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Agendamento</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Agendamento</label>
                                       <select value={editingSource.scheduleHours}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
                                         {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Modo de coleta</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Modo</label>
                                       <select value={editingSource.autoMode}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
-                                        {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>)}
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
+                                        {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Notícias por coleta</label>
+                                    <div>
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Notícias/coleta</label>
                                       <select value={editingSource.fetchLimit ?? 3}
                                         onChange={(e) => setEditingSource((s) => s && ({ ...s, fetchLimit: Number(e.target.value) }))}
-                                        className="border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] bg-white">
+                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
                                         {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                                       </select>
                                     </div>
-                                    <div className="flex flex-col gap-1 justify-end">
-                                      <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Crédito</label>
-                                      <label className="flex items-center gap-2 border rounded-lg px-3 py-2 text-sm cursor-pointer bg-white h-[34px]">
+                                    <div className="flex flex-col justify-end">
+                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Crédito</label>
+                                      <label className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 text-xs cursor-pointer bg-white">
                                         <input type="checkbox" checked={editingSource.giveCredit}
                                           onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
-                                        Dar crédito à fonte
+                                        Dar crédito
                                       </label>
                                     </div>
                                   </div>
-                                  {/* Row 3: prompt — collapsible */}
                                   <details className="group">
                                     <summary className="cursor-pointer flex items-center gap-2 text-xs font-semibold text-purple-600 py-1 select-none list-none">
-                                      <Wand2 size={12}/>
-                                      Prompt personalizado desta fonte
-                                      {editingSource.customPrompt && (
-                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>
-                                      )}
+                                      <Wand2 size={12}/>Prompt personalizado
+                                      {editingSource.customPrompt && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>}
                                       <ChevronDown size={12} className="ml-auto group-open:hidden"/>
-                                      <ChevronUp   size={12} className="ml-auto hidden group-open:block"/>
+                                      <ChevronUp size={12} className="ml-auto hidden group-open:block"/>
                                     </summary>
                                     <div className="pt-2">
                                       <PromptEditor
@@ -1329,188 +1083,595 @@ export default function RSSManager() {
                                   </details>
                                   <div className="flex gap-2">
                                     <button onClick={() => { void saveEdit(); }}
-                                      className="bg-[#0b3d91] text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#0b3d91]/90 transition-colors">
+                                      className="bg-[#0B2A66] text-white px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-[#0B2A66]/90 transition-colors">
                                       Salvar
                                     </button>
                                     <button onClick={() => setEditingSource(null)}
-                                      className="bg-gray-200 text-gray-700 px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-300 transition-colors">
+                                      className="bg-slate-100 text-slate-700 px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors">
                                       Cancelar
                                     </button>
                                   </div>
                                 </div>
-                              ) : (
-                                /* ── View mode: 3 colunas ── */
-                                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 pl-6 pr-3 py-2.5 bg-white hover:bg-gray-50 transition-colors">
+                              </td>
+                            </tr>
+                          );
+                        }
 
-                                  {/* Col 1: toggle + editoria */}
-                                  <div className="flex items-center gap-2.5">
-                                    <button onClick={() => { void toggleSource(src); }}
-                                      className={`relative w-8 h-[18px] rounded-full flex-shrink-0 transition-colors ${src.active ? "bg-green-500" : "bg-gray-300"}`}>
-                                      <span className={`absolute top-0.5 w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${src.active ? "translate-x-[18px]" : "translate-x-0.5"}`}/>
-                                    </button>
-                                    <Badge label={TAG_MAP[src.category] ?? src.category} color="bg-gray-100 text-gray-600"/>
-                                  </div>
+                        const color    = srcColor(src.id);
+                        const initials = srcInitials(src.name);
+                        const catLabel = (TAG_MAP[src.category] ?? src.category);
 
-                                  {/* Col 2: config summary */}
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                      <AutoModeBadge mode={src.autoMode}/>
-                                      {src.scheduleHours > 0 ? (
-                                        <span className="flex items-center gap-0.5 text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
-                                          <Clock size={9}/>{src.scheduleHours}h
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] text-gray-400">sem agend.</span>
-                                      )}
-                                      <span className="flex items-center gap-0.5 text-[10px] font-medium text-sky-700 bg-sky-50 px-1.5 py-0.5 rounded">
-                                        {src.fetchLimit ?? 3} notícia{(src.fetchLimit ?? 3) !== 1 ? "s" : ""}/coleta
-                                      </span>
-                                      {src.giveCredit && <span className="text-[10px] text-blue-500 font-medium">crédito ✓</span>}
-                                      {src.customPrompt && (
-                                        <span className="flex items-center gap-0.5 text-[10px] text-purple-500 font-medium"><Wand2 size={9}/>prompt próprio</span>
-                                      )}
-                                    </div>
-                                    {src.lastFetchedAt && (
-                                      <p className="text-[10px] text-gray-300 mt-0.5">
-                                        Última coleta: {new Date(src.lastFetchedAt).toLocaleString("pt-BR")}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Col 3: actions */}
-                                  <div className="flex items-center gap-0.5 flex-shrink-0">
-                                    <button onClick={() => { void runSource(src.id); }} disabled={runningId === src.id}
-                                      title="Executar agora"
-                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50 border border-transparent hover:border-amber-200">
-                                      <Play size={12} className={runningId === src.id ? "animate-pulse" : ""}/>
-                                      Coletar
-                                    </button>
-                                    <button onClick={() => setEditingSource(src)}
-                                      title="Configurar"
-                                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-gray-500 hover:text-[#0b3d91] hover:bg-blue-50 transition-colors border border-transparent hover:border-blue-200">
-                                      <Settings size={12}/>
-                                      Config
-                                    </button>
-                                    <button onClick={() => { void deleteSource(src.id); }}
-                                      title="Remover fonte"
-                                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
-                                      <Trash2 size={13}/>
-                                    </button>
-                                  </div>
+                        return (
+                          <tr key={src.id} className="hover:bg-slate-50/60 transition-colors group">
+                            {/* Fonte */}
+                            <td className="py-3.5 pr-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: color }}>
+                                  {initials}
                                 </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
+                                <div className="min-w-0">
+                                  <p className="text-sm font-semibold text-slate-800 truncate max-w-[160px]">{src.name}</p>
+                                  <a href={src.url} target="_blank" rel="noreferrer"
+                                    className="text-[11px] text-[#2563EB] hover:underline truncate block max-w-[160px]"
+                                    title={src.url}>
+                                    {src.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 26)}{src.url.length > 33 ? "…" : ""}
+                                  </a>
+                                </div>
+                              </div>
+                            </td>
+                            {/* Categoria */}
+                            <td className="py-3.5 pr-4">
+                              <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">{catLabel}</span>
+                            </td>
+                            {/* Última coleta */}
+                            <td className="py-3.5 pr-4">
+                              <span className="text-xs text-slate-500 whitespace-nowrap">{fmtFetch(src.lastFetchedAt)}</span>
+                            </td>
+                            {/* Status */}
+                            <td className="py-3.5 pr-4">
+                              <button
+                                onClick={() => { void toggleSource(src); }}
+                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer transition-colors ${
+                                  src.active
+                                    ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                    : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                }`}
+                              >
+                                {src.active ? "● Ativo" : "○ Pausado"}
+                              </button>
+                            </td>
+                            {/* Modo */}
+                            <td className="py-3.5 pr-4">
+                              <AutoModeBadge mode={src.autoMode} />
+                            </td>
+                            {/* Ações */}
+                            <td className="py-3.5">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => { void runSource(src.id); }}
+                                  disabled={runningId === src.id}
+                                  title="Coletar agora"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40"
+                                >
+                                  {runningId === src.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                                </button>
+                                <button
+                                  onClick={() => setEditingSource({ ...src })}
+                                  title="Editar"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <button
+                                  onClick={() => { void deleteSource(src.id); }}
+                                  title="Remover"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-500">
+                      {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredSources.length)} de {filteredSources.length}
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                      >
+                        <ChevronDown size={13} className="-rotate-90" />
+                      </button>
+                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-colors ${
+                            currentPage === page
+                              ? "bg-[#0B2A66] text-white"
+                              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                      {totalPages > 5 && <span className="text-slate-400 text-xs px-1">…</span>}
+                      {totalPages > 5 && (
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-colors ${
+                            currentPage === totalPages
+                              ? "bg-[#0B2A66] text-white"
+                              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
                       )}
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+                      >
+                        <ChevronDown size={13} className="rotate-90" />
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                  </div>
+                )}
+                {totalPages <= 1 && filteredSources.length > 0 && (
+                  <p className="text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100">
+                    {filteredSources.length} fonte{filteredSources.length !== 1 ? "s" : ""}
+                  </p>
+                )}
+              </>
             )}
           </div>
-        </section>
 
-        {/* ══ MANUAL FETCH ═══════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-xl shadow-sm border">
-          <div className="px-6 py-4 border-b flex items-center gap-2">
-            <RefreshCw size={18} className="text-[#0b3d91]"/>
-            <h2 className="font-semibold text-gray-800">Buscar e Pré-visualizar Artigos</h2>
-          </div>
-          <div className="p-6">
-            <div className="flex flex-wrap gap-3 items-center">
-              <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)}
-                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]">
-                <option value="all">Todas as fontes ativas</option>
-                {sources.filter((s) => s.active).map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-              <button
-                onClick={() => { void fetchArticles(); }}
-                disabled={fetching || sources.filter((s) => s.active).length === 0}
-                className="flex items-center gap-2 bg-[#c8102e] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#c8102e]/90 disabled:opacity-50 transition-colors">
-                <RefreshCw size={16} className={fetching ? "animate-spin" : ""}/>
-                {fetching ? "Buscando artigos…" : "Buscar Agora"}
-              </button>
-            </div>
-            {fetchError && (
-              <div className="mt-3 flex items-center gap-2 text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3">
-                <AlertCircle size={16}/>{fetchError}
+          {/* ── RIGHT: add form + advanced ────────────────────────────────── */}
+          <div className="space-y-4">
+
+            {/* Add source form */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="mb-4">
+                <h3 className="text-sm font-bold text-[#0B2A66]">Adicionar nova fonte RSS</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Informe os dados da fonte para começar a importar.</p>
               </div>
-            )}
-          </div>
-        </section>
+              <form onSubmit={(e) => { void addSource(e); }} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    Nome da fonte <span className="text-[#E71D36]">*</span>
+                  </label>
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Ex.: G1 – São Paulo"
+                    className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    URL do feed <span className="text-[#E71D36]">*</span>
+                  </label>
+                  <input
+                    value={newUrl}
+                    onChange={(e) => setNewUrl(e.target.value)}
+                    placeholder="https://site.com.br/feed.xml"
+                    className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    Categoria <span className="text-[#E71D36]">*</span>
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={newCat}
+                      onChange={(e) => setNewCat(e.target.value)}
+                      className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700"
+                    >
+                      {allCategories.map(({ slug, label }) => (
+                        <option key={slug} value={slug}>{label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                </div>
+                {/* Advanced options */}
+                <details className="group">
+                  <summary className="cursor-pointer flex items-center gap-2 text-xs font-semibold text-slate-500 py-1 select-none list-none">
+                    <Settings size={12} className="text-slate-400"/>
+                    Opções avançadas
+                    <ChevronDown size={12} className="ml-auto group-open:hidden"/>
+                    <ChevronUp size={12} className="ml-auto hidden group-open:block"/>
+                  </summary>
+                  <div className="pt-3 space-y-3">
+                    <div className="relative">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Agendamento</label>
+                      <select value={newSchedule} onChange={(e) => setNewSchedule(Number(e.target.value))}
+                        className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none">
+                        {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-3 bottom-3 text-slate-400 pointer-events-none" />
+                    </div>
+                    <div className="relative">
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Automação</label>
+                      <select value={newAutoMode} onChange={(e) => setNewAutoMode(e.target.value as AutoMode)}
+                        className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none">
+                        {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>)}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-3 bottom-3 text-slate-400 pointer-events-none" />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                      <input type="checkbox" checked={newCredit} onChange={(e) => setNewCredit(e.target.checked)} className="rounded"/>
+                      <BadgeCheck size={14} className="text-[#0B2A66]"/> Dar crédito à fonte
+                    </label>
+                  </div>
+                </details>
 
-        {/* ══ RESULTS + QUEUE ════════════════════════════════════════════════ */}
-        {articles.length > 0 && (
-          <section className="space-y-3">
+                {addError && <p className="text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/>{addError}</p>}
 
-            {/* ── Queue control bar ── */}
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              {/* Header */}
-              <div className="flex items-center gap-3 px-4 py-3 border-b bg-gray-50">
-                <ListChecks size={16} className="text-purple-600 shrink-0"/>
-                <span className="font-semibold text-sm text-gray-800">
-                  Fila de Reescrita e Publicação
-                </span>
-                <span className="ml-auto text-xs text-gray-400">
-                  {articles.length} artigo(s) coletado(s)
-                </span>
-              </div>
-
-              <div className="p-4 space-y-3">
-                {/* Selecionar todos */}
-                <div className="flex items-center gap-3 flex-wrap">
-                  <button
-                    onClick={toggleSelectAll}
-                    disabled={queueRunning}
-                    className="flex items-center gap-2 text-sm text-gray-700 hover:text-[#1a2448] disabled:opacity-40 transition-colors"
-                  >
-                    {queueStats.allSelected
-                      ? <CheckSquare size={17} className="text-purple-600"/>
-                      : <Square size={17} className="text-gray-400"/>
-                    }
-                    {queueStats.allSelected ? "Desmarcar todos" : "Selecionar todos"}
+                <div className="flex gap-2 pt-1">
+                  <button type="button"
+                    onClick={() => { setNewName(""); setNewUrl(""); }}
+                    className="flex-1 py-2.5 text-sm font-medium rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors">
+                    Cancelar
                   </button>
-                  <span className="text-xs text-gray-400">
-                    {queueStats.selected} de {queueStats.selectable} selecionados
-                  </span>
+                  <button type="submit" disabled={adding}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 text-sm font-semibold rounded-xl text-white disabled:opacity-60 transition-colors"
+                    style={{ background: "#E71D36" }}>
+                    {adding ? <Loader2 size={14} className="animate-spin"/> : <Plus size={14}/>}
+                    {adding ? "Salvando…" : "Salvar fonte"}
+                  </button>
+                </div>
+              </form>
 
-                  {/* Delay setting (important for Gemini free) */}
-                  <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-                    <Timer size={13} className="text-amber-500"/>
-                    <span>Intervalo:</span>
-                    <input
-                      type="number" min={1} max={60} value={queueDelay}
-                      onChange={(e) => setQueueDelay(Math.max(1, Number(e.target.value)))}
-                      disabled={queueRunning}
-                      className="w-14 border rounded px-2 py-1 text-center text-xs focus:outline-none focus:ring-1 focus:ring-purple-400 disabled:opacity-40"
+              {/* Dica */}
+              <div className="mt-4 flex items-start gap-2.5 bg-blue-50 rounded-xl p-3.5">
+                <div className="w-5 h-5 bg-blue-100 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertCircle size={11} className="text-[#2563EB]" />
+                </div>
+                <p className="text-[11px] text-blue-700 leading-relaxed">
+                  <span className="font-semibold">Dica:</span> Certifique-se de que a URL do feed RSS está correta e é pública.
+                </p>
+              </div>
+            </div>
+
+            {/* ── AI Settings collapsible ─────────────────────────────────── */}
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+              <button type="button" onClick={() => setPromptsOpen((v) => !v)}
+                className="w-full flex items-center gap-3 p-5 hover:bg-slate-50 transition-colors text-left">
+                <div className="w-8 h-8 bg-purple-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Brain size={15} className="text-purple-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#0B2A66]">Configurações de IA</p>
+                  <p className="text-xs text-slate-500 truncate">{AI_PROVIDERS.find((p) => p.value === aiSettings.provider)?.label ?? "—"}</p>
+                </div>
+                {promptsOpen ? <ChevronUp size={14} className="text-slate-400 shrink-0"/> : <ChevronDown size={14} className="text-slate-400 shrink-0"/>}
+              </button>
+
+              {promptsOpen && (
+                <div className="border-t border-slate-100 p-5 space-y-4">
+                  <form onSubmit={(e) => { void saveAiSettings(e); }} className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-2">Provedor de IA</label>
+                      <div className="space-y-2">
+                        {AI_PROVIDERS.map((p) => (
+                          <button key={p.value} type="button"
+                            onClick={() => setAiSettings((a) => ({ ...a, provider: p.value, model: "" }))}
+                            className={`w-full flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 text-left transition-all ${
+                              aiSettings.provider === p.value
+                                ? "border-purple-400 bg-purple-50"
+                                : "border-slate-200 hover:border-slate-300"
+                            }`}
+                          >
+                            <span className="text-xs font-semibold text-slate-800">{p.label}</span>
+                            <span className="text-[10px] text-slate-400">{p.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Modelo</label>
+                      <div className="relative">
+                        <select value={aiSettings.model}
+                          onChange={(e) => setAiSettings((a) => ({ ...a, model: e.target.value }))}
+                          className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none">
+                          <option value="">Padrão (recomendado)</option>
+                          {(aiSettings.provider === "openai" ? OPENAI_MODELS : GEMINI_MODELS).map((m) => (
+                            <option key={m} value={m}>{m}</option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    {needsKey && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          API Key {aiSettings.hasKey && <span className="text-green-600 ml-1">✓ configurada</span>}
+                        </label>
+                        <div className="relative">
+                          <Key size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type={showApiKey ? "text" : "password"}
+                            value={aiApiKey}
+                            onChange={(e) => setAiApiKey(e.target.value)}
+                            placeholder={aiSettings.hasKey ? "••••• (manter atual)" : "Insira sua API Key"}
+                            className="w-full pl-8 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50"
+                          />
+                          <button type="button" onClick={() => setShowApiKey((s) => !s)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {aiError && <p className="text-xs text-red-500">{aiError}</p>}
+                    <button type="submit" disabled={aiSaving}
+                      className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
+                        aiSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
+                      }`}>
+                      {aiSaved ? "✓ Salvo!" : aiSaving ? "Salvando…" : "Salvar Configuração de IA"}
+                    </button>
+                  </form>
+
+                  {/* Prompts */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                        <Wand2 size={12} className="text-purple-500"/>Prompts de Reescrita
+                      </p>
+                      <span className="text-[10px] text-slate-400">fonte &gt; categoria &gt; geral</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 border-b border-slate-100 pb-2 mb-3">
+                      {[{ slug: "__global__", label: "🌐 Geral" } as { slug: string; label: string }, ...allCategories].map(({ slug, label }) => {
+                        const hasCustom = slug === "__global__" ? !!prompts.global : !!prompts.categories?.[slug];
+                        return (
+                          <button key={slug} type="button" onClick={() => setPromptTab(slug)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-semibold border-b-2 transition-colors ${
+                              promptTab === slug
+                                ? "border-purple-600 text-purple-700 bg-purple-50"
+                                : "border-transparent text-slate-500 hover:text-slate-700"
+                            }`}
+                          >
+                            {label}
+                            {hasCustom && <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <textarea
+                      key={promptTab}
+                      value={promptCurrentVal}
+                      onChange={(e) => setTabPrompt(promptTab, e.target.value)}
+                      rows={7}
+                      placeholder={`Prompt para ${promptTabLabel}. Deixe vazio para usar o padrão.`}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono outline-none focus:border-[#0B2A66] resize-y bg-slate-50"
+                      spellCheck={false}
                     />
-                    <span>segundos entre requisições</span>
-                    {aiSettings.provider === "gemini_free" && (
-                      <span className="text-amber-600 font-semibold">(Gemini grátis: mín. 4s)</span>
+                    <div className="flex items-center gap-3 mt-2">
+                      <button type="button" onClick={() => { void loadDefaultPromptInto(promptTab); }}
+                        disabled={promptDefaultLoading}
+                        className="text-[11px] text-[#2563EB] hover:underline disabled:opacity-50">
+                        {promptDefaultLoading ? "Carregando…" : "Carregar padrão"}
+                      </button>
+                      {promptHasValue && (
+                        <button type="button" onClick={() => clearTabPrompt(promptTab)}
+                          className="text-[11px] text-red-400 hover:underline">
+                          Limpar
+                        </button>
+                      )}
+                      <button type="button" onClick={() => { void savePrompts(); }}
+                        disabled={promptSaving}
+                        className={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 ${
+                          promptSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
+                        }`}>
+                        {promptSaved ? "✓ Salvo!" : promptSaving ? "Salvando…" : "Salvar Prompts"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Global defaults + Manual fetch + Logs collapsible ───────── */}
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+              <button type="button" onClick={() => { setLogsOpen((v) => !v); if (!logsOpen) void loadLogs(); }}
+                className="w-full flex items-center gap-3 p-5 hover:bg-slate-50 transition-colors text-left">
+                <div className="w-8 h-8 bg-amber-50 rounded-xl flex items-center justify-center shrink-0">
+                  <Zap size={15} className="text-amber-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#0B2A66]">Configurações Globais</p>
+                  <p className="text-xs text-slate-500">{sources.filter((s) => s.active).length} fontes ativas</p>
+                </div>
+                {logsOpen ? <ChevronUp size={14} className="text-slate-400 shrink-0"/> : <ChevronDown size={14} className="text-slate-400 shrink-0"/>}
+              </button>
+
+              {logsOpen && (
+                <div className="border-t border-slate-100 p-5 space-y-4">
+                  {/* Global defaults */}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-600">Padrões para fontes ativas</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="col-span-2">
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Modo de reescrita</label>
+                        <div className="relative">
+                          <select value={defAutoMode} onChange={(e) => setDefAutoMode(e.target.value as AutoMode)}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 outline-none focus:border-[#0B2A66] appearance-none">
+                            {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Agendamento</label>
+                        <div className="relative">
+                          <select value={defSchedule} onChange={(e) => setDefSchedule(Number(e.target.value))}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 outline-none focus:border-[#0B2A66] appearance-none">
+                            {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Notícias/coleta</label>
+                        <div className="relative">
+                          <select value={defFetchLimit} onChange={(e) => setDefFetchLimit(Number(e.target.value))}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs bg-slate-50 outline-none focus:border-[#0B2A66] appearance-none">
+                            {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+                        </div>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                          <input type="checkbox" checked={defCredit} onChange={(e) => setDefCredit(e.target.checked)} className="rounded"/>
+                          Dar crédito à fonte (padrão)
+                        </label>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button type="button" onClick={() => { void applyDefaultsToAll(); }}
+                        disabled={applyingDefs || sources.filter((s) => s.active).length === 0}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 ${
+                          defsApplied ? "bg-green-500 text-white" : "bg-[#0B2A66] text-white hover:bg-[#0B2A66]/90"
+                        }`}>
+                        {defsApplied
+                          ? <><CheckCircle size={12}/>Aplicado!</>
+                          : applyingDefs
+                            ? <><Loader2 size={12} className="animate-spin"/>Aplicando…</>
+                            : <><Settings size={12}/>Aplicar a todos os feeds ativos</>}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Manual fetch */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1.5">
+                      <RefreshCw size={12} className="text-[#0B2A66]"/>Pré-visualizar artigos
+                    </p>
+                    <div className="relative mb-2">
+                      <select value={selectedSource} onChange={(e) => setSelectedSource(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm bg-slate-50 outline-none focus:border-[#0B2A66] appearance-none">
+                        <option value="all">Todas as fontes ativas</option>
+                        {sources.filter((s) => s.active).map((s) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    </div>
+                    <button onClick={() => { void fetchArticles(); }}
+                      disabled={fetching || sources.filter((s) => s.active).length === 0}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-50"
+                      style={{ background: "#E71D36" }}>
+                      <RefreshCw size={14} className={fetching ? "animate-spin" : ""}/>
+                      {fetching ? "Buscando artigos…" : "Buscar Agora"}
+                    </button>
+                    {fetchError && (
+                      <p className="mt-2 text-xs text-red-500 flex items-center gap-1"><AlertCircle size={11}/>{fetchError}</p>
+                    )}
+                  </div>
+
+                  {/* Logs */}
+                  <div className="border-t border-slate-100 pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                        <BookOpen size={12} className="text-[#0B2A66]"/>Log de Coleta
+                        {logs.length > 0 && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{logs.length}</span>
+                        )}
+                        {runningId !== null && <Loader2 size={10} className="animate-spin text-amber-500"/>}
+                      </p>
+                      <button type="button" onClick={() => { void loadLogs(); }}
+                        className="flex items-center gap-1 text-[11px] text-[#0B2A66] hover:underline">
+                        <RefreshCw size={10}/> Atualizar
+                      </button>
+                    </div>
+                    {logs.length === 0 ? (
+                      <p className="text-xs text-slate-400 text-center py-4">Execute uma coleta para ver os logs.</p>
+                    ) : (
+                      <div className="space-y-1 max-h-[220px] overflow-y-auto">
+                        {logs.slice(0, 30).map((entry) => {
+                          const icons: Record<RssLogEntry["type"], string> = {
+                            fetch:"🔍",rewrite:"✨",publish:"📢",draft:"📝",skip:"⏭",error:"❌",duplicate:"♻",
+                          };
+                          const clrs: Record<RssLogEntry["type"], string> = {
+                            fetch:"text-blue-600",rewrite:"text-purple-600",publish:"text-green-600",
+                            draft:"text-amber-600",skip:"text-slate-400",error:"text-red-600",duplicate:"text-slate-400",
+                          };
+                          return (
+                            <div key={entry.id} className="flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0">
+                              <span className="text-sm shrink-0">{icons[entry.type]}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-[10px] font-bold uppercase ${clrs[entry.type]}`}>{entry.type}</span>
+                                  <span className="text-[10px] text-slate-400 ml-auto shrink-0">{new Date(entry.ts).toLocaleTimeString("pt-BR")}</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 truncate">{entry.articleTitle ?? entry.sourceName}</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-                {/* Progress bar + stats (visible after queue starts) */}
+        {/* ══ ARTICLE PREVIEW + QUEUE (full width) ═════════════════════════ */}
+        {articles.length > 0 && (
+          <div className="mt-5 space-y-3">
+
+            {/* Queue control bar */}
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center gap-3 px-6 py-4 border-b border-slate-100">
+                <ListChecks size={16} className="text-purple-600 shrink-0"/>
+                <span className="font-semibold text-sm text-[#0B2A66]">Fila de Reescrita e Publicação</span>
+                <span className="ml-auto text-xs text-slate-400">{articles.length} artigo(s) coletado(s)</span>
+              </div>
+              <div className="p-6 space-y-3">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button onClick={toggleSelectAll} disabled={queueRunning}
+                    className="flex items-center gap-2 text-sm text-slate-700 hover:text-[#0B2A66] disabled:opacity-40 transition-colors">
+                    {queueStats.allSelected
+                      ? <CheckSquare size={17} className="text-purple-600"/>
+                      : <Square size={17} className="text-slate-400"/>}
+                    {queueStats.allSelected ? "Desmarcar todos" : "Selecionar todos"}
+                  </button>
+                  <span className="text-xs text-slate-400">{queueStats.selected} de {queueStats.selectable} selecionados</span>
+                  <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
+                    <Timer size={13} className="text-amber-500"/>
+                    Intervalo:
+                    <input type="number" min={1} max={60} value={queueDelay}
+                      onChange={(e) => setQueueDelay(Math.max(1, Number(e.target.value)))}
+                      disabled={queueRunning}
+                      className="w-14 border border-slate-200 rounded-xl px-2 py-1 text-center text-xs outline-none focus:border-[#0B2A66] disabled:opacity-40"/>
+                    seg
+                    {aiSettings.provider === "gemini_free" && (
+                      <span className="text-amber-600 font-semibold">(mín. 4s)</span>
+                    )}
+                  </div>
+                </div>
                 {(queueStats.done > 0 || queueStats.errors > 0 || queueStats.skipped > 0 || queueRunning) && (
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-4 text-xs flex-wrap">
-                      <span className="flex items-center gap-1 text-green-600 font-semibold">
-                        <CheckCircle size={12}/> {queueStats.done} publicado(s)
-                      </span>
-                      {queueStats.skipped > 0 && (
-                        <span className="flex items-center gap-1 text-amber-500 font-semibold">
-                          ⚠ {queueStats.skipped} duplicado(s)
-                        </span>
-                      )}
-                      {queueStats.errors > 0 && (
-                        <span className="flex items-center gap-1 text-red-500 font-semibold">
-                          <AlertCircle size={12}/> {queueStats.errors} erro(s)
-                        </span>
-                      )}
+                      <span className="flex items-center gap-1 text-green-600 font-semibold"><CheckCircle size={12}/>{queueStats.done} publicado(s)</span>
+                      {queueStats.skipped > 0 && <span className="text-amber-500 font-semibold">⚠ {queueStats.skipped} duplicado(s)</span>}
+                      {queueStats.errors > 0 && <span className="flex items-center gap-1 text-red-500 font-semibold"><AlertCircle size={12}/>{queueStats.errors} erro(s)</span>}
                       {queueStats.active && (
                         <span className="flex items-center gap-1 text-purple-600 font-semibold animate-pulse">
                           <Loader2 size={12} className="animate-spin"/>
@@ -1518,236 +1679,155 @@ export default function RSSManager() {
                         </span>
                       )}
                     </div>
-                    {/* Progress bar */}
                     {(() => {
                       const total = queueStats.done + queueStats.errors + queueStats.skipped +
                         articles.filter((a) => a.selectedForQueue && (a.queueStatus === "pending" || a.queueStatus === "rewriting" || a.queueStatus === "publishing")).length;
                       const pct = total > 0 ? Math.round(((queueStats.done + queueStats.errors + queueStats.skipped) / total) * 100) : 0;
                       return (
-                        <div className="w-full bg-gray-100 rounded-full h-1.5">
+                        <div className="w-full bg-slate-100 rounded-full h-1.5">
                           <div className="bg-purple-500 h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }}/>
                         </div>
                       );
                     })()}
                   </div>
                 )}
-
-                {/* Action buttons */}
                 <div className="flex gap-2 flex-wrap">
                   {queueRunning ? (
-                    <button
-                      onClick={() => { cancelQueueRef.current = true; }}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 transition-colors"
-                    >
+                    <button onClick={() => { cancelQueueRef.current = true; }}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 transition-colors">
                       <StopCircle size={15}/> Pausar fila
                     </button>
                   ) : (
-                    <button
-                      onClick={() => { void processQueue(); }}
+                    <button onClick={() => { void processQueue(); }}
                       disabled={queueStats.selected === 0}
-                      className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
+                      className="flex items-center gap-2 px-5 py-2 bg-purple-600 text-white rounded-xl text-sm font-semibold hover:bg-purple-700 disabled:opacity-40 transition-colors">
                       <Wand2 size={15}/>
                       Processar fila — Reescrever e Publicar com IA ({queueStats.selected})
                     </button>
                   )}
-                  <p className="text-[11px] text-gray-400 self-center">
-                    SEO/AIO · padrão jornalístico · palavras-chave automáticas
-                  </p>
                 </div>
               </div>
             </div>
 
-            {/* ── Article cards ── */}
+            {/* Article cards */}
             {articles.map((art, idx) => {
-              const isQueued  = !!art.selectedForQueue;
               const qs        = art.queueStatus;
-              const isActive  = qs === "rewriting" || qs === "publishing";
               const isDone    = qs === "done";
               const isSkipped = qs === "skipped";
               const isError   = qs === "error";
+              const isActive  = qs === "rewriting" || qs === "publishing";
+              const isQueued  = !!art.selectedForQueue;
 
               return (
                 <div key={`${art.sourceId}-${idx}`}
-                  className={`bg-white rounded-xl shadow-sm border overflow-hidden transition-all
-                    ${isDone || isSkipped ? "opacity-50" : ""}
-                    ${isQueued && !isDone && !isSkipped ? "border-purple-200" : ""}
-                    ${isActive ? "border-purple-400 shadow-md" : ""}
-                  `}>
+                  className={`bg-white rounded-2xl overflow-hidden transition-all ${
+                    isDone || isSkipped ? "opacity-50" : ""
+                  } ${isQueued && !isDone && !isSkipped ? "ring-1 ring-purple-200" : ""} ${
+                    isActive ? "ring-2 ring-purple-400" : ""
+                  }`}
+                  style={{ boxShadow: CARD_SHADOW }}>
 
                   <div className="flex gap-3 p-4 items-start">
-                    {/* Queue checkbox */}
                     <button
-                      onClick={() => {
-                        if (!queueRunning && !isDone && !isSkipped)
-                          updateArticle(idx, { selectedForQueue: !art.selectedForQueue });
-                      }}
+                      onClick={() => { if (!queueRunning && !isDone && !isSkipped) updateArticle(idx, { selectedForQueue: !art.selectedForQueue }); }}
                       disabled={queueRunning || isDone || isSkipped}
-                      className="mt-0.5 shrink-0 disabled:cursor-default"
-                      title={isDone ? "Já publicado" : isSkipped ? "Duplicado" : "Selecionar para fila"}
-                    >
+                      className="mt-0.5 shrink-0 disabled:cursor-default">
                       {isDone
                         ? <CheckCircle size={18} className="text-green-500"/>
-                        : isSkipped
-                          ? <span className="text-amber-400 text-base">⚠</span>
-                          : isError
-                            ? <AlertCircle size={18} className="text-red-400"/>
-                            : isQueued
-                              ? <CheckSquare size={18} className="text-purple-600"/>
-                              : <Square size={18} className="text-gray-300 hover:text-gray-400 transition-colors"/>
-                      }
+                        : isSkipped ? <span className="text-amber-400 text-base">⚠</span>
+                        : isError ? <AlertCircle size={18} className="text-red-400"/>
+                        : isQueued ? <CheckSquare size={18} className="text-purple-600"/>
+                        : <Square size={18} className="text-slate-300 hover:text-slate-400 transition-colors"/>}
                     </button>
-
-                    {/* Featured image */}
                     {art.imageUrl ? (
                       <img src={art.imageUrl} alt=""
-                        className="w-24 h-16 object-cover rounded-lg flex-shrink-0 bg-gray-100"
+                        className="w-24 h-16 object-cover rounded-xl flex-shrink-0 bg-slate-100"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}/>
                     ) : (
-                      <div className="w-24 h-16 rounded-lg flex-shrink-0 bg-gray-100 flex items-center justify-center">
-                        <Rss size={20} className="text-gray-300"/>
+                      <div className="w-24 h-16 rounded-xl flex-shrink-0 bg-slate-100 flex items-center justify-center">
+                        <Rss size={20} className="text-slate-300"/>
                       </div>
                     )}
-
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-bold text-[#c8102e] uppercase tracking-wide">
-                          {TAG_MAP[art.category] ?? art.category}
-                        </span>
-                        <span className="text-xs text-gray-400">·</span>
-                        <span className="text-xs text-gray-400">{art.sourceName}</span>
-
-                        {/* Queue status badge */}
-                        {qs === "pending" && (
-                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-500">
-                            ⏳ Na fila
-                          </span>
-                        )}
-                        {qs === "rewriting" && (
-                          <span className="ml-1 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 animate-pulse">
-                            <Loader2 size={9} className="animate-spin"/> Reescrevendo…
-                          </span>
-                        )}
-                        {qs === "publishing" && (
-                          <span className="ml-1 flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 animate-pulse">
-                            <Loader2 size={9} className="animate-spin"/> Publicando…
-                          </span>
-                        )}
-                        {qs === "done" && (
-                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                            ✓ Publicado com IA
-                          </span>
-                        )}
-                        {qs === "skipped" && (
-                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">
-                            ⚠ Duplicado
-                          </span>
-                        )}
-                        {qs === "error" && (
-                          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                            ✗ Erro
-                          </span>
-                        )}
-
+                        <span className="text-xs font-bold text-[#E71D36] uppercase tracking-wide">{TAG_MAP[art.category] ?? art.category}</span>
+                        <span className="text-xs text-slate-400">· {art.sourceName}</span>
+                        {qs === "rewriting" && <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 animate-pulse"><Loader2 size={9} className="animate-spin"/>Reescrevendo…</span>}
+                        {qs === "publishing" && <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 animate-pulse"><Loader2 size={9} className="animate-spin"/>Publicando…</span>}
+                        {qs === "done" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">✓ Publicado</span>}
+                        {qs === "skipped" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-600">⚠ Duplicado</span>}
+                        {qs === "error" && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">✗ Erro</span>}
                         {art.link && (
                           <a href={art.link} target="_blank" rel="noreferrer"
-                            className="text-gray-300 hover:text-[#0b3d91] ml-auto flex-shrink-0 transition-colors">
+                            className="text-slate-300 hover:text-[#0B2A66] ml-auto transition-colors">
                             <ExternalLink size={13}/>
                           </a>
                         )}
                       </div>
-                      <p className="font-semibold text-gray-800 text-sm leading-snug line-clamp-2">{art.title}</p>
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">{art.excerpt}</p>
+                      <p className="font-semibold text-slate-800 text-sm leading-snug line-clamp-2">{art.title}</p>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{art.excerpt}</p>
                     </div>
                   </div>
 
-                  {/* Expand panel — manual editing / individual actions */}
-                  <div className="border-t px-4 py-3">
-                    <button
-                      onClick={() => updateArticle(idx, { expanded: !art.expanded })}
-                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition-colors">
+                  <div className="border-t border-slate-100 px-4 py-3">
+                    <button onClick={() => updateArticle(idx, { expanded: !art.expanded })}
+                      className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 transition-colors">
                       {art.expanded ? <ChevronUp size={13}/> : <ChevronDown size={13}/>}
                       {art.expanded ? "Recolher" : "Editar / Publicar manualmente"}
                     </button>
-
                     {art.expanded && (
                       <div className="mt-3 space-y-3">
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Título</label>
-                          <input value={art.editTitle ?? art.title}
-                            onChange={(e) => updateArticle(idx, { editTitle: e.target.value })}
-                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Título</label>
+                          <input value={art.editTitle ?? art.title} onChange={(e) => updateArticle(idx, { editTitle: e.target.value })}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66]"/>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">Subtítulo / Chapéu</label>
-                          <input value={art.editSubtitle ?? ""}
-                            onChange={(e) => updateArticle(idx, { editSubtitle: e.target.value })}
-                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91]"/>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Subtítulo / Chapéu</label>
+                          <input value={art.editSubtitle ?? ""} onChange={(e) => updateArticle(idx, { editSubtitle: e.target.value })}
+                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66]"/>
                         </div>
                         <div>
-                          <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
                             Conteúdo
-                            {art.rewritten && (
-                              <span className="ml-2 text-purple-600 font-semibold">✦ Reescrito com IA (SEO/AIO)</span>
-                            )}
+                            {art.rewritten && <span className="ml-2 text-purple-600 font-semibold">✦ Reescrito com IA</span>}
                           </label>
-                          <textarea value={art.editContent ?? art.fullText}
-                            onChange={(e) => updateArticle(idx, { editContent: e.target.value })}
-                            rows={10}
-                            className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0b3d91] font-mono leading-relaxed"/>
+                          <textarea value={art.editContent ?? art.fullText} onChange={(e) => updateArticle(idx, { editContent: e.target.value })}
+                            rows={10} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] font-mono leading-relaxed"/>
                         </div>
-
                         {art.rewritten && (art.aiKeywords || art.aiSlug) && (
-                          <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 space-y-2">
-                            {art.aiSlug && (
-                              <div>
-                                <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Slug SEO</span>
-                                <p className="text-sm font-mono text-purple-800 mt-0.5">{art.aiSlug}</p>
-                              </div>
-                            )}
-                            {art.aiKeywords && (
-                              <div>
-                                <span className="text-[10px] font-bold text-purple-500 uppercase tracking-wider">Palavras-chave</span>
-                                <p className="text-sm text-purple-800 mt-0.5">{art.aiKeywords}</p>
-                              </div>
-                            )}
+                          <div className="bg-purple-50 border border-purple-200 rounded-xl p-3 space-y-2">
+                            {art.aiSlug && <p className="text-xs font-mono text-purple-800">slug: {art.aiSlug}</p>}
+                            {art.aiKeywords && <p className="text-xs text-purple-800">keywords: {art.aiKeywords}</p>}
                           </div>
                         )}
                       </div>
                     )}
-
                     {art.error && !isSkipped && (
-                      <p className="mt-2 text-xs text-red-500 flex items-center gap-1">
-                        <AlertCircle size={12}/>{art.error}
-                      </p>
+                      <p className="mt-2 text-xs text-red-500 flex items-center gap-1"><AlertCircle size={12}/>{art.error}</p>
                     )}
-
-                    {/* Individual actions */}
                     {!isDone && !isSkipped && (
                       <div className="flex flex-wrap gap-2 mt-3">
                         {art.imported ? (
-                          <span className="flex items-center gap-1 text-sm text-green-600 font-semibold">
-                            <CheckCircle size={16}/> Importado!
-                          </span>
+                          <span className="flex items-center gap-1 text-sm text-green-600 font-semibold"><CheckCircle size={16}/> Importado!</span>
                         ) : (
                           <>
                             <button onClick={() => { void rewrite(idx); }}
                               disabled={art.rewriting || art.importing || queueRunning}
-                              className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors">
+                              className="flex items-center gap-1.5 bg-purple-600 text-white px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-purple-700 disabled:opacity-50 transition-colors">
                               <Wand2 size={13} className={art.rewriting ? "animate-pulse" : ""}/>
-                              {art.rewriting ? "Reescrevendo com IA…" : "Reescrever com IA"}
+                              {art.rewriting ? "Reescrevendo…" : "Reescrever com IA"}
                             </button>
                             <button onClick={() => { void importArticle(idx, "draft"); }}
                               disabled={art.importing || art.rewriting || queueRunning}
-                              className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-gray-200 disabled:opacity-50 transition-colors">
-                              <Send size={13}/>
-                              {art.importing ? "Salvando…" : "Rascunho"}
+                              className="flex items-center gap-1.5 bg-slate-100 text-slate-700 px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-slate-200 disabled:opacity-50 transition-colors">
+                              <Send size={13}/>{art.importing ? "Salvando…" : "Rascunho"}
                             </button>
                             <button onClick={() => { void importArticle(idx, "published"); }}
                               disabled={art.importing || art.rewriting || queueRunning}
-                              className="flex items-center gap-1.5 bg-[#c8102e] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[#c8102e]/90 disabled:opacity-50 transition-colors">
-                              <Send size={13}/>
-                              {art.importing ? "Publicando…" : "Publicar"}
+                              className="flex items-center gap-1.5 text-white px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-50 transition-colors"
+                              style={{ background: "#E71D36" }}>
+                              <Send size={13}/>{art.importing ? "Publicando…" : "Publicar"}
                             </button>
                           </>
                         )}
@@ -1757,86 +1837,9 @@ export default function RSSManager() {
                 </div>
               );
             })}
-          </section>
+          </div>
         )}
 
-        {/* ══ LOGS ════════════════════════════════════════════════════════════ */}
-        <section className="bg-white rounded-xl shadow-sm border">
-          <button
-            type="button"
-            onClick={() => { setLogsOpen((v) => !v); if (!logsOpen) void loadLogs(); }}
-            className="w-full px-6 py-4 flex items-center gap-2 hover:bg-gray-50 transition-colors text-left"
-          >
-            <BookOpen size={18} className="text-[#0b3d91]"/>
-            <h2 className="font-semibold text-gray-800">Log de Coleta</h2>
-            {logs.length > 0 && (
-              <span className="ml-2 text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                {logs.length} event{logs.length !== 1 ? "os" : "o"}
-              </span>
-            )}
-            {runningId !== null && (
-              <span className="flex items-center gap-1 text-[11px] text-amber-600 animate-pulse">
-                <Loader2 size={11} className="animate-spin"/> coletando…
-              </span>
-            )}
-            <span className="ml-auto text-gray-400">
-              {logsOpen ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
-            </span>
-          </button>
-
-          {logsOpen && (
-            <div className="border-t">
-              <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b">
-                <span className="text-[11px] text-gray-400">Últimas {logs.length} entradas — mais recentes primeiro</span>
-                <button
-                  type="button"
-                  onClick={() => { void loadLogs(); }}
-                  className="flex items-center gap-1 text-[11px] text-[#0b3d91] hover:underline"
-                >
-                  <RefreshCw size={10}/> Atualizar
-                </button>
-              </div>
-              {logs.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Nenhum evento ainda. Execute uma coleta para ver os logs.</p>
-              ) : (
-                <div className="divide-y max-h-[420px] overflow-y-auto">
-                  {logs
-                    .filter((e) => !runStartRef.current || e.ts >= runStartRef.current || runStartRef.current === "")
-                    .map((entry) => {
-                    const icons: Record<RssLogEntry["type"], string> = {
-                      fetch:     "🔍", rewrite:   "✨", publish:   "📢",
-                      draft:     "📝", skip:      "⏭", error:     "❌", duplicate: "♻",
-                    };
-                    const colors: Record<RssLogEntry["type"], string> = {
-                      fetch:     "text-blue-600", rewrite:   "text-purple-600", publish:   "text-green-600",
-                      draft:     "text-amber-600", skip:     "text-gray-400",   error:     "text-red-600",
-                      duplicate: "text-gray-400",
-                    };
-                    const time = new Date(entry.ts).toLocaleTimeString("pt-BR");
-                    return (
-                      <div key={entry.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
-                        <span className="text-sm shrink-0 mt-0.5">{icons[entry.type]}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[10px] font-bold uppercase tracking-wide ${colors[entry.type]}`}>{entry.type}</span>
-                            <span className="text-[11px] text-gray-500 font-medium">{entry.sourceName}</span>
-                            <span className="text-[10px] text-gray-300 ml-auto shrink-0">{time}</span>
-                          </div>
-                          <p className="text-xs text-gray-700 truncate">{entry.articleTitle}</p>
-                          {entry.message && (
-                            <p className="text-[11px] text-gray-400 mt-0.5">{entry.message}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
-      </div>
-    </AdminLayout>
+      </AdminLayout>
   );
 }

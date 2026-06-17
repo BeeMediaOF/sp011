@@ -1,0 +1,446 @@
+{
+  "project": "SBC Agora",
+  "screen": "Propagandas",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "dangerColor": "#EF4444",
+    "infoColor": "#2563EB",
+    "purpleColor": "#7C3AED",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": true
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        },
+        {
+          "label": "Menu",
+          "icon": "menu",
+          "active": false
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "102px",
+      "background": "#FFFFFF",
+      "title": "Propagandas",
+      "subtitle": "Gerencie os anúncios exibidos no portal.",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "ads_stats",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Propagandas ativas",
+              "value": "24",
+              "variation": "+3",
+              "comparison": "este mês",
+              "trend": "up",
+              "icon": "megaphone",
+              "iconColor": "purple",
+              "background": "#F5F3FF"
+            },
+            {
+              "title": "Impressões (30 dias)",
+              "value": "245.672",
+              "variation": "+16,4%",
+              "comparison": "vs 30 dias anteriores",
+              "trend": "up",
+              "icon": "bar-chart",
+              "iconColor": "blue",
+              "background": "#EFF6FF"
+            },
+            {
+              "title": "Cliques (30 dias)",
+              "value": "12.842",
+              "variation": "+9,5%",
+              "comparison": "vs 30 dias anteriores",
+              "trend": "up",
+              "icon": "link",
+              "iconColor": "orange",
+              "background": "#FFF7ED"
+            },
+            {
+              "title": "CTR médio",
+              "value": "5,23%",
+              "variation": "+1,1%",
+              "comparison": "vs 30 dias anteriores",
+              "trend": "up",
+              "icon": "sparkles",
+              "iconColor": "purple",
+              "background": "#FAF5FF"
+            }
+          ]
+        },
+        {
+          "type": "ads_management_grid",
+          "columns": "2fr 0.85fr",
+          "items": [
+            {
+              "component": "ads_table_panel",
+              "cardStyle": {
+                "background": "#FFFFFF",
+                "borderRadius": "16px",
+                "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+              },
+              "filters": {
+                "search": {
+                  "placeholder": "Buscar propagandas...",
+                  "icon": "search"
+                },
+                "status": {
+                  "label": "Status",
+                  "selected": "Todos",
+                  "options": ["Todos", "Ativa", "Pausada", "Inativa"]
+                }
+              },
+              "primaryAction": {
+                "label": "Nova propaganda",
+                "icon": "plus",
+                "style": "solid_red",
+                "action": "create_ad"
+              },
+              "table": {
+                "columns": [
+                  {
+                    "label": "Propaganda",
+                    "key": "ad",
+                    "type": "thumbnail_with_title"
+                  },
+                  {
+                    "label": "Posição",
+                    "key": "position",
+                    "type": "text"
+                  },
+                  {
+                    "label": "Formato",
+                    "key": "format",
+                    "type": "text"
+                  },
+                  {
+                    "label": "Impressões",
+                    "key": "impressions",
+                    "type": "number"
+                  },
+                  {
+                    "label": "Cliques",
+                    "key": "clicks",
+                    "type": "number"
+                  },
+                  {
+                    "label": "CTR",
+                    "key": "ctr",
+                    "type": "percentage"
+                  },
+                  {
+                    "label": "Status",
+                    "key": "status",
+                    "type": "badge"
+                  },
+                  {
+                    "label": "Ações",
+                    "key": "actions",
+                    "type": "icons_and_toggle"
+                  }
+                ],
+                "rows": [
+                  {
+                    "id": 1,
+                    "ad": {
+                      "name": "Banner Topo",
+                      "thumbnail": "blue_banner_728x90"
+                    },
+                    "position": "Topo do site",
+                    "format": "728x90",
+                    "impressions": "56.432",
+                    "clicks": "3.345",
+                    "ctr": "5,74%",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["analytics", "edit", "toggle_on"]
+                  },
+                  {
+                    "id": 2,
+                    "ad": {
+                      "name": "Sidebar Direita",
+                      "thumbnail": "red_sidebar_300x250"
+                    },
+                    "position": "Sidebar",
+                    "format": "300x250",
+                    "impressions": "48.219",
+                    "clicks": "2.156",
+                    "ctr": "4,47%",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["analytics", "edit", "toggle_on"]
+                  },
+                  {
+                    "id": 3,
+                    "ad": {
+                      "name": "Entre Conteúdo",
+                      "thumbnail": "news_banner_728x90"
+                    },
+                    "position": "Entre parágrafos",
+                    "format": "728x90",
+                    "impressions": "67.891",
+                    "clicks": "3.841",
+                    "ctr": "5,66%",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["analytics", "edit", "toggle_on"]
+                  },
+                  {
+                    "id": 4,
+                    "ad": {
+                      "name": "Rodapé",
+                      "thumbnail": "landscape_banner_728x90"
+                    },
+                    "position": "Rodapé do site",
+                    "format": "728x90",
+                    "impressions": "42.330",
+                    "clicks": "1.876",
+                    "ctr": "4,43%",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["analytics", "edit", "toggle_on"]
+                  },
+                  {
+                    "id": 5,
+                    "ad": {
+                      "name": "Popup Mobile",
+                      "thumbnail": "mobile_popup_320x480"
+                    },
+                    "position": "Popup (mobile)",
+                    "format": "320x480",
+                    "impressions": "30.800",
+                    "clicks": "1.024",
+                    "ctr": "3,33%",
+                    "status": {
+                      "label": "Pausada",
+                      "color": "orange"
+                    },
+                    "actions": ["analytics", "edit", "toggle_off"]
+                  },
+                  {
+                    "id": 6,
+                    "ad": {
+                      "name": "Banner Topo 2",
+                      "thumbnail": "small_news_banner_728x90"
+                    },
+                    "position": "Topo do site",
+                    "format": "728x90",
+                    "impressions": "0",
+                    "clicks": "0",
+                    "ctr": "0%",
+                    "status": {
+                      "label": "Inativa",
+                      "color": "red"
+                    },
+                    "actions": ["analytics", "edit", "toggle_off"]
+                  }
+                ],
+                "pagination": {
+                  "summary": "Mostrando 1 a 6 de 24 propagandas",
+                  "currentPage": 1,
+                  "pages": [1, 2, 3, "...", 4],
+                  "hasPrevious": true,
+                  "hasNext": true
+                }
+              }
+            },
+            {
+              "component": "create_ad_panel",
+              "title": "Criar nova propaganda",
+              "description": "Preencha as informações para criar um novo anúncio.",
+              "fields": [
+                {
+                  "label": "Nome da propaganda",
+                  "required": true,
+                  "type": "text",
+                  "placeholder": "Ex.: Banner Topo"
+                },
+                {
+                  "label": "Posição",
+                  "required": true,
+                  "type": "select",
+                  "placeholder": "Selecione a posição",
+                  "options": [
+                    "Topo do site",
+                    "Sidebar",
+                    "Entre parágrafos",
+                    "Rodapé do site",
+                    "Popup mobile"
+                  ]
+                },
+                {
+                  "label": "Formato",
+                  "required": true,
+                  "type": "select",
+                  "placeholder": "Selecione o formato",
+                  "options": ["728x90", "300x250", "320x480", "970x90", "1080x1080"]
+                },
+                {
+                  "label": "Destino (URL)",
+                  "required": true,
+                  "type": "url",
+                  "placeholder": "https://exemplo.com.br"
+                },
+                {
+                  "label": "Arquivo do anúncio",
+                  "required": true,
+                  "type": "upload",
+                  "uploadMode": "drag_and_drop",
+                  "placeholder": "Arraste e solte o arquivo aqui ou",
+                  "button": "Selecionar arquivo",
+                  "acceptedFormats": ["JPG", "PNG", "GIF", "HTML5"],
+                  "maxSize": "2MB",
+                  "icon": "image"
+                }
+              ],
+              "toggle": {
+                "label": "Status",
+                "description": "Ativar propaganda",
+                "enabled": true
+              },
+              "actions": [
+                {
+                  "label": "Cancelar",
+                  "style": "outline"
+                },
+                {
+                  "label": "Salvar propaganda",
+                  "style": "solid_red"
+                }
+              ],
+              "tip": {
+                "icon": "info",
+                "title": "Dica",
+                "text": "Utilize formatos leves e responsivos para melhor desempenho e experiência do usuário."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Propagandas minimalista para o painel administrativo do portal SBC Agora, seguindo a identidade visual azul-marinho, vermelho e branco. A sidebar deve ficar à esquerda com o item Propagandas ativo em vermelho. A topbar deve ter título Propagandas, subtítulo de gerenciamento de anúncios, busca, seletor de data, notificações e perfil do administrador. No conteúdo, exiba quatro cards de métricas: Propagandas ativas, Impressões em 30 dias, Cliques em 30 dias e CTR médio. Abaixo, organize a página em duas colunas: à esquerda, uma tabela de propagandas com busca, filtro de status, thumbnail, posição, formato, impressões, cliques, CTR, status e ações; à direita, um painel para criar nova propaganda com campos de nome, posição, formato, destino URL, upload do arquivo, toggle de status, botões Cancelar e Salvar propaganda, além de um box de dica. Use cards brancos, sombras suaves, cantos arredondados, muito respiro e interface premium."
+}
