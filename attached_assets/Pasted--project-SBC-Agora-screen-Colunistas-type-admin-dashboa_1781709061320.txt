@@ -1,0 +1,432 @@
+{
+  "project": "SBC Agora",
+  "screen": "Colunistas",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "dangerColor": "#EF4444",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": true
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        },
+        {
+          "label": "Menu",
+          "icon": "menu",
+          "active": false
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "102px",
+      "background": "#FFFFFF",
+      "title": "Colunistas",
+      "subtitle": "Gerencie os colunistas e seus perfis no portal.",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "columnist_stats",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Colunistas ativos",
+              "value": "18",
+              "variation": "+2",
+              "comparison": "este mês",
+              "trend": "up",
+              "icon": "user-check",
+              "iconColor": "green",
+              "background": "#ECFDF5"
+            },
+            {
+              "title": "Artigos publicados",
+              "value": "236",
+              "variation": "+24,2%",
+              "comparison": "vs mês anterior",
+              "trend": "up",
+              "icon": "file-text",
+              "iconColor": "blue",
+              "background": "#EFF6FF"
+            },
+            {
+              "title": "Visualizações (30 dias)",
+              "value": "82.451",
+              "variation": "+10,7%",
+              "comparison": "vs 30 dias anteriores",
+              "trend": "up",
+              "icon": "eye",
+              "iconColor": "orange",
+              "background": "#FFF7ED"
+            },
+            {
+              "title": "Colunistas inativos",
+              "value": "3",
+              "description": "Ver lista",
+              "icon": "user-x",
+              "iconColor": "red",
+              "background": "#FEF2F2"
+            }
+          ]
+        },
+        {
+          "type": "columnists_management_grid",
+          "columns": "2fr 0.85fr",
+          "items": [
+            {
+              "component": "columnists_table_panel",
+              "cardStyle": {
+                "background": "#FFFFFF",
+                "borderRadius": "16px",
+                "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+              },
+              "filters": {
+                "search": {
+                  "placeholder": "Buscar colunistas...",
+                  "icon": "search"
+                },
+                "status": {
+                  "label": "Status",
+                  "selected": "Todos",
+                  "options": ["Todos", "Ativo", "Inativo"]
+                }
+              },
+              "primaryAction": {
+                "label": "Novo colunista",
+                "icon": "plus",
+                "style": "solid_red",
+                "action": "create_columnist"
+              },
+              "table": {
+                "columns": [
+                  {
+                    "label": "Colunista",
+                    "key": "columnist",
+                    "type": "avatar_with_name"
+                  },
+                  {
+                    "label": "E-mail",
+                    "key": "email",
+                    "type": "email"
+                  },
+                  {
+                    "label": "Coluna",
+                    "key": "column",
+                    "type": "text"
+                  },
+                  {
+                    "label": "Artigos",
+                    "key": "articles",
+                    "type": "number"
+                  },
+                  {
+                    "label": "Status",
+                    "key": "status",
+                    "type": "badge"
+                  },
+                  {
+                    "label": "Ações",
+                    "key": "actions",
+                    "type": "icons"
+                  }
+                ],
+                "rows": [
+                  {
+                    "id": 1,
+                    "columnist": {
+                      "name": "Carlos Andrade",
+                      "avatar": "male_portrait_01"
+                    },
+                    "email": "carlos.andrade@sbcagora.com.br",
+                    "column": "Política em Foco",
+                    "articles": 42,
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 2,
+                    "columnist": {
+                      "name": "Mariana Souza",
+                      "avatar": "female_portrait_01"
+                    },
+                    "email": "mariana.souza@sbcagora.com.br",
+                    "column": "Economia & Negócios",
+                    "articles": 38,
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 3,
+                    "columnist": {
+                      "name": "João Paulo Lima",
+                      "avatar": "male_portrait_02"
+                    },
+                    "email": "joao.lima@sbcagora.com.br",
+                    "column": "Esportes na Área",
+                    "articles": 57,
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 4,
+                    "columnist": {
+                      "name": "Patrícia Gomes",
+                      "avatar": "female_portrait_02"
+                    },
+                    "email": "patricia.gomes@sbcagora.com.br",
+                    "column": "Cultura & Lazer",
+                    "articles": 31,
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 5,
+                    "columnist": {
+                      "name": "Roberto Silva",
+                      "avatar": "male_portrait_03"
+                    },
+                    "email": "roberto.silva@sbcagora.com.br",
+                    "column": "Opinião",
+                    "articles": 28,
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 6,
+                    "columnist": {
+                      "name": "Ana Beatriz",
+                      "avatar": "female_portrait_03"
+                    },
+                    "email": "ana.beatriz@sbcagora.com.br",
+                    "column": "Saúde & Bem-estar",
+                    "articles": 22,
+                    "status": {
+                      "label": "Inativo",
+                      "color": "red"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  },
+                  {
+                    "id": 7,
+                    "columnist": {
+                      "name": "Eduardo Martins",
+                      "avatar": "male_portrait_04"
+                    },
+                    "email": "eduardo.martins@sbcagora.com.br",
+                    "column": "Tecnologia & Inovação",
+                    "articles": 18,
+                    "status": {
+                      "label": "Inativo",
+                      "color": "red"
+                    },
+                    "actions": ["edit", "view", "more"]
+                  }
+                ],
+                "pagination": {
+                  "summary": "Mostrando 1 a 7 de 18 colunistas",
+                  "currentPage": 1,
+                  "pages": [1, 2, 3],
+                  "hasPrevious": true,
+                  "hasNext": true
+                }
+              }
+            },
+            {
+              "component": "add_columnist_panel",
+              "title": "Adicionar novo colunista",
+              "description": "Preencha as informações para adicionar um novo colunista.",
+              "fields": [
+                {
+                  "label": "Nome completo",
+                  "required": true,
+                  "type": "text",
+                  "placeholder": "Ex.: Carlos Andrade"
+                },
+                {
+                  "label": "E-mail",
+                  "required": true,
+                  "type": "email",
+                  "placeholder": "ex.: carlos.andrade@sbcagora.com.br"
+                },
+                {
+                  "label": "Coluna",
+                  "required": true,
+                  "type": "select",
+                  "placeholder": "Ex.: Política em Foco",
+                  "options": [
+                    "Política em Foco",
+                    "Economia & Negócios",
+                    "Esportes na Área",
+                    "Cultura & Lazer",
+                    "Opinião",
+                    "Saúde & Bem-estar",
+                    "Tecnologia & Inovação"
+                  ]
+                },
+                {
+                  "label": "Imagem do colunista",
+                  "required": true,
+                  "type": "upload",
+                  "uploadMode": "drag_and_drop",
+                  "placeholder": "Arraste e solte a imagem aqui ou clique para selecionar",
+                  "acceptedFormats": ["JPG", "PNG"],
+                  "maxSize": "2MB",
+                  "icon": "upload-cloud"
+                },
+                {
+                  "label": "Bio",
+                  "required": false,
+                  "type": "textarea",
+                  "placeholder": "Breve descrição sobre o colunista...",
+                  "counter": "0/500"
+                }
+              ],
+              "toggle": {
+                "label": "Status",
+                "description": "Ativar colunista",
+                "enabled": true
+              },
+              "actions": [
+                {
+                  "label": "Cancelar",
+                  "style": "outline"
+                },
+                {
+                  "label": "Salvar colunista",
+                  "style": "solid_red"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Colunistas minimalista para o painel administrativo do portal SBC Agora, seguindo a identidade visual azul-marinho, vermelho e branco. A sidebar deve ficar à esquerda com o item Colunistas ativo em vermelho. A topbar deve ter título Colunistas, subtítulo de gerenciamento, busca, seletor de data, notificações e perfil do administrador. No conteúdo, exiba quatro cards de métricas: Colunistas ativos, Artigos publicados, Visualizações em 30 dias e Colunistas inativos. Abaixo, organize a página em duas colunas: à esquerda, uma tabela de colunistas com busca, filtro de status, avatar, nome, e-mail, coluna, número de artigos, status e ações; à direita, um painel para adicionar novo colunista com campos de nome completo, e-mail, coluna, upload de imagem, bio, toggle de status, botões Cancelar e Salvar colunista. Use cards brancos, sombras suaves, cantos arredondados, muito respiro e interface premium."
+}

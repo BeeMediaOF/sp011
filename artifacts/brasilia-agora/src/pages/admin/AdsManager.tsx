@@ -2,10 +2,12 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import {
-  Plus, Trash2, Eye, EyeOff, MousePointer, ExternalLink,
-  ImageIcon, CheckCircle, X, LayoutTemplate, Home, Newspaper, GalleryHorizontal, FileText, PanelBottom, PanelTop, PanelLeft,
+  Plus, Trash2, Pencil, Search, Megaphone,
+  MousePointer, Sparkles, ImageIcon, X, Upload,
+  ChevronLeft, ChevronRight, Info, BarChart2,
 } from "lucide-react";
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -15,417 +17,145 @@ function toBase64(file: File): Promise<string> {
   });
 }
 
+function fmtNum(n: number): string {
+  return (n ?? 0).toLocaleString("pt-BR");
+}
+
+function calcCTR(clicks: number, impressions: number): string {
+  if (!impressions) return "0%";
+  return ((clicks / impressions) * 100).toFixed(2).replace(".", ",") + "%";
+}
+
+const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
+
+// ─── Position / format maps ────────────────────────────────────────────────────
 type AdPosition = Ad["position"];
 
-// ─── Slot definitions ──────────────────────────────────────────────────────────
-const SLOTS: {
-  key: AdPosition;
-  label: string;
-  location: string;
-  hint: string;
-  pagePos: string;
-  icon: React.ReactNode;
-  accent: string;
-  bg: string;
-}[] = [
-  {
-    key:      "slot_01",
-    label:    "Espaço 1 — Home",
-    location: "Após o 1º bloco de notícias",
-    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
-    pagePos:  "top-[22%]",
-    icon:     <Home size={14} />,
-    accent:   "#c8102e",
-    bg:       "bg-red-50 border-red-200",
-  },
-  {
-    key:      "slot_02",
-    label:    "Espaço 2 — Home",
-    location: "Após o 2º bloco de notícias",
-    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
-    pagePos:  "top-[38%]",
-    icon:     <Home size={14} />,
-    accent:   "#0b3d91",
-    bg:       "bg-blue-50 border-blue-200",
-  },
-  {
-    key:      "slot_03",
-    label:    "Espaço 3 — Home",
-    location: "Após o 4º bloco de notícias",
-    hint:     "Banner horizontal, largura total. Ex: 970×250 px",
-    pagePos:  "top-[55%]",
-    icon:     <Home size={14} />,
-    accent:   "#7c3aed",
-    bg:       "bg-purple-50 border-purple-200",
-  },
-  {
-    key:      "slot_04",
-    label:    "Espaço 4 — Home",
-    location: "Após o 7º bloco de notícias",
-    hint:     "Banner horizontal, largura total. Ex: 970×90 px",
-    pagePos:  "top-[72%]",
-    icon:     <Home size={14} />,
-    accent:   "#ea580c",
-    bg:       "bg-orange-50 border-orange-200",
-  },
-  {
-    key:      "slot_05",
-    label:    "Espaço 5 — Editorias",
-    location: "Dentro das páginas de editoria",
-    hint:     "Banner ou retângulo. Ex: 300×250 px",
-    pagePos:  "top-[45%]",
-    icon:     <Newspaper size={14} />,
-    accent:   "#0d9488",
-    bg:       "bg-teal-50 border-teal-200",
-  },
-  {
-    key:      "slot_06",
-    label:    "Espaço 6 — Artigo: Banner Horizontal",
-    location: "Após o corpo do artigo (acima do rodapé)",
-    hint:     "Banner largo. Ex: 970×90 ou 728×90 px",
-    pagePos:  "top-[65%]",
-    icon:     <FileText size={14} />,
-    accent:   "#7c3aed",
-    bg:       "bg-violet-50 border-violet-200",
-  },
-  {
-    key:      "slot_07",
-    label:    "Espaço 7 — Artigo: Sidebar Direita",
-    location: "Coluna lateral direita do artigo (sticky)",
-    hint:     "Retângulo vertical. Ex: 300×250 ou 300×600 px",
-    pagePos:  "top-[35%]",
-    icon:     <FileText size={14} />,
-    accent:   "#ea580c",
-    bg:       "bg-orange-50 border-orange-200",
-  },
-  {
-    key:      "slot_08",
-    label:    "Espaço 8 — Home: Topo",
-    location: "Logo antes do primeiro bloco de notícias",
-    hint:     "Billboard / Leaderboard. Ex: 970×250 ou 728×90 px",
-    pagePos:  "top-[10%]",
-    icon:     <PanelTop size={14} />,
-    accent:   "#0284c7",
-    bg:       "bg-sky-50 border-sky-200",
-  },
-  {
-    key:      "slot_09",
-    label:    "Espaço 9 — Home: Rodapé",
-    location: "Após todos os blocos, antes do rodapé",
-    hint:     "Banner horizontal. Ex: 970×90 ou 728×90 px",
-    pagePos:  "top-[88%]",
-    icon:     <PanelBottom size={14} />,
-    accent:   "#14b8a6",
-    bg:       "bg-teal-50 border-teal-200",
-  },
-  {
-    key:      "slot_10",
-    label:    "Espaço 10 — Artigo: In-content",
-    location: "Entre a imagem principal e o corpo do artigo",
-    hint:     "Banner horizontal ou retângulo. Ex: 728×90 ou 300×250 px",
-    pagePos:  "top-[18%]",
-    icon:     <FileText size={14} />,
-    accent:   "#7c3aed",
-    bg:       "bg-violet-50 border-violet-200",
-  },
-  {
-    key:      "slot_11",
-    label:    "Espaço 11 — Archive: Sidebar",
-    location: "Coluna lateral direita das páginas de editoria",
-    hint:     "Retângulo. Ex: 300×250 ou 300×600 px",
-    pagePos:  "top-[25%]",
-    icon:     <PanelLeft size={14} />,
-    accent:   "#16a34a",
-    bg:       "bg-green-50 border-green-200",
-  },
+const POSITION_OPTIONS: { value: AdPosition; label: string; format: string }[] = [
+  { value: "slot_08", label: "Topo do site",            format: "970×250" },
+  { value: "slot_07", label: "Sidebar direita",         format: "300×250" },
+  { value: "slot_10", label: "Entre parágrafos",        format: "728×90"  },
+  { value: "slot_09", label: "Rodapé do site",          format: "728×90"  },
+  { value: "slot_01", label: "Home – após 1º bloco",    format: "970×90"  },
+  { value: "slot_02", label: "Home – após 2º bloco",    format: "970×90"  },
+  { value: "slot_03", label: "Home – após 4º bloco",    format: "970×250" },
+  { value: "slot_04", label: "Home – após 7º bloco",    format: "970×90"  },
+  { value: "slot_05", label: "Editoria – sidebar",      format: "300×250" },
+  { value: "slot_06", label: "Artigo – pós texto",      format: "728×90"  },
+  { value: "slot_11", label: "Arquivo – sidebar",       format: "300×250" },
+  { value: "topo",    label: "Topo (legado)",           format: "728×90"  },
+  { value: "centro",  label: "Centro (legado)",         format: "728×90"  },
+  { value: "lateral", label: "Lateral (legado)",        format: "300×250" },
+  { value: "rodape",  label: "Rodapé (legado)",         format: "728×90"  },
+  { value: "banner",  label: "Banner (legado)",         format: "728×90"  },
+  { value: "sidebar", label: "Sidebar (legado)",        format: "300×250" },
+  { value: "central", label: "Central (legado)",        format: "728×90"  },
+  { value: "slidebar_250", label: "Slidebar 250",       format: "300×250" },
+  { value: "slidebar_500", label: "Slidebar 500",       format: "300×600" },
 ];
 
-// ─── Add form (per-slot) ───────────────────────────────────────────────────────
-interface SlotFormProps {
-  slotKey: AdPosition;
-  onSaved: () => void;
-  onCancel: () => void;
-}
+const POSITION_LABELS: Record<string, string> = Object.fromEntries(
+  POSITION_OPTIONS.map((p) => [p.value, p.label])
+);
+const FORMAT_LABELS: Record<string, string> = Object.fromEntries(
+  POSITION_OPTIONS.map((p) => [p.value, p.format])
+);
 
-function SlotForm({ slotKey, onSaved, onCancel }: SlotFormProps) {
-  const [name, setName]       = useState("");
-  const [link, setLink]       = useState("");
-  const [preview, setPreview] = useState("");
-  const [saving, setSaving]   = useState(false);
-  const fileRef               = useRef<HTMLInputElement>(null);
-
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (f) setPreview(await toBase64(f));
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim() || !link.trim() || !preview) return;
-    setSaving(true);
-    try {
-      await adminApi.createAd({ name, link, imageBase64: preview, position: slotKey, active: true });
-      onSaved();
-    } catch (err) {
-      alert((err as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-5 mt-3 space-y-4 shadow-sm">
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-sm font-bold text-gray-700">Adicionar propaganda</p>
-        <button type="button" onClick={onCancel} className="text-gray-400 hover:text-gray-600 p-1">
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Anunciante</label>
-          <input
-            value={name} onChange={(e) => setName(e.target.value)} required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="Ex: Loja ABC"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-gray-500 mb-1 uppercase tracking-wide">Link ao clicar</label>
-          <input
-            value={link} onChange={(e) => setLink(e.target.value)} required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="https://..."
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">Imagem da propaganda</label>
-        <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
-        {!preview ? (
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-gray-400 hover:bg-gray-50 transition-colors w-full justify-center"
-          >
-            <ImageIcon size={16} />
-            Clique para selecionar a imagem
-          </button>
-        ) : (
-          <div className="flex items-start gap-3">
-            <img src={preview} alt="Preview" className="max-h-24 max-w-xs rounded-lg border border-gray-200 object-contain" />
-            <button
-              type="button"
-              onClick={() => { setPreview(""); if (fileRef.current) fileRef.current.value = ""; }}
-              className="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 mt-1"
-            >
-              <X size={12} /> Trocar imagem
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="flex justify-end gap-2 pt-1">
-        <button type="button" onClick={onCancel}
-          className="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
-          Cancelar
-        </button>
-        <button
-          type="submit"
-          disabled={saving || !preview || !name.trim() || !link.trim()}
-          className="px-5 py-2 bg-[#1a2448] text-white rounded-lg text-sm font-semibold hover:bg-[#2a3458] transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
-        >
-          {saving ? "Salvando..." : <><CheckCircle size={14} /> Publicar propaganda</>}
-        </button>
-      </div>
-    </form>
+// ─── Sub-components ────────────────────────────────────────────────────────────
+function StatusBadge({ active }: { active: boolean }) {
+  return active ? (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+      Ativo
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+      <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block" />
+      Pausada
+    </span>
   );
 }
 
-// ─── Ad card ──────────────────────────────────────────────────────────────────
-interface AdCardProps {
-  ad: Ad;
-  accent: string;
-  onToggle: (ad: Ad) => void;
-  onDelete: (id: string) => void;
-}
-
-function AdCard({ ad, accent, onToggle, onDelete }: AdCardProps) {
+function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () => void }) {
   return (
-    <div className={`flex gap-4 items-start p-4 rounded-xl border bg-white shadow-sm transition-opacity ${!ad.active ? "opacity-50" : ""}`}>
-      <div className="shrink-0 w-[120px] h-[72px] overflow-hidden rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center">
-        <img src={ad.imageBase64} alt={ad.name} className="max-w-full max-h-full object-contain" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="font-bold text-[#1a2448] truncate text-sm">{ad.name}</p>
-          <span
-            className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: accent + "20", color: accent }}
-          >
-            {ad.active ? "● Ativo" : "● Inativo"}
-          </span>
-        </div>
-        <a
-          href={ad.link} target="_blank" rel="noreferrer"
-          className="text-xs text-blue-600 hover:underline flex items-center gap-1 mt-0.5 break-all"
-        >
-          {ad.link.length > 50 ? ad.link.slice(0, 50) + "…" : ad.link}
-          <ExternalLink size={10} />
-        </a>
-        <div className="flex items-center gap-3 mt-1.5">
-          <span className="flex items-center gap-1 text-[11px] text-orange-600 font-semibold">
-            <MousePointer size={11} /> {ad.clicks ?? 0} clique{ad.clicks !== 1 ? "s" : ""}
-          </span>
-          <span className="text-[11px] text-gray-400">
-            {new Date(ad.createdAt).toLocaleDateString("pt-BR")}
-          </span>
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <button
-          onClick={() => onToggle(ad)}
-          title={ad.active ? "Pausar" : "Ativar"}
-          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors"
-        >
-          {ad.active ? <EyeOff size={14} /> : <Eye size={14} />}
-        </button>
-        <button
-          onClick={() => onDelete(ad.id)}
-          title="Excluir"
-          className="w-8 h-8 rounded-lg border border-red-200 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={onChange}
+      className={`relative inline-flex h-5 w-9 rounded-full transition-colors shrink-0 ${checked ? "bg-[#0B2A66]" : "bg-gray-300"}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 rounded-full bg-white shadow transform transition-transform mt-0.5 ${checked ? "translate-x-[18px]" : "translate-x-0.5"}`}
+      />
+    </button>
   );
 }
 
-// ─── Page map visual ──────────────────────────────────────────────────────────
-function SlotStatus({ slotKey, label, accent, adsBySlot }: { slotKey: string; label: string; accent: string; adsBySlot: Record<string, Ad[]> }) {
-  const count = adsBySlot[slotKey]?.length ?? 0;
-  const active = adsBySlot[slotKey]?.filter((a) => a.active).length ?? 0;
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-8 h-5 rounded flex items-center justify-center text-[9px] font-black text-white shrink-0" style={{ backgroundColor: accent }}>
-        {slotKey.replace("slot_0", "")}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-gray-700 truncate">{label}</p>
-      </div>
-      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${count === 0 ? "bg-gray-100 text-gray-400" : "bg-green-100 text-green-700"}`}>
-        {count === 0 ? "Vazio" : `${active} ativo${active !== 1 ? "s" : ""}`}
-      </span>
-    </div>
-  );
+// ─── Empty form factory ────────────────────────────────────────────────────────
+function emptyForm() {
+  return { name: "", position: "" as AdPosition | "", link: "", preview: "", active: true };
 }
 
-function PageMap({ adsBySlot }: { adsBySlot: Record<string, Ad[]> }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-      <div className="flex items-center gap-2 mb-4">
-        <LayoutTemplate size={16} className="text-gray-500" />
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mapa de espaços</h3>
-        <span className="text-[11px] text-gray-400 ml-1">— onde cada espaço publicitário aparece</span>
-      </div>
+type StatusFilter = "todos" | "ativo" | "pausado";
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* ── Home ─────────────────────────────────────────── */}
-        <div className="flex gap-4 items-start">
-          <div className="shrink-0 relative w-[120px] h-[280px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
-            <div className="h-6 bg-gray-300 border-b border-gray-300 flex items-center px-2">
-              <div className="w-10 h-2.5 bg-gray-400 rounded-sm" />
-            </div>
-            <div className="p-1.5 space-y-1">
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[7].accent }}>AD 8</div>
-              <div className="h-10 bg-gray-300 rounded-sm" />
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[0].accent }}>AD 1</div>
-              <div className="h-6 bg-gray-200 rounded-sm" />
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[1].accent }}>AD 2</div>
-              <div className="h-6 bg-gray-200 rounded-sm" />
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[2].accent }}>AD 3</div>
-              <div className="h-4 bg-gray-200 rounded-sm" />
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[3].accent }}>AD 4</div>
-              <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[8].accent }}>AD 9</div>
-            </div>
-          </div>
-          <div className="flex-1 space-y-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><Home size={11}/> Home</p>
-            <SlotStatus key="slot_08" slotKey="slot_08" label="Topo (antes do 1º bloco)" accent={SLOTS[7].accent} adsBySlot={adsBySlot} />
-            {SLOTS.slice(0, 4).map((s) => (
-              <SlotStatus key={s.key} slotKey={s.key} label={s.location} accent={s.accent} adsBySlot={adsBySlot} />
-            ))}
-            <SlotStatus key="slot_09" slotKey="slot_09" label="Rodapé (antes do footer)" accent={SLOTS[8].accent} adsBySlot={adsBySlot} />
-          </div>
-        </div>
-
-        {/* ── Artigo + Editoria ─────────────────────────────── */}
-        <div className="flex gap-4 items-start">
-          <div className="shrink-0 relative w-[120px] h-[280px] bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
-            <div className="h-6 bg-gray-300 border-b border-gray-300 flex items-center px-2">
-              <div className="w-10 h-2.5 bg-gray-400 rounded-sm" />
-            </div>
-            <div className="p-1.5 space-y-1 flex gap-1">
-              {/* Article body */}
-              <div className="flex-1 space-y-1">
-                <div className="h-4 bg-gray-300 rounded-sm" />
-                <div className="h-2 bg-gray-200 rounded-sm" />
-                <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[9].accent }}>10</div>
-                <div className="h-16 bg-gray-200 rounded-sm" />
-                <div className="h-2.5 rounded-sm flex items-center justify-center text-[7px] font-bold text-white" style={{ backgroundColor: SLOTS[5].accent }}>AD 6</div>
-              </div>
-              {/* Sidebar */}
-              <div className="w-[28px] shrink-0 space-y-1 mt-4">
-                <div className="h-2.5 rounded-sm flex items-center justify-center text-[6px] font-bold text-white" style={{ backgroundColor: SLOTS[6].accent }}>7</div>
-                <div className="h-16 bg-gray-200 rounded-sm" />
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 space-y-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1"><FileText size={11}/> Artigo</p>
-            <SlotStatus slotKey="slot_10" label="In-content (entre imagem e corpo)" accent={SLOTS[9].accent} adsBySlot={adsBySlot} />
-            <SlotStatus slotKey="slot_06" label="Banner após o artigo" accent={SLOTS[5].accent} adsBySlot={adsBySlot} />
-            <SlotStatus slotKey="slot_07" label="Sidebar direita (sticky)" accent={SLOTS[6].accent} adsBySlot={adsBySlot} />
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1 pt-1 border-t border-gray-100 mt-1"><Newspaper size={11}/> Editoria / Arquivo</p>
-            <SlotStatus slotKey="slot_05" label="Banner nas editorias" accent={SLOTS[4].accent} adsBySlot={adsBySlot} />
-            <SlotStatus slotKey="slot_11" label="Sidebar das editorias" accent={SLOTS[10].accent} adsBySlot={adsBySlot} />
-          </div>
-        </div>
-
-      </div>
-    </div>
-  );
-}
-
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// ─── Main component ────────────────────────────────────────────────────────────
 export default function AdsManager() {
-  const [ads, setAds]         = useState<Ad[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openForm, setOpenForm] = useState<AdPosition | null>(null);
+  const [ads, setAds]           = useState<Ad[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [currentPage, setCurrentPage]   = useState(1);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm]           = useState(emptyForm());
+  const [dragOver, setDragOver]   = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const PAGE_SIZE = 6;
 
   const load = async () => {
     setLoading(true);
-    try { const data = await adminApi.getAds(); setAds(data.ads); }
-    catch { } finally { setLoading(false); }
+    try {
+      const data = await adminApi.getAds();
+      setAds(data.ads);
+    } catch { }
+    finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { void load(); }, []);
 
-  const adsBySlot = useMemo(() => {
-    const map: Record<string, Ad[]> = {};
-    SLOTS.forEach((s) => { map[s.key] = []; });
-    ads.forEach((a) => {
-      if (map[a.position]) map[a.position].push(a);
-    });
-    return map;
+  // ── Stats ────────────────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const active           = ads.filter((a) => a.active).length;
+    const totalImpressions = ads.reduce((s, a) => s + (a.impressions ?? 0), 0);
+    const totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
+    const ctr              = totalImpressions > 0
+      ? ((totalClicks / totalImpressions) * 100).toFixed(2).replace(".", ",") + "%"
+      : "0%";
+    return { active, totalImpressions, totalClicks, ctr };
   }, [ads]);
 
-  const totalActive = useMemo(() => ads.filter((a) => a.active).length, [ads]);
+  // ── Filtered + paginated ─────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let list = ads;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((a) =>
+        a.name.toLowerCase().includes(q) ||
+        (POSITION_LABELS[a.position] ?? a.position).toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter === "ativo")   list = list.filter((a) => a.active);
+    if (statusFilter === "pausado") list = list.filter((a) => !a.active);
+    return list;
+  }, [ads, search, statusFilter]);
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────────
   async function toggleActive(ad: Ad) {
     try { await adminApi.updateAd(ad.id, { active: !ad.active }); await load(); }
     catch (err) { alert((err as Error).message); }
@@ -437,107 +167,480 @@ export default function AdsManager() {
     catch (err) { alert((err as Error).message); }
   }
 
+  async function handleFile(file: File) {
+    if (file.size > 5 * 1024 * 1024) { alert("Arquivo maior que 5MB."); return; }
+    const b64 = await toBase64(file);
+    setForm((f) => ({ ...f, preview: b64 }));
+  }
+
+  function startEdit(ad: Ad) {
+    setEditingId(ad.id);
+    setForm({ name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active });
+  }
+
+  function resetForm() {
+    setEditingId(null);
+    setForm(emptyForm());
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.name.trim() || !form.position || !form.link.trim() || !form.preview) return;
+    setSaving(true);
+    try {
+      if (editingId) {
+        await adminApi.updateAd(editingId, {
+          name: form.name, link: form.link,
+          imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
+        });
+      } else {
+        await adminApi.createAd({
+          name: form.name, link: form.link,
+          imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
+        });
+      }
+      resetForm();
+      await load();
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title="Propagandas">
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="space-y-6">
 
-        {/* ── Header ── */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-black text-[#1a2448]">Propagandas</h2>
-            <p className="text-sm text-gray-500 mt-0.5">
-              {loading ? "Carregando…" : `${ads.length} propaganda${ads.length !== 1 ? "s" : ""} · ${totalActive} ativa${totalActive !== 1 ? "s" : ""}`}
-            </p>
+        {/* ══ Stat cards ══════════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+                <Megaphone size={22} className="text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Propagandas ativas</p>
+                <p className="text-2xl font-bold text-[#0F172A]">{stats.active}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">de {ads.length} cadastradas</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                <BarChart2 size={22} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Impressões (total)</p>
+                <p className="text-2xl font-bold text-[#0F172A]">{fmtNum(stats.totalImpressions)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">todas as propagandas</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center shrink-0">
+                <MousePointer size={22} className="text-orange-500" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Cliques (total)</p>
+                <p className="text-2xl font-bold text-[#0F172A]">{fmtNum(stats.totalClicks)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">todas as propagandas</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-fuchsia-50 flex items-center justify-center shrink-0">
+                <Sparkles size={22} className="text-fuchsia-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 font-medium">CTR médio</p>
+                <p className="text-2xl font-bold text-[#0F172A]">{stats.ctr}</p>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-3">cliques ÷ impressões</p>
           </div>
         </div>
 
-        {/* ── Mapa visual ── */}
-        <PageMap adsBySlot={adsBySlot} />
+        {/* ══ 2-column grid ═══════════════════════════════════════════════════ */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
 
-        {/* ── Slots ── */}
-        {loading ? (
-          <div className="text-center py-12 text-gray-400 text-sm">Carregando propagandas…</div>
-        ) : (
-          <div className="space-y-4">
-            {SLOTS.map((slot) => {
-              const slotAds = adsBySlot[slot.key] ?? [];
-              const isOpen  = openForm === slot.key;
+          {/* ── LEFT: table panel ──────────────────────────────────────────── */}
+          <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
 
-              return (
-                <div key={slot.key} className={`rounded-xl border-2 overflow-hidden ${slot.bg}`}>
-                  {/* Slot header */}
-                  <div className="flex items-center gap-3 px-5 py-3.5">
-                    <div
-                      className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0"
-                      style={{ backgroundColor: slot.accent }}
-                    >
-                      {slot.icon}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-bold text-[#1a2448] text-sm">{slot.label}</p>
-                      <p className="text-[11px] text-gray-500 truncate">{slot.location} · {slot.hint}</p>
-                    </div>
-                    {slotAds.length > 1 && (
-                      <span className="flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 shrink-0">
-                        <GalleryHorizontal size={11} />
-                        Carrossel · {slotAds.length}
-                      </span>
-                    )}
-                    {slotAds.length === 1 && (
-                      <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-white/80 text-gray-600 shrink-0">
-                        1 anúncio
-                      </span>
-                    )}
-                    <button
-                      onClick={() => setOpenForm(isOpen ? null : slot.key)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-colors shrink-0"
-                      style={{ backgroundColor: slot.accent }}
-                    >
-                      <Plus size={13} />
-                      {isOpen ? "Fechar" : "Adicionar"}
-                    </button>
-                  </div>
+            {/* Filter bar */}
+            <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              <div className="relative flex-1 max-w-xs">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar propagandas..."
+                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-medium">Status</span>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="ativo">Ativo</option>
+                  <option value="pausado">Pausado</option>
+                </select>
+              </div>
+              <button
+                onClick={resetForm}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                style={{ backgroundColor: "#E71D36" }}
+              >
+                <Plus size={16} />
+                Nova propaganda
+              </button>
+            </div>
 
-                  {/* Inline add form */}
-                  {isOpen && (
-                    <div className="px-5 pb-4">
-                      <SlotForm
-                        slotKey={slot.key}
-                        onSaved={() => { setOpenForm(null); load(); }}
-                        onCancel={() => setOpenForm(null)}
-                      />
-                    </div>
-                  )}
-
-                  {/* Ad cards */}
-                  {slotAds.length > 0 && (
-                    <div className="px-5 pb-4 space-y-2">
-                      {slotAds.map((ad) => (
-                        <AdCard
+            {/* Table body */}
+            {loading ? (
+              <div className="py-16 text-center text-sm text-gray-400">Carregando propagandas…</div>
+            ) : filtered.length === 0 ? (
+              <div className="py-16 text-center text-sm text-gray-400">Nenhuma propaganda encontrada</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Status</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paginated.map((ad, i) => (
+                        <tr
                           key={ad.id}
-                          ad={ad}
-                          accent={slot.accent}
-                          onToggle={toggleActive}
-                          onDelete={handleDelete}
-                        />
+                          className={`hover:bg-gray-50/50 transition-colors ${i < paginated.length - 1 ? "border-b border-gray-50" : ""} ${editingId === ad.id ? "bg-blue-50/30" : ""}`}
+                        >
+                          {/* Propaganda */}
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center">
+                                {ad.imageBase64 ? (
+                                  <img src={ad.imageBase64} alt={ad.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <ImageIcon size={14} className="text-gray-300" />
+                                )}
+                              </div>
+                              <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{ad.name}</span>
+                            </div>
+                          </td>
+                          {/* Posição */}
+                          <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                            {POSITION_LABELS[ad.position] ?? ad.position}
+                          </td>
+                          {/* Formato */}
+                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                            {FORMAT_LABELS[ad.position] ?? "—"}
+                          </td>
+                          {/* Impressões */}
+                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                            {fmtNum(ad.impressions ?? 0)}
+                          </td>
+                          {/* Cliques */}
+                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                            {fmtNum(ad.clicks ?? 0)}
+                          </td>
+                          {/* CTR */}
+                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                            {calcCTR(ad.clicks ?? 0, ad.impressions ?? 0)}
+                          </td>
+                          {/* Status */}
+                          <td className="px-4 py-3 text-center">
+                            <StatusBadge active={ad.active} />
+                          </td>
+                          {/* Ações */}
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                onClick={() => startEdit(ad)}
+                                title="Editar"
+                                className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
+                                  editingId === ad.id
+                                    ? "border-[#0B2A66] bg-[#0B2A66] text-white"
+                                    : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66]"
+                                }`}
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <ToggleSwitch
+                                checked={ad.active}
+                                onChange={() => { void toggleActive(ad); }}
+                              />
+                              <button
+                                onClick={() => { void handleDelete(ad.id); }}
+                                title="Excluir"
+                                className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
                       ))}
-                    </div>
-                  )}
+                    </tbody>
+                  </table>
+                </div>
 
-                  {/* Empty state */}
-                  {slotAds.length === 0 && !isOpen && (
-                    <div className="px-5 pb-4">
-                      <div className="rounded-lg border border-dashed border-current/30 py-4 flex items-center justify-center gap-2 opacity-40">
-                        <ImageIcon size={14} />
-                        <span className="text-xs font-medium">Espaço vazio — clique em Adicionar para publicar aqui</span>
-                      </div>
+                {/* Pagination */}
+                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+                  <p className="text-xs text-gray-500">
+                    Mostrando {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length} propagandas
+                  </p>
+                  {totalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <ChevronLeft size={14} />
+                      </button>
+                      {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
+                        const page = i + 1;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setCurrentPage(page)}
+                            className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                              currentPage === page
+                                ? "bg-[#0B2A66] text-white"
+                                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      })}
+                      {totalPages > 4 && (
+                        <>
+                          <span className="text-gray-400 text-xs px-1">…</span>
+                          <button
+                            onClick={() => setCurrentPage(totalPages)}
+                            className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                              currentPage === totalPages
+                                ? "bg-[#0B2A66] text-white"
+                                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                            }`}
+                          >
+                            {totalPages}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <ChevronRight size={14} />
+                      </button>
                     </div>
                   )}
                 </div>
-              );
-            })}
+              </>
+            )}
           </div>
-        )}
+
+          {/* ── RIGHT: form + tips ─────────────────────────────────────────── */}
+          <div className="space-y-4">
+
+            {/* Form card */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="mb-4">
+                <h3 className="font-semibold text-[#0F172A]">
+                  {editingId ? "Editar propaganda" : "Adicionar nova propaganda"}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {editingId ? "Atualize as informações do anúncio." : "Preencha os dados para criar um novo anúncio."}
+                </p>
+              </div>
+
+              <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
+                {/* Nome */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Nome da propaganda <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="Ex.: Banner Topo"
+                    required
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+                  />
+                </div>
+
+                {/* Posição */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Posição <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={form.position}
+                    onChange={(e) => setForm((f) => ({ ...f, position: e.target.value as AdPosition }))}
+                    required
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
+                  >
+                    <option value="">Selecione a posição</option>
+                    {POSITION_OPTIONS.slice(0, 11).map((p) => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Formato (derivado da posição) */}
+                {form.position && (
+                  <div>
+                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Formato recomendado</label>
+                    <div className="px-3 py-2.5 text-sm border border-gray-100 rounded-xl bg-gray-50 text-gray-600">
+                      {FORMAT_LABELS[form.position] ?? "—"} px
+                    </div>
+                  </div>
+                )}
+
+                {/* Destino URL */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Destino (URL) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    value={form.link}
+                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+                    placeholder="https://..."
+                    type="url"
+                    required
+                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+                  />
+                </div>
+
+                {/* Arquivo do anúncio */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                    Arquivo do anúncio <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*,.gif"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { void handleFile(f); } }}
+                  />
+                  {form.preview ? (
+                    <div className="relative rounded-xl border border-gray-200 overflow-hidden">
+                      <img src={form.preview} alt="Preview" className="w-full max-h-28 object-contain bg-gray-50" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setForm((f) => ({ ...f, preview: "" }));
+                          if (fileRef.current) fileRef.current.value = "";
+                        }}
+                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-gray-600 hover:text-red-500"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                      onDragLeave={() => setDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setDragOver(false);
+                        const f = e.dataTransfer.files?.[0];
+                        if (f) { void handleFile(f); }
+                      }}
+                      onClick={() => fileRef.current?.click()}
+                      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-6 cursor-pointer transition-colors ${
+                        dragOver ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <Upload size={20} className={dragOver ? "text-[#0B2A66]" : "text-gray-400"} />
+                      <p className="text-xs text-center text-gray-500 leading-relaxed">
+                        Arraste e solte o arquivo aqui<br />
+                        <span className="text-[#0B2A66] font-medium">ou clique para selecionar</span>
+                      </p>
+                      <p className="text-[10px] text-gray-400">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Status toggle */}
+                <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                  <span className="text-sm font-medium text-[#0F172A]">Status</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{form.active ? "Ativo" : "Pausado"}</span>
+                    <ToggleSwitch
+                      checked={form.active}
+                      onChange={() => setForm((f) => ({ ...f, active: !f.active }))}
+                    />
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-1">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving || !form.name.trim() || !form.position || !form.link.trim() || !form.preview}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: "#E71D36" }}
+                  >
+                    {saving ? "Salvando…" : editingId ? "Atualizar" : "Salvar propaganda"}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Tips card */}
+            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+              <div className="flex items-center gap-2 mb-3">
+                <Info size={14} className="text-blue-600" />
+                <span className="text-xs font-semibold text-blue-700">Dicas</span>
+              </div>
+              <ul className="space-y-1.5">
+                {[
+                  "Use formatos responsivos para melhor experiência.",
+                  "Verifique o tamanho máximo do arquivo (5MB).",
+                  "Anúncios inativos não serão exibidos no site.",
+                ].map((tip, i) => (
+                  <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+                    <span className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+          </div>
+        </div>
       </div>
     </AdminLayout>
   );
