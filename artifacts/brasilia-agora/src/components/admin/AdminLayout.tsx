@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronRight, Globe, Newspaper, Webhook, Megaphone,
   Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap,
-  ChevronDown, Bell, Search, ExternalLink,
+  ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
+  UserCircle, KeyRound, Eye, AlertCircle, CheckCircle, Info,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 
@@ -75,6 +76,210 @@ function usePanelTheme() {
 
 function formatDate() {
   return new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// ─── Notification types ───────────────────────────────────────────────────────
+interface Notification {
+  id: string;
+  type: "info" | "success" | "warning" | "error";
+  title: string;
+  body: string;
+  time: string;
+  read: boolean;
+}
+
+const INITIAL_NOTIFICATIONS: Notification[] = [
+  { id: "1", type: "success", title: "Artigo publicado",      body: "\"Economia cresce 2,3% no primeiro trimestre\" foi publicado.",  time: "2 min atrás",  read: false },
+  { id: "2", type: "info",    title: "Nova fonte RSS",        body: "Fonte Correio Braziliense sincronizada com 14 novos artigos.",    time: "18 min atrás", read: false },
+  { id: "3", type: "warning", title: "Propaganda expirando",  body: "Banner Principal expira em 2 dias. Renove o contrato.",          time: "1 h atrás",    read: false },
+  { id: "4", type: "error",   title: "Falha no RSS",          body: "Não foi possível acessar feed do Metrópoles. Verifique a URL.",  time: "3 h atrás",    read: true  },
+  { id: "5", type: "info",    title: "Backup realizado",      body: "Backup automático concluído com sucesso às 04:00.",              time: "8 h atrás",    read: true  },
+];
+
+const NOTIF_ICON: Record<Notification["type"], React.ElementType> = {
+  success: CheckCircle,
+  info:    Info,
+  warning: AlertCircle,
+  error:   AlertCircle,
+};
+const NOTIF_COLOR: Record<Notification["type"], string> = {
+  success: "#16A34A",
+  info:    "#2563EB",
+  warning: "#D97706",
+  error:   "#DC2626",
+};
+const NOTIF_BG: Record<Notification["type"], string> = {
+  success: "#DCFCE7",
+  info:    "#DBEAFE",
+  warning: "#FEF3C7",
+  error:   "#FEE2E2",
+};
+
+function NotificationBell({ accent }: { accent: string }) {
+  const [open, setOpen]               = useState(false);
+  const [notifs, setNotifs]           = useState(INITIAL_NOTIFICATIONS);
+  const ref                           = useRef<HTMLDivElement>(null);
+  const unread                        = notifs.filter((n) => !n.read).length;
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  function markAllRead() { setNotifs((prev) => prev.map((n) => ({ ...n, read: true }))); }
+  function dismiss(id: string) { setNotifs((prev) => prev.filter((n) => n.id !== id)); }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors"
+      >
+        <Bell size={18} />
+        {unread > 0 && (
+          <span
+            className="absolute top-1.5 right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white text-[9px] font-bold"
+            style={{ backgroundColor: accent }}
+          >
+            {unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-2 w-[360px] bg-white rounded-2xl border border-slate-200 z-50 overflow-hidden"
+          style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.12)" }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-[13px] font-bold text-slate-800">Notificações</span>
+              {unread > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: accent }}>
+                  {unread}
+                </span>
+              )}
+            </div>
+            {unread > 0 && (
+              <button onClick={markAllRead} className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-[#0B2A66] transition-colors">
+                <CheckCheck size={13} /> Marcar todas como lidas
+              </button>
+            )}
+          </div>
+
+          {/* List */}
+          <div className="max-h-[340px] overflow-y-auto">
+            {notifs.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 text-sm">Nenhuma notificação</div>
+            ) : (
+              notifs.map((n) => {
+                const NIcon = NOTIF_ICON[n.type];
+                return (
+                  <div
+                    key={n.id}
+                    className={`flex gap-3 px-4 py-3 border-b border-slate-50 transition-colors ${n.read ? "bg-white" : "bg-blue-50/40"}`}
+                  >
+                    <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: NOTIF_BG[n.type] }}>
+                      <NIcon size={14} style={{ color: NOTIF_COLOR[n.type] }} />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-[12px] font-semibold leading-tight ${n.read ? "text-slate-600" : "text-slate-800"}`}>{n.title}</p>
+                        <button onClick={() => dismiss(n.id)} className="text-slate-300 hover:text-slate-500 shrink-0 mt-0.5"><X size={12} /></button>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{n.body}</p>
+                      <p className="text-[10px] text-slate-400 mt-1">{n.time}</p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-2.5 border-t border-slate-100 text-center">
+            <button className="text-[11px] font-medium text-[#0B2A66] hover:underline">Ver todas as notificações</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UserMenu({ onLogout }: { onLogout: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref             = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-3 px-2 py-1.5 rounded-xl hover:bg-slate-100 transition-colors"
+      >
+        <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0 bg-[#0B2A66]">
+          AD
+        </div>
+        <div className="hidden lg:block text-left">
+          <p className="text-sm font-semibold text-slate-800 leading-none">Administrador</p>
+          <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
+        </div>
+        <ChevronDown size={13} className={`text-slate-400 transition-transform hidden lg:block ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-2 w-[220px] bg-white rounded-2xl border border-slate-200 z-50 overflow-hidden py-1.5"
+          style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.12)" }}
+        >
+          {/* User info */}
+          <div className="px-4 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-[#0B2A66] flex items-center justify-center text-white text-sm font-bold shrink-0">AD</div>
+              <div>
+                <p className="text-[13px] font-bold text-slate-800 leading-none">Administrador</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Super Admin</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="py-1">
+            {[
+              { Icon: UserCircle, label: "Minha conta",    onClick: () => {} },
+              { Icon: KeyRound,   label: "Alterar senha",  onClick: () => {} },
+              { Icon: Eye,        label: "Ver portal",     onClick: () => window.open("/", "_blank") },
+            ].map(({ Icon, label, onClick }) => (
+              <button key={label} onClick={() => { onClick(); setOpen(false); }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-600 hover:bg-slate-50 hover:text-[#0B2A66] transition-colors text-left">
+                <Icon size={15} className="text-slate-400" /> {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="border-t border-slate-100 py-1">
+            <button
+              onClick={() => { onLogout(); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50 transition-colors text-left"
+            >
+              <LogOut size={15} /> Sair
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function AdminLayout({ children, title, noPadding, topbarExtra }: AdminLayoutProps) {
@@ -208,30 +413,15 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
             ) : (
               <>
                 {/* Date */}
-                <span className="text-sm text-slate-500 hidden lg:block">{formatDate()}</span>
+                <span className="text-sm text-slate-500 hidden lg:flex items-center gap-2">
+                  <span className="text-slate-400">📅</span> {formatDate()}
+                </span>
 
                 {/* Notifications */}
-                <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
-                  <Bell size={18} />
-                  <span
-                    className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-                    style={{ backgroundColor: accent }}
-                  />
-                </button>
+                <NotificationBell accent={accent} />
 
                 {/* User */}
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                    style={{ backgroundColor: "#0B2A66" }}
-                  >
-                    AD
-                  </div>
-                  <div className="hidden lg:block">
-                    <p className="text-sm font-semibold text-slate-800 leading-none">Administrador</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
-                  </div>
-                </div>
+                <UserMenu onLogout={handleLogout} />
               </>
             )}
           </div>
