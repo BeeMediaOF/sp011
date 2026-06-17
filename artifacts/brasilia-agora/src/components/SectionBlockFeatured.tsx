@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
+import { useSite } from "../hooks/useSite";
 
 interface Article {
   id: string;
@@ -19,6 +20,10 @@ interface Props {
 }
 
 export default function SectionBlockFeatured({ title, color, href, articles }: Props) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
+
   const [featured, ...rest] = articles;
   const sideItems = rest.slice(0, 4);
 
@@ -83,8 +88,8 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                 {featured.summary}
               </p>
               <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400">
-                <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0" />
-                <span className="font-medium text-gray-600">Bee News</span>
+                <img src={bylineLogo} alt={bylineName} className="w-4 h-4 rounded-full object-cover shrink-0" />
+                <span className="font-medium text-gray-600">{bylineName}</span>
                 <span className="w-1 h-1 rounded-full bg-gray-300" />
                 <span>{featured.time}</span>
               </div>

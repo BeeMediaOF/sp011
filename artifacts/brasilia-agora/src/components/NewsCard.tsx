@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { useSite } from "../hooks/useSite";
 
 interface NewsCardProps {
   id: string;
@@ -12,6 +13,10 @@ interface NewsCardProps {
 }
 
 export default function NewsCard({ id, title, summary, image, chapeu, chapeuColor, author, time }: NewsCardProps) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
+
   return (
     <Link href={`/artigo/${id}`} className="block group">
       <div className="overflow-hidden bg-gray-100 mb-3">
@@ -31,8 +36,8 @@ export default function NewsCard({ id, title, summary, image, chapeu, chapeuColo
         {summary}
       </p>
       <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-2">
-        <img src="/favicon.jpg" alt="Bee News" className="w-4 h-4 rounded-full object-cover shrink-0" />
-        <span className="font-medium text-gray-600">Bee News</span>
+        <img src={bylineLogo} alt={bylineName} className="w-4 h-4 rounded-full object-cover shrink-0" />
+        <span className="font-medium text-gray-600">{bylineName}</span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span>{time}</span>
       </div>
