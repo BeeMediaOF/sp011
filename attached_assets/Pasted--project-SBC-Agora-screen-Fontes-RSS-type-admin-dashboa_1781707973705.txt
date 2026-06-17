@@ -1,0 +1,431 @@
+{
+  "project": "SBC Agora",
+  "screen": "Fontes RSS",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "dangerColor": "#EF4444",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": true
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        },
+        {
+          "label": "Menu",
+          "icon": "menu",
+          "active": false
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "102px",
+      "background": "#FFFFFF",
+      "title": "Fontes RSS",
+      "subtitle": "Gerencie as fontes de notícias via RSS do portal.",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "rss_stats",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Fontes ativas",
+              "value": "24",
+              "variation": "+2",
+              "comparison": "este mês",
+              "trend": "up",
+              "icon": "rss",
+              "iconColor": "green",
+              "background": "#ECFDF5"
+            },
+            {
+              "title": "Total de itens hoje",
+              "value": "152",
+              "variation": "+10,4%",
+              "comparison": "vs ontem",
+              "trend": "up",
+              "icon": "file-text",
+              "iconColor": "orange",
+              "background": "#FFF7ED"
+            },
+            {
+              "title": "Importados (7 dias)",
+              "value": "1.248",
+              "variation": "+24,3%",
+              "comparison": "vs 7 dias anteriores",
+              "trend": "up",
+              "icon": "download",
+              "iconColor": "blue",
+              "background": "#EFF6FF"
+            },
+            {
+              "title": "Com erro",
+              "value": "2",
+              "description": "Ver fontes com erro",
+              "icon": "alert-triangle",
+              "iconColor": "red",
+              "background": "#FEF2F2"
+            }
+          ]
+        },
+        {
+          "type": "rss_management_grid",
+          "columns": "2fr 0.85fr",
+          "items": [
+            {
+              "component": "rss_table_panel",
+              "cardStyle": {
+                "background": "#FFFFFF",
+                "borderRadius": "16px",
+                "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+              },
+              "filters": {
+                "search": {
+                  "placeholder": "Buscar fontes...",
+                  "icon": "search"
+                },
+                "status": {
+                  "label": "Status",
+                  "selected": "Todos",
+                  "options": ["Todos", "Ativo", "Pausado", "Erro", "Inativo"]
+                }
+              },
+              "table": {
+                "columns": [
+                  {
+                    "label": "Fonte",
+                    "key": "source",
+                    "type": "source_with_icon"
+                  },
+                  {
+                    "label": "URL",
+                    "key": "url",
+                    "type": "link"
+                  },
+                  {
+                    "label": "Categoria",
+                    "key": "category",
+                    "type": "text"
+                  },
+                  {
+                    "label": "Última importação",
+                    "key": "lastImport",
+                    "type": "datetime"
+                  },
+                  {
+                    "label": "Status",
+                    "key": "status",
+                    "type": "badge"
+                  },
+                  {
+                    "label": "Itens",
+                    "key": "items",
+                    "type": "number"
+                  },
+                  {
+                    "label": "Ações",
+                    "key": "actions",
+                    "type": "icons"
+                  }
+                ],
+                "rows": [
+                  {
+                    "id": 1,
+                    "source": {
+                      "name": "G1 - São Paulo",
+                      "iconText": "g1",
+                      "iconColor": "#E71D36"
+                    },
+                    "url": "https://g1.globo.com/sp/rss/g1/sp/",
+                    "category": "Cidades",
+                    "lastImport": "23 mai, 2025 - 09:45",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "items": 45,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 2,
+                    "source": {
+                      "name": "Folha de S.Paulo",
+                      "iconText": "F",
+                      "iconColor": "#0EA5E9"
+                    },
+                    "url": "https://www1.folha.uol.com.br/rss/",
+                    "category": "Política",
+                    "lastImport": "23 mai, 2025 - 09:30",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "items": 30,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 3,
+                    "source": {
+                      "name": "UOL Notícias",
+                      "iconText": "UOL",
+                      "iconColor": "#020617"
+                    },
+                    "url": "https://noticias.uol.com.br/feed/",
+                    "category": "Geral",
+                    "lastImport": "23 mai, 2025 - 09:15",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "items": 28,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 4,
+                    "source": {
+                      "name": "Agência Brasil",
+                      "icon": "map-pin",
+                      "iconColor": "#16A34A"
+                    },
+                    "url": "https://agenciabrasil.ebc.com.br/rss/",
+                    "category": "Economia",
+                    "lastImport": "23 mai, 2025 - 08:50",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "items": 22,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 5,
+                    "source": {
+                      "name": "Terra - Notícias",
+                      "iconText": "T",
+                      "iconColor": "#F97316"
+                    },
+                    "url": "https://www.terra.com.br/rss/",
+                    "category": "Geral",
+                    "lastImport": "23 mai, 2025 - 08:40",
+                    "status": {
+                      "label": "Ativo",
+                      "color": "green"
+                    },
+                    "items": 20,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 6,
+                    "source": {
+                      "name": "Estadão",
+                      "iconText": "E",
+                      "iconColor": "#020617"
+                    },
+                    "url": "https://www.estadao.com.br/rss/",
+                    "category": "Política",
+                    "lastImport": "23 mai, 2025 - 08:20",
+                    "status": {
+                      "label": "Erro",
+                      "color": "red"
+                    },
+                    "items": 0,
+                    "actions": ["play", "edit", "more"]
+                  },
+                  {
+                    "id": 7,
+                    "source": {
+                      "name": "Veja",
+                      "iconText": "veja",
+                      "iconColor": "#020617"
+                    },
+                    "url": "https://veja.abril.com.br/rss/",
+                    "category": "Política",
+                    "lastImport": "23 mai, 2025 - 08:10",
+                    "status": {
+                      "label": "Erro",
+                      "color": "red"
+                    },
+                    "items": 0,
+                    "actions": ["play", "edit", "more"]
+                  }
+                ],
+                "pagination": {
+                  "summary": "Mostrando 1 a 7 de 24 fontes",
+                  "currentPage": 1,
+                  "pages": [1, 2, 3, "...", 4],
+                  "hasPrevious": true,
+                  "hasNext": true
+                }
+              }
+            },
+            {
+              "component": "add_rss_source_panel",
+              "title": "Adicionar nova fonte RSS",
+              "description": "Informe os dados da fonte para começar a importar.",
+              "primaryActionTop": {
+                "label": "Adicionar fonte RSS",
+                "icon": "plus",
+                "style": "solid_red"
+              },
+              "fields": [
+                {
+                  "label": "Nome da fonte",
+                  "required": true,
+                  "type": "text",
+                  "placeholder": "Ex.: G1 - São Paulo"
+                },
+                {
+                  "label": "URL do feed",
+                  "required": true,
+                  "type": "url",
+                  "placeholder": "Ex.: https://site.com.br/rss",
+                  "helper": "Cole a URL do feed RSS"
+                },
+                {
+                  "label": "Categoria",
+                  "required": true,
+                  "type": "select",
+                  "placeholder": "Selecione uma categoria",
+                  "options": ["Cidades", "Política", "Economia", "Esportes", "Cultura", "Geral"]
+                }
+              ],
+              "toggle": {
+                "label": "Status",
+                "description": "Ativar fonte imediatamente",
+                "enabled": true
+              },
+              "actions": [
+                {
+                  "label": "Cancelar",
+                  "style": "outline"
+                },
+                {
+                  "label": "Salvar fonte",
+                  "style": "solid_red"
+                }
+              ],
+              "tip": {
+                "icon": "info",
+                "title": "Dica",
+                "text": "Certifique-se de que a URL do feed RSS está correta e é pública."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Fontes RSS minimalista para o painel administrativo do portal SBC Agora, seguindo a identidade visual azul-marinho, vermelho e branco. A sidebar deve ficar à esquerda com o item Fontes RSS ativo em vermelho. A topbar deve ter título Fontes RSS, subtítulo de gerenciamento, busca, seletor de data, notificações e perfil do administrador. No conteúdo, exiba quatro cards de métricas: Fontes ativas, Total de itens hoje, Importados em 7 dias e Com erro. Abaixo, organize a página em duas colunas: à esquerda, uma tabela de fontes RSS com busca, filtro de status, URL, categoria, última importação, status, itens e ações; à direita, um painel para adicionar nova fonte RSS com campos de nome, URL do feed, categoria, toggle de status, botões Cancelar e Salvar fonte, além de um box de dica. Use cards brancos, sombras suaves, cantos arredondados, muito respiro e interface premium."
+}

@@ -5,7 +5,7 @@ import {
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
   Settings, Key, Brain, Clock, BadgeCheck, Zap, Eye, EyeOff,
   Play, ListChecks, Square, CheckSquare, StopCircle, Timer,
-  Loader2, SplitSquareHorizontal, BookOpen, Pencil, X,
+  Loader2, SplitSquareHorizontal, BookOpen, Pencil, X, Search,
 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL ?? "/";
