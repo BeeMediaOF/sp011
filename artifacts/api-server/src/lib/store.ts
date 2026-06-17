@@ -412,13 +412,39 @@ export const store = {
   // Articles
   getArticles: () => [..._store.articles],
   getArticle: (id: string) => _store.articles.find((a) => a.id === id) ?? null,
-  isDuplicateArticle: (title: string, rssSourceUrl?: string): boolean => {
+  isDuplicateArticle: (title: string, rssSourceUrl?: string, imageUrl?: string): boolean => {
     const norm = title.trim().toLowerCase();
-    return _store.articles.some(
-      (a) =>
-        a.title.trim().toLowerCase() === norm ||
-        (rssSourceUrl && rssSourceUrl.length > 0 && a.rssSourceUrl === rssSourceUrl)
-    );
+
+    // Helper: strip accents + punctuation, return meaningful words (>3 chars)
+    const keywords = (s: string): Set<string> =>
+      new Set(
+        s.toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter(w => w.length > 3)
+      );
+
+    const incomingWords = keywords(title);
+
+    return _store.articles.some((a) => {
+      // 1. Exact title match
+      if (a.title.trim().toLowerCase() === norm) return true;
+      // 2. Same source URL
+      if (rssSourceUrl && rssSourceUrl.length > 0 && a.rssSourceUrl === rssSourceUrl) return true;
+      // 3. Same image URL (strong signal: same story re-published by another source)
+      if (imageUrl && imageUrl.length > 10 && a.imageUrl === imageUrl) return true;
+      // 4. Title word-overlap ≥ 65% (catches same story with slightly different wording)
+      if (incomingWords.size >= 4) {
+        const existingWords = keywords(a.title);
+        if (existingWords.size >= 4) {
+          const shared = [...incomingWords].filter(w => existingWords.has(w)).length;
+          const overlap = shared / Math.min(incomingWords.size, existingWords.size);
+          if (overlap >= 0.65) return true;
+        }
+      }
+      return false;
+    });
   },
   createArticle: (data: Omit<Article, "id" | "createdAt" | "updatedAt">): Article => {
     const article: Article = {

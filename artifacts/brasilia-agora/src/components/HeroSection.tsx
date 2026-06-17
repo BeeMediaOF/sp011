@@ -112,7 +112,7 @@ function FeaturedCard({
         >
           {item.chapeu}
         </span>
-        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[18px] sm:text-[20px] line-clamp-4 mb-2 transition-colors group-hover:text-gray-200"
+        <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[15px] sm:text-[17px] line-clamp-3 mb-2 transition-colors group-hover:text-gray-200"
           dangerouslySetInnerHTML={{ __html: item.title }}
         />
         <div className="flex items-center gap-2 text-[11px] text-white/60">

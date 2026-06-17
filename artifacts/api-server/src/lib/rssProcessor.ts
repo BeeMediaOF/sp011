@@ -580,8 +580,8 @@ export async function autoProcessArticle(
   const { autoMode, giveCredit, name: sourceName, category } = src;
   if (autoMode === "none") return;
 
-  // Skip duplicates — check by title or source URL
-  if (store.isDuplicateArticle(art.title, art.link)) {
+  // Skip duplicates — check by title, source URL, image URL, or similar wording
+  if (store.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
     addLog({ type: "duplicate", sourceName, articleTitle: art.title, message: "Artigo duplicado — ignorado" });
     logger.info({ title: art.title }, "Skipping duplicate RSS article");
     return;
@@ -655,7 +655,7 @@ export async function processDueSource(src: RssSource): Promise<number> {
   let processed = 0;
   for (const art of articles) {
     if (processed >= MAX_PER_ROUND) break;
-    if (store.isDuplicateArticle(art.title, art.link)) {
+    if (store.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
       logger.info({ title: art.title }, "Skipping duplicate RSS article in scheduler");
       continue;
     }
