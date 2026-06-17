@@ -35,12 +35,10 @@ import Dashboard from "@/pages/admin/Dashboard";
 import Articles from "@/pages/admin/Articles";
 import ArticleEdit from "@/pages/admin/ArticleEdit";
 import MenuManager from "@/pages/admin/MenuManager";
-import LogoUpload from "@/pages/admin/LogoUpload";
 import Settings from "@/pages/admin/Settings";
 import Webhook from "@/pages/admin/Webhook";
 import AdsManager from "@/pages/admin/AdsManager";
 import ColumnistsManager from "@/pages/admin/ColumnistsManager";
-import ContactSettings from "@/pages/admin/ContactSettings";
 import Analytics from "@/pages/admin/Analytics";
 import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
 import RSSManager from "@/pages/admin/RSSManager";
@@ -114,7 +112,7 @@ function Router() {
         <RequireAuth><MenuManager /></RequireAuth>
       </Route>
       <Route path="/admin/logo">
-        <RequireAuth><LogoUpload /></RequireAuth>
+        <RequireAuth><Settings /></RequireAuth>
       </Route>
       <Route path="/admin/configuracoes">
         <RequireAuth><Settings /></RequireAuth>
@@ -129,7 +127,7 @@ function Router() {
         <RequireAuth><ColumnistsManager /></RequireAuth>
       </Route>
       <Route path="/admin/contato">
-        <RequireAuth><ContactSettings /></RequireAuth>
+        <RequireAuth><Settings /></RequireAuth>
       </Route>
       <Route path="/admin/analytics">
         <RequireAuth><Analytics /></RequireAuth>

@@ -23,10 +23,8 @@ const NAV_MAIN = [
 ];
 
 const NAV_CONFIG = [
-  { label: "Webhook",             icon: Webhook, path: "/admin/webhook" },
-  { label: "Logo do Painel",      icon: Image,   path: "/admin/logo" },
-  { label: "Informações do Site", icon: Globe,   path: "/admin/configuracoes" },
-  { label: "Contato",             icon: Mail,    path: "/admin/contato" },
+  { label: "Webhook",        icon: Webhook,   path: "/admin/webhook" },
+  { label: "Configurações",  icon: Settings,  path: "/admin/configuracoes" },
 ];
 
 interface AdminLayoutProps {
