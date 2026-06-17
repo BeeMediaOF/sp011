@@ -1817,7 +1817,10 @@
         "id": "hero",
         "name": "Hero / Destaques",
         "visible": true,
-        "order": 0
+        "order": 0,
+        "category": "geral",
+        "layout": "featured",
+        "color": "#6b7280"
       },
       {
         "id": "brasil",
