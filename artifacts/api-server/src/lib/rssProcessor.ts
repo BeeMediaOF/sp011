@@ -193,6 +193,34 @@ function parseRewriteResult(raw: string): RewriteResult {
   }
 }
 
+/** Retry helper — retries on 503/UNAVAILABLE up to maxAttempts times */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxAttempts = 3,
+  baseDelayMs = 5_000,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err);
+      const isRetryable =
+        msg.includes("503") ||
+        msg.includes("UNAVAILABLE") ||
+        msg.includes("overloaded") ||
+        msg.includes("high demand") ||
+        msg.includes("rate limit") ||
+        msg.includes("429");
+      if (!isRetryable || attempt === maxAttempts) throw err;
+      const delay = baseDelayMs * attempt; // 5s, 10s, 15s
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
@@ -208,43 +236,49 @@ export async function rewriteWithAI(
     const apiKey = settings.rssAiApiKey;
     if (!apiKey) throw new Error("API key da OpenAI não configurada");
     const model = settings.rssAiModel || "gpt-4o-mini";
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 8192,
-      }),
-      signal: AbortSignal.timeout(60_000),
+    raw = await withRetry(async () => {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 8192,
+        }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new Error(`OpenAI: ${err?.error?.message ?? res.statusText}`);
+      }
+      const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+      return data.choices?.[0]?.message?.content ?? "";
     });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { error?: { message?: string } };
-      throw new Error(`OpenAI: ${err?.error?.message ?? res.statusText}`);
-    }
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    raw = data.choices?.[0]?.message?.content ?? "";
   } else if (provider === "gemini_paid") {
     const apiKey = settings.rssAiApiKey;
     if (!apiKey) throw new Error("API key do Gemini não configurada");
     const model = settings.rssAiModel || "gemini-2.5-flash";
     const ai = new GoogleGenAI({ apiKey });
-    const resp = await ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { maxOutputTokens: 8192 },
+    raw = await withRetry(async () => {
+      const resp = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: { maxOutputTokens: 8192 },
+      });
+      return resp.text ?? "";
     });
-    raw = resp.text ?? "";
   } else {
     // Default: gemini_free (Replit integration)
     const ai    = getGeminiFree();
     const model = settings.rssAiModel || "gemini-2.5-flash";
-    const resp  = await ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: { maxOutputTokens: 8192 },
+    raw = await withRetry(async () => {
+      const resp = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: { maxOutputTokens: 8192 },
+      });
+      return resp.text ?? "";
     });
-    raw = resp.text ?? "";
   }
 
   return parseRewriteResult(raw);

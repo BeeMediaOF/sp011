@@ -44,7 +44,6 @@ import ContactSettings from "@/pages/admin/ContactSettings";
 import Analytics from "@/pages/admin/Analytics";
 import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
 import RSSManager from "@/pages/admin/RSSManager";
-import Pipeline from "@/pages/admin/Pipeline";
 import SocialMedia from "@/pages/admin/SocialMedia";
 import PerplexitySearch from "@/pages/admin/PerplexitySearch";
 
@@ -137,9 +136,6 @@ function Router() {
       </Route>
       <Route path="/admin/home-blocos">
         <RequireAuth><HomeBlocksManager /></RequireAuth>
-      </Route>
-      <Route path="/admin/pipeline">
-        <RequireAuth><Pipeline /></RequireAuth>
       </Route>
       <Route path="/admin/rss">
         <RequireAuth><RSSManager /></RequireAuth>

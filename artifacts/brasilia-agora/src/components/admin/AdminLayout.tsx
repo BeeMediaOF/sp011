@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
   ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
-  Users, Mail, BarChart2, LayoutGrid, Rss, GitBranch, Share2, Zap,
+  Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 
@@ -16,7 +16,6 @@ const NAV = [
   { label: "Blocos Home",  icon: LayoutGrid,       path: "/admin/home-blocos" },
   { label: "Propagandas",  icon: Megaphone,        path: "/admin/propagandas" },
   { label: "Colunistas",   icon: Users,            path: "/admin/colunistas" },
-  { label: "Pipeline",     icon: GitBranch,        path: "/admin/pipeline" },
   { label: "Fontes RSS",   icon: Rss,              path: "/admin/rss" },
   { label: "Perplexity",   icon: Zap,              path: "/admin/perplexity" },
   { label: "Redes Sociais",icon: Share2,           path: "/admin/redes-sociais" },
