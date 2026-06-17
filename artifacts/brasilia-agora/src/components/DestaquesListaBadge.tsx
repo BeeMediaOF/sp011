@@ -90,7 +90,7 @@ function AdSidebarInline() {
   return (
     <div className="mt-6">
       <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
-      {!loading && ad ? (
+      {!loading && ad && (
         <a
           href={ad.link}
           target="_blank"
