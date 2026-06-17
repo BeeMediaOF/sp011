@@ -1,0 +1,697 @@
+{
+  "project": "SBC Agora",
+  "screen": "Blocos da Home",
+  "type": "functional_admin_page",
+  "language": "pt-BR",
+  "objective": "Criar uma página funcional para editar blocos da home em tempo real. Ao clicar em qualquer bloco, o usuário consegue editar nome, tipo, formato, categoria, cores, fonte dos artigos, quantidade de itens, visibilidade, ordenação e estilo visual, com atualização instantânea na prévia.",
+  "priority": "Alta performance, edição rápida, visualização ao vivo e experiência simples para o administrador.",
+  "coreBehavior": {
+    "clickToEdit": true,
+    "realTimePreview": true,
+    "dragAndDropOrdering": true,
+    "autosaveDraft": true,
+    "manualPublish": true,
+    "instantUIFeedback": true,
+    "debouncedUpdates": true,
+    "optimisticUpdate": true,
+    "cachePreview": true
+  },
+  "performanceRules": {
+    "previewUpdateDelay": "150ms",
+    "autosaveDelay": "800ms",
+    "useOptimisticRendering": true,
+    "avoidFullPageReload": true,
+    "updateOnlyChangedBlock": true,
+    "lazyLoadImages": true,
+    "cacheArticleQueries": true,
+    "cacheCategories": true,
+    "cacheAds": true,
+    "cacheBlockSettings": true
+  },
+  "layout": {
+    "sidebar": {
+      "activeItem": "Blocos Home",
+      "items": [
+        "Dashboard",
+        "Analytics",
+        "Artigos",
+        "Novo Artigo",
+        "Menu",
+        "Blocos Home",
+        "Propagandas",
+        "Colunistas",
+        "Fontes RSS",
+        "Perplexity",
+        "Redes Sociais",
+        "Configurações"
+      ]
+    },
+    "topbar": {
+      "title": "Blocos da Home",
+      "description": "Gerencie, ordene e edite os blocos que aparecem na página inicial do portal.",
+      "actions": [
+        {
+          "label": "Desfazer",
+          "action": "undo"
+        },
+        {
+          "label": "Refazer",
+          "action": "redo"
+        },
+        {
+          "label": "Salvar alterações",
+          "action": "publishChanges",
+          "style": "primary_red"
+        }
+      ]
+    },
+    "mainGrid": {
+      "columns": "320px 1fr",
+      "leftPanel": "Lista e edição rápida dos blocos",
+      "rightPanel": "Prévia ao vivo da home"
+    }
+  },
+  "tabs": [
+    {
+      "label": "Blocos",
+      "active": true
+    },
+    {
+      "label": "Cabeçalho",
+      "active": false
+    },
+    {
+      "label": "Rodapé",
+      "active": false
+    },
+    {
+      "label": "Configurações",
+      "active": false
+    }
+  ],
+  "leftPanel": {
+    "title": "Blocos da Home",
+    "summary": "11 visíveis · 12 total",
+    "filters": [
+      {
+        "label": "Todos",
+        "active": true
+      },
+      {
+        "label": "Visíveis",
+        "active": false
+      },
+      {
+        "label": "Ocultos",
+        "active": false
+      }
+    ],
+    "blocksList": {
+      "sortable": true,
+      "dragHandle": true,
+      "actionsPerBlock": [
+        "selecionar",
+        "mostrar_ocultar",
+        "duplicar",
+        "excluir",
+        "expandir_configuracoes"
+      ],
+      "onClick": {
+        "action": "selectBlock",
+        "result": "Abre o editor do bloco clicado e destaca o mesmo bloco na prévia ao vivo."
+      },
+      "items": [
+        {
+          "id": "hero-destaques",
+          "name": "Hero / Destaques",
+          "type": "content",
+          "format": "hero_3_cards",
+          "visible": true,
+          "selected": false
+        },
+        {
+          "id": "tecnologia",
+          "name": "Tecnologia",
+          "type": "content",
+          "format": "grid",
+          "visible": true,
+          "selected": false
+        },
+        {
+          "id": "colunistas",
+          "name": "Colunistas",
+          "type": "columnists",
+          "format": "carousel",
+          "visible": true,
+          "selected": false
+        },
+        {
+          "id": "ultimas-noticias",
+          "name": "Últimas Notícias",
+          "type": "content",
+          "format": "list",
+          "visible": true,
+          "selected": false
+        },
+        {
+          "id": "propaganda-home",
+          "name": "Propaganda",
+          "type": "advertising",
+          "format": "banner_970x90",
+          "visible": true,
+          "selected": true
+        }
+      ]
+    },
+    "quickEditor": {
+      "enabled": true,
+      "visibleWhenBlockSelected": true,
+      "selectedBlockId": "propaganda-home",
+      "fields": [
+        {
+          "label": "Nome do bloco",
+          "key": "name",
+          "type": "text",
+          "value": "Propaganda",
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Tipo de bloco",
+          "key": "type",
+          "type": "select",
+          "value": "advertising",
+          "options": [
+            {
+              "label": "Conteúdo",
+              "value": "content"
+            },
+            {
+              "label": "Imagem",
+              "value": "image"
+            },
+            {
+              "label": "Carrossel",
+              "value": "carousel"
+            },
+            {
+              "label": "Propaganda",
+              "value": "advertising"
+            },
+            {
+              "label": "Lista",
+              "value": "list"
+            },
+            {
+              "label": "Vídeo",
+              "value": "video"
+            },
+            {
+              "label": "Newsletter",
+              "value": "newsletter"
+            },
+            {
+              "label": "HTML Personalizado",
+              "value": "html"
+            }
+          ],
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Formato",
+          "key": "format",
+          "type": "select",
+          "value": "banner_970x90",
+          "optionsByType": {
+            "content": [
+              "hero_3_cards",
+              "grid_3",
+              "grid_4",
+              "list_compact",
+              "carousel_cards",
+              "duplo",
+              "masonry"
+            ],
+            "advertising": [
+              "banner_970x90",
+              "banner_728x90",
+              "sidebar_300x250",
+              "native_article",
+              "popup_mobile",
+              "full_width"
+            ],
+            "image": [
+              "full_width_image",
+              "image_card",
+              "image_with_text",
+              "background_overlay"
+            ],
+            "carousel": [
+              "carousel_news",
+              "carousel_images",
+              "carousel_columnists",
+              "carousel_ads"
+            ],
+            "video": [
+              "video_featured",
+              "video_grid",
+              "youtube_embed"
+            ]
+          },
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Categorias",
+          "key": "categories",
+          "type": "multi_select_chips",
+          "value": [
+            "Política",
+            "Cidade / DF",
+            "Segurança"
+          ],
+          "options": [
+            "Política",
+            "Cidade / DF",
+            "Segurança",
+            "Saúde",
+            "Educação",
+            "Cultura",
+            "Esportes",
+            "Tecnologia",
+            "Economia",
+            "Brasil",
+            "Mundo",
+            "Colunas"
+          ],
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Fonte dos artigos",
+          "key": "source",
+          "type": "select",
+          "value": "automatic_by_category",
+          "options": [
+            {
+              "label": "Automático por categoria",
+              "value": "automatic_by_category"
+            },
+            {
+              "label": "Mais lidas",
+              "value": "most_read"
+            },
+            {
+              "label": "Últimas notícias",
+              "value": "latest"
+            },
+            {
+              "label": "Selecionar manualmente",
+              "value": "manual"
+            },
+            {
+              "label": "Fonte RSS",
+              "value": "rss"
+            },
+            {
+              "label": "Perplexity",
+              "value": "perplexity"
+            }
+          ],
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Quantidade de itens",
+          "key": "itemsLimit",
+          "type": "number",
+          "value": 3,
+          "min": 1,
+          "max": 12,
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Cor principal",
+          "key": "primaryColor",
+          "type": "color",
+          "value": "#0B2A66",
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Cor de destaque",
+          "key": "accentColor",
+          "type": "color",
+          "value": "#E71D36",
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Cor do texto",
+          "key": "textColor",
+          "type": "color",
+          "value": "#FFFFFF",
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Exibir título",
+          "key": "showTitle",
+          "type": "toggle",
+          "value": true,
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Exibir categoria",
+          "key": "showCategory",
+          "type": "toggle",
+          "value": true,
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Exibir imagem",
+          "key": "showImage",
+          "type": "toggle",
+          "value": true,
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Exibir autor e data",
+          "key": "showAuthorDate",
+          "type": "toggle",
+          "value": true,
+          "realTimeUpdate": true
+        },
+        {
+          "label": "Exibir resumo",
+          "key": "showSummary",
+          "type": "toggle",
+          "value": false,
+          "realTimeUpdate": true
+        }
+      ],
+      "actions": [
+        {
+          "label": "Aplicar agora",
+          "action": "applyBlockChanges",
+          "style": "primary"
+        },
+        {
+          "label": "Duplicar bloco",
+          "action": "duplicateBlock",
+          "style": "secondary"
+        },
+        {
+          "label": "Remover bloco",
+          "action": "deleteBlock",
+          "style": "danger"
+        }
+      ]
+    }
+  },
+  "livePreview": {
+    "title": "Prévia ao vivo",
+    "status": "Ao vivo",
+    "description": "As alterações são aplicadas em tempo real.",
+    "responsivePreview": {
+      "devices": [
+        {
+          "label": "Desktop",
+          "active": true
+        },
+        {
+          "label": "Tablet",
+          "active": false
+        },
+        {
+          "label": "Mobile",
+          "active": false
+        }
+      ]
+    },
+    "interaction": {
+      "clickBlockToEdit": true,
+      "hoverShowsToolbar": true,
+      "selectedBlockBorder": "#2563EB",
+      "editableToolbar": [
+        {
+          "icon": "move",
+          "action": "dragBlock"
+        },
+        {
+          "icon": "edit",
+          "action": "editBlock"
+        },
+        {
+          "icon": "eye",
+          "action": "previewBlock"
+        },
+        {
+          "icon": "copy",
+          "action": "duplicateBlock"
+        },
+        {
+          "icon": "trash",
+          "action": "deleteBlock"
+        }
+      ]
+    },
+    "previewData": {
+      "siteLogo": "SBC Agora",
+      "mainMenu": [
+        "Home",
+        "Política",
+        "Cidade",
+        "Saúde",
+        "Esportes",
+        "Economia",
+        "Mundo",
+        "Colunas"
+      ],
+      "ticker": {
+        "enabled": true,
+        "items": [
+          "USD R$ 5,08 ▲ 0,00%",
+          "EUR R$ 5,89 ▲ 0,00%",
+          "BTC R$ 334.649 ▼ 0,14%"
+        ]
+      },
+      "blocks": [
+        {
+          "id": "hero-destaques",
+          "selected": true,
+          "type": "content",
+          "format": "hero_3_cards",
+          "items": [
+            {
+              "category": "Geral",
+              "title": "Caso Master: Denunciante Vladimir Timerman e Nelson Tanure da Gafisa trocam farpas acaloradas após acesso do...",
+              "author": "Redação Via Metrópoles - São Paulo",
+              "time": "3 min atrás"
+            },
+            {
+              "category": "Geral",
+              "title": "STJ Anula Empréstimos de Analfabeto em Caixa Eletrônico: Banco Mercantil Condenado por Formalidades Ausentes",
+              "author": "Redação Via Metrópoles - Brasil",
+              "time": "4 min atrás"
+            },
+            {
+              "category": "Cidade",
+              "title": "Família de advogada do DF aguarda há 20 dias repatriamento do corpo após trágico acidente em safári na Namíbia",
+              "author": "Redação Via Metrópoles - DF",
+              "time": "4 min atrás"
+            }
+          ]
+        },
+        {
+          "id": "mais-lidas",
+          "type": "list",
+          "format": "ranking_horizontal",
+          "title": "Mais Lidas"
+        },
+        {
+          "id": "propaganda-home",
+          "type": "advertising",
+          "format": "banner_970x90",
+          "title": "Propaganda"
+        }
+      ]
+    }
+  },
+  "blockTypes": {
+    "content": {
+      "label": "Conteúdo",
+      "description": "Blocos de notícias automáticas ou manuais.",
+      "editableOptions": [
+        "título",
+        "categoria",
+        "fonte",
+        "formato",
+        "quantidade",
+        "ordem",
+        "cores",
+        "imagem",
+        "autor",
+        "data",
+        "resumo"
+      ]
+    },
+    "advertising": {
+      "label": "Propaganda",
+      "description": "Blocos conectados ao módulo de anúncios.",
+      "editableOptions": [
+        "nome",
+        "posição",
+        "campanha",
+        "formato",
+        "imagem",
+        "link",
+        "cor de fundo",
+        "status",
+        "data de início",
+        "data de fim"
+      ]
+    },
+    "image": {
+      "label": "Imagem",
+      "description": "Blocos visuais com banner, editorial ou chamada.",
+      "editableOptions": [
+        "imagem",
+        "título",
+        "link",
+        "overlay",
+        "cor",
+        "posição do texto",
+        "botão"
+      ]
+    },
+    "carousel": {
+      "label": "Carrossel",
+      "description": "Blocos com rolagem horizontal.",
+      "editableOptions": [
+        "itens",
+        "velocidade",
+        "autoplay",
+        "setas",
+        "indicadores",
+        "quantidade visível",
+        "fonte"
+      ]
+    },
+    "newsletter": {
+      "label": "Newsletter",
+      "description": "Bloco de captura de e-mails.",
+      "editableOptions": [
+        "título",
+        "texto",
+        "placeholder",
+        "botão",
+        "cor",
+        "integração"
+      ]
+    },
+    "html": {
+      "label": "HTML Personalizado",
+      "description": "Código livre para blocos avançados.",
+      "editableOptions": [
+        "html",
+        "css",
+        "javascript",
+        "altura",
+        "visibilidade"
+      ]
+    }
+  },
+  "stateManagement": {
+    "selectedBlockId": "propaganda-home",
+    "previewMode": "desktop",
+    "isDirty": true,
+    "isSaving": false,
+    "lastSavedAt": null,
+    "history": {
+      "undoStack": true,
+      "redoStack": true,
+      "maxHistoryItems": 30
+    }
+  },
+  "api": {
+    "getBlocks": {
+      "method": "GET",
+      "endpoint": "/api/admin/home-blocks",
+      "description": "Carrega todos os blocos da home com configurações e ordem."
+    },
+    "updateBlock": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/{blockId}",
+      "description": "Atualiza um bloco específico sem recarregar a tela.",
+      "debounce": "800ms"
+    },
+    "reorderBlocks": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/reorder",
+      "description": "Salva a nova ordem dos blocos após drag and drop."
+    },
+    "toggleVisibility": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/home-blocks/{blockId}/visibility",
+      "description": "Ativa ou oculta um bloco da home."
+    },
+    "duplicateBlock": {
+      "method": "POST",
+      "endpoint": "/api/admin/home-blocks/{blockId}/duplicate",
+      "description": "Duplica um bloco com todas as configurações."
+    },
+    "deleteBlock": {
+      "method": "DELETE",
+      "endpoint": "/api/admin/home-blocks/{blockId}",
+      "description": "Remove o bloco após confirmação."
+    },
+    "publishChanges": {
+      "method": "POST",
+      "endpoint": "/api/admin/home-blocks/publish",
+      "description": "Publica a versão atual da home."
+    },
+    "previewRender": {
+      "method": "POST",
+      "endpoint": "/api/admin/home-blocks/preview",
+      "description": "Renderiza a prévia com base nas configurações atuais sem publicar."
+    }
+  },
+  "database": {
+    "tables": {
+      "home_blocks": {
+        "fields": {
+          "id": "uuid",
+          "name": "text",
+          "type": "text",
+          "format": "text",
+          "position": "integer",
+          "visible": "boolean",
+          "source_type": "text",
+          "source_value": "jsonb",
+          "settings": "jsonb",
+          "style": "jsonb",
+          "created_at": "timestamp",
+          "updated_at": "timestamp"
+        }
+      },
+      "home_block_versions": {
+        "fields": {
+          "id": "uuid",
+          "version_name": "text",
+          "blocks_snapshot": "jsonb",
+          "created_by": "uuid",
+          "published": "boolean",
+          "created_at": "timestamp"
+        }
+      },
+      "home_block_items": {
+        "fields": {
+          "id": "uuid",
+          "block_id": "uuid",
+          "article_id": "uuid",
+          "ad_id": "uuid",
+          "custom_title": "text",
+          "custom_image": "text",
+          "custom_link": "text",
+          "position": "integer"
+        }
+      }
+    }
+  },
+  "aiBuilderInstructions": "Implemente esta página como uma ferramenta funcional de edição da home. Ao clicar em um bloco da lista ou da prévia, abra imediatamente as configurações daquele bloco no painel lateral. Qualquer alteração em nome, formato, categoria, cor, quantidade, fonte ou visibilidade deve atualizar a prévia em tempo real, sem recarregar a página. Use estado local para renderização instantânea, debounce para salvar no banco, optimistic update para resposta rápida e botão Salvar alterações para publicar oficialmente. A lista precisa aceitar drag and drop para reordenar blocos. A prévia precisa destacar o bloco selecionado com borda azul e exibir toolbar flutuante com ações de mover, editar, duplicar e excluir. A tela precisa ter CRUD completo, histórico para desfazer/refazer, suporte a desktop/tablet/mobile, cache para artigos/categorias/anúncios e integração com os módulos de Artigos, Propagandas, Colunistas, Fontes RSS, Perplexity, Newsletter, HTML e Vídeos.",
+  "promptForLovableOrBolt": "Crie uma página funcional chamada Blocos da Home para o painel administrativo SBC Agora. A tela deve permitir editar os blocos da página inicial em tempo real. Use layout com sidebar à esquerda, painel de lista de blocos e prévia ao vivo da home. Ao clicar em qualquer bloco, o painel lateral deve abrir as configurações do bloco selecionado. O usuário deve conseguir mudar nome, tipo, formato, categoria, fonte dos artigos, quantidade de itens, ordem, cores, imagem, visibilidade, autor, data, resumo e estilo visual. As mudanças devem aparecer instantaneamente na prévia sem reload. Use drag and drop para reordenar, toggle para ativar/ocultar, botões para duplicar/excluir, desfazer/refazer e salvar alterações. Use estado local, optimistic update, debounce de 800ms para salvar rascunho, publicação manual e endpoints REST para CRUD. A prévia deve ter modo desktop, tablet e mobile, bloco selecionado com borda azul e toolbar flutuante. Interface minimalista premium em português, com branco, azul-marinho e vermelho."
+}
