@@ -1,0 +1,440 @@
+{
+  "project": "SBC Agora",
+  "screen": "Analytics",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "dangerColor": "#EF4444",
+    "warningColor": "#F59E0B",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": true
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "88px",
+      "background": "#FFFFFF",
+      "title": "Analytics",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateFilter": {
+        "label": "Últimos 30 dias",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "kpi_grid",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Visualizações de página",
+              "value": "74.913",
+              "variation": "+14,3%",
+              "comparison": "vs últimos 30 dias",
+              "trend": "up",
+              "icon": "eye",
+              "iconColor": "blue",
+              "background": "#EEF4FF"
+            },
+            {
+              "title": "Usuários únicos",
+              "value": "32.845",
+              "variation": "+12,7%",
+              "comparison": "vs últimos 30 dias",
+              "trend": "up",
+              "icon": "users",
+              "iconColor": "green",
+              "background": "#ECFDF5"
+            },
+            {
+              "title": "Tempo médio de sessão",
+              "value": "02:48",
+              "variation": "+8,6%",
+              "comparison": "vs últimos 30 dias",
+              "trend": "up",
+              "icon": "clock",
+              "iconColor": "orange",
+              "background": "#FFF7ED"
+            },
+            {
+              "title": "Taxa de rejeição",
+              "value": "38,6%",
+              "variation": "-6,2%",
+              "comparison": "vs últimos 30 dias",
+              "trend": "down",
+              "icon": "trending-down",
+              "iconColor": "red",
+              "background": "#FEF2F2"
+            }
+          ]
+        },
+        {
+          "type": "analytics_grid",
+          "columns": "2fr 1.1fr 1.1fr",
+          "items": [
+            {
+              "component": "line_chart",
+              "title": "Tráfego ao longo do tempo",
+              "infoIcon": true,
+              "filter": "Últimos 30 dias",
+              "chartStyle": {
+                "lineColor": "#2563EB",
+                "fillGradient": "rgba(37, 99, 235, 0.12)",
+                "axisColor": "#CBD5E1",
+                "gridStyle": "dashed"
+              },
+              "yAxis": ["0", "10k", "20k", "30k", "40k"],
+              "xAxis": ["23 Abr", "28 Abr", "3 Mai", "8 Mai", "13 Mai", "18 Mai", "23 Mai"],
+              "highlight": {
+                "date": "15 de maio de 2025",
+                "value": "24.812",
+                "label": "visualizações"
+              },
+              "data": [
+                {
+                  "date": "23 Abr",
+                  "value": 12000
+                },
+                {
+                  "date": "28 Abr",
+                  "value": 14500
+                },
+                {
+                  "date": "3 Mai",
+                  "value": 13200
+                },
+                {
+                  "date": "8 Mai",
+                  "value": 21000
+                },
+                {
+                  "date": "13 Mai",
+                  "value": 15800
+                },
+                {
+                  "date": "15 Mai",
+                  "value": 24812
+                },
+                {
+                  "date": "18 Mai",
+                  "value": 15000
+                },
+                {
+                  "date": "23 Mai",
+                  "value": 27500
+                }
+              ]
+            },
+            {
+              "component": "traffic_sources",
+              "title": "Fontes de tráfego",
+              "infoIcon": true,
+              "filter": "Últimos 30 dias",
+              "sources": [
+                {
+                  "name": "Direto",
+                  "percentage": "38,7%",
+                  "value": "28.974",
+                  "color": "#2563EB"
+                },
+                {
+                  "name": "Google",
+                  "percentage": "34,1%",
+                  "value": "25.556",
+                  "color": "#2563EB"
+                },
+                {
+                  "name": "Redes Sociais",
+                  "percentage": "14,8%",
+                  "value": "11.083",
+                  "color": "#7C3AED"
+                },
+                {
+                  "name": "RSS",
+                  "percentage": "6,3%",
+                  "value": "4.702",
+                  "color": "#F97316"
+                },
+                {
+                  "name": "Referência",
+                  "percentage": "6,1%",
+                  "value": "4.598",
+                  "color": "#16A34A"
+                }
+              ]
+            },
+            {
+              "component": "donut_chart",
+              "title": "Dispositivos",
+              "infoIcon": true,
+              "filter": "Últimos 30 dias",
+              "centerValue": "74.913",
+              "centerLabel": "visualizações",
+              "segments": [
+                {
+                  "name": "Mobile",
+                  "percentage": "59,2%",
+                  "value": "44.356",
+                  "color": "#2563EB"
+                },
+                {
+                  "name": "Desktop",
+                  "percentage": "32,1%",
+                  "value": "24.051",
+                  "color": "#22C55E"
+                },
+                {
+                  "name": "Tablet",
+                  "percentage": "8,7%",
+                  "value": "6.506",
+                  "color": "#F97316"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bottom_grid",
+          "columns": "1.4fr 1fr 1.1fr",
+          "items": [
+            {
+              "component": "top_articles_table",
+              "title": "Artigos com melhor desempenho",
+              "infoIcon": true,
+              "columns": ["Artigo", "Visualizações", "Engajamento", "Taxa de engajamento"],
+              "rows": [
+                {
+                  "title": "Prefeitura anuncia novo pacote de investimentos para a educação",
+                  "date": "23 Mai, 2025",
+                  "views": "10.845",
+                  "engagement": "2.384",
+                  "engagementRate": "22,0%"
+                },
+                {
+                  "title": "Trânsito sofre alterações no centro a partir de próxima semana",
+                  "date": "23 Mai, 2025",
+                  "views": "8.732",
+                  "engagement": "1.672",
+                  "engagementRate": "19,2%"
+                },
+                {
+                  "title": "Nova tecnologia 5G começa a ser testada em SBC",
+                  "date": "22 Mai, 2025",
+                  "views": "6.521",
+                  "engagement": "1.245",
+                  "engagementRate": "19,1%"
+                },
+                {
+                  "title": "Confira a programação completa do Festival de Inverno 2025",
+                  "date": "22 Mai, 2025",
+                  "views": "5.234",
+                  "engagement": "987",
+                  "engagementRate": "18,9%"
+                },
+                {
+                  "title": "SBC vence fora de casa e assume liderança do grupo",
+                  "date": "22 Mai, 2025",
+                  "views": "4.812",
+                  "engagement": "843",
+                  "engagementRate": "17,5%"
+                }
+              ],
+              "footerLink": "Ver todos os artigos"
+            },
+            {
+              "component": "category_audience",
+              "title": "Audiência por categoria",
+              "infoIcon": true,
+              "columns": ["Categoria", "Visualizações", "%"],
+              "categories": [
+                {
+                  "name": "Cidades",
+                  "views": "45.832",
+                  "percentage": "35,6%",
+                  "color": "#2563EB"
+                },
+                {
+                  "name": "Política",
+                  "views": "28.119",
+                  "percentage": "21,9%",
+                  "color": "#E71D36"
+                },
+                {
+                  "name": "Economia",
+                  "views": "20.334",
+                  "percentage": "16,8%",
+                  "color": "#F97316"
+                },
+                {
+                  "name": "Esportes",
+                  "views": "18.765",
+                  "percentage": "14,6%",
+                  "color": "#16A34A"
+                },
+                {
+                  "name": "Cultura",
+                  "views": "15.406",
+                  "percentage": "11,9%",
+                  "color": "#7C3AED"
+                }
+              ],
+              "footerLink": "Ver todas as categorias"
+            },
+            {
+              "component": "region_audience",
+              "title": "Audiência por região",
+              "infoIcon": true,
+              "tabs": [
+                {
+                  "label": "Brasil",
+                  "active": true
+                },
+                {
+                  "label": "Mundo",
+                  "active": false
+                }
+              ],
+              "map": {
+                "type": "brazil",
+                "highlightRegion": "Sudeste",
+                "colorScale": ["#DBEAFE", "#60A5FA", "#2563EB"]
+              },
+              "regions": [
+                {
+                  "name": "Sudeste",
+                  "percentage": "52,8%"
+                },
+                {
+                  "name": "Sul",
+                  "percentage": "17,6%"
+                },
+                {
+                  "name": "Nordeste",
+                  "percentage": "15,3%"
+                },
+                {
+                  "name": "Centro-Oeste",
+                  "percentage": "8,2%"
+                },
+                {
+                  "name": "Norte",
+                  "percentage": "6,1%"
+                }
+              ],
+              "footerLink": "Ver relatório completo"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Analytics minimalista para o painel administrativo do portal SBC Agora, mantendo sidebar branca, topbar limpa, identidade azul-marinho e vermelho, cards brancos com sombras suaves e cantos arredondados. A página deve conter KPIs de visualizações, usuários únicos, tempo médio de sessão e taxa de rejeição; gráfico de tráfego dos últimos 30 dias; fontes de tráfego com barras horizontais; gráfico de dispositivos; tabela de artigos com melhor desempenho; audiência por categoria e audiência por região com mapa do Brasil. Use textos em português, visual premium, espaçamento generoso e hierarquia clara."
+}

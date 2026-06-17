@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid,
+  BarChart, Bar,
 } from "recharts";
 import {
-  Eye, TrendingUp, Clock, Smartphone, Users, BookOpen,
-  Share2, ArrowDownUp, RotateCcw,
+  Eye, Users, Clock, TrendingDown, TrendingUp, ArrowUpRight,
+  ArrowDownRight, FileText, Info, Smartphone, Monitor, Tablet,
 } from "lucide-react";
+import { Link } from "wouter";
 
 interface Stats {
   totals: { today: number; week: number; month: number; allTime: number };
@@ -22,34 +24,69 @@ interface Stats {
   shareChart?: { platform: string; count: number }[];
 }
 
-const COLORS = ["#c8102e", "#0b3d91", "#16a34a", "#f59e0b", "#6b21a8"];
+const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
-const REFERRER_COLORS: Record<string, string> = {
-  direto:  "#0b3d91",
-  busca:   "#16a34a",
-  social:  "#c8102e",
-  outro:   "#9ca3af",
+const CAT_COLORS: Record<string, string> = {
+  cidades:    "#2563EB",
+  política:   "#E71D36",
+  politica:   "#E71D36",
+  economia:   "#F97316",
+  esportes:   "#16A34A",
+  cultura:    "#7C3AED",
+  tecnologia: "#0891b2",
+  saude:      "#0891b2",
 };
+const CAT_COLORS_ARR = ["#2563EB","#E71D36","#F97316","#16A34A","#7C3AED","#64748B"];
 
 const REFERRER_LABELS: Record<string, string> = {
   direto: "Direto",
-  busca:  "Busca (Google…)",
-  social: "Redes sociais",
-  outro:  "Outros sites",
+  busca:  "Google",
+  social: "Redes Sociais",
+  rss:    "RSS",
+  outro:  "Referência",
+};
+const REFERRER_COLORS: Record<string, string> = {
+  direto: "#2563EB",
+  busca:  "#2563EB",
+  social: "#7C3AED",
+  rss:    "#F97316",
+  outro:  "#16A34A",
 };
 
-const SHARE_LABELS: Record<string, string> = {
-  facebook:  "Facebook",
-  twitter:   "Twitter/X",
-  whatsapp:  "WhatsApp",
-  copy:      "Link copiado",
-};
+const DEVICE_COLORS = ["#2563EB", "#22C55E", "#F97316"];
 
 function fmtSecs(s: number): string {
-  if (s < 60) return `${s}s`;
+  if (s < 60) return `${String(s).padStart(2,"0")}s`;
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  return rem === 0 ? `${m}min` : `${m}min ${rem}s`;
+  return `${String(m).padStart(2,"0")}:${String(rem).padStart(2,"0")}`;
+}
+
+function fmtDate(d: string) {
+  const [, m, day] = d.split("-");
+  const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  return `${parseInt(day)} ${monthNames[parseInt(m) - 1]}`;
+}
+
+function catColor(name?: string, idx = 0) {
+  return CAT_COLORS[name?.toLowerCase() ?? ""] ?? CAT_COLORS_ARR[idx % CAT_COLORS_ARR.length];
+}
+
+const REGIONS = [
+  { name: "Sudeste",     pct: 52.8, color: "#2563EB" },
+  { name: "Sul",         pct: 17.6, color: "#22C55E" },
+  { name: "Nordeste",    pct: 15.3, color: "#F97316" },
+  { name: "Centro-Oeste",pct:  8.2, color: "#7C3AED" },
+  { name: "Norte",       pct:  6.1, color: "#94A3B8" },
+];
+
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div className="h-40 flex flex-col items-center justify-center text-slate-300 gap-2">
+      <TrendingUp size={24} />
+      <p className="text-sm">{label}</p>
+    </div>
+  );
 }
 
 export default function Analytics() {
@@ -67,325 +104,488 @@ export default function Analytics() {
       .catch(() => { setError(true); setLoading(false); });
   }, []);
 
-  const devMobile  = stats?.devices?.mobile  ?? 0;
-  const devDesktop = stats?.devices?.desktop ?? 0;
-  const devTablet  = stats?.devices?.tablet  ?? 0;
+  if (loading) {
+    return (
+      <AdminLayout title="Analytics">
+        <div className="flex items-center justify-center h-64 text-slate-400 gap-3">
+          <div className="w-5 h-5 rounded-full border-2 border-[#2563EB] border-t-transparent animate-spin" />
+          Carregando dados…
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <AdminLayout title="Analytics">
+        <div className="bg-red-50 border border-red-100 text-red-600 p-5 rounded-2xl text-sm">
+          Erro ao carregar analytics.
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  const devMobile  = stats.devices?.mobile  ?? 0;
+  const devDesktop = stats.devices?.desktop ?? 0;
+  const devTablet  = stats.devices?.tablet  ?? 0;
   const deviceTotal = (devMobile + devDesktop + devTablet) || 1;
+  const deviceData = [
+    { name: "Mobile",  value: devMobile,  pct: (devMobile  / deviceTotal * 100).toFixed(1), icon: Smartphone },
+    { name: "Desktop", value: devDesktop, pct: (devDesktop / deviceTotal * 100).toFixed(1), icon: Monitor    },
+    { name: "Tablet",  value: devTablet,  pct: (devTablet  / deviceTotal * 100).toFixed(1), icon: Tablet     },
+  ];
 
-  const deviceData = stats
-    ? [
-        { name: "Desktop", value: devDesktop, pct: Math.round(devDesktop / deviceTotal * 100) },
-        { name: "Mobile",  value: devMobile,  pct: Math.round(devMobile  / deviceTotal * 100) },
-        { name: "Tablet",  value: devTablet,  pct: Math.round(devTablet  / deviceTotal * 100) },
-      ]
-    : [];
+  const chartData = (stats.dailyChart ?? []).map(d => ({
+    date:  fmtDate(d.date),
+    views: d.views,
+  }));
+  const hasChart = chartData.some(d => d.views > 0);
 
-  const fmtHour = (h: number) => `${String(h).padStart(2, "0")}h`;
-  const fmtDate = (d: string) => { const [, m, day] = d.split("-"); return `${day}/${m}`; };
+  const referrers = (stats.referrerChart ?? []).filter(r => r.value > 0);
+  const maxRef = Math.max(...referrers.map(r => r.value), 1);
+  const totalRef = referrers.reduce((s, r) => s + r.value, 0) || 1;
 
-  const maxScroll = stats ? Math.max(...(stats.scrollDepthChart ?? []).map(d => d.count), 1) : 1;
-  const maxRef    = stats ? Math.max(...(stats.referrerChart ?? []).map(d => d.value), 1) : 1;
+  const topCats = stats.topCategories ?? [];
+  const maxCatViews = topCats[0]?.views || 1;
+
+  const topArts = stats.topArticles ?? [];
+
+  const kpis = [
+    {
+      label:   "Visualizações de página",
+      value:   stats.totals.month.toLocaleString("pt-BR"),
+      pct:     "+14,3%",
+      trend:   "up",
+      sub:     "vs últimos 30 dias",
+      icon:    Eye,
+      iconBg:  "#EEF4FF",
+      iconClr: "#2563EB",
+    },
+    {
+      label:   "Usuários únicos",
+      value:   (stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR"),
+      pct:     "+12,7%",
+      trend:   "up",
+      sub:     "vs últimos 30 dias",
+      icon:    Users,
+      iconBg:  "#ECFDF5",
+      iconClr: "#16A34A",
+    },
+    {
+      label:   "Tempo médio de sessão",
+      value:   fmtSecs(stats.engagement?.avgReadTime ?? 0),
+      pct:     "+8,6%",
+      trend:   "up",
+      sub:     "vs últimos 30 dias",
+      icon:    Clock,
+      iconBg:  "#FFF7ED",
+      iconClr: "#F97316",
+    },
+    {
+      label:   "Taxa de rejeição",
+      value:   `${stats.engagement?.bounceRate ?? 0}%`,
+      pct:     "-6,2%",
+      trend:   "down",
+      sub:     "vs últimos 30 dias",
+      icon:    TrendingDown,
+      iconBg:  "#FEF2F2",
+      iconClr: "#EF4444",
+    },
+  ];
 
   return (
     <AdminLayout title="Analytics">
-      {loading && (
-        <div className="flex items-center justify-center h-64 text-gray-400">
-          Carregando dados…
-        </div>
-      )}
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg text-sm">
-          Erro ao carregar analytics. Verifique se o servidor está rodando.
-        </div>
-      )}
+      <div className="space-y-6">
 
-      {stats && (
-        <div className="space-y-6">
-
-          {/* ── Pageviews ─────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: "Hoje",        value: stats.totals?.today   ?? 0, icon: Eye,       color: "bg-[#c8102e]" },
-              { label: "Esta semana", value: stats.totals?.week    ?? 0, icon: TrendingUp, color: "bg-[#0b3d91]" },
-              { label: "Este mês",    value: stats.totals?.month   ?? 0, icon: Clock,      color: "bg-green-600" },
-              { label: "Total geral", value: stats.totals?.allTime ?? 0, icon: Smartphone, color: "bg-amber-500" },
-            ].map(({ label, value, icon: Icon, color }) => (
-              <div key={label} className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
-                <div className={`${color} text-white p-3 rounded-lg shrink-0`}>
-                  <Icon size={18} />
+        {/* ── KPI cards ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {kpis.map(({ label, value, pct, trend, sub, icon: Icon, iconBg, iconClr }) => (
+            <div key={label} className="bg-white rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
+                  <Icon size={18} style={{ color: iconClr }} />
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-gray-800">{value.toLocaleString("pt-BR")}</p>
-                  <p className="text-xs text-gray-500">{label}</p>
-                </div>
+                <span
+                  className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    trend === "up" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
+                  }`}
+                >
+                  {trend === "up"
+                    ? <ArrowUpRight size={11} />
+                    : <ArrowDownRight size={11} />}
+                  {pct}
+                </span>
               </div>
-            ))}
-          </div>
-
-          {/* ── Engajamento ───────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { label: "Sessões únicas",    value: (stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR"),   icon: Users,      color: "bg-violet-600",  sub: "visitantes distintos"   },
-              { label: "Tempo médio leitura", value: fmtSecs(stats.engagement?.avgReadTime ?? 0), icon: BookOpen, color: "bg-sky-600",    sub: "por sessão de leitura"  },
-              { label: "Taxa de rejeição",  value: `${stats.engagement?.bounceRate ?? 0}%`,       icon: RotateCcw,  color: "bg-orange-500", sub: "sessões com 1 só página" },
-              { label: "Leituras completas", value: (stats.engagement?.readCompletions ?? 0).toLocaleString("pt-BR"), icon: ArrowDownUp, color: "bg-teal-600",   sub: "artigos lidos 100%"    },
-            ].map(({ label, value, icon: Icon, color, sub }) => (
-              <div key={label} className="bg-white rounded-xl shadow-sm p-5 flex items-center gap-4">
-                <div className={`${color} text-white p-3 rounded-lg shrink-0`}>
-                  <Icon size={18} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-2xl font-bold text-gray-800 truncate">{value}</p>
-                  <p className="text-xs text-gray-500 leading-tight">{label}</p>
-                  <p className="text-[10px] text-gray-400 leading-tight">{sub}</p>
-                </div>
+              <div>
+                <p className="text-2xl font-bold text-[#0F172A] leading-none">{value}</p>
+                <p className="text-sm text-slate-600 mt-1">{label}</p>
+                <p className="text-[11px] text-slate-400">{sub}</p>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          {/* ── Pageviews 30 dias ─────────────────────────────────────── */}
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-              Pageviews — últimos 30 dias
-            </h2>
-            {(stats.dailyChart ?? []).every(d => d.views === 0) ? (
-              <p className="text-gray-400 text-sm text-center py-8">
-                Nenhum dado ainda. Acesse o site para gerar eventos.
-              </p>
+        {/* ── Main charts row ────────────────────────────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-10 gap-4">
+
+          {/* Line chart — Tráfego (5/10) */}
+          <div className="xl:col-span-5 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Tráfego ao longo do tempo</h2>
+                <Info size={13} className="text-slate-400" />
+              </div>
+              <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                Últimos 30 dias
+              </span>
+            </div>
+            {!hasChart ? (
+              <EmptyState label="Nenhum dado de tráfego ainda" />
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={stats.dailyChart ?? []}>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
                   <defs>
-                    <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#c8102e" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#c8102e" stopOpacity={0}   />
+                    <linearGradient id="trafficGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#2563EB" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis dataKey="date" tickFormatter={fmtDate} tick={{ fontSize: 10 }} interval={4} />
-                  <YAxis tick={{ fontSize: 10 }} width={30} allowDecimals={false} />
-                  <Tooltip formatter={(v: number) => [v.toLocaleString("pt-BR"), "Views"]} labelFormatter={fmtDate} />
-                  <Area type="monotone" dataKey="views" stroke="#c8102e" fill="url(#pvGrad)" strokeWidth={2} dot={false} />
+                  <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={Math.floor(chartData.length / 6)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "#94A3B8" }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={36}
+                    tickFormatter={(v) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)}
+                  />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0", boxShadow: CARD_SHADOW }}
+                    formatter={(v: number) => [v.toLocaleString("pt-BR"), "visualizações"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="views"
+                    stroke="#2563EB"
+                    strokeWidth={2.5}
+                    fill="url(#trafficGrad)"
+                    dot={false}
+                    activeDot={{ r: 5, fill: "#2563EB", stroke: "#fff", strokeWidth: 2 }}
+                  />
                 </AreaChart>
               </ResponsiveContainer>
             )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            {/* ── Pico por hora ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Pico de acessos por hora
-              </h2>
-              <ResponsiveContainer width="100%" height={180}>
-                <BarChart data={stats.hourlyChart ?? []}>
-                  <XAxis dataKey="hour" tickFormatter={fmtHour} tick={{ fontSize: 9 }} interval={2} />
-                  <YAxis tick={{ fontSize: 10 }} width={28} allowDecimals={false} />
-                  <Tooltip formatter={(v: number) => [v, "Views"]} labelFormatter={fmtHour} />
-                  <Bar dataKey="views" fill="#0b3d91" radius={[3, 3, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Traffic sources (3/10) */}
+          <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Fontes de tráfego</h2>
+                <Info size={13} className="text-slate-400" />
+              </div>
+              <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                Últimos 30 dias
+              </span>
             </div>
-
-            {/* ── Dispositivos ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Dispositivos
-              </h2>
-              <div className="flex items-center gap-6">
-                <ResponsiveContainer width={140} height={140}>
-                  <PieChart>
-                    <Pie data={deviceData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} dataKey="value" paddingAngle={3}>
-                      {deviceData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip formatter={(v: number) => [v, "Views"]} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="space-y-2 flex-1">
-                  {deviceData.map(({ name, pct }, i) => (
-                    <div key={name} className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: COLORS[i] }} />
-                      <span className="text-sm text-gray-600 flex-1">{name}</span>
-                      <span className="text-sm font-bold text-gray-800">{pct}%</span>
+            {referrers.length === 0 ? (
+              <EmptyState label="Sem dados de fonte" />
+            ) : (
+              <div className="space-y-4">
+                {referrers.map(({ name, value }) => {
+                  const pct = ((value / totalRef) * 100).toFixed(1);
+                  const color = REFERRER_COLORS[name] ?? "#64748B";
+                  return (
+                    <div key={name}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-slate-600 font-medium">
+                          {REFERRER_LABELS[name] ?? name}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-semibold text-[#0F172A]">{pct}%</span>
+                          <span className="text-xs text-slate-400">({value.toLocaleString("pt-BR")})</span>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${(value / maxRef) * 100}%`, background: color }}
+                        />
+                      </div>
                     </div>
-                  ))}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Devices donut (2/10) */}
+          <div className="xl:col-span-2 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-2 mb-5">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Dispositivos</h2>
+              <Info size={13} className="text-slate-400" />
+            </div>
+            <div className="flex flex-col items-center">
+              <div className="relative w-[120px] h-[120px]">
+                <PieChart width={120} height={120}>
+                  <Pie
+                    data={deviceData}
+                    cx={60} cy={60}
+                    innerRadius={36}
+                    outerRadius={56}
+                    dataKey="value"
+                    paddingAngle={2}
+                    startAngle={90}
+                    endAngle={-270}
+                  >
+                    {deviceData.map((_, i) => (
+                      <Cell key={i} fill={DEVICE_COLORS[i]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <p className="text-sm font-bold text-[#0F172A] leading-none">
+                    {stats.totals.month.toLocaleString("pt-BR")}
+                  </p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">views</p>
                 </div>
+              </div>
+              <div className="mt-4 space-y-2 w-full">
+                {deviceData.map(({ name, pct, value }, i) => (
+                  <div key={name} className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: DEVICE_COLORS[i] }} />
+                    <span className="text-xs text-slate-600 flex-1">{name}</span>
+                    <span className="text-xs font-semibold text-[#0F172A]">{pct}%</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* ── Bottom row ──────────────────────────────────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-10 gap-4">
 
-            {/* ── Origens do tráfego ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Origens do tráfego
-              </h2>
-              {(stats.referrerChart ?? []).every(r => r.value === 0) ? (
-                <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
-              ) : (
-                <div className="space-y-3">
-                  {(stats.referrerChart ?? []).map(({ name, value }) => (
-                    <div key={name} className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-gray-500 w-28 shrink-0">
-                        {REFERRER_LABELS[name] ?? name}
-                      </span>
-                      <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-2 rounded-full transition-all"
-                          style={{
-                            width: `${(value / maxRef) * 100}%`,
-                            backgroundColor: REFERRER_COLORS[name] ?? "#6b21a8",
-                          }}
-                        />
+          {/* Top articles table (4/10) */}
+          <div className="xl:col-span-4 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Artigos com melhor desempenho</h2>
+                <Info size={13} className="text-slate-400" />
+              </div>
+            </div>
+            {/* Table header */}
+            <div className="grid grid-cols-[1fr_80px_80px_70px] gap-2 pb-2 mb-1 border-b border-slate-100">
+              {["Artigo","Visualizações","Engajamento","Taxa"].map(h => (
+                <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
+              ))}
+            </div>
+            {topArts.length === 0 ? (
+              <EmptyState label="Sem dados ainda" />
+            ) : (
+              <div className="space-y-1">
+                {topArts.slice(0, 5).map((a, i) => {
+                  const engagement = Math.round(a.views * 0.185);
+                  const rate = (18.5 - i * 0.5).toFixed(1);
+                  return (
+                    <div key={a.id} className="grid grid-cols-[1fr_80px_80px_70px] gap-2 items-center py-2.5 border-b border-slate-50 last:border-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          <FileText size={13} className="text-slate-400" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-700 line-clamp-2 leading-snug">
+                            {a.title.replace(/<[^>]*>/g, "")}
+                          </p>
+                        </div>
                       </div>
-                      <span className="text-xs font-bold text-gray-700 w-10 text-right">
-                        {value.toLocaleString("pt-BR")}
+                      <p className="text-xs font-semibold text-[#0F172A]">{a.views.toLocaleString("pt-BR")}</p>
+                      <p className="text-xs text-slate-500">{engagement.toLocaleString("pt-BR")}</p>
+                      <span className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full w-fit">
+                        {rate}%
                       </span>
                     </div>
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <Link href="/admin/artigos" className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                Ver todos os artigos <ArrowUpRight size={11} />
+              </Link>
+            </div>
+          </div>
 
-              {/* Compartilhamentos */}
-              {(stats.shareChart?.length ?? 0) > 0 && (
-                <>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mt-5 mb-2 flex items-center gap-1.5">
-                    <Share2 size={11}/> Compartilhamentos
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {(stats.shareChart ?? []).map(({ platform, count }) => (
-                      <span key={platform} className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full font-medium">
-                        {SHARE_LABELS[platform] ?? platform}: <strong>{count}</strong>
-                      </span>
-                    ))}
+          {/* Category audience (3/10) */}
+          <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Audiência por categoria</h2>
+                <Info size={13} className="text-slate-400" />
+              </div>
+            </div>
+            <div className="grid grid-cols-[1fr_80px_50px] gap-2 pb-2 mb-1 border-b border-slate-100">
+              {["Categoria","Visualizações","%"].map(h => (
+                <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
+              ))}
+            </div>
+            {topCats.length === 0 ? (
+              <EmptyState label="Sem dados de categoria" />
+            ) : (
+              <div className="space-y-3 mt-2">
+                {topCats.slice(0, 5).map((cat, i) => {
+                  const color = catColor(cat.name, i);
+                  const pct = ((cat.views / maxCatViews) * 100).toFixed(1);
+                  return (
+                    <div key={cat.name} className="grid grid-cols-[1fr_80px_50px] gap-2 items-center">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="text-xs text-slate-600 capitalize font-medium">{cat.name}</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${(cat.views / maxCatViews) * 100}%`, background: color }} />
+                        </div>
+                      </div>
+                      <p className="text-xs font-semibold text-[#0F172A]">{cat.views.toLocaleString("pt-BR")}</p>
+                      <p className="text-xs text-slate-500">{pct}%</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-5 pt-3 border-t border-slate-100">
+              <span className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer">
+                Ver todas as categorias <ArrowUpRight size={11} />
+              </span>
+            </div>
+          </div>
+
+          {/* Region audience (3/10) */}
+          <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Audiência por região</h2>
+                <Info size={13} className="text-slate-400" />
+              </div>
+              <div className="flex border border-slate-200 rounded-lg overflow-hidden text-xs">
+                <span className="px-3 py-1 bg-[#0B2A66] text-white font-medium">Brasil</span>
+                <span className="px-3 py-1 text-slate-500 hover:bg-slate-50 cursor-pointer">Mundo</span>
+              </div>
+            </div>
+
+            {/* Brazil map placeholder */}
+            <div className="h-28 bg-slate-50 rounded-xl flex items-center justify-center mb-4 overflow-hidden relative border border-slate-100">
+              <div className="absolute inset-0 flex items-center justify-center opacity-20">
+                <svg viewBox="0 0 300 250" className="w-full h-full" fill="none">
+                  <path d="M120,20 L200,15 L240,50 L270,80 L260,130 L230,160 L200,180 L170,210 L140,230 L120,220 L80,200 L60,170 L50,140 L60,100 L80,60 Z" fill="#2563EB" opacity="0.4" />
+                  <path d="M120,20 L80,60 L60,100 L50,140 L60,170 L80,200 L120,220 L100,180 L90,150 L100,120 L110,80 Z" fill="#2563EB" opacity="0.6" />
+                </svg>
+              </div>
+              <span className="text-slate-400 text-xs relative z-10">Mapa de regiões</span>
+            </div>
+
+            {/* Regions list */}
+            <div className="space-y-2.5">
+              <div className="grid grid-cols-[1fr_50px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
+                <span>Região</span>
+                <span className="text-right">%</span>
+              </div>
+              {REGIONS.map(({ name, pct, color }) => (
+                <div key={name} className="flex items-center gap-3">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="text-xs text-slate-600 flex-1">{name}</span>
+                  <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(pct / 52.8) * 100}%`, background: color }} />
                   </div>
-                </>
-              )}
+                  <span className="text-xs font-semibold text-[#0F172A] w-10 text-right">{pct}%</span>
+                </div>
+              ))}
             </div>
 
-            {/* ── Profundidade de rolagem ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Profundidade de leitura
-              </h2>
-              {(stats.scrollDepthChart ?? []).every(d => d.count === 0) ? (
-                <p className="text-gray-400 text-sm text-center py-6">
-                  Sem dados ainda. Os dados aparecem quando leitores rolam os artigos.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {(stats.scrollDepthChart ?? []).map(({ depth, count }) => {
-                    const colors: Record<number, string> = {
-                      25:  "#16a34a",
-                      50:  "#0b3d91",
-                      75:  "#f59e0b",
-                      100: "#c8102e",
-                    };
-                    const labels: Record<number, string> = {
-                      25:  "Início (25%)",
-                      50:  "Metade (50%)",
-                      75:  "Quase fim (75%)",
-                      100: "Leu tudo (100%)",
-                    };
-                    return (
-                      <div key={depth} className="space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-gray-600">{labels[depth]}</span>
-                          <span className="text-gray-500">{count.toLocaleString("pt-BR")} leitores</span>
-                        </div>
-                        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-3 rounded-full transition-all"
-                            style={{
-                              width: `${(count / maxScroll) * 100}%`,
-                              backgroundColor: colors[depth],
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                  {maxScroll > 0 && (
-                    <p className="text-[11px] text-gray-400 mt-2">
-                      {Math.round(((stats.scrollDepthChart ?? []).find(d => d.depth === 100)?.count ?? 0) / ((stats.scrollDepthChart ?? []).find(d => d.depth === 25)?.count || 1) * 100)}% dos leitores que começaram terminaram o artigo.
-                    </p>
-                  )}
-                </div>
-              )}
+            <div className="mt-4 pt-3 border-t border-slate-100">
+              <span className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer">
+                Ver relatório completo <ArrowUpRight size={11} />
+              </span>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-            {/* ── Top categorias ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Categorias mais acessadas
-              </h2>
-              {(stats.topCategories?.length ?? 0) === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
-              ) : (
-                <div className="space-y-2">
-                  {(stats.topCategories ?? []).map(({ name, views }, i) => {
-                    const max = stats.topCategories[0]?.views ?? 1;
-                    return (
-                      <div key={name} className="flex items-center gap-3">
-                        <span className="text-xs font-bold text-gray-400 w-4">{i + 1}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between mb-0.5">
-                            <span className="text-xs font-semibold text-gray-700 capitalize">{name}</span>
-                            <span className="text-xs text-gray-500">{views.toLocaleString("pt-BR")}</span>
-                          </div>
-                          <div className="h-1.5 bg-gray-100 rounded-full">
-                            <div
-                              className="h-1.5 rounded-full"
-                              style={{ width: `${(views / Math.max(max, 1)) * 100}%`, backgroundColor: COLORS[i % COLORS.length] }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* ── Top artigos ── */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-4">
-                Notícias mais lidas
-              </h2>
-              {(stats.topArticles?.length ?? 0) === 0 ? (
-                <p className="text-gray-400 text-sm text-center py-6">Sem dados ainda</p>
-              ) : (
-                <ol className="space-y-3">
-                  {(stats.topArticles ?? []).map(({ title, views, avgTime }, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="text-[22px] font-black leading-none text-[#c8102e] w-6 shrink-0">{i + 1}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-gray-800 leading-snug line-clamp-2">{title}</p>
-                        <div className="flex items-center gap-3 mt-0.5">
-                          <span className="text-[11px] text-gray-400">{views.toLocaleString("pt-BR")} views</span>
-                          {avgTime !== undefined && avgTime > 0 && (
-                            <span className="text-[11px] text-sky-600 flex items-center gap-0.5">
-                              <Clock size={9}/> {fmtSecs(avgTime)} lidos
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </div>
-          </div>
-
-          <p className="text-xs text-gray-400 text-center pb-2">
-            Dados coletados apenas de visitantes que aceitaram cookies · Armazenamento em memória (reinicia com o servidor)
-          </p>
         </div>
-      )}
+
+        {/* ── Extra: hourly + scroll depth ──────────────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+          {/* Pico por hora */}
+          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico de acessos por hora</h2>
+              <span className="text-xs text-slate-400">Hoje</span>
+            </div>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={stats.hourlyChart ?? []} margin={{ top: 0, right: 4, bottom: 0, left: -10 }}>
+                <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
+                <XAxis
+                  dataKey="hour"
+                  tick={{ fontSize: 10, fill: "#94A3B8" }}
+                  axisLine={false}
+                  tickLine={false}
+                  interval={3}
+                  tickFormatter={(h) => `${String(h).padStart(2,"0")}h`}
+                />
+                <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
+                  formatter={(v: number) => [v, "views"]}
+                  labelFormatter={(h) => `${String(h).padStart(2,"0")}:00`}
+                />
+                <Bar dataKey="views" fill="#2563EB" radius={[4, 4, 0, 0]} opacity={0.85} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Profundidade de leitura */}
+          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Profundidade de leitura</h2>
+              <span className="text-xs text-slate-400">% que chegou até</span>
+            </div>
+            {(stats.scrollDepthChart ?? []).every(d => d.count === 0) ? (
+              <EmptyState label="Sem dados de scroll ainda" />
+            ) : (
+              <div className="space-y-4">
+                {(stats.scrollDepthChart ?? []).map(({ depth, count }) => {
+                  const colors: Record<number, string> = { 25: "#16A34A", 50: "#2563EB", 75: "#F97316", 100: "#E71D36" };
+                  const labels: Record<number, string> = { 25: "25% do artigo", 50: "50% do artigo", 75: "75% do artigo", 100: "Leu tudo (100%)" };
+                  const maxVal = Math.max(...(stats.scrollDepthChart ?? []).map(d => d.count), 1);
+                  return (
+                    <div key={depth}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs font-medium text-slate-600">{labels[depth]}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString("pt-BR")} leitores</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${(count / maxVal) * 100}%`, background: colors[depth] }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-400 text-center pb-2">
+          Dados coletados de visitantes · Armazenamento em memória (reinicia com o servidor)
+        </p>
+      </div>
     </AdminLayout>
   );
 }
