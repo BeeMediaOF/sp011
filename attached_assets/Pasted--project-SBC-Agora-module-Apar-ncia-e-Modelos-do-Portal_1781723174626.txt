@@ -1,0 +1,770 @@
+{
+  "project": "SBC Agora",
+  "module": "Aparência e Modelos do Portal",
+  "type": "functional_configuration_json",
+  "language": "pt-BR",
+  "objective": "Criar um sistema funcional para o administrador configurar tema claro/escuro, salvar preferência visual do cliente, escolher modelos prontos de cabeçalho, rodapé e aplicar modelos completos de home com blocos pré-configurados.",
+  "functionalRequirement": "O sistema deve permitir trocar tema, cabeçalho, rodapé e modelo de home sem quebrar a estrutura atual. Cada escolha deve ser salva por cliente/portal e aplicada em tempo real na prévia antes da publicação.",
+  "coreFeatures": {
+    "themeMode": true,
+    "saveClientPreference": true,
+    "headerTemplates": true,
+    "footerTemplates": true,
+    "homeTemplates": true,
+    "livePreview": true,
+    "publishLayout": true,
+    "restoreDefault": true,
+    "versionHistory": true
+  },
+  "themeSettings": {
+    "title": "Tema do portal",
+    "description": "Permite escolher entre tema claro, escuro ou automático.",
+    "fieldKey": "theme_mode",
+    "options": [
+      {
+        "label": "Claro",
+        "value": "light",
+        "description": "Interface limpa, fundo branco, ideal para portais tradicionais.",
+        "preview": {
+          "background": "#FFFFFF",
+          "surface": "#F8FAFC",
+          "text": "#0F172A",
+          "primary": "#0B2A66",
+          "accent": "#E71D36"
+        }
+      },
+      {
+        "label": "Escuro",
+        "value": "dark",
+        "description": "Interface escura, moderna e com maior contraste visual.",
+        "preview": {
+          "background": "#07111F",
+          "surface": "#0F1B2E",
+          "text": "#F8FAFC",
+          "primary": "#1D4ED8",
+          "accent": "#EF233C"
+        }
+      },
+      {
+        "label": "Automático",
+        "value": "system",
+        "description": "Segue a preferência do navegador ou dispositivo do visitante.",
+        "preview": {
+          "mode": "system_preference"
+        }
+      }
+    ],
+    "default": "light",
+    "clientPreference": {
+      "enabled": true,
+      "saveBy": "portal_id",
+      "storage": "database",
+      "fallback": "light",
+      "applyOnLoad": true
+    },
+    "adminBehavior": {
+      "previewBeforeSave": true,
+      "instantPreview": true,
+      "requiresPublish": true
+    }
+  },
+  "headerTemplates": {
+    "title": "Modelos de cabeçalho",
+    "description": "Modelos prontos para o topo do portal.",
+    "maxTemplates": 6,
+    "selected": "header_classic_news",
+    "templates": [
+      {
+        "id": "header_classic_news",
+        "name": "Clássico Jornalístico",
+        "description": "Logo central, menu horizontal, busca e faixa de cotações/notícias.",
+        "bestFor": ["Portal de Notícias", "Cidade", "Política"],
+        "layout": {
+          "logoPosition": "center",
+          "menuPosition": "below_logo",
+          "showSearch": true,
+          "showTicker": true,
+          "showDate": false,
+          "showSocialIcons": false
+        }
+      },
+      {
+        "id": "header_modern_left",
+        "name": "Moderno Lateral",
+        "description": "Logo à esquerda, menu no centro e ações à direita.",
+        "bestFor": ["Esporte", "Tecnologia", "Cultura"],
+        "layout": {
+          "logoPosition": "left",
+          "menuPosition": "center",
+          "showSearch": true,
+          "showTicker": false,
+          "showDate": true,
+          "showSocialIcons": true
+        }
+      },
+      {
+        "id": "header_breaking_news",
+        "name": "Plantão",
+        "description": "Cabeçalho com faixa vermelha de urgência e destaque para últimas notícias.",
+        "bestFor": ["Notícias Urgentes", "Política", "Segurança"],
+        "layout": {
+          "logoPosition": "left",
+          "menuPosition": "below_logo",
+          "showSearch": true,
+          "showTicker": true,
+          "tickerStyle": "breaking_red",
+          "showBreakingBadge": true
+        }
+      },
+      {
+        "id": "header_sports",
+        "name": "Esportivo",
+        "description": "Visual mais dinâmico com placares, editorias esportivas e chamada ao vivo.",
+        "bestFor": ["Esporte", "Futebol", "Bet", "Cobertura ao vivo"],
+        "layout": {
+          "logoPosition": "left",
+          "menuPosition": "horizontal",
+          "showScoreTicker": true,
+          "showLiveButton": true,
+          "showSearch": true
+        }
+      },
+      {
+        "id": "header_magazine",
+        "name": "Revista",
+        "description": "Cabeçalho elegante para cultura, comportamento e colunas.",
+        "bestFor": ["Cultura", "Lifestyle", "Colunistas"],
+        "layout": {
+          "logoPosition": "center",
+          "menuPosition": "minimal",
+          "showSearch": true,
+          "showSocialIcons": true,
+          "showTicker": false
+        }
+      },
+      {
+        "id": "header_minimal",
+        "name": "Minimalista",
+        "description": "Topo limpo, discreto e rápido, com foco total no conteúdo.",
+        "bestFor": ["Blogs", "Portais leves", "Mobile first"],
+        "layout": {
+          "logoPosition": "left",
+          "menuPosition": "compact",
+          "showSearch": true,
+          "showTicker": false,
+          "showDate": false
+        }
+      }
+    ]
+  },
+  "footerTemplates": {
+    "title": "Modelos de rodapé",
+    "description": "Modelos prontos para o rodapé do portal.",
+    "maxTemplates": 5,
+    "selected": "footer_editorial_columns",
+    "templates": [
+      {
+        "id": "footer_editorial_columns",
+        "name": "Editorial com Colunas",
+        "description": "Rodapé completo com editorias, páginas institucionais, contato e redes sociais.",
+        "layout": {
+          "columns": [
+            "Sobre o portal",
+            "Editorias",
+            "Institucional",
+            "Redes sociais"
+          ],
+          "showLogo": true,
+          "showNewsletter": true,
+          "showCopyright": true
+        }
+      },
+      {
+        "id": "footer_minimal",
+        "name": "Minimalista",
+        "description": "Rodapé enxuto com logo, links essenciais e direitos autorais.",
+        "layout": {
+          "columns": ["Links principais"],
+          "showLogo": true,
+          "showNewsletter": false,
+          "showSocialIcons": true
+        }
+      },
+      {
+        "id": "footer_newsletter_focus",
+        "name": "Newsletter em Destaque",
+        "description": "Rodapé com foco em captação de e-mails.",
+        "layout": {
+          "columns": ["Newsletter", "Editorias", "Contato"],
+          "showNewsletter": true,
+          "newsletterPosition": "top",
+          "showSocialIcons": true
+        }
+      },
+      {
+        "id": "footer_city_portal",
+        "name": "Portal Local",
+        "description": "Rodapé com informações da cidade, contato comercial e mapa.",
+        "layout": {
+          "columns": ["Cidade", "Anuncie", "Contato", "Mapa"],
+          "showMap": true,
+          "showCommercialContact": true
+        }
+      },
+      {
+        "id": "footer_sports",
+        "name": "Esportivo",
+        "description": "Rodapé com campeonatos, times, redes sociais e parceiros.",
+        "layout": {
+          "columns": ["Competições", "Times", "Parceiros", "Redes sociais"],
+          "showSponsors": true,
+          "showSocialIcons": true
+        }
+      }
+    ]
+  },
+  "homeTemplates": {
+    "title": "Modelos de Home",
+    "description": "Modelos prontos de página inicial com blocos configurados por tipo de portal.",
+    "maxTemplates": 8,
+    "selected": "home_news_portal",
+    "templates": [
+      {
+        "id": "home_news_portal",
+        "name": "Portal de Notícias",
+        "description": "Modelo principal para portal jornalístico completo.",
+        "bestFor": ["Notícias gerais", "Cidades", "Política", "Economia"],
+        "blocks": [
+          {
+            "type": "ticker",
+            "title": "Últimas notícias",
+            "format": "breaking_news_bar",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Hero / Destaques",
+            "format": "hero_3_cards",
+            "source": "latest_featured",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "advertising",
+            "title": "Banner Topo",
+            "format": "970x90",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Mais Lidas",
+            "format": "ranking_horizontal",
+            "source": "most_read",
+            "itemsLimit": 5,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Política",
+            "format": "grid_3",
+            "source": "category",
+            "category": "Política",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Cidade",
+            "format": "grid_3",
+            "source": "category",
+            "category": "Cidade",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "columnists",
+            "title": "Colunistas",
+            "format": "carousel",
+            "visible": true
+          },
+          {
+            "type": "newsletter",
+            "title": "Receba notícias no seu e-mail",
+            "format": "inline_banner",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_sports",
+        "name": "Esporte",
+        "description": "Modelo para portal esportivo com placares, destaques e cobertura ao vivo.",
+        "bestFor": ["Futebol", "Esportes", "Bet", "Cobertura ao vivo"],
+        "blocks": [
+          {
+            "type": "ticker",
+            "title": "Placar ao vivo",
+            "format": "score_ticker",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Jogo do Dia",
+            "format": "hero_big_match",
+            "source": "category",
+            "category": "Esportes",
+            "itemsLimit": 1,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Últimas do Futebol",
+            "format": "grid_4",
+            "source": "category",
+            "category": "Futebol",
+            "itemsLimit": 4,
+            "visible": true
+          },
+          {
+            "type": "advertising",
+            "title": "Banner Patrocinador",
+            "format": "970x90",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Mais Lidas no Esporte",
+            "format": "ranking_list",
+            "source": "most_read",
+            "itemsLimit": 5,
+            "visible": true
+          },
+          {
+            "type": "video",
+            "title": "Vídeos",
+            "format": "video_grid",
+            "visible": true
+          },
+          {
+            "type": "categories",
+            "title": "Competições",
+            "format": "chips",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_culture",
+        "name": "Cultura",
+        "description": "Modelo editorial para cultura, eventos, cinema, música e agenda.",
+        "bestFor": ["Cultura", "Agenda", "Eventos", "Música", "Cinema"],
+        "blocks": [
+          {
+            "type": "content",
+            "title": "Destaques Culturais",
+            "format": "magazine_hero",
+            "source": "category",
+            "category": "Cultura",
+            "itemsLimit": 4,
+            "visible": true
+          },
+          {
+            "type": "image",
+            "title": "Agenda da Semana",
+            "format": "image_with_text",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Eventos",
+            "format": "cards_3",
+            "source": "category",
+            "category": "Eventos",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "columnists",
+            "title": "Opinião & Crônicas",
+            "format": "carousel",
+            "visible": true
+          },
+          {
+            "type": "newsletter",
+            "title": "Receba a agenda cultural",
+            "format": "banner",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_city",
+        "name": "Cidade / Região",
+        "description": "Modelo voltado para notícias locais, bairros, serviços e utilidade pública.",
+        "bestFor": ["Cidade", "Região", "Prefeitura", "Serviços"],
+        "blocks": [
+          {
+            "type": "ticker",
+            "title": "Serviços e alertas",
+            "format": "utility_ticker",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Destaques da Cidade",
+            "format": "hero_3_cards",
+            "source": "category",
+            "category": "Cidade",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "weather",
+            "title": "Clima na Cidade",
+            "format": "horizontal_card",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Bairros",
+            "format": "grid_4",
+            "source": "tag",
+            "tag": "bairros",
+            "itemsLimit": 4,
+            "visible": true
+          },
+          {
+            "type": "map",
+            "title": "Mapa de Serviços",
+            "format": "card",
+            "visible": false
+          },
+          {
+            "type": "advertising",
+            "title": "Comércio Local",
+            "format": "native_article",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_politics",
+        "name": "Política",
+        "description": "Modelo para cobertura política, bastidores, entrevistas e análises.",
+        "bestFor": ["Política", "Eleições", "Câmara", "Prefeitura"],
+        "blocks": [
+          {
+            "type": "content",
+            "title": "Principal da Política",
+            "format": "hero_featured",
+            "source": "category",
+            "category": "Política",
+            "itemsLimit": 1,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Bastidores",
+            "format": "list_with_thumbnail",
+            "source": "tag",
+            "tag": "bastidores",
+            "itemsLimit": 5,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Câmara Municipal",
+            "format": "grid_3",
+            "source": "category",
+            "category": "Política",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "columnists",
+            "title": "Análise Política",
+            "format": "carousel",
+            "visible": true
+          },
+          {
+            "type": "poll",
+            "title": "Enquete",
+            "format": "card",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_economy",
+        "name": "Economia",
+        "description": "Modelo para negócios, mercado, cotações e empreendedorismo.",
+        "bestFor": ["Economia", "Negócios", "Empreendedorismo"],
+        "blocks": [
+          {
+            "type": "quotes",
+            "title": "Cotações",
+            "format": "ticker",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Destaques de Economia",
+            "format": "hero_2_columns",
+            "source": "category",
+            "category": "Economia",
+            "itemsLimit": 4,
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Negócios",
+            "format": "grid_3",
+            "source": "tag",
+            "tag": "negócios",
+            "itemsLimit": 3,
+            "visible": true
+          },
+          {
+            "type": "counter",
+            "title": "Indicadores",
+            "format": "cards",
+            "visible": true
+          },
+          {
+            "type": "newsletter",
+            "title": "Resumo econômico",
+            "format": "inline",
+            "visible": true
+          }
+        ]
+      },
+      {
+        "id": "home_video",
+        "name": "Vídeos / TV",
+        "description": "Modelo com foco em vídeos, entrevistas e transmissão.",
+        "bestFor": ["WebTV", "Entrevistas", "Podcasts", "YouTube"],
+        "blocks": [
+          {
+            "type": "video",
+            "title": "Vídeo Principal",
+            "format": "featured_video",
+            "visible": true
+          },
+          {
+            "type": "video",
+            "title": "Últimos Vídeos",
+            "format": "video_grid",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Notícias Relacionadas",
+            "format": "list_compact",
+            "source": "latest",
+            "itemsLimit": 6,
+            "visible": true
+          },
+          {
+            "type": "advertising",
+            "title": "Patrocínio",
+            "format": "970x90",
+            "visible": true
+          },
+          {
+            "type": "embed",
+            "title": "Player ao Vivo",
+            "format": "iframe",
+            "visible": false
+          }
+        ]
+      },
+      {
+        "id": "home_magazine",
+        "name": "Revista / Lifestyle",
+        "description": "Modelo visual e leve para comportamento, gastronomia, turismo e variedades.",
+        "bestFor": ["Lifestyle", "Turismo", "Gastronomia", "Comportamento"],
+        "blocks": [
+          {
+            "type": "content",
+            "title": "Destaques da Revista",
+            "format": "masonry",
+            "source": "latest_featured",
+            "itemsLimit": 6,
+            "visible": true
+          },
+          {
+            "type": "image",
+            "title": "Imagem Editorial",
+            "format": "full_width_image",
+            "visible": true
+          },
+          {
+            "type": "content",
+            "title": "Guias e Roteiros",
+            "format": "cards_4",
+            "source": "category",
+            "category": "Turismo",
+            "itemsLimit": 4,
+            "visible": true
+          },
+          {
+            "type": "social_links",
+            "title": "Siga nas redes",
+            "format": "follow_bar",
+            "visible": true
+          },
+          {
+            "type": "newsletter",
+            "title": "Newsletter da Revista",
+            "format": "banner",
+            "visible": true
+          }
+        ]
+      }
+    ]
+  },
+  "adminInterface": {
+    "pageName": "Aparência do Portal",
+    "menuLocation": "Configurações > Aparência",
+    "sections": [
+      {
+        "title": "Tema",
+        "fields": ["theme_mode", "primary_color", "accent_color", "font_family"]
+      },
+      {
+        "title": "Cabeçalho",
+        "fields": ["header_template", "logo_position", "show_search", "show_ticker"]
+      },
+      {
+        "title": "Rodapé",
+        "fields": ["footer_template", "show_newsletter", "show_social_icons"]
+      },
+      {
+        "title": "Modelo de Home",
+        "fields": ["home_template", "apply_blocks", "replace_current_layout"]
+      }
+    ],
+    "actions": [
+      {
+        "label": "Pré-visualizar",
+        "action": "previewAppearance"
+      },
+      {
+        "label": "Aplicar modelo",
+        "action": "applySelectedTemplate"
+      },
+      {
+        "label": "Salvar preferência",
+        "action": "saveClientPreference"
+      },
+      {
+        "label": "Restaurar padrão",
+        "action": "restoreDefaultAppearance"
+      }
+    ]
+  },
+  "backendBehavior": {
+    "saveThemePreference": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/appearance/theme",
+      "payload": {
+        "portal_id": "uuid",
+        "theme_mode": "light"
+      },
+      "result": "Salva a preferência de tema do portal."
+    },
+    "applyHeaderTemplate": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/appearance/header",
+      "payload": {
+        "portal_id": "uuid",
+        "header_template_id": "header_classic_news"
+      },
+      "result": "Aplica o modelo de cabeçalho selecionado."
+    },
+    "applyFooterTemplate": {
+      "method": "PATCH",
+      "endpoint": "/api/admin/appearance/footer",
+      "payload": {
+        "portal_id": "uuid",
+        "footer_template_id": "footer_editorial_columns"
+      },
+      "result": "Aplica o modelo de rodapé selecionado."
+    },
+    "applyHomeTemplate": {
+      "method": "POST",
+      "endpoint": "/api/admin/appearance/home-template/apply",
+      "payload": {
+        "portal_id": "uuid",
+        "home_template_id": "home_news_portal",
+        "replace_current_blocks": true,
+        "save_previous_version": true
+      },
+      "result": "Cria ou substitui os blocos atuais da home com base no modelo selecionado."
+    }
+  },
+  "database": {
+    "tables": {
+      "portal_appearance": {
+        "description": "Armazena preferências visuais do portal.",
+        "fields": {
+          "id": "uuid",
+          "portal_id": "uuid",
+          "theme_mode": "text",
+          "primary_color": "text",
+          "accent_color": "text",
+          "font_family": "text",
+          "header_template_id": "text",
+          "footer_template_id": "text",
+          "home_template_id": "text",
+          "settings_json": "jsonb",
+          "updated_at": "timestamp"
+        }
+      },
+      "appearance_templates": {
+        "description": "Armazena modelos reutilizáveis de tema, cabeçalho, rodapé e home.",
+        "fields": {
+          "id": "uuid",
+          "template_type": "text",
+          "name": "text",
+          "description": "text",
+          "preview_image": "text",
+          "config_json": "jsonb",
+          "is_default": "boolean",
+          "created_at": "timestamp"
+        }
+      },
+      "home_blocks": {
+        "description": "Recebe os blocos gerados quando um modelo de home é aplicado.",
+        "fields": {
+          "id": "uuid",
+          "portal_id": "uuid",
+          "title": "text",
+          "type": "text",
+          "format": "text",
+          "position": "integer",
+          "visible": "boolean",
+          "source_type": "text",
+          "source_value": "jsonb",
+          "settings": "jsonb",
+          "style": "jsonb",
+          "created_at": "timestamp",
+          "updated_at": "timestamp"
+        }
+      },
+      "home_layout_versions": {
+        "description": "Guarda histórico antes de aplicar novos modelos.",
+        "fields": {
+          "id": "uuid",
+          "portal_id": "uuid",
+          "version_name": "text",
+          "layout_snapshot": "jsonb",
+          "created_by": "uuid",
+          "created_at": "timestamp"
+        }
+      }
+    }
+  },
+  "aiBuilderInstructions": "Implemente uma área funcional chamada Aparência do Portal dentro das configurações do painel. O cliente deve conseguir escolher tema Claro, Escuro ou Automático, e essa preferência precisa ficar salva no banco por portal. Também deve existir uma galeria de modelos prontos de Cabeçalho, Rodapé e Home. Ao selecionar um modelo, a prévia deve atualizar em tempo real. Ao aplicar um modelo de home, o sistema deve criar automaticamente os blocos correspondentes na tabela home_blocks. Antes de substituir a home atual, salve uma versão em home_layout_versions para permitir restauração. O sistema precisa permitir até 8 modelos de home prontos: Portal de Notícias, Esporte, Cultura, Cidade/Região, Política, Economia, Vídeos/TV e Revista/Lifestyle. Cada modelo deve vir com blocos pré-configurados, mas o administrador poderá editar tudo depois na página Blocos da Home.",
+  "promptForLovableOrBolt": "Crie um módulo funcional chamado Aparência do Portal no painel SBC Agora. Ele deve permitir escolher tema Claro, Escuro ou Automático, salvando a preferência do cliente no banco. Crie também seleção de modelos prontos de cabeçalho e rodapé com prévia ao vivo. Inclua uma galeria com até 8 modelos de home: Portal de Notícias, Esporte, Cultura, Cidade/Região, Política, Economia, Vídeos/TV e Revista/Lifestyle. Cada modelo de home deve gerar automaticamente blocos como hero, ticker, propaganda, mais lidas, newsletter, colunistas, vídeos, clima, cotações e categorias. Ao aplicar um modelo, salvar a versão anterior para restauração. A interface deve ter prévia em tempo real, botão Aplicar modelo, Salvar preferência e Restaurar padrão. Tudo deve ser funcional, integrado com a página Blocos da Home e preparado para CRUD com Supabase ou API REST."
+}
