@@ -294,36 +294,7 @@ const _storeDir = join(dirname(fileURLToPath(import.meta.url)), "..", "data");
 const STORE_FILE = join(_storeDir, "store.json");
 
 const defaultStore: StoreData = {
-  articles: [
-    {
-      id: "hero-1",
-      title: "Câmara Legislativa aprova projeto que cria o programa Morar DF",
-      subtitle: "Iniciativa prevê subsídio para famílias de baixa renda adquirirem a casa própria no Distrito Federal.",
-      content: "A Câmara Legislativa do Distrito Federal aprovou nesta semana o projeto de lei que institui o programa Morar DF. A iniciativa prevê subsídio direto para famílias de baixa renda que desejam adquirir imóveis na capital. O programa deve beneficiar cerca de 15 mil famílias nos próximos dois anos.",
-      category: "politica",
-      tag: "POLÍTICA",
-      imageUrl: "",
-      author: "Bee News",
-      publishedAt: new Date().toISOString(),
-      status: "published",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: "hero-2",
-      title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília",
-      subtitle: "Motoristas devem ficar atentos às mudanças no tráfego durante o período de obras.",
-      content: "O Departamento de Trânsito do DF informou que obras de manutenção no Eixo Monumental vão alterar o trânsito neste fim de semana. A interdição parcial ocorre entre as vias N2 e S2.",
-      category: "transporte",
-      tag: "TRÂNSITO",
-      imageUrl: "",
-      author: "Bee News",
-      publishedAt: new Date().toISOString(),
-      status: "published",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ],
+  articles: [],
   menuItems: [
     { id: "1", label: "HOME",      path: "/",          order: 0, visible: true },
     { id: "2", label: "POLÍTICA",  path: "/politica",  order: 1, visible: true },
