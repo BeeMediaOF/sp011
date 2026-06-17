@@ -1,0 +1,485 @@
+{
+  "project": "SBC Agora",
+  "screen": "Menu",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#2563EB",
+    "dangerColor": "#E71D36",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        },
+        {
+          "label": "Menu",
+          "icon": "menu",
+          "active": true
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "88px",
+      "background": "#FFFFFF",
+      "title": "Menu",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "page_header",
+          "tabs": [
+            {
+              "label": "Menu principal",
+              "active": true
+            },
+            {
+              "label": "Menu superior",
+              "active": false
+            },
+            {
+              "label": "Rodapé",
+              "active": false
+            }
+          ],
+          "actions": [
+            {
+              "label": "Criar novo menu",
+              "icon": "plus-circle",
+              "style": "outline",
+              "action": "create_menu"
+            },
+            {
+              "label": "Salvar alterações",
+              "icon": "save",
+              "style": "solid_red",
+              "action": "save_menu_changes"
+            }
+          ]
+        },
+        {
+          "type": "menu_preview",
+          "title": "Pré-visualização do menu principal",
+          "logo": "SBC Agora",
+          "navigation": [
+            {
+              "label": "Página inicial",
+              "icon": "home",
+              "active": true
+            },
+            {
+              "label": "Notícias",
+              "hasDropdown": true
+            },
+            {
+              "label": "Política"
+            },
+            {
+              "label": "Economia"
+            },
+            {
+              "label": "Esportes"
+            },
+            {
+              "label": "Cultura"
+            },
+            {
+              "label": "Colunistas"
+            },
+            {
+              "label": "Vídeos"
+            },
+            {
+              "label": "Podcasts"
+            },
+            {
+              "label": "Mais",
+              "hasDropdown": true
+            },
+            {
+              "label": "Buscar",
+              "icon": "search"
+            }
+          ],
+          "responsivePreview": {
+            "label": "Responsivo",
+            "devices": [
+              {
+                "label": "desktop",
+                "icon": "monitor",
+                "active": true
+              },
+              {
+                "label": "tablet",
+                "icon": "tablet",
+                "active": false
+              },
+              {
+                "label": "mobile",
+                "icon": "smartphone",
+                "active": false
+              }
+            ]
+          }
+        },
+        {
+          "type": "menu_editor_grid",
+          "columns": "1fr 1.7fr 1.1fr",
+          "items": [
+            {
+              "component": "available_items",
+              "title": "Itens disponíveis",
+              "description": "Páginas, categorias e links que podem ser adicionados ao menu.",
+              "tabs": [
+                {
+                  "label": "Páginas",
+                  "active": true
+                },
+                {
+                  "label": "Categorias",
+                  "active": false
+                },
+                {
+                  "label": "Links personalizados",
+                  "active": false
+                }
+              ],
+              "search": {
+                "placeholder": "Buscar páginas...",
+                "icon": "search"
+              },
+              "items": [
+                {
+                  "label": "Página Inicial",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Sobre o SBC Agora",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Contato",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Anuncie",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Termos de Uso",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Política de Privacidade",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                },
+                {
+                  "label": "Trabalhe Conosco",
+                  "type": "Página",
+                  "icon": "file",
+                  "actionIcon": "plus"
+                }
+              ],
+              "footerAction": {
+                "label": "Ver todas as páginas",
+                "icon": "arrow-right"
+              }
+            },
+            {
+              "component": "menu_structure",
+              "title": "Estrutura do menu",
+              "description": "Arraste e solte para reordenar. Arraste para a direita para criar subitens.",
+              "action": {
+                "label": "Adicionar item",
+                "icon": "plus",
+                "style": "outline"
+              },
+              "sortable": true,
+              "items": [
+                {
+                  "id": "home",
+                  "label": "Página Inicial",
+                  "type": "Link personalizado",
+                  "icon": "home",
+                  "depth": 0,
+                  "expanded": false,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "noticias",
+                  "label": "Notícias",
+                  "type": "Categoria",
+                  "icon": "menu",
+                  "depth": 0,
+                  "expanded": true,
+                  "actions": ["collapse", "edit", "delete"],
+                  "children": [
+                    {
+                      "id": "brasil",
+                      "label": "Brasil",
+                      "type": "Categoria",
+                      "depth": 1,
+                      "actions": ["expand", "edit", "delete"]
+                    },
+                    {
+                      "id": "mundo",
+                      "label": "Mundo",
+                      "type": "Categoria",
+                      "depth": 1,
+                      "actions": ["expand", "edit", "delete"]
+                    },
+                    {
+                      "id": "tecnologia",
+                      "label": "Tecnologia",
+                      "type": "Categoria",
+                      "depth": 1,
+                      "actions": ["expand", "edit", "delete"]
+                    },
+                    {
+                      "id": "educacao",
+                      "label": "Educação",
+                      "type": "Categoria",
+                      "depth": 1,
+                      "actions": ["expand", "edit", "delete"]
+                    }
+                  ]
+                },
+                {
+                  "id": "politica",
+                  "label": "Política",
+                  "type": "Categoria",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "economia",
+                  "label": "Economia",
+                  "type": "Categoria",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "esportes",
+                  "label": "Esportes",
+                  "type": "Categoria",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "cultura",
+                  "label": "Cultura",
+                  "type": "Categoria",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "colunistas",
+                  "label": "Colunistas",
+                  "type": "Página",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "videos",
+                  "label": "Vídeos",
+                  "type": "Página",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "podcasts",
+                  "label": "Podcasts",
+                  "type": "Página",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                },
+                {
+                  "id": "mais",
+                  "label": "Mais",
+                  "type": "Link personalizado",
+                  "depth": 0,
+                  "actions": ["expand", "edit", "delete"]
+                }
+              ]
+            },
+            {
+              "component": "item_settings",
+              "title": "Configurações do item",
+              "description": "Selecione um item para editar suas configurações.",
+              "selectedItem": {
+                "id": "noticias",
+                "label": "Notícias"
+              },
+              "fields": [
+                {
+                  "label": "Texto do menu",
+                  "type": "text",
+                  "value": "Notícias"
+                },
+                {
+                  "label": "Tipo",
+                  "type": "select",
+                  "value": "Categoria",
+                  "options": ["Página", "Categoria", "Link personalizado"]
+                },
+                {
+                  "label": "Categoria",
+                  "type": "select",
+                  "value": "Notícias",
+                  "options": ["Notícias", "Política", "Economia", "Esportes", "Cultura"]
+                }
+              ],
+              "toggles": [
+                {
+                  "label": "Abrir em nova aba",
+                  "description": "Abre o link em uma nova aba do navegador.",
+                  "enabled": false
+                },
+                {
+                  "label": "Visível no menu",
+                  "description": "Exibe este item no menu do site.",
+                  "enabled": true
+                },
+                {
+                  "label": "Destacar item",
+                  "description": "Aplica destaque visual no menu.",
+                  "enabled": false
+                }
+              ],
+              "iconPicker": {
+                "label": "Ícone (opcional)",
+                "placeholder": "Selecione um ícone",
+                "icon": "diamond"
+              },
+              "tip": {
+                "icon": "info",
+                "text": "Dica: arraste os itens para definir a ordem e criar subitens."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Menu minimalista para o painel administrativo do portal SBC Agora, mantendo sidebar branca, topbar limpa, identidade azul-marinho e vermelho, cards brancos com sombras suaves e cantos arredondados. A página deve permitir gerenciar menus do portal, com abas Menu principal, Menu superior e Rodapé, botões Criar novo menu e Salvar alterações, pré-visualização horizontal do menu do site, painel de itens disponíveis, estrutura do menu com itens arrastáveis e subitens, além de configurações do item selecionado com campos, toggles e seleção de ícone. Use textos em português, visual premium, muito respiro e interface editorial moderna."
+}
