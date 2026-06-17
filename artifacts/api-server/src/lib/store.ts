@@ -29,7 +29,7 @@ export interface Article {
   status: "draft" | "published";
   createdAt: string;
   updatedAt: string;
-  origin?: "manual" | "rss";
+  origin?: "manual" | "rss" | "perplexity";
   rssSourceId?: string;
   rssSourceName?: string;
   rssSourceUrl?: string;
