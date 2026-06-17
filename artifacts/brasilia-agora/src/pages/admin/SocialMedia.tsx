@@ -8,6 +8,7 @@ import {
   Copy, AlertTriangle, Image as ImageIcon, Layers,
   Hash, Info, Save, AlignLeft, Building2, Folder,
   Type, Layout, Smile, FileText, Megaphone, ToggleLeft, ToggleRight,
+  Plus, MoreVertical, Pencil, Copy as CopyIcon,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +58,12 @@ interface SocialConfig {
   captionHashtagsFixed?: string;
   captionAssinatura?: string;
   captionTom?: string;
+  templateLayout?: string;
+  templateOverlayOpacity?: number;
+  templateCategoryStyle?: string;
+  templateShowAuthor?: boolean;
+  templateShowDate?: boolean;
+  templateShowCTA?: boolean;
 }
 
 interface Article {
@@ -71,7 +78,9 @@ interface Article {
 }
 
 type ActiveTab = "credenciais" | "template" | "legenda" | "publicar";
-type TemplateType = "feed" | "story";
+type TemplateType = "feed" | "story" | "facebook";
+
+const FB_W = 1200, FB_H = 630;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const FEED_W = 1080, FEED_H = 1350;
@@ -121,8 +130,8 @@ function renderCanvas(
   logoBase64?: string,
   siteName?: string,
 ) {
-  const W = type === "feed" ? FEED_W : STORY_W;
-  const H = type === "feed" ? FEED_H : STORY_H;
+  const W = type === "feed" ? FEED_W : type === "story" ? STORY_W : FB_W;
+  const H = type === "feed" ? FEED_H : type === "story" ? STORY_H : FB_H;
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext("2d")!;
@@ -351,9 +360,11 @@ export default function SocialMedia() {
   const [publishResults, setPublishResults] = useState<Record<string, { ok: boolean; error?: string; id?: string }> | null>(null);
 
   const [captionPlatform, setCaptionPlatform] = useState<"feed" | "story" | "facebook">("feed");
+  const [templateDestTab, setTemplateDestTab] = useState<TemplateType>("feed");
 
-  const feedCanvasRef  = useRef<HTMLCanvasElement>(null);
-  const storyCanvasRef = useRef<HTMLCanvasElement>(null);
+  const feedCanvasRef      = useRef<HTMLCanvasElement>(null);
+  const storyCanvasRef     = useRef<HTMLCanvasElement>(null);
+  const facebookCanvasRef  = useRef<HTMLCanvasElement>(null);
 
   // Load config
   useEffect(() => {
@@ -398,6 +409,9 @@ export default function SocialMedia() {
     }
     if (storyCanvasRef.current) {
       renderCanvas(storyCanvasRef.current, "story", selArt, cfg, logoBase64, siteName);
+    }
+    if (facebookCanvasRef.current) {
+      renderCanvas(facebookCanvasRef.current, "facebook", selArt, cfg, logoBase64, siteName);
     }
   }, [selArt, cfg, logoBase64, siteName]);
 
@@ -652,348 +666,291 @@ export default function SocialMedia() {
 
         {/* ── TEMPLATE ─────────────────────────────────────────────────────────── */}
         {tab === "template" && (
-          <div className="space-y-5">
-            {/* Type toggle */}
-            <div className="flex gap-2">
-              {(["feed", "story"] as const).map(t => (
-                <button key={t} onClick={() => { setPreviewType(t); setTimeout(redrawCanvas, 50); }}
-                  className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                    previewType === t ? "bg-[#E71D36] text-white border-[#E71D36]" : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
-                  }`}>
-                  {t === "feed" ? "Feed 1080×1350" : "Story 1080×1920"}
-                </button>
-              ))}
-            </div>
+          <div className="grid gap-6" style={{ gridTemplateColumns: "0.85fr 1.6fr" }}>
 
-            <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
-              {/* ── Controls ── */}
-              <div className="space-y-4">
+            {/* ── LEFT: Settings ── */}
+            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+              {/* Card header */}
+              <div className="px-6 pt-6 pb-4 border-b border-[#F1F5F9]">
+                <h2 className="font-semibold text-[#0F172A] text-[15px]">Configurar máscara de publicações</h2>
+                <p className="text-xs text-[#64748B] mt-0.5">Personalize como seus artigos serão exibidos nas redes sociais.</p>
+              </div>
 
-                {/* Article for preview */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4">
-                  <h3 className="font-semibold text-gray-800 text-sm mb-3 flex items-center gap-2">
-                    <ImageIcon size={14} /> Artigo para prévia
-                  </h3>
-                  {articles.length === 0 ? (
-                    <p className="text-xs text-gray-400">Carregando artigos…</p>
-                  ) : (
+              <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
+
+                {/* Destination sub-tabs */}
+                <div>
+                  <p className="text-xs font-medium text-[#64748B] mb-2">Destino (Template)</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {([
+                      { id: "feed",     icon: <Instagram size={13}/>, label: "Instagram Feed",  size: "1080×1350" },
+                      { id: "story",    icon: <Layers    size={13}/>, label: "Instagram Story", size: "1080×1920" },
+                      { id: "facebook", icon: <Facebook  size={13}/>, label: "Facebook Page",   size: "1200×630" },
+                    ] as const).map(d => (
+                      <button key={d.id}
+                        onClick={() => setTemplateDestTab(d.id)}
+                        className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border text-center transition-all ${
+                          templateDestTab === d.id
+                            ? "border-[#0B2A66] bg-[#EFF6FF] text-[#0B2A66]"
+                            : "border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]"
+                        }`}>
+                        {d.icon}
+                        <span className="text-[11px] font-medium leading-tight">{d.label}</span>
+                        <span className="text-[10px] opacity-70">{d.size}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Modelo de layout */}
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1.5">Modelo de layout</label>
+                  <select
+                    className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+                    value={cfg.templateLayout ?? "Padrão com badge e logo"}
+                    onChange={e => { setCfg(p => ({ ...p, templateLayout: e.target.value })); }}>
+                    {["Padrão com badge e logo", "Editorial com imagem cheia", "Urgente com faixa vermelha", "Minimalista com título central", "Imagem escura com overlay"].map(o => (
+                      <option key={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Cor primária + Cor de destaque */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Cor primária (overlay)</label>
+                    <div className="flex items-center gap-2 border border-[#E2E8F0] rounded-xl px-3 py-2">
+                      <input type="color"
+                        value={cfg.templatePanelColor ?? "#1a2448"}
+                        onChange={e => { setCfg(p => ({ ...p, templatePanelColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
+                        className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
+                      <span className="text-xs font-mono text-[#0F172A]">{cfg.templatePanelColor ?? "#1a2448"}</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Cor de destaque (badge/CTA)</label>
+                    <div className="flex items-center gap-2 border border-[#E2E8F0] rounded-xl px-3 py-2">
+                      <input type="color"
+                        value={cfg.templateAccentColor ?? "#f59e0b"}
+                        onChange={e => { setCfg(p => ({ ...p, templateAccentColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
+                        className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
+                      <span className="text-xs font-mono text-[#0F172A]">{cfg.templateAccentColor ?? "#f59e0b"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tamanho do título + Subtítulo toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-medium text-[#64748B]">Tamanho do título</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#64748B]">Exibir subtítulo</span>
+                      <button
+                        onClick={() => { setCfg(p => ({ ...p, templateShowSubtitle: !(cfg.templateShowSubtitle ?? false) })); setTimeout(redrawCanvas, 50); }}
+                        className={`relative w-9 h-5 rounded-full transition-colors ${cfg.templateShowSubtitle ? "bg-[#0B2A66]" : "bg-gray-200"}`}>
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.templateShowSubtitle ? "translate-x-4" : "translate-x-0.5"}`} />
+                      </button>
+                    </div>
+                  </div>
+                  <input type="range" min="0.5" max="1.8" step="0.05"
+                    value={cfg.templateTitleSizeScale ?? 1.0}
+                    onChange={e => { setCfg(p => ({ ...p, templateTitleSizeScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
+                    className="w-full accent-[#0B2A66]" />
+                  <div className="flex justify-between text-[10px] text-[#94A3B8] mt-0.5"><span>Pequeno</span><span>Extra grande</span></div>
+                </div>
+
+                {/* Posição do logo + Opacidade do overlay */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Posição do logo</label>
                     <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
-                      value={selArt?.id ?? ""}
-                      onChange={e => {
-                        const found = articles.find(a => a.id === e.target.value) ?? null;
-                        setSelArt(found);
-                        setTimeout(redrawCanvas, 100);
-                      }}>
-                      <option value="">— sem artigo (fundo padrão) —</option>
-                      {articles.map(a => (
-                        <option key={a.id} value={a.id}>
-                          [{a.tag ?? a.category}] {a.title.replace(/<[^>]*>/g, "").slice(0, 55)}
-                          {a.title.length > 55 ? "…" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                {/* Title controls */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-800 text-sm">Título</h3>
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                        <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
-                          checked={cfg.templateShowSubtitle ?? true}
-                          onChange={e => { setCfg(p => ({ ...p, templateShowSubtitle: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
-                        Subtítulo
-                      </label>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Fonte</label>
-                    <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
-                      value={cfg.templateTitleFont ?? "Inter, Arial, sans-serif"}
-                      onChange={e => { setCfg(p => ({ ...p, templateTitleFont: e.target.value })); setTimeout(redrawCanvas, 50); }}>
-                      <option value="Inter, Arial, sans-serif">Inter (Sans-serif moderna)</option>
-                      <option value="Arial Black, Arial, sans-serif">Arial Black (impacto)</option>
-                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                      <option value="Arial, Helvetica, sans-serif">Arial (Sans-serif simples)</option>
-                      <option value="Merriweather, Georgia, serif">Merriweather (Serif elegante)</option>
-                      <option value="Georgia, serif">Georgia (Serif clássica)</option>
-                      <option value="'Times New Roman', serif">Times New Roman</option>
+                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+                      value={cfg.templateLogoPosition ?? "top-left"}
+                      onChange={e => { setCfg(p => ({ ...p, templateLogoPosition: e.target.value as typeof cfg.templateLogoPosition, templateShowLogo: true })); setTimeout(redrawCanvas, 50); }}>
+                      <option value="top-left">Superior esquerda</option>
+                      <option value="top-right">Superior direita</option>
+                      <option value="bottom-left">Inferior esquerda</option>
+                      <option value="bottom-right">Inferior direita</option>
                     </select>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1.5">Cor do título</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color"
-                          value={cfg.templateTitleColor ?? "#ffffff"}
-                          onChange={e => { setCfg(p => ({ ...p, templateTitleColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
-                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
-                        <span className="text-xs text-gray-400 font-mono">{cfg.templateTitleColor ?? "#ffffff"}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">Máx. linhas</label>
-                      <div className="flex items-center gap-1">
-                        {[2, 3, 4, 5].map(n => (
-                          <button key={n}
-                            onClick={() => { setCfg(p => ({ ...p, templateTitleMaxLines: n })); setTimeout(redrawCanvas, 50); }}
-                            className={`flex-1 py-1.5 rounded text-xs font-semibold border transition-colors ${
-                              (cfg.templateTitleMaxLines ?? 4) === n
-                                ? "bg-[#E71D36] text-white border-[#E71D36]"
-                                : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                            }`}>{n}</button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
                   <div>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Tamanho</span>
-                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleSizeScale ?? 1.0) * 100)}%</span>
-                    </div>
-                    <input type="range" min="0.5" max="1.8" step="0.05"
-                      value={cfg.templateTitleSizeScale ?? 1.0}
-                      onChange={e => { setCfg(p => ({ ...p, templateTitleSizeScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#E71D36]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Pequeno</span><span>Grande</span></div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Posição horizontal</span>
-                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleOffsetX ?? 0) * 100)}%</span>
-                    </div>
-                    <input type="range" min="-0.15" max="0.15" step="0.01"
-                      value={cfg.templateTitleOffsetX ?? 0}
-                      onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#E71D36]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>← Esquerda</span><span>Direita →</span></div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Posição vertical</span>
-                      <span className="font-mono text-gray-500">{Math.round((cfg.templateTitleOffsetY ?? 0) * 100)}%</span>
-                    </div>
-                    <input type="range" min="-0.25" max="0.35" step="0.01"
-                      value={cfg.templateTitleOffsetY ?? 0}
-                      onChange={e => { setCfg(p => ({ ...p, templateTitleOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#E71D36]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>↓ Mais baixo</span><span>↑ Mais alto</span></div>
-                  </div>
-                </div>
-
-                {/* Category tag */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-800 text-sm">Tag de Categoria</h3>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
-                        checked={cfg.templateShowCategory ?? true}
-                        onChange={e => { setCfg(p => ({ ...p, templateShowCategory: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
-                      Exibir
-                    </label>
-                  </div>
-                  {(cfg.templateShowCategory ?? true) && (
-                    <>
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>Posição horizontal</span>
-                          <span className="font-mono text-gray-500">{Math.round((cfg.templateCategoryOffsetX ?? 0) * 100)}%</span>
-                        </div>
-                        <input type="range" min="0" max="0.6" step="0.01"
-                          value={cfg.templateCategoryOffsetX ?? 0}
-                          onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetX: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#E71D36]" />
-                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Borda esq.</span><span>Centro →</span></div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>Posição vertical</span>
-                          <span className="font-mono text-gray-500">{Math.round((cfg.templateCategoryOffsetY ?? 0) * 100)}%</span>
-                        </div>
-                        <input type="range" min="0" max="0.4" step="0.01"
-                          value={cfg.templateCategoryOffsetY ?? 0}
-                          onChange={e => { setCfg(p => ({ ...p, templateCategoryOffsetY: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#E71D36]" />
-                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Topo</span><span>↓ Mais baixo</span></div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Logo */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-800 text-sm">Logo</h3>
-                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
-                      <input type="checkbox" className="w-3.5 h-3.5 accent-[#E71D36]"
-                        checked={cfg.templateShowLogo ?? false}
-                        onChange={e => { setCfg(p => ({ ...p, templateShowLogo: e.target.checked })); setTimeout(redrawCanvas, 50); }} />
-                      Exibir
-                    </label>
-                  </div>
-                  {(cfg.templateShowLogo ?? false) && (
-                    <>
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>Tamanho</span>
-                          <span className="font-mono text-gray-500">{Math.round((cfg.templateLogoScale ?? 1.0) * 100)}%</span>
-                        </div>
-                        <input type="range" min="0.4" max="2.0" step="0.1"
-                          value={cfg.templateLogoScale ?? 1.0}
-                          onChange={e => { setCfg(p => ({ ...p, templateLogoScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                          className="w-full accent-[#E71D36]" />
-                        <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menor</span><span>Maior</span></div>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600 mb-2">Posição</p>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {([
-                            { key: "top-left",     label: "↖ Sup. Esq." },
-                            { key: "top-right",    label: "↗ Sup. Dir." },
-                            { key: "bottom-left",  label: "↙ Inf. Esq." },
-                            { key: "bottom-right", label: "↘ Inf. Dir." },
-                          ] as const).map(({ key, label }) => (
-                            <button key={key}
-                              onClick={() => { setCfg(p => ({ ...p, templateLogoPosition: key })); setTimeout(redrawCanvas, 50); }}
-                              className={`py-1.5 px-2 rounded text-xs font-medium border transition-colors ${
-                                (cfg.templateLogoPosition ?? "top-right") === key
-                                  ? "bg-[#E71D36] text-white border-[#E71D36]"
-                                  : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                              }`}>
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* Layout */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800 text-sm">Foto</h3>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Altura da foto</span>
-                      <span className="font-mono text-gray-500">{Math.round((cfg.templatePhotoRatio ?? 0.54) * 100)}%</span>
-                    </div>
-                    <input type="range" min="0.35" max="0.72" step="0.01"
-                      value={cfg.templatePhotoRatio ?? 0.54}
-                      onChange={e => { setCfg(p => ({ ...p, templatePhotoRatio: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#E71D36]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Menos foto</span><span>Mais foto</span></div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1.5">Recorte vertical</p>
-                    <div className="flex gap-1.5">
-                      {([
-                        { key: "top",    label: "⬆ Topo"   },
-                        { key: "center", label: "◎ Centro" },
-                        { key: "bottom", label: "⬇ Base"   },
-                      ] as const).map(({ key, label }) => (
-                        <button key={key}
-                          onClick={() => { setCfg(p => ({ ...p, templatePhotoCropY: key })); setTimeout(redrawCanvas, 50); }}
-                          className={`flex-1 py-1.5 rounded text-xs font-medium border transition-colors ${
-                            (cfg.templatePhotoCropY ?? "center") === key
-                              ? "bg-[#E71D36] text-white border-[#E71D36]"
-                              : "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100"
-                          }`}>{label}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-gray-600 mb-1">
-                      <span>Vinheta (foto→painel)</span>
-                      <span className="font-mono text-gray-500">{Math.round((cfg.templatePhotoVignette ?? 0.40) * 100)}%</span>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-medium text-[#64748B]">Opacidade do overlay</label>
+                      <span className="text-xs font-mono text-[#0B2A66]">{Math.round((cfg.templatePhotoVignette ?? 0.40) * 100)}%</span>
                     </div>
                     <input type="range" min="0" max="1" step="0.05"
                       value={cfg.templatePhotoVignette ?? 0.40}
                       onChange={e => { setCfg(p => ({ ...p, templatePhotoVignette: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#E71D36]" />
-                    <div className="flex justify-between text-xs text-gray-400 mt-0.5"><span>Sem vinheta</span><span>Intensa</span></div>
+                      className="w-full accent-[#0B2A66] mt-1" />
+                    <div className="flex justify-between text-[10px] text-[#94A3B8] mt-0.5"><span>0%</span><span>100%</span></div>
                   </div>
                 </div>
 
-                {/* Colors */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-                  <h3 className="font-semibold text-gray-800 text-sm">Cores</h3>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1.5">Cor do painel</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color"
-                          value={cfg.templatePanelColor ?? "#1a2448"}
-                          onChange={e => { setCfg(p => ({ ...p, templatePanelColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
-                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
-                        <span className="text-xs text-gray-400 font-mono">{cfg.templatePanelColor ?? "#1a2448"}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1.5">Cor de destaque</label>
-                      <div className="flex items-center gap-2">
-                        <input type="color"
-                          value={cfg.templateAccentColor ?? "#f59e0b"}
-                          onChange={e => { setCfg(p => ({ ...p, templateAccentColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
-                          className="w-9 h-9 rounded border border-gray-300 cursor-pointer p-0.5" />
-                        <span className="text-xs text-gray-400 font-mono">{cfg.templateAccentColor ?? "#f59e0b"}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-400 mt-1">Badge + subtítulo</p>
-                    </div>
+                {/* Estilo da tag de categoria */}
+                <div>
+                  <label className="block text-xs font-medium text-[#64748B] mb-1.5">Estilo da tag de categoria</label>
+                  <select
+                    className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+                    value={cfg.templateCategoryStyle ?? "Retangular preenchida"}
+                    onChange={e => { setCfg(p => ({ ...p, templateCategoryStyle: e.target.value })); }}>
+                    {["Retangular preenchida", "Pílula preenchida", "Contorno fino", "Sem tag"].map(o => (
+                      <option key={o}>{o}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Exibir elementos toggles */}
+                <div>
+                  <p className="text-xs font-medium text-[#64748B] mb-2">Exibir elementos</p>
+                  <div className="flex flex-wrap gap-4">
+                    {([
+                      { key: "templateShowAuthor",   label: "Autor",      def: true },
+                      { key: "templateShowDate",     label: "Data",       def: true },
+                      { key: "templateShowCategory", label: "Categoria",  def: true },
+                      { key: "templateShowCTA",      label: "CTA (Ver mais)", def: true },
+                    ] as const).map(({ key, label, def }) => {
+                      const on = (cfg as Record<string, unknown>)[key] !== undefined
+                        ? !!(cfg as Record<string, unknown>)[key]
+                        : def;
+                      return (
+                        <label key={key} className="flex items-center gap-2 cursor-pointer">
+                          <button
+                            onClick={() => { setCfg(p => ({ ...p, [key]: !on })); setTimeout(redrawCanvas, 50); }}
+                            className={`relative w-9 h-5 rounded-full transition-colors ${on ? "bg-[#0B2A66]" : "bg-gray-200"}`}>
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${on ? "translate-x-4" : "translate-x-0.5"}`} />
+                          </button>
+                          <span className="text-sm text-[#0F172A]">{label}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
 
-                {/* URL personalizada */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
-                  <h3 className="font-semibold text-gray-800 text-sm">URL do rodapé</h3>
-                  <input
-                    type="text"
-                    placeholder="Ex: brasilia.com.br  (deixe vazio para automático)"
-                    value={cfg.templateSiteUrl ?? ""}
-                    onChange={e => { setCfg(p => ({ ...p, templateSiteUrl: e.target.value })); setTimeout(redrawCanvas, 80); }}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#E71D36]"
-                  />
-                  <p className="text-[10px] text-gray-400">Aparece discreto no canto inferior esquerdo da máscara.</p>
+                {/* Templates salvos */}
+                <div className="pt-2 border-t border-[#F1F5F9]">
+                  <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">Templates salvos</p>
+                  <div className="space-y-1.5">
+                    {["Plantão", "Notícia padrão", "Esportes", "Urgente"].map(name => (
+                      <div key={name} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-[#F8FAFC] transition-colors group">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-1 h-4 rounded-full bg-[#E2E8F0]" />
+                          <span className="text-sm text-[#0F172A]">{name}</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-[#F1F5F9] text-[#64748B] rounded-md font-medium">Padrão</span>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#64748B] hover:text-[#0B2A66] transition-colors">
+                            <Pencil size={13}/>
+                          </button>
+                          <button className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#64748B] hover:text-[#0B2A66] transition-colors">
+                            <MoreVertical size={13}/>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button className="mt-3 w-full flex items-center justify-center gap-2 py-2 border border-dashed border-[#CBD5E1] rounded-xl text-sm text-[#64748B] hover:border-[#0B2A66] hover:text-[#0B2A66] hover:bg-[#F8FAFC] transition-all">
+                    <Plus size={14}/> Novo template
+                  </button>
                 </div>
+              </div>
+            </div>
 
-                <button onClick={saveConfig} disabled={saving}
-                  className="w-full py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {saving ? <RefreshCw size={13} className="animate-spin" /> : <CheckCircle size={13} />}
-                  {saving ? "Salvando…" : "Salvar template"}
-                </button>
+            {/* ── RIGHT: Preview ── */}
+            <div className="bg-white rounded-2xl overflow-hidden flex flex-col" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+              {/* Card header */}
+              <div className="px-6 pt-6 pb-4 border-b border-[#F1F5F9] flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Prévia do template</h2>
+                  <p className="text-xs text-[#64748B] mt-0.5">Visualize como suas publicações serão exibidas em cada destino.</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {articles.length > 0 && (
+                    <select
+                      className="border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white max-w-[220px]"
+                      value={selArt?.id ?? ""}
+                      onChange={e => { const found = articles.find(a => a.id === e.target.value) ?? null; setSelArt(found); setTimeout(redrawCanvas, 100); }}>
+                      <option value="">— sem artigo —</option>
+                      {articles.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.title.replace(/<[^>]*>/g, "").slice(0, 40)}{a.title.length > 40 ? "…" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={() => { setCfg(p => ({ ...p, templatePanelColor: "#1a2448", templateAccentColor: "#f59e0b", templateTitleSizeScale: 1.0, templatePhotoVignette: 0.40, templateShowSubtitle: false })); setTimeout(redrawCanvas, 80); }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors flex-shrink-0">
+                    <RefreshCw size={12}/> Redefinir padrão
+                  </button>
+                </div>
               </div>
 
-              {/* ── Canvas preview ── */}
-              <div className="flex flex-col items-center gap-3 lg:sticky lg:top-4">
-                <p className="text-xs text-gray-400 font-medium uppercase tracking-wide">
-                  Prévia — {previewType === "feed" ? "Feed 1080×1350" : "Story 1080×1920"}
-                </p>
-                <div className="relative overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-gray-900"
-                  style={{ width: 270, height: previewType === "feed" ? 338 : 480 }}>
-                  <canvas ref={previewType === "feed" ? feedCanvasRef : storyCanvasRef}
-                    style={{ width: "100%", height: "100%", display: "block" }} />
+              {/* 3 canvas previews */}
+              <div className="flex-1 px-6 py-6">
+                <div className="flex gap-6 items-start justify-center h-full">
+
+                  {/* Feed 4:5 */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
+                      <Instagram size={12}/> <span className="font-medium">Instagram Feed</span>
+                      <span className="text-[#94A3B8]">1080×1350</span>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900"
+                      style={{ width: 200, height: 250 }}>
+                      <canvas ref={feedCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+                    </div>
+                    <button onClick={() => { if (!feedCanvasRef.current) return; const a = document.createElement("a"); a.download = "feed.jpg"; a.href = feedCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
+                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                      <Eye size={10}/> Baixar
+                    </button>
+                  </div>
+
+                  {/* Story 9:16 */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
+                      <Layers size={12}/> <span className="font-medium">Instagram Story</span>
+                      <span className="text-[#94A3B8]">1080×1920</span>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900"
+                      style={{ width: 141, height: 250 }}>
+                      <canvas ref={storyCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+                    </div>
+                    <button onClick={() => { if (!storyCanvasRef.current) return; const a = document.createElement("a"); a.download = "story.jpg"; a.href = storyCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
+                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                      <Eye size={10}/> Baixar
+                    </button>
+                  </div>
+
+                  {/* Facebook 1.91:1 */}
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
+                      <Facebook size={12}/> <span className="font-medium">Facebook Page</span>
+                      <span className="text-[#94A3B8]">1200×630</span>
+                    </div>
+                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900 flex items-center justify-center"
+                      style={{ width: 320, height: 168 }}>
+                      <canvas ref={facebookCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+                    </div>
+                    <button onClick={() => { if (!facebookCanvasRef.current) return; const a = document.createElement("a"); a.download = "facebook.jpg"; a.href = facebookCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
+                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                      <Eye size={10}/> Baixar
+                    </button>
+                  </div>
+
                 </div>
-                <button onClick={() => {
-                    const ref = previewType === "feed" ? feedCanvasRef.current : storyCanvasRef.current;
-                    if (!ref) return;
-                    const a = document.createElement("a");
-                    a.download = `${previewType}.jpg`;
-                    a.href = ref.toDataURL("image/jpeg", 0.92);
-                    a.click();
-                  }}
-                  className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                  <Eye size={11}/> Baixar prévia
+              </div>
+
+              {/* Footer actions */}
+              <div className="px-6 py-4 border-t border-[#F1F5F9] flex items-center justify-end gap-3">
+                <button
+                  onClick={() => toast({ title: "Template duplicado!", description: "Uma cópia foi criada nos templates salvos.", duration: 2500 })}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#E2E8F0] rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC] transition-colors">
+                  <CopyIcon size={14}/> Duplicar template
+                </button>
+                <button onClick={saveConfig} disabled={saving}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-xl text-sm font-semibold hover:bg-[#c9182e] disabled:opacity-50 transition-colors">
+                  {saving ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>}
+                  {saving ? "Salvando…" : "Salvar template"}
                 </button>
               </div>
             </div>
@@ -1375,12 +1332,6 @@ export default function SocialMedia() {
           </div>
         )}
 
-        {/* Hidden canvases for template tab (other type) */}
-        {tab === "template" && (
-          <>
-            <canvas ref={previewType === "feed" ? storyCanvasRef : feedCanvasRef} className="hidden" />
-          </>
-        )}
       </div>
     </AdminLayout>
   );

@@ -1,0 +1,464 @@
+{
+  "project": "SBC Agora",
+  "screen": "Redes Sociais - Templates",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "purpose": "Configurar máscaras visuais para publicações automáticas das notícias no Instagram Feed, Instagram Story e Facebook Page.",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "dangerColor": "#E71D36",
+    "infoColor": "#2563EB",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "250px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real.",
+        "icon": "social-share-gradient"
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "line-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "edit",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share-2",
+          "active": true
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        },
+        {
+          "label": "Menu",
+          "icon": "menu",
+          "active": false
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "104px",
+      "background": "#FFFFFF",
+      "title": "Redes Sociais",
+      "subtitle": "Conexão Meta · publicação automática no Feed e Story",
+      "backButton": {
+        "icon": "arrow-left",
+        "visible": true
+      },
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 2
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "tabs": [
+      {
+        "label": "Credenciais Meta",
+        "active": false
+      },
+      {
+        "label": "Templates",
+        "active": true
+      },
+      {
+        "label": "Legenda automática",
+        "active": false
+      },
+      {
+        "label": "Publicar",
+        "active": false
+      }
+    ],
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "columns": "0.85fr 1.6fr",
+      "sections": [
+        {
+          "component": "template_settings",
+          "title": "Configurar máscara de publicações",
+          "description": "Personalize como seus artigos serão exibidos nas redes sociais.",
+          "cardStyle": {
+            "background": "#FFFFFF",
+            "borderRadius": "16px",
+            "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+          },
+          "destinationTabs": [
+            {
+              "label": "Instagram Feed",
+              "size": "1080x1350",
+              "ratio": "4:5",
+              "icon": "instagram",
+              "active": true
+            },
+            {
+              "label": "Instagram Story",
+              "size": "1080x1920",
+              "ratio": "9:16",
+              "icon": "instagram",
+              "active": false
+            },
+            {
+              "label": "Facebook Page",
+              "size": "1200x630",
+              "ratio": "1.91:1",
+              "icon": "facebook",
+              "active": false
+            }
+          ],
+          "fields": [
+            {
+              "label": "Modelo de layout",
+              "type": "select",
+              "value": "Padrão com badge e logo",
+              "options": [
+                "Padrão com badge e logo",
+                "Editorial com imagem cheia",
+                "Urgente com faixa vermelha",
+                "Minimalista com título central",
+                "Imagem escura com overlay"
+              ]
+            },
+            {
+              "label": "Imagem de fundo",
+              "type": "file_selector",
+              "fileName": "fundo-noticia.jpg",
+              "dimensions": "1920x1280",
+              "thumbnail": "news_background_police_car",
+              "actions": [
+                {
+                  "label": "Alterar",
+                  "style": "outline"
+                },
+                {
+                  "icon": "trash",
+                  "style": "icon_button"
+                }
+              ]
+            },
+            {
+              "label": "Cor primária (overlay)",
+              "type": "color_input",
+              "value": "#0D1B2A"
+            },
+            {
+              "label": "Cor de destaque (badge/CTA)",
+              "type": "color_input",
+              "value": "#E31B23"
+            },
+            {
+              "label": "Tamanho do título",
+              "type": "range",
+              "value": "Grande",
+              "min": "Pequeno",
+              "max": "Extra grande"
+            },
+            {
+              "label": "Exibir subtítulo",
+              "type": "toggle",
+              "enabled": false
+            },
+            {
+              "label": "Posição do logo",
+              "type": "select",
+              "value": "Superior esquerda",
+              "options": [
+                "Superior esquerda",
+                "Superior direita",
+                "Inferior esquerda",
+                "Inferior direita",
+                "Oculto"
+              ]
+            },
+            {
+              "label": "Opacidade do overlay",
+              "type": "range",
+              "value": "70%",
+              "min": "0%",
+              "max": "100%"
+            },
+            {
+              "label": "Estilo da tag de categoria",
+              "type": "select",
+              "value": "Retangular preenchida",
+              "options": [
+                "Retangular preenchida",
+                "Pílula preenchida",
+                "Contorno fino",
+                "Sem tag"
+              ]
+            }
+          ],
+          "elementToggles": {
+            "label": "Exibir elementos",
+            "items": [
+              {
+                "label": "Autor",
+                "enabled": true
+              },
+              {
+                "label": "Data",
+                "enabled": true
+              },
+              {
+                "label": "Categoria",
+                "enabled": true
+              },
+              {
+                "label": "CTA (Ver mais)",
+                "enabled": true
+              }
+            ]
+          },
+          "savedTemplates": {
+            "title": "Templates salvos",
+            "items": [
+              {
+                "name": "Plantão",
+                "badge": "Padrão",
+                "actions": ["edit", "more"]
+              },
+              {
+                "name": "Notícia padrão",
+                "badge": "Padrão",
+                "actions": ["edit", "more"]
+              },
+              {
+                "name": "Esportes",
+                "badge": "Padrão",
+                "actions": ["edit", "more"]
+              },
+              {
+                "name": "Urgente",
+                "badge": "Padrão",
+                "actions": ["edit", "more"]
+              }
+            ],
+            "action": {
+              "label": "Novo template",
+              "icon": "plus",
+              "style": "outline"
+            }
+          }
+        },
+        {
+          "component": "template_preview",
+          "title": "Prévia do template",
+          "description": "Visualize como suas publicações serão exibidas em cada destino.",
+          "cardStyle": {
+            "background": "#FFFFFF",
+            "borderRadius": "16px",
+            "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+          },
+          "topAction": {
+            "label": "Redefinir padrão",
+            "icon": "refresh-cw",
+            "style": "outline"
+          },
+          "previews": [
+            {
+              "platform": "Instagram Feed",
+              "icon": "instagram",
+              "size": "1080x1350",
+              "ratio": "4:5",
+              "mockup": {
+                "background": "news_background_police_car",
+                "overlay": {
+                  "color": "#0D1B2A",
+                  "opacity": "70%"
+                },
+                "logo": {
+                  "text": "SBCAgora",
+                  "position": "top-left"
+                },
+                "categoryBadge": {
+                  "text": "GERAL",
+                  "background": "#E31B23",
+                  "position": "middle-left"
+                },
+                "headline": "Casal encontrado morto em Itapetininga: mulher degolada e marido falecido em acidente; polícia investiga feminicídio e suicídio",
+                "summary": "Sara Letícia foi achada sem vida em casa, horas após Diego da Silva morrer em colisão na Rodovia Raposo Tavares; polícia investiga feminicídio seguido de suicídio.",
+                "meta": {
+                  "author": "Redação SBC Agora",
+                  "date": "23 mai, 2025"
+                }
+              }
+            },
+            {
+              "platform": "Instagram Story",
+              "icon": "instagram",
+              "size": "1080x1920",
+              "ratio": "9:16",
+              "mockup": {
+                "background": "news_background_police_car",
+                "overlay": {
+                  "color": "#0D1B2A",
+                  "opacity": "70%"
+                },
+                "topBar": {
+                  "account": "SBC Agora",
+                  "time": "23 h",
+                  "closeIcon": true
+                },
+                "categoryBadge": {
+                  "text": "GERAL",
+                  "background": "#E31B23"
+                },
+                "headline": "Casal encontrado morto em Itapetininga: mulher degolada e marido falecido em acidente; polícia investiga feminicídio e suicídio",
+                "cta": {
+                  "text": "Ver mais",
+                  "style": "white_pill"
+                }
+              }
+            },
+            {
+              "platform": "Facebook Page",
+              "icon": "facebook",
+              "size": "1200x630",
+              "ratio": "1.91:1",
+              "mockup": {
+                "background": "news_background_police_car",
+                "overlay": {
+                  "color": "#0D1B2A",
+                  "opacity": "70%"
+                },
+                "logo": {
+                  "text": "SBCAgora",
+                  "position": "top-left"
+                },
+                "categoryBadge": {
+                  "text": "GERAL",
+                  "background": "#E31B23"
+                },
+                "headline": "Casal encontrado morto em Itapetininga: mulher degolada e marido falecido em acidente; polícia investiga feminicídio e suicídio",
+                "meta": {
+                  "author": "Redação SBC Agora",
+                  "date": "23 mai, 2025"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "component": "action_bar",
+          "position": "bottom-right",
+          "actions": [
+            {
+              "label": "Duplicar template",
+              "icon": "copy",
+              "style": "outline",
+              "action": "duplicate_template"
+            },
+            {
+              "label": "Salvar template",
+              "icon": "save",
+              "style": "solid_red",
+              "action": "save_template"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "automationRules": {
+    "description": "Máscara visual usada automaticamente ao transformar notícias do portal em imagens para redes sociais.",
+    "destinations": [
+      "Instagram Feed",
+      "Instagram Story",
+      "Facebook Page"
+    ],
+    "defaultTemplate": "Notícia padrão",
+    "imageGeneration": {
+      "useArticleImage": true,
+      "applyOverlay": true,
+      "includeLogo": true,
+      "includeCategory": true,
+      "includeAuthor": true,
+      "includeDate": true,
+      "includeCTA": true
+    }
+  },
+  "prompt": "Crie uma página Templates para o módulo Redes Sociais do painel administrativo SBC Agora. A interface deve permitir configurar a máscara visual das publicações automáticas para Instagram Feed, Instagram Story e Facebook Page. Use sidebar branca com Redes Sociais ativo em vermelho, topbar com busca, data, notificações e perfil do administrador. No topo, exiba as abas Credenciais Meta, Templates, Legenda automática e Publicar, com Templates ativo. À esquerda, crie um painel de configuração com seleção de destino, modelo de layout, imagem de fundo, cores, tamanho do título, exibição de subtítulo, posição do logo, opacidade do overlay, estilo da tag de categoria, toggles de elementos e lista de templates salvos. À direita, exiba prévias do template em Instagram Feed 1080x1350, Instagram Story 1080x1920 e Facebook Page 1200x630. No rodapé, botões Duplicar template e Salvar template. Visual minimalista premium em português, com branco, azul-marinho e vermelho."
+}
