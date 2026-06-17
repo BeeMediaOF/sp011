@@ -33,6 +33,7 @@ interface AdminLayoutProps {
   children: React.ReactNode;
   title: string;
   noPadding?: boolean;
+  topbarExtra?: React.ReactNode;
 }
 
 const LS_SIDEBAR = "admin_sidebar_color";
@@ -78,7 +79,7 @@ function formatDate() {
   return new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export default function AdminLayout({ children, title, noPadding }: AdminLayoutProps) {
+export default function AdminLayout({ children, title, noPadding, topbarExtra }: AdminLayoutProps) {
   const [configOpen, setConfigOpen] = useState(false);
   const [location, navigate] = useLocation();
   const { accent, logo } = usePanelTheme();
@@ -204,31 +205,37 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
           </div>
 
           <div className="flex items-center gap-4 ml-auto">
-            {/* Date */}
-            <span className="text-sm text-slate-500 hidden lg:block">{formatDate()}</span>
+            {topbarExtra ? (
+              topbarExtra
+            ) : (
+              <>
+                {/* Date */}
+                <span className="text-sm text-slate-500 hidden lg:block">{formatDate()}</span>
 
-            {/* Notifications */}
-            <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
-              <Bell size={18} />
-              <span
-                className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
-                style={{ backgroundColor: accent }}
-              />
-            </button>
+                {/* Notifications */}
+                <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
+                  <Bell size={18} />
+                  <span
+                    className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+                    style={{ backgroundColor: accent }}
+                  />
+                </button>
 
-            {/* User */}
-            <div className="flex items-center gap-3">
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
-                style={{ backgroundColor: "#0B2A66" }}
-              >
-                AD
-              </div>
-              <div className="hidden lg:block">
-                <p className="text-sm font-semibold text-slate-800 leading-none">Administrador</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
-              </div>
-            </div>
+                {/* User */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                    style={{ backgroundColor: "#0B2A66" }}
+                  >
+                    AD
+                  </div>
+                  <div className="hidden lg:block">
+                    <p className="text-sm font-semibold text-slate-800 leading-none">Administrador</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </header>
 

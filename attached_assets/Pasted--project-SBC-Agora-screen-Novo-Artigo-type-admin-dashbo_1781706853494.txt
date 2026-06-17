@@ -1,0 +1,372 @@
+{
+  "project": "SBC Agora",
+  "screen": "Novo Artigo",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "infoColor": "#2563EB",
+    "dangerColor": "#E71D36",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": false
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": true
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "88px",
+      "background": "#FFFFFF",
+      "breadcrumb": ["Dashboard", "Artigos", "Novo artigo"],
+      "title": "Novo artigo",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      },
+      "actions": [
+        {
+          "label": "Salvar rascunho",
+          "icon": "save",
+          "style": "outline",
+          "action": "save_draft"
+        },
+        {
+          "label": "Pré-visualizar",
+          "icon": "eye",
+          "style": "outline",
+          "action": "preview_article"
+        },
+        {
+          "label": "Publicar",
+          "icon": "send",
+          "style": "solid_red",
+          "hasDropdown": true,
+          "action": "publish_article"
+        }
+      ]
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "columns": "2.4fr 1fr",
+      "sections": [
+        {
+          "type": "article_editor",
+          "component": "main_form",
+          "cardStyle": {
+            "background": "#FFFFFF",
+            "borderRadius": "16px",
+            "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+          },
+          "fields": [
+            {
+              "label": "Título da matéria",
+              "required": true,
+              "type": "text",
+              "placeholder": "Digite o título da matéria",
+              "width": "large"
+            },
+            {
+              "label": "Slug",
+              "required": true,
+              "type": "text",
+              "placeholder": "slug-da-materia",
+              "helper": "URL amigável gerada automaticamente",
+              "width": "small"
+            },
+            {
+              "label": "Subtítulo",
+              "required": false,
+              "type": "text",
+              "placeholder": "Digite o subtítulo da matéria (opcional)",
+              "width": "full"
+            },
+            {
+              "label": "Resumo",
+              "required": false,
+              "type": "textarea",
+              "placeholder": "Breve descrição ou destaque da matéria",
+              "counter": "0/160",
+              "width": "full"
+            }
+          ],
+          "editor": {
+            "label": "Conteúdo",
+            "required": true,
+            "type": "rich_text",
+            "placeholder": "Escreva o conteúdo da matéria aqui...",
+            "wordCounter": "0 palavras",
+            "toolbar": [
+              {
+                "label": "Parágrafo",
+                "type": "dropdown"
+              },
+              {
+                "icon": "bold",
+                "label": "Negrito"
+              },
+              {
+                "icon": "italic",
+                "label": "Itálico"
+              },
+              {
+                "icon": "underline",
+                "label": "Sublinhado"
+              },
+              {
+                "icon": "strikethrough",
+                "label": "Tachado"
+              },
+              {
+                "icon": "list",
+                "label": "Lista"
+              },
+              {
+                "icon": "align-left",
+                "label": "Alinhamento"
+              },
+              {
+                "icon": "quote",
+                "label": "Citação"
+              },
+              {
+                "icon": "link",
+                "label": "Link"
+              },
+              {
+                "icon": "image",
+                "label": "Imagem"
+              },
+              {
+                "icon": "video",
+                "label": "Vídeo"
+              },
+              {
+                "icon": "table",
+                "label": "Tabela"
+              },
+              {
+                "icon": "more-horizontal",
+                "label": "Mais opções"
+              }
+            ]
+          },
+          "featuredImage": {
+            "label": "Imagem de destaque",
+            "required": true,
+            "type": "upload",
+            "uploadMode": "drag_and_drop",
+            "placeholder": "Arraste e solte uma imagem aqui ou",
+            "button": "Selecionar imagem",
+            "formats": ["JPG", "PNG", "WebP"],
+            "recommendedSize": "1200x630px",
+            "icon": "image"
+          }
+        },
+        {
+          "type": "content_blocks",
+          "title": "Blocos de conteúdo",
+          "description": "Adicione elementos para enriquecer sua matéria.",
+          "columns": 3,
+          "blocks": [
+            {
+              "label": "Adicionar galeria",
+              "description": "Adicione uma galeria de imagens à matéria",
+              "icon": "image",
+              "color": "#2563EB",
+              "action": "add_gallery"
+            },
+            {
+              "label": "Adicionar vídeo",
+              "description": "Incorpore um vídeo do YouTube ou Vimeo",
+              "icon": "video",
+              "color": "#E71D36",
+              "action": "add_video"
+            },
+            {
+              "label": "Adicionar citação",
+              "description": "Destaque citações importantes no texto",
+              "icon": "quote",
+              "color": "#0B2A66",
+              "action": "add_quote"
+            }
+          ]
+        },
+        {
+          "type": "right_sidebar",
+          "position": "right",
+          "sections": [
+            {
+              "component": "publication_settings",
+              "title": "Publicação",
+              "fields": [
+                {
+                  "label": "Status",
+                  "required": true,
+                  "type": "select",
+                  "value": "Rascunho",
+                  "statusDot": "#F59E0B",
+                  "options": ["Rascunho", "Publicado", "Agendado"]
+                },
+                {
+                  "label": "Agendamento",
+                  "type": "datetime",
+                  "placeholder": "Publicar agora",
+                  "icon": "calendar",
+                  "helper": "Deixe em branco para publicar imediatamente"
+                }
+              ]
+            },
+            {
+              "component": "article_metadata",
+              "fields": [
+                {
+                  "label": "Categoria",
+                  "required": true,
+                  "type": "select",
+                  "placeholder": "Selecione uma categoria",
+                  "options": ["Cidades", "Política", "Economia", "Esportes", "Cultura", "Trânsito", "Saúde"]
+                },
+                {
+                  "label": "Tags",
+                  "type": "tag_input",
+                  "placeholder": "Digite e pressione Enter para adicionar",
+                  "helper": "Separe as tags com Enter"
+                },
+                {
+                  "label": "Autor",
+                  "required": true,
+                  "type": "select",
+                  "value": "Administrador (Você)",
+                  "options": ["Administrador (Você)", "Redação", "Colunista"]
+                }
+              ]
+            },
+            {
+              "component": "seo_settings",
+              "title": "SEO",
+              "fields": [
+                {
+                  "label": "Título SEO",
+                  "type": "text",
+                  "placeholder": "Título para SEO (opcional)",
+                  "counter": "0/60"
+                },
+                {
+                  "label": "Meta descrição",
+                  "type": "textarea",
+                  "placeholder": "Descrição para mecanismos de busca (opcional)",
+                  "counter": "0/160"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Novo Artigo minimalista para o painel administrativo do portal SBC Agora, seguindo o visual premium do dashboard: sidebar branca com o item Novo Artigo ativo em vermelho, topbar limpa com breadcrumb, busca, data, notificações e perfil do administrador. No topo, exiba botões Salvar rascunho, Pré-visualizar e Publicar. No conteúdo, use layout em duas colunas: à esquerda, formulário editorial com título da matéria, slug, subtítulo, resumo, editor de texto rico, upload de imagem de destaque e blocos para adicionar galeria, vídeo e citação. À direita, painel de publicação com status, agendamento, categoria, tags, autor e SEO. Use cards brancos, cantos arredondados, sombras suaves, muito respiro e textos em português."
+}
