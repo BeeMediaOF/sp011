@@ -1,5 +1,11 @@
 import { Router } from "express";
-import { authMiddleware, generateToken, validateCredentials } from "../middlewares/auth.js";
+import { eq, sql } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
+import {
+  authMiddleware, generateToken, verifyPassword,
+  checkRateLimit, resetRateLimit,
+} from "../middlewares/auth.js";
+import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
 import { rewriteWithAI } from "../lib/rssProcessor.js";
 
@@ -8,18 +14,132 @@ const router = Router();
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/login */
-router.post("/login", (req, res) => {
-  const { username, password } = req.body as { username?: string; password?: string };
-  if (!username || !password) {
-    res.status(400).json({ error: "username and password are required" });
+router.post("/login", async (req, res) => {
+  const ip = getClientIp(req);
+  const ua = req.headers["user-agent"] ?? "";
+
+  // Rate limit by IP
+  if (!checkRateLimit(ip)) {
+    await logSecurity({
+      eventType: "rate_limit_exceeded",
+      severity: "high",
+      description: `Login rate limit excedido para IP: ${ip}`,
+      ipAddress: ip, userAgent: ua, route: "/api/admin/login",
+    });
+    res.status(429).json({ error: "Muitas tentativas. Tente novamente em alguns minutos." });
     return;
   }
-  if (!validateCredentials(username, password)) {
-    res.status(401).json({ error: "Invalid credentials" });
+
+  const { email, username, password } = req.body as {
+    email?: string; username?: string; password?: string;
+  };
+  const identifier = (email ?? username ?? "").trim().toLowerCase();
+
+  if (!identifier || !password) {
+    res.status(400).json({ error: "E-mail e senha são obrigatórios." });
     return;
   }
-  const token = generateToken(username);
-  res.json({ token, username });
+
+  try {
+    // Try DB user first
+    const [user] = await db.select().from(usersTable)
+      .where(eq(sql`lower(${usersTable.email})`, identifier));
+
+    if (user) {
+      // Check if blocked
+      if (user.status === "blocked" || (user.lockedUntil && user.lockedUntil > new Date())) {
+        await logSecurity({
+          userId: user.id, userEmail: user.email,
+          eventType: "account_locked",
+          severity: "medium",
+          description: `Tentativa de login em conta bloqueada: ${user.email}`,
+          ipAddress: ip, userAgent: ua, route: "/api/admin/login",
+        });
+        res.status(403).json({ error: "E-mail ou senha inválidos." });
+        return;
+      }
+      if (user.status === "inactive") {
+        res.status(403).json({ error: "E-mail ou senha inválidos." });
+        return;
+      }
+
+      const valid = verifyPassword(password, user.passwordHash);
+      if (!valid) {
+        const newFailed = user.failedLoginAttempts + 1;
+        const lockUntil = newFailed >= 5 ? new Date(Date.now() + 30 * 60_000) : null;
+        await db.update(usersTable).set({
+          failedLoginAttempts: newFailed,
+          lockedUntil: lockUntil,
+        }).where(eq(usersTable.id, user.id));
+        await logSecurity({
+          userId: user.id, userEmail: user.email,
+          eventType: newFailed >= 5 ? "account_locked" : "failed_login",
+          severity: newFailed >= 5 ? "high" : "medium",
+          description: `Tentativa de login inválida (${newFailed}/5): ${user.email}`,
+          ipAddress: ip, userAgent: ua, route: "/api/admin/login",
+        });
+        res.status(401).json({ error: "E-mail ou senha inválidos." });
+        return;
+      }
+
+      // Success
+      await db.update(usersTable).set({
+        lastLogin: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        updatedAt: new Date(),
+      }).where(eq(usersTable.id, user.id));
+      resetRateLimit(ip);
+      await logAudit({
+        userId: user.id, userEmail: user.email,
+        action: "login", module: "auth",
+        description: `Login realizado: ${user.email}`,
+        ipAddress: ip, userAgent: ua,
+      });
+      const token = generateToken(user.id, user.role);
+      res.json({ token, email: user.email, role: user.role, name: user.name });
+      return;
+    }
+
+    // No DB user found
+    await logSecurity({
+      eventType: "failed_login", severity: "low",
+      description: `Tentativa de login com credencial desconhecida: ${identifier}`,
+      ipAddress: ip, userAgent: ua, route: "/api/admin/login",
+    });
+    res.status(401).json({ error: "E-mail ou senha inválidos." });
+  } catch (err) {
+    req.log.error({ err }, "Login error");
+    res.status(500).json({ error: "Erro interno no login." });
+  }
+});
+
+/** GET /api/admin/me — current user info */
+router.get("/me", authMiddleware, async (req, res) => {
+  try {
+    if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+    const [user] = await db.select({
+      id: usersTable.id, name: usersTable.name, email: usersTable.email,
+      role: usersTable.role, status: usersTable.status,
+      lastLogin: usersTable.lastLogin, mustChangePassword: usersTable.mustChangePassword,
+    }).from(usersTable).where(eq(usersTable.id, req.userId));
+    if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
+    res.json({ user });
+  } catch (err) {
+    req.log.error({ err }, "Error fetching current user");
+    res.status(500).json({ error: "Erro interno" });
+  }
+});
+
+/** POST /api/admin/logout */
+router.post("/logout", authMiddleware, async (req, res) => {
+  await logAudit({
+    userId: req.userId,
+    action: "logout", module: "auth",
+    description: `Logout realizado`,
+    ipAddress: getClientIp(req), userAgent: req.headers["user-agent"],
+  });
+  res.json({ success: true });
 });
 
 // All routes below require auth

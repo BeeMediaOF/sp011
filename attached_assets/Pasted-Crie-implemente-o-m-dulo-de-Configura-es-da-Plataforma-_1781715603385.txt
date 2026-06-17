@@ -1,0 +1,159 @@
+Crie/implemente o módulo de **Configurações da Plataforma** com controle de usuários, senhas e níveis de perfil.
+
+A plataforma precisa ter autenticação com login e senha, cadastro de usuários e controle de permissões por perfil.
+
+## Página: Configurações
+
+Dentro de Configurações, criar uma área chamada **Usuários e Permissões**.
+
+Essa área deve permitir ao administrador:
+
+* Cadastrar novo usuário
+* Editar usuário existente
+* Alterar senha
+* Ativar ou desativar usuário
+* Definir o perfil do usuário
+* Excluir usuário, se permitido
+* Visualizar lista de usuários cadastrados
+
+## Campos do cadastro de usuário
+
+Cada usuário deve ter:
+
+* Nome
+* E-mail
+* Senha
+* Confirmação de senha
+* Perfil: Administrador ou Editor
+* Status: Ativo ou Inativo
+* Data de criação
+* Último acesso
+
+As senhas devem ser armazenadas de forma segura, com hash, nunca em texto puro.
+
+## Perfis de acesso
+
+### Administrador
+
+O administrador tem controle total da plataforma.
+
+Permissões do Administrador:
+
+* Acessa todas as páginas
+* Pode criar, editar e excluir usuários
+* Pode alterar permissões
+* Pode acessar Configurações
+* Pode acessar Fontes RSS
+* Pode acessar Colunistas
+* Pode acessar Propagandas
+* Pode acessar Redes Sociais
+* Pode acessar Blocos Home
+* Pode criar, editar, publicar e excluir artigos
+* Pode alterar menus
+* Pode visualizar Analytics e Dashboard
+* Pode controlar toda a plataforma
+
+### Editor
+
+O editor tem acesso restrito.
+
+O Editor só pode visualizar/acessar:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+
+O Editor NÃO pode acessar:
+
+* Configurações
+* Cadastro de usuários
+* Permissões
+* Fontes RSS
+* Colunistas
+* Redes Sociais
+* Blocos Home
+* Áreas administrativas sensíveis
+* Qualquer página fora da lista permitida
+
+Caso o Editor tente acessar uma página restrita, exibir uma mensagem:
+
+**“Acesso restrito. Você não tem permissão para visualizar esta página.”**
+
+Também oculte do menu lateral todos os itens que o Editor não pode acessar.
+
+## Regras de segurança
+
+* Implementar autenticação obrigatória para acessar a plataforma.
+* Se o usuário não estiver logado, redirecionar para a tela de login.
+* Se o usuário estiver inativo, bloquear login.
+* Criar middleware ou função de proteção de rotas por perfil.
+* Validar permissões tanto no frontend quanto no backend.
+* Nunca permitir que um Editor acesse uma rota restrita apenas digitando a URL.
+* Manter sessão segura do usuário logado.
+* Criar botão de logout.
+
+## Tela de login
+
+Criar uma tela de login simples com:
+
+* E-mail
+* Senha
+* Botão Entrar
+* Mensagem de erro para login inválido
+* Redirecionamento para Dashboard após login bem-sucedido
+
+## Banco de dados
+
+Criar ou atualizar a tabela de usuários com os campos necessários:
+
+* id
+* name
+* email
+* password_hash
+* role
+* status
+* created_at
+* updated_at
+* last_login
+
+Valores possíveis para role:
+
+* admin
+* editor
+
+Valores possíveis para status:
+
+* active
+* inactive
+
+## Ajustes no menu da plataforma
+
+O menu deve ser dinâmico conforme o perfil do usuário.
+
+Administrador vê todos os menus.
+
+Editor vê apenas:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+
+## Critérios finais
+
+A funcionalidade precisa estar 100% funcional, integrada ao layout atual da plataforma, sem quebrar páginas existentes.
+
+Ao finalizar, testar os seguintes cenários:
+
+1. Admin consegue acessar tudo.
+2. Admin consegue criar um Editor.
+3. Editor consegue acessar apenas as páginas permitidas.
+4. Editor não consegue acessar Configurações.
+5. Usuário inativo não consegue fazer login.
+6. Rotas restritas estão protegidas no frontend e backend.
+7. Menu muda automaticamente conforme o perfil do usuário.
+
+Mantenha o visual seguindo o padrão atual da plataforma, com interface limpa, moderna e organizada.

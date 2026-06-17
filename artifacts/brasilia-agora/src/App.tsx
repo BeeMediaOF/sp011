@@ -29,7 +29,7 @@ import { useAnalytics } from "@/hooks/useAnalytics";
 import { useState, useEffect } from "react";
 
 // Admin pages
-import { RequireAuth } from "@/pages/Admin";
+import { RequireAuth, RequireAdmin } from "@/pages/Admin";
 import Login from "@/pages/admin/Login";
 import Dashboard from "@/pages/admin/Dashboard";
 import Articles from "@/pages/admin/Articles";
@@ -44,6 +44,9 @@ import HomeBlocksManager from "@/pages/admin/HomeBlocksManager";
 import RSSManager from "@/pages/admin/RSSManager";
 import SocialMedia from "@/pages/admin/SocialMedia";
 import PerplexitySearch from "@/pages/admin/PerplexitySearch";
+import UsersManager from "@/pages/admin/UsersManager";
+import Logs from "@/pages/admin/Logs";
+import SecurityCheckup from "@/pages/admin/SecurityCheckup";
 
 const queryClient = new QueryClient();
 
@@ -97,52 +100,65 @@ function AnalyticsProvider() {
 function Router() {
   return (
     <Switch>
-      {/* ── Admin routes (flattened — avoids Wouter v3 nested-Switch issues) ── */}
+      {/* ── Admin routes ── */}
       <Route path="/admin/login" component={Login} />
+
+      {/* Admin-only routes */}
       <Route path="/admin/artigos/novo">
-        <RequireAuth><ArticleEdit /></RequireAuth>
+        <RequireAdmin><ArticleEdit /></RequireAdmin>
       </Route>
       <Route path="/admin/artigos/:id">
-        <RequireAuth><ArticleEdit /></RequireAuth>
+        <RequireAdmin><ArticleEdit /></RequireAdmin>
       </Route>
       <Route path="/admin/artigos">
-        <RequireAuth><Articles /></RequireAuth>
+        <RequireAdmin><Articles /></RequireAdmin>
       </Route>
-      <Route path="/admin/menu">
-        <RequireAuth><MenuManager /></RequireAuth>
+      <Route path="/admin/home-blocos">
+        <RequireAdmin><HomeBlocksManager /></RequireAdmin>
       </Route>
-      <Route path="/admin/logo">
-        <RequireAuth><Settings /></RequireAuth>
+      <Route path="/admin/colunistas">
+        <RequireAdmin><ColumnistsManager /></RequireAdmin>
       </Route>
-      <Route path="/admin/configuracoes">
-        <RequireAuth><Settings /></RequireAuth>
+      <Route path="/admin/rss">
+        <RequireAdmin><RSSManager /></RequireAdmin>
+      </Route>
+      <Route path="/admin/redes-sociais">
+        <RequireAdmin><SocialMedia /></RequireAdmin>
+      </Route>
+      <Route path="/admin/perplexity">
+        <RequireAdmin><PerplexitySearch /></RequireAdmin>
       </Route>
       <Route path="/admin/webhook">
-        <RequireAuth><Webhook /></RequireAuth>
+        <RequireAdmin><Webhook /></RequireAdmin>
+      </Route>
+      <Route path="/admin/configuracoes">
+        <RequireAdmin><Settings /></RequireAdmin>
+      </Route>
+      <Route path="/admin/logo">
+        <RequireAdmin><Settings /></RequireAdmin>
+      </Route>
+      <Route path="/admin/contato">
+        <RequireAdmin><Settings /></RequireAdmin>
+      </Route>
+      <Route path="/admin/usuarios">
+        <RequireAdmin><UsersManager /></RequireAdmin>
+      </Route>
+      <Route path="/admin/logs">
+        <RequireAdmin><Logs /></RequireAdmin>
+      </Route>
+      <Route path="/admin/seguranca">
+        <RequireAdmin><SecurityCheckup /></RequireAdmin>
+      </Route>
+
+      {/* Editor + Admin routes */}
+      <Route path="/admin/menu">
+        <RequireAuth><MenuManager /></RequireAuth>
       </Route>
       <Route path="/admin/propagandas">
         <RequireAuth><AdsManager /></RequireAuth>
       </Route>
-      <Route path="/admin/colunistas">
-        <RequireAuth><ColumnistsManager /></RequireAuth>
-      </Route>
-      <Route path="/admin/contato">
-        <RequireAuth><Settings /></RequireAuth>
-      </Route>
       <Route path="/admin/analytics">
         <RequireAuth><Analytics /></RequireAuth>
-      </Route>
-      <Route path="/admin/home-blocos">
-        <RequireAuth><HomeBlocksManager /></RequireAuth>
-      </Route>
-      <Route path="/admin/rss">
-        <RequireAuth><RSSManager /></RequireAuth>
-      </Route>
-      <Route path="/admin/redes-sociais">
-        <RequireAuth><SocialMedia /></RequireAuth>
-      </Route>
-      <Route path="/admin/perplexity">
-        <RequireAuth><PerplexitySearch /></RequireAuth>
       </Route>
       <Route path="/admin">
         <RequireAuth><Dashboard /></RequireAuth>

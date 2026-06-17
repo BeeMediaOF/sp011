@@ -1,0 +1,474 @@
+## Segurança, Backend Completo, Logs e Deploy na Hostinger
+
+Além das funções de usuários, senhas e permissões, implemente uma camada completa de segurança para proteger a plataforma contra invasões, ataques, acessos indevidos e brechas comuns.
+
+A plataforma será hospedada na **Hostinger**, então todo o backend, banco de dados, variáveis de ambiente, autenticação e estrutura de deploy devem ser preparados para funcionar corretamente nesse ambiente.
+
+## Backend completo
+
+Criar o backend completo da plataforma, sem deixar funcionalidades apenas simuladas no frontend.
+
+O backend deve incluir:
+
+* Autenticação real com login e senha
+* Cadastro de usuários
+* Controle de permissões por perfil
+* Proteção de rotas
+* Validações no servidor
+* CRUD completo das áreas principais
+* Logs de ações
+* Logs de segurança
+* Sistema de sessões ou tokens seguros
+* Middleware de autenticação
+* Middleware de autorização por perfil
+* Integração completa com banco de dados
+* Tratamento de erros
+* Estrutura preparada para produção
+
+Não usar dados mockados em funcionalidades principais. Tudo precisa estar integrado ao banco de dados.
+
+## Tabelas obrigatórias do banco de dados
+
+Criar todas as tabelas necessárias para a plataforma funcionar de verdade.
+
+### Tabela users
+
+Campos:
+
+* id
+* name
+* email
+* password_hash
+* role
+* status
+* created_at
+* updated_at
+* last_login
+* failed_login_attempts
+* locked_until
+* password_changed_at
+
+Perfis possíveis:
+
+* admin
+* editor
+
+Status possíveis:
+
+* active
+* inactive
+* blocked
+
+### Tabela user_sessions
+
+Campos:
+
+* id
+* user_id
+* token_hash
+* ip_address
+* user_agent
+* created_at
+* expires_at
+* revoked_at
+
+### Tabela audit_logs
+
+Registrar todas as ações importantes da plataforma.
+
+Campos:
+
+* id
+* user_id
+* action
+* module
+* description
+* ip_address
+* user_agent
+* metadata
+* created_at
+
+Exemplos de ações que devem gerar log:
+
+* Login realizado
+* Tentativa de login inválida
+* Logout
+* Criação de usuário
+* Alteração de senha
+* Alteração de perfil
+* Exclusão de usuário
+* Criação de artigo
+* Edição de artigo
+* Exclusão de artigo
+* Publicação de artigo
+* Alteração de configurações
+* Alteração de propaganda
+* Alteração de menu
+* Acesso negado a uma página restrita
+
+### Tabela security_logs
+
+Registrar eventos de segurança.
+
+Campos:
+
+* id
+* user_id
+* event_type
+* severity
+* description
+* ip_address
+* user_agent
+* route
+* payload_summary
+* created_at
+
+Tipos de eventos:
+
+* failed_login
+* account_locked
+* unauthorized_access
+* suspicious_request
+* csrf_detected
+* rate_limit_exceeded
+* invalid_token
+* permission_denied
+* system_error
+
+Níveis de severidade:
+
+* low
+* medium
+* high
+* critical
+
+### Tabela roles
+
+Campos:
+
+* id
+* name
+* description
+* created_at
+* updated_at
+
+Criar os perfis iniciais:
+
+* Administrador
+* Editor
+
+### Tabela permissions
+
+Campos:
+
+* id
+* key
+* name
+* description
+* module
+* created_at
+* updated_at
+
+### Tabela role_permissions
+
+Campos:
+
+* id
+* role_id
+* permission_id
+* created_at
+
+Usar essa estrutura para deixar o sistema escalável, permitindo novos perfis no futuro.
+
+## Menu de Logs
+
+Criar uma nova página no painel chamada **Logs**.
+
+A página Logs deve ser acessível apenas para Administradores.
+
+Ela deve conter:
+
+### Logs de Acesso
+
+Mostrar:
+
+* Usuário
+* E-mail
+* IP
+* Navegador
+* Data e hora
+* Status do acesso
+* Login bem-sucedido ou falha
+
+### Logs de Ações
+
+Mostrar:
+
+* Usuário responsável
+* Módulo alterado
+* Ação realizada
+* Descrição da ação
+* Data e hora
+* IP
+* Detalhes técnicos quando necessário
+
+### Logs de Segurança
+
+Mostrar:
+
+* Tipo do evento
+* Severidade
+* Descrição
+* Rota acessada
+* IP
+* Usuário, quando identificado
+* Data e hora
+
+Adicionar filtros por:
+
+* Data
+* Usuário
+* Tipo de ação
+* Severidade
+* Módulo
+
+Adicionar busca por:
+
+* Nome
+* E-mail
+* IP
+* Ação
+* Módulo
+
+## Página Segurança
+
+Criar uma nova área dentro de Configurações chamada **Segurança**.
+
+Somente Administradores podem acessar.
+
+Essa página deve conter um checkup geral de segurança da plataforma.
+
+## Checkup de Segurança Total
+
+Implementar uma verificação geral de segurança com status visual.
+
+Itens obrigatórios do checkup:
+
+* Verificar se senhas estão usando hash seguro
+* Verificar se existe proteção contra SQL Injection
+* Verificar se existe proteção contra XSS
+* Verificar se existe proteção contra CSRF
+* Verificar se rotas privadas estão protegidas
+* Verificar se permissões estão sendo validadas no backend
+* Verificar se o Editor não consegue acessar rotas restritas
+* Verificar se tokens ou sessões possuem expiração
+* Verificar se há rate limit no login
+* Verificar se contas são bloqueadas após muitas tentativas inválidas
+* Verificar se variáveis sensíveis estão no .env
+* Verificar se o sistema não expõe senha, token ou dados sensíveis
+* Verificar se erros do backend não revelam informações internas
+* Verificar se uploads, caso existam, possuem validação
+* Verificar se CORS está configurado corretamente
+* Verificar se headers de segurança estão ativos
+* Verificar se HTTPS está previsto para produção
+* Verificar se logs de segurança estão funcionando
+* Verificar se backup do banco está previsto
+* Verificar se o usuário admin padrão precisa trocar a senha inicial
+
+Cada item deve exibir:
+
+* Status: Seguro, Atenção ou Crítico
+* Descrição
+* Recomendação de correção
+* Data da última verificação
+
+## Proteções obrigatórias contra ataques
+
+Implementar proteções contra:
+
+* SQL Injection
+* XSS
+* CSRF
+* Brute force
+* Session hijacking
+* Token inválido ou expirado
+* Acesso direto por URL
+* Escalada de privilégio
+* Exposição de dados sensíveis
+* Requisições suspeitas
+* CORS mal configurado
+* Upload malicioso, caso exista upload na plataforma
+
+## Login seguro
+
+No login, implementar:
+
+* Hash seguro de senha
+* Validação de e-mail e senha
+* Rate limit por IP e por usuário
+* Bloqueio temporário após muitas tentativas inválidas
+* Registro de tentativas de login
+* Registro de IP e navegador
+* Mensagem genérica para erro de login, sem revelar se o e-mail existe ou não
+* Sessão ou token com expiração
+* Logout seguro
+* Revogação da sessão ao sair
+
+Mensagem de erro recomendada:
+
+**“E-mail ou senha inválidos.”**
+
+Não exibir mensagens como:
+
+* “E-mail não encontrado”
+* “Senha incorreta”
+
+## Controle de permissões
+
+As permissões devem ser validadas no frontend e no backend.
+
+Não basta esconder botões ou menus.
+
+Se um Editor tentar acessar uma rota restrita diretamente pela URL, o backend deve bloquear.
+
+Retornar erro 403 com a mensagem:
+
+**“Acesso restrito. Você não tem permissão para executar esta ação.”**
+
+## Menu dinâmico com segurança
+
+O menu lateral deve ser carregado conforme o perfil do usuário.
+
+Administrador vê:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+* Artigos
+* Fontes RSS
+* Colunistas
+* Redes Sociais
+* Blocos Home
+* Configurações
+* Logs
+* Segurança
+
+Editor vê apenas:
+
+* Dashboard
+* Analytics
+* Propaganda
+* Menu
+* Novo Artigo
+
+O Editor não pode visualizar nem acessar:
+
+* Configurações
+* Usuários
+* Permissões
+* Logs
+* Segurança
+* Fontes RSS
+* Colunistas
+* Redes Sociais
+* Blocos Home
+* Áreas críticas da plataforma
+
+## Variáveis de ambiente
+
+Criar arquivo `.env.example` com as variáveis necessárias para produção na Hostinger.
+
+Exemplo:
+
+* DATABASE_URL
+* JWT_SECRET ou SESSION_SECRET
+* APP_URL
+* NODE_ENV
+* CORS_ORIGIN
+* ADMIN_DEFAULT_EMAIL
+* ADMIN_DEFAULT_PASSWORD
+* LOG_LEVEL
+
+Nunca colocar senhas reais ou chaves reais diretamente no código.
+
+## Deploy na Hostinger
+
+Preparar o projeto para ser publicado na Hostinger.
+
+Incluir:
+
+* Scripts de build
+* Scripts de start
+* Instruções de instalação
+* Instruções de configuração do banco de dados
+* Instruções de variáveis de ambiente
+* Instruções para rodar migrations
+* Instruções para criar usuário administrador inicial
+* Documentação básica do deploy
+
+Criar um arquivo `README_DEPLOY_HOSTINGER.md` explicando:
+
+1. Como configurar o banco de dados.
+2. Como configurar o arquivo `.env`.
+3. Como instalar dependências.
+4. Como rodar migrations.
+5. Como criar o primeiro administrador.
+6. Como iniciar o projeto em produção.
+7. Como validar se o sistema está seguro após o deploy.
+
+## Migrations e seed inicial
+
+Criar migrations para todas as tabelas.
+
+Criar seed inicial com:
+
+* Perfil Administrador
+* Perfil Editor
+* Permissões básicas
+* Usuário administrador inicial
+
+O administrador inicial deve ser criado com senha temporária e o sistema deve solicitar troca de senha no primeiro acesso.
+
+## Painel de saúde do sistema
+
+Criar uma área chamada **Status do Sistema**, dentro de Segurança ou Configurações.
+
+Mostrar:
+
+* Status do banco de dados
+* Status do backend
+* Ambiente atual
+* Último login administrativo
+* Últimos eventos críticos
+* Total de tentativas de login falhas nas últimas 24 horas
+* Total de acessos bloqueados
+* Versão da aplicação
+
+## Critérios finais obrigatórios
+
+Antes de finalizar, testar:
+
+1. Admin acessa todas as áreas.
+2. Editor acessa apenas áreas permitidas.
+3. Editor não acessa Configurações digitando URL direta.
+4. Editor não acessa Logs.
+5. Editor não acessa Segurança.
+6. Tentativas de login inválidas são registradas.
+7. Muitas tentativas inválidas bloqueiam temporariamente o acesso.
+8. Senhas estão com hash seguro.
+9. Rotas privadas exigem autenticação.
+10. Rotas administrativas exigem perfil admin.
+11. Logs de ações estão sendo gravados.
+12. Logs de segurança estão sendo gravados.
+13. Checkup de segurança funciona.
+14. Variáveis sensíveis estão fora do código.
+15. Sistema está preparado para deploy na Hostinger.
+16. Banco de dados possui todas as tabelas necessárias.
+17. Backend está completo e funcional.
+18. Frontend não possui dados mockados nas áreas principais.
+19. Logout encerra sessão corretamente.
+20. Usuário inativo ou bloqueado não consegue acessar a plataforma.
+
+Entregar a funcionalidade completa, com frontend, backend, banco de dados, segurança, logs, permissões e documentação de deploy para Hostinger.

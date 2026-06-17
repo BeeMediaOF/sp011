@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { adminApi } from "../../lib/adminApi";
-import { Lock, User, Eye, EyeOff } from "lucide-react";
+import { Lock, Mail, Eye, EyeOff } from "lucide-react";
 import logoFallback from "../../assets/images/logo_final.png";
 
 export default function Login() {
   const [, navigate] = useLocation();
-  const [username, setUsername] = useState("admin");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState("");
@@ -31,11 +31,17 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const { token } = await adminApi.login(username, password);
-      localStorage.setItem("admin_token", token);
+      const res = await adminApi.login(email, password);
+      localStorage.setItem("admin_token", res.token);
+      localStorage.setItem("admin_role", res.role ?? "editor");
+      localStorage.setItem("admin_user", JSON.stringify({
+        email: res.email ?? email,
+        name: res.name ?? "Usuário",
+        role: res.role ?? "editor",
+      }));
       navigate("/admin");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Erro ao fazer login");
+      setError(err instanceof Error ? err.message : "E-mail ou senha inválidos.");
     } finally {
       setLoading(false);
     }
@@ -54,16 +60,17 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Usuário</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2"
                   style={{ "--tw-ring-color": sidebarColor } as React.CSSProperties}
-                  placeholder="admin"
+                  placeholder="seu@email.com.br"
+                  autoComplete="email"
                   required
                 />
               </div>
@@ -79,6 +86,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full pl-9 pr-10 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   required
                 />
                 <button
@@ -106,7 +114,6 @@ export default function Login() {
               {loading ? "Entrando..." : "Entrar"}
             </button>
           </form>
-
         </div>
       </div>
     </div>

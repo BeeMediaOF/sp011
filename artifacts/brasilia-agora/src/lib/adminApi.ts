@@ -19,6 +19,8 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
     const err = await res.json().catch(() => ({ error: res.statusText }));
     if (res.status === 401) {
       localStorage.removeItem("admin_token");
+      localStorage.removeItem("admin_role");
+      localStorage.removeItem("admin_user");
       window.location.href = "/admin/login";
       throw new Error("Sessão expirada. Redirecionando para o login...");
     }
@@ -28,8 +30,12 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 }
 
 export const adminApi = {
-  login: (username: string, password: string) =>
-    req<{ token: string; username: string }>("POST", "/login", { username, password }),
+  login: (email: string, password: string) =>
+    req<{ token: string; email: string; role: string; name: string }>("POST", "/login", { email, password }),
+
+  logout: () => req<{ success: boolean }>("POST", "/logout", {}),
+
+  me: () => req<{ user: AdminUser }>("GET", "/me"),
 
   // Articles
   getArticles: () => req<{ articles: Article[] }>("GET", "/articles"),
@@ -80,7 +86,77 @@ export const adminApi = {
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
     return fetch("/api/analytics/stats", { headers }).then((r) => r.json()) as Promise<AnalyticsStats>;
   },
+
+  // Users (admin only)
+  getUsers: () => req<{ users: AdminUser[] }>("GET", "/users"),
+  getUser: (id: number) => req<{ user: AdminUser }>("GET", `/users/${id}`),
+  createUser: (data: { name: string; email: string; password: string; role: "admin" | "editor"; status: "active" | "inactive" }) =>
+    req<{ user: AdminUser }>("POST", "/users", data),
+  updateUser: (id: number, data: { name?: string; email?: string; role?: "admin" | "editor"; status?: "active" | "inactive" | "blocked" }) =>
+    req<{ user: AdminUser }>("PUT", `/users/${id}`, data),
+  changeUserPassword: (id: number, password: string) =>
+    req<{ success: boolean }>("PUT", `/users/${id}/password`, { password }),
+  deleteUser: (id: number) => req<{ success: boolean }>("DELETE", `/users/${id}`),
+
+  // Logs (admin only)
+  getAuditLogs: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+    return req<{ logs: AuditLog[]; total: number }>("GET", `/logs/audit${qs}`);
+  },
+  getSecurityLogs: (params?: Record<string, string>) => {
+    const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+    return req<{ logs: SecurityLog[]; total: number }>("GET", `/logs/security${qs}`);
+  },
+  getLogStats: () => req<LogStats>("GET", "/logs/stats"),
 };
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "editor";
+  status: "active" | "inactive" | "blocked";
+  createdAt: string;
+  updatedAt: string;
+  lastLogin: string | null;
+  mustChangePassword: number;
+}
+
+export interface AuditLog {
+  id: number;
+  userId: number | null;
+  userEmail: string | null;
+  action: string;
+  module: string;
+  description: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  metadata: string | null;
+  createdAt: string;
+}
+
+export interface SecurityLog {
+  id: number;
+  userId: number | null;
+  userEmail: string | null;
+  eventType: string;
+  severity: "low" | "medium" | "high" | "critical";
+  description: string;
+  ipAddress: string | null;
+  userAgent: string | null;
+  route: string | null;
+  payloadSummary: string | null;
+  createdAt: string;
+}
+
+export interface LogStats {
+  failedLoginsLast24h: number;
+  blockedAccessLast24h: number;
+  criticalEventsLast24h: number;
+  lastAdminLogin: string | null;
+}
 
 export interface Article {
   id: string;
@@ -166,7 +242,6 @@ export interface Ad {
   imageBase64: string;
   link: string;
   position: "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07" | "slot_08" | "slot_09" | "slot_10" | "slot_11" | "topo" | "centro" | "lateral" | "rodape" | "slidebar_250" | "slidebar_500" | "banner" | "sidebar" | "central";
-
   active: boolean;
   clicks: number;
   impressions: number;
