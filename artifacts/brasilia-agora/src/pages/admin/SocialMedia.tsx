@@ -6,6 +6,8 @@ import {
   Share2, Instagram, Facebook, Eye, Send, CheckCircle,
   XCircle, RefreshCw, ChevronDown, ChevronUp, ExternalLink,
   Copy, AlertTriangle, Image as ImageIcon, Layers,
+  Hash, Info, Save, AlignLeft, Building2, Folder,
+  Type, Layout, Smile, FileText, Megaphone, ToggleLeft, ToggleRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -40,6 +42,21 @@ interface SocialConfig {
   templateTitleMaxLines?: number;
   templateShowSubtitle?: boolean;
   templateSiteUrl?: string;
+  captionUseTitulo?: boolean;
+  captionUseResumo?: boolean;
+  captionIncludePortal?: boolean;
+  captionIncludeCategoria?: boolean;
+  captionIncludeHashtags?: boolean;
+  captionIncludeCTA?: boolean;
+  captionLimitChars?: boolean;
+  captionCharLimit?: "feed" | "story" | "facebook";
+  captionUseEmojis?: boolean;
+  captionSeparateBlocks?: boolean;
+  captionPrefixo?: string;
+  captionCTA?: string;
+  captionHashtagsFixed?: string;
+  captionAssinatura?: string;
+  captionTom?: string;
 }
 
 interface Article {
@@ -333,6 +350,8 @@ export default function SocialMedia() {
   const [publishing, setPublishing] = useState(false);
   const [publishResults, setPublishResults] = useState<Record<string, { ok: boolean; error?: string; id?: string }> | null>(null);
 
+  const [captionPlatform, setCaptionPlatform] = useState<"feed" | "story" | "facebook">("feed");
+
   const feedCanvasRef  = useRef<HTMLCanvasElement>(null);
   const storyCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -448,11 +467,51 @@ export default function SocialMedia() {
   };
 
   const TABS: { id: ActiveTab; label: string }[] = [
-    { id: "credenciais", label: "Credenciais" },
+    { id: "credenciais", label: "Credenciais Meta" },
     { id: "template",    label: "Templates" },
-    { id: "legenda",     label: "Legenda" },
+    { id: "legenda",     label: "Legenda automática" },
     { id: "publicar",    label: "Publicar" },
   ];
+
+  const CHAR_LIMITS: Record<string, number> = { feed: 2200, story: 150, facebook: 63206 };
+
+  function buildRuleCaption(article: Article | null, platform: "feed" | "story" | "facebook"): string {
+    if (!article) return "";
+    const title   = article.title.replace(/<[^>]*>/g, "");
+    const summary = (article.subtitle ?? "").replace(/<[^>]*>/g, "");
+    const cat     = (article.tag ?? article.category ?? "geral").toUpperCase();
+    const sep     = cfg.captionSeparateBlocks !== false ? "\n\n" : "\n";
+    const parts: string[] = [];
+
+    const prefixo = cfg.captionPrefixo ?? "{categoria} | {titulo}";
+    if (prefixo) {
+      parts.push(prefixo.replace("{categoria}", cat).replace("{titulo}", title));
+    } else if (cfg.captionUseTitulo !== false) {
+      parts.push(title);
+    }
+
+    if (cfg.captionUseResumo !== false && summary) parts.push(summary);
+    if (cfg.captionIncludePortal && siteName) parts.push(siteName);
+    if (cfg.captionIncludeCTA !== false) {
+      parts.push(cfg.captionCTA ?? "Leia a matéria completa no link da bio.");
+    }
+    if (cfg.captionAssinatura) parts.push(cfg.captionAssinatura);
+
+    let caption = parts.join(sep);
+
+    if (cfg.captionIncludeHashtags !== false) {
+      const autoTags = (article.keywords ?? article.category ?? "")
+        .split(/[,\s]+/).filter(Boolean)
+        .map(t => `#${t.replace(/[^a-zA-ZÀ-ú0-9]/g, "")}`)
+        .filter(t => t.length > 1).slice(0, 5).join(" ");
+      const fixed = cfg.captionHashtagsFixed ?? "#SBCAgora #NotíciasDeVerdade";
+      if (autoTags || fixed) caption += "\n\n" + [autoTags, fixed].filter(Boolean).join(" ");
+    }
+
+    const limit = CHAR_LIMITS[platform];
+    if (cfg.captionLimitChars && caption.length > limit) caption = caption.slice(0, limit - 3) + "…";
+    return caption;
+  }
 
   return (
     <AdminLayout title="Redes Sociais">
@@ -941,59 +1000,244 @@ export default function SocialMedia() {
           </div>
         )}
 
-        {/* ── LEGENDA ───────────────────────────────────────────────────────────── */}
-        {tab === "legenda" && (
-          <div className="space-y-6">
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Variáveis disponíveis</p>
-              <div className="flex flex-wrap gap-2">
-                {["{{titulo}}", "{{resumo}}", "{{tags}}", "{{categoria}}"].map(v => (
-                  <button key={v} onClick={() => navigator.clipboard.writeText(v)}
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono text-gray-700 hover:bg-gray-100">
-                    <Copy size={10} /> {v}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-gray-400">Clique para copiar. As variáveis são substituídas automaticamente ao publicar.</p>
-            </div>
+        {/* ── LEGENDA AUTOMÁTICA ────────────────────────────────────────────────── */}
+        {tab === "legenda" && (() => {
+          const previewCaption = buildRuleCaption(selArt, captionPlatform);
+          const charCount = previewCaption.length;
+          const charLimit = CHAR_LIMITS[captionPlatform];
+          const charPct   = Math.min(100, Math.round((charCount / charLimit) * 100));
+          const withinLimit = charCount <= charLimit;
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <Instagram size={15} /> Legenda do Feed
-                </h3>
-                <textarea
-                  rows={10}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={cfg.feedCaption ?? DEFAULT_FEED_CAPTION}
-                  onChange={e => setCfg(p => ({ ...p, feedCaption: e.target.value }))}
-                />
-                <p className="text-xs text-gray-400">{(cfg.feedCaption ?? DEFAULT_FEED_CAPTION).length} / 2200 caracteres (limite Instagram)</p>
+          const hashtagList = previewCaption.match(/#\S+/g) ?? [];
+          const bodyWithoutTags = previewCaption.replace(/#\S+/g, "").trim();
+
+          type ToggleRule = {
+            key: keyof SocialConfig;
+            icon: React.ReactNode;
+            label: string;
+            defaultVal?: boolean;
+            extra?: React.ReactNode;
+          };
+
+          const toggleRules: ToggleRule[] = [
+            { key: "captionUseTitulo",       icon: <FileText  size={14}/>, label: "Usar título da notícia",       defaultVal: true },
+            { key: "captionUseResumo",        icon: <AlignLeft size={14}/>, label: "Usar resumo da matéria",       defaultVal: true },
+            { key: "captionIncludePortal",    icon: <Building2 size={14}/>, label: "Incluir nome do portal",       defaultVal: false },
+            { key: "captionIncludeCategoria", icon: <Folder    size={14}/>, label: "Incluir categoria",            defaultVal: true },
+            { key: "captionIncludeHashtags",  icon: <Hash      size={14}/>, label: "Incluir hashtags automáticas", defaultVal: true },
+            { key: "captionIncludeCTA",       icon: <Megaphone size={14}/>, label: "Incluir CTA",                  defaultVal: true },
+            { key: "captionLimitChars",       icon: <Type      size={14}/>, label: "Limitar caracteres por rede",  defaultVal: true,
+              extra: cfg.captionLimitChars !== false ? (
+                <select
+                  className="ml-2 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+                  value={cfg.captionCharLimit ?? "feed"}
+                  onChange={e => setCfg(p => ({ ...p, captionCharLimit: e.target.value as "feed"|"story"|"facebook" }))}>
+                  <option value="feed">Instagram Feed (2.200)</option>
+                  <option value="story">Instagram Story (150)</option>
+                  <option value="facebook">Facebook Page (63.206)</option>
+                </select>
+              ) : null
+            },
+            { key: "captionUseEmojis",        icon: <Smile     size={14}/>, label: "Usar emojis",                  defaultVal: false },
+            { key: "captionSeparateBlocks",   icon: <Layout    size={14}/>, label: "Separar legenda por blocos",   defaultVal: true },
+          ];
+
+          return (
+            <div className="space-y-5">
+              {/* ── 2-column main grid ── */}
+              <div className="grid gap-6" style={{ gridTemplateColumns: "0.95fr 1.35fr" }}>
+
+                {/* ── LEFT: Regras de geração ── */}
+                <div className="bg-white rounded-2xl p-6 space-y-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Regras de geração</h2>
+
+                  {/* Toggles */}
+                  <div className="space-y-1">
+                    {toggleRules.map(rule => {
+                      const val = (cfg as Record<string, unknown>)[rule.key] as boolean | undefined;
+                      const on  = val !== undefined ? val : (rule.defaultVal ?? true);
+                      return (
+                        <div key={rule.key as string}
+                          className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-gray-50 transition-colors">
+                          <span className="flex items-center gap-2.5 text-sm text-[#0F172A]">
+                            <span className="text-[#64748B]">{rule.icon}</span>
+                            {rule.label}
+                            {rule.extra}
+                          </span>
+                          <button
+                            onClick={() => setCfg(p => ({ ...p, [rule.key as string]: !on }))}
+                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${on ? "bg-[#0B2A66]" : "bg-gray-200"}`}
+                            style={{ minWidth: 40 }}>
+                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Fields */}
+                  <div className="space-y-3 pt-1 border-t border-gray-100">
+                    {([
+                      { key: "captionPrefixo",      label: "Prefixo da legenda",  placeholder: "{categoria} | {titulo}", type: "text" },
+                      { key: "captionCTA",           label: "CTA padrão",          placeholder: "Leia a matéria completa no link da bio.", type: "text" },
+                      { key: "captionHashtagsFixed", label: "Hashtags fixas",      placeholder: "#SBCAgora #NotíciasDeVerdade", type: "text" },
+                      { key: "captionAssinatura",    label: "Assinatura",          placeholder: "SBC Agora – Notícias de Verdade.", type: "text" },
+                    ] as const).map(f => (
+                      <div key={f.key}>
+                        <label className="block text-xs font-medium text-[#64748B] mb-1">{f.label}</label>
+                        <input
+                          type="text"
+                          placeholder={f.placeholder}
+                          value={(cfg as Record<string, unknown>)[f.key] as string ?? ""}
+                          onChange={e => setCfg(p => ({ ...p, [f.key]: e.target.value }))}
+                          className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+                        />
+                      </div>
+                    ))}
+
+                    <div>
+                      <label className="block text-xs font-medium text-[#64748B] mb-1">Tom de voz</label>
+                      <select
+                        value={cfg.captionTom ?? "Jornalístico"}
+                        onChange={e => setCfg(p => ({ ...p, captionTom: e.target.value }))}
+                        className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white">
+                        {["Jornalístico", "Institucional", "Popular", "Urgente", "Neutro"].map(t => (
+                          <option key={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── RIGHT: Prévia da legenda ── */}
+                <div className="bg-white rounded-2xl p-6 space-y-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Prévia da legenda</h2>
+
+                  {/* Platform tabs */}
+                  <div className="flex gap-1 bg-[#F7F9FC] rounded-xl p-1">
+                    {([
+                      { id: "feed",     icon: <Instagram size={13}/>, label: "Instagram Feed" },
+                      { id: "story",    icon: <Layers    size={13}/>, label: "Instagram Story" },
+                      { id: "facebook", icon: <Facebook  size={13}/>, label: "Facebook Page" },
+                    ] as const).map(p => (
+                      <button key={p.id}
+                        onClick={() => setCaptionPlatform(p.id)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                          captionPlatform === p.id
+                            ? "bg-white text-[#0B2A66] shadow-sm"
+                            : "text-[#64748B] hover:text-[#0F172A]"
+                        }`}>
+                        {p.icon} {p.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Article selector for preview */}
+                  {articles.length > 0 && (
+                    <select
+                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+                      value={selArt?.id ?? ""}
+                      onChange={e => {
+                        const found = articles.find(a => a.id === e.target.value) ?? null;
+                        setSelArt(found);
+                      }}>
+                      <option value="">— selecione um artigo para prévia —</option>
+                      {articles.map(a => (
+                        <option key={a.id} value={a.id}>
+                          [{a.tag ?? a.category}] {a.title.replace(/<[^>]*>/g, "").slice(0, 55)}{a.title.length > 55 ? "…" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
+                  {/* Preview text */}
+                  <div className="min-h-[180px] bg-[#F8FAFC] rounded-xl p-4 text-sm text-[#0F172A] leading-relaxed whitespace-pre-wrap border border-[#E2E8F0]">
+                    {previewCaption || (
+                      <span className="text-[#94A3B8] italic text-sm">
+                        Selecione um artigo acima para visualizar a legenda gerada automaticamente.
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Character counter */}
+                  {previewCaption && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[#64748B]">Caracteres usados</span>
+                        <span className={`font-medium ${withinLimit ? "text-[#16A34A]" : "text-[#E71D36]"}`}>
+                          {charCount.toLocaleString("pt-BR")} / {charLimit.toLocaleString("pt-BR")} — {withinLimit ? "Dentro do limite" : "Acima do limite"}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${withinLimit ? "bg-[#16A34A]" : "bg-[#E71D36]"}`}
+                          style={{ width: `${charPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hashtag chips */}
+                  {hashtagList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {hashtagList.map((tag, i) => (
+                        <span key={i}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#EFF6FF] text-[#2563EB] rounded-lg text-xs font-medium">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <Layers size={15} /> Legenda do Story
-                </h3>
-                <textarea
-                  rows={10}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  value={cfg.storyCaption ?? DEFAULT_STORY_CAPTION}
-                  onChange={e => setCfg(p => ({ ...p, storyCaption: e.target.value }))}
-                />
-                <p className="text-xs text-gray-400">{(cfg.storyCaption ?? DEFAULT_STORY_CAPTION).length} caracteres</p>
+              {/* ── Variables panel ── */}
+              <div className="bg-white rounded-2xl px-5 py-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wide">Variáveis disponíveis</span>
+                  <span className="text-xs text-[#64748B]">Clique para copiar</span>
+                  <div className="flex flex-wrap gap-2">
+                    {["{titulo}", "{resumo}", "{categoria}", "{cidade}", "{autor}", "{link}"].map(v => (
+                      <button key={v}
+                        onClick={() => { navigator.clipboard.writeText(v); toast({ title: `${v} copiado!`, duration: 1500 }); }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs font-mono text-[#0F172A] hover:bg-[#EFF6FF] hover:border-[#0B2A66]/30 hover:text-[#0B2A66] transition-colors">
+                        <Copy size={10}/> {v}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Action bar ── */}
+              <div className="bg-white rounded-2xl px-5 py-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 flex items-start gap-2.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-4 py-3">
+                    <Info size={15} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-[#1E40AF] leading-relaxed">
+                      Ao publicar um novo artigo, a legenda será gerada automaticamente com base nas regras acima e na prévia correspondente à rede selecionada.
+                    </p>
+                  </div>
+                  <div className="flex gap-3 flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        if (!articles[0]) return;
+                        if (!selArt) setSelArt(articles[0]);
+                        toast({ title: "Exemplo gerado!", description: "Selecione um artigo para ver a prévia.", duration: 2000 });
+                      }}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC] transition-colors">
+                      <RefreshCw size={14}/> Gerar exemplo
+                    </button>
+                    <button onClick={saveConfig} disabled={saving}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-xl text-sm font-semibold hover:bg-[#c9182e] disabled:opacity-50 transition-colors">
+                      {saving ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>}
+                      {saving ? "Salvando…" : "Salvar regras"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div className="flex justify-end">
-              <button onClick={saveConfig} disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50">
-                {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                {saving ? "Salvando…" : "Salvar legendas"}
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── PUBLICAR ─────────────────────────────────────────────────────────── */}
         {tab === "publicar" && (
