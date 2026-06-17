@@ -6,9 +6,9 @@ import {
   Save, Send, Eye, ChevronDown, ChevronRight,
   Image as ImageIcon, X, CheckCircle, Sparkles, Loader2,
   Bold, Italic, Underline, Strikethrough, Link as LinkIcon,
-  List, ListOrdered, AlignLeft, Quote, Video, Table,
+  List, ListOrdered, Quote, Video, Table,
   MoreHorizontal, Heading2, Heading3, ImagePlus,
-  GalleryHorizontal, AlertCircle,
+  GalleryHorizontal, AlertCircle, Wand2,
 } from "lucide-react";
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -40,6 +40,14 @@ const empty: Partial<Article> = {
   tag: "GERAL", imageUrl: "", author: "Redação", status: "draft",
 };
 
+function AiBadge() {
+  return (
+    <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded-full">
+      <Wand2 size={9} /> IA
+    </span>
+  );
+}
+
 function slugify(s: string) {
   return s.toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
@@ -69,13 +77,18 @@ export default function ArticleEdit() {
   const [loading, setLoading]         = useState(!isNew);
   const [saving, setSaving]           = useState(false);
   const [rewriting, setRewriting]     = useState(false);
+  const [autofilling, setAutofilling] = useState(false);
+  const [aiFilledFields, setAiFilledFields] = useState<Set<string>>(new Set());
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState("");
   const [dragOver, setDragOver]       = useState(false);
 
-  const contentRef  = useRef<HTMLTextAreaElement>(null);
-  const imageRef    = useRef<HTMLInputElement>(null);
-  const dropRef     = useRef<HTMLDivElement>(null);
+  const contentRef    = useRef<HTMLTextAreaElement>(null);
+  const imageRef      = useRef<HTMLInputElement>(null);
+  const dropRef       = useRef<HTMLDivElement>(null);
+  const autofillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track which values came from user vs. autofill so we don't overwrite user edits
+  const userEditedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isNew && articleId) {
@@ -84,6 +97,11 @@ export default function ArticleEdit() {
         .then((r) => {
           setForm(r.article);
           setSlug(r.article.slug ?? slugify(r.article.title ?? ""));
+          // Mark pre-existing fields as user-edited so autofill won't overwrite them
+          const preExisting = new Set<string>();
+          if (r.article.subtitle?.trim()) preExisting.add("subtitle");
+          if (r.article.keywords?.trim()) preExisting.add("summary");
+          userEditedRef.current = preExisting;
         })
         .catch(() => setError("Artigo não encontrado"))
         .finally(() => setLoading(false));
@@ -94,6 +112,59 @@ export default function ArticleEdit() {
   useEffect(() => {
     if (isNew) setSlug(slugify(form.title ?? ""));
   }, [form.title, isNew]);
+
+  // ── Debounced autofill — triggers 1.5s after title/content stabilises ──
+  useEffect(() => {
+    const title   = form.title ?? "";
+    const content = form.content ?? "";
+    if (title.trim().length < 10) return; // need at least some title text
+
+    if (autofillTimer.current) clearTimeout(autofillTimer.current);
+    autofillTimer.current = setTimeout(() => {
+      setAutofilling(true);
+      adminApi.autofillArticle(title, content)
+        .then((ai) => {
+          const filled = new Set<string>();
+
+          // Subtitle — fill if empty and user hasn't edited it
+          if (ai.subtitle && !userEditedRef.current.has("subtitle") && !form.subtitle?.trim()) {
+            setField("subtitle", ai.subtitle);
+            filled.add("subtitle");
+          }
+          // Summary/keywords — fill if empty
+          if (ai.summary && !userEditedRef.current.has("summary") && !form.keywords?.trim()) {
+            setField("keywords", ai.summary);
+            filled.add("summary");
+          }
+          // Tags — fill if empty
+          if (ai.tags.length > 0 && !userEditedRef.current.has("tags") && tags.length === 0) {
+            setTags(ai.tags);
+            filled.add("tags");
+          }
+          // SEO Title — fill if empty
+          if (ai.seoTitle && !userEditedRef.current.has("seoTitle") && !seoTitle.trim()) {
+            setSeoTitle(ai.seoTitle.slice(0, 60));
+            filled.add("seoTitle");
+          }
+          // Meta description — fill if empty
+          if (ai.metaDesc && !userEditedRef.current.has("metaDesc") && !seoDesc.trim()) {
+            setSeoDesc(ai.metaDesc.slice(0, 160));
+            filled.add("metaDesc");
+          }
+          // Slug — only fill if it's still the auto-generated one (isNew) and not manually edited
+          if (ai.slug && isNew && !userEditedRef.current.has("slug")) {
+            setSlug(ai.slug.slice(0, 80));
+            filled.add("slug");
+          }
+          if (filled.size > 0) setAiFilledFields(filled);
+        })
+        .catch(() => { /* silent — autofill is best-effort */ })
+        .finally(() => setAutofilling(false));
+    }, 1500);
+
+    return () => { if (autofillTimer.current) clearTimeout(autofillTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.title, form.content]);
 
   function setField<K extends keyof Article>(key: K, value: Article[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -218,6 +289,16 @@ export default function ArticleEdit() {
 
   const topbarActions = (
     <div className="flex items-center gap-2">
+      {autofilling && (
+        <span className="text-xs font-medium px-3 py-1.5 rounded-xl flex items-center gap-1.5 bg-purple-50 text-purple-600">
+          <Loader2 size={12} className="animate-spin" /> Preenchendo com IA…
+        </span>
+      )}
+      {!autofilling && aiFilledFields.size > 0 && !error && !success && (
+        <span className="text-xs font-medium px-3 py-1.5 rounded-xl flex items-center gap-1.5 bg-purple-50 text-purple-600">
+          <Wand2 size={12} /> Campos preenchidos por IA
+        </span>
+      )}
       {(error || success) && (
         <span className={`text-xs font-medium px-3 py-1.5 rounded-xl flex items-center gap-1.5 ${
           error ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
@@ -299,12 +380,13 @@ export default function ArticleEdit() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
                   Slug <span className="text-[#E71D36]">*</span>
+                  {aiFilledFields.has("slug") && <AiBadge />}
                 </label>
                 <input
                   value={slug}
-                  onChange={(e) => setSlug(slugify(e.target.value))}
+                  onChange={(e) => { userEditedRef.current.add("slug"); setSlug(slugify(e.target.value)); }}
                   placeholder="slug-da-materia"
                   className="w-full px-4 py-2.5 text-xs font-mono border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
                 />
@@ -314,25 +396,33 @@ export default function ArticleEdit() {
 
             {/* Subtitle */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Subtítulo</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Subtítulo {aiFilledFields.has("subtitle") && <AiBadge />}
+              </label>
               <input
                 value={form.subtitle ?? ""}
-                onChange={(e) => setField("subtitle", e.target.value)}
+                onChange={(e) => { userEditedRef.current.add("subtitle"); setField("subtitle", e.target.value); }}
                 placeholder="Digite o subtítulo da matéria (opcional)"
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors ${
+                  aiFilledFields.has("subtitle") ? "border-purple-200" : "border-slate-200"
+                }`}
               />
             </div>
 
             {/* Summary */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Resumo</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Resumo {aiFilledFields.has("summary") && <AiBadge />}
+              </label>
               <textarea
                 value={form.keywords ?? ""}
-                onChange={(e) => setField("keywords", e.target.value)}
+                onChange={(e) => { userEditedRef.current.add("summary"); setField("keywords", e.target.value); }}
                 placeholder="Breve descrição ou destaque da matéria"
                 rows={3}
                 maxLength={160}
-                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors"
+                className={`w-full px-4 py-3 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors ${
+                  aiFilledFields.has("summary") ? "border-purple-200" : "border-slate-200"
+                }`}
               />
               <p className="text-[10px] text-slate-400 text-right mt-0.5">
                 {(form.keywords ?? "").length}/160
@@ -614,13 +704,17 @@ export default function ArticleEdit() {
 
             {/* Tags */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tags</label>
-              <div className="border border-slate-200 rounded-xl bg-slate-50 px-3 py-2 focus-within:border-[#0B2A66] transition-colors">
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Tags {aiFilledFields.has("tags") && <AiBadge />}
+              </label>
+              <div className={`border rounded-xl bg-slate-50 px-3 py-2 focus-within:border-[#0B2A66] transition-colors ${
+                aiFilledFields.has("tags") ? "border-purple-200" : "border-slate-200"
+              }`}>
                 <div className="flex flex-wrap gap-1.5 mb-1.5">
                   {tags.map((t) => (
                     <span key={t} className="flex items-center gap-1 text-[11px] font-semibold text-[#0B2A66] bg-[#EEF2FF] px-2 py-0.5 rounded-full">
                       {t}
-                      <button type="button" onClick={() => setTags((prev) => prev.filter((x) => x !== t))}>
+                      <button type="button" onClick={() => { userEditedRef.current.add("tags"); setTags((prev) => prev.filter((x) => x !== t)); }}>
                         <X size={9} />
                       </button>
                     </span>
@@ -628,7 +722,7 @@ export default function ArticleEdit() {
                 </div>
                 <input
                   value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
+                  onChange={(e) => { userEditedRef.current.add("tags"); setTagInput(e.target.value); }}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTag(tagInput); } }}
                   placeholder={tags.length ? "" : "Digite e pressione Enter para adicionar"}
                   className="text-sm bg-transparent outline-none w-full placeholder:text-slate-400"
@@ -684,24 +778,32 @@ export default function ArticleEdit() {
             <h3 className="text-sm font-semibold text-[#0B2A66]">SEO</h3>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Título SEO</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Título SEO {aiFilledFields.has("seoTitle") && <AiBadge />}
+              </label>
               <input
                 value={seoTitle}
-                onChange={(e) => setSeoTitle(e.target.value.slice(0, 60))}
+                onChange={(e) => { userEditedRef.current.add("seoTitle"); setSeoTitle(e.target.value.slice(0, 60)); }}
                 placeholder="Título para SEO (opcional)"
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                className={`w-full px-4 py-2.5 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors ${
+                  aiFilledFields.has("seoTitle") ? "border-purple-200" : "border-slate-200"
+                }`}
               />
               <p className="text-[10px] text-slate-400 text-right mt-0.5">{seoTitle.length}/60</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Meta descrição</label>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Meta descrição {aiFilledFields.has("metaDesc") && <AiBadge />}
+              </label>
               <textarea
                 value={seoDesc}
-                onChange={(e) => setSeoDesc(e.target.value.slice(0, 160))}
+                onChange={(e) => { userEditedRef.current.add("metaDesc"); setSeoDesc(e.target.value.slice(0, 160)); }}
                 placeholder="Descrição para mecanismos de busca (opcional)"
                 rows={3}
-                className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors"
+                className={`w-full px-4 py-3 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors ${
+                  aiFilledFields.has("metaDesc") ? "border-purple-200" : "border-slate-200"
+                }`}
               />
               <p className="text-[10px] text-slate-400 text-right mt-0.5">{seoDesc.length}/160</p>
             </div>

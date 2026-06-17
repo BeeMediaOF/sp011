@@ -100,6 +100,100 @@ router.post("/articles/:id/rewrite", async (req, res) => {
   }
 });
 
+/** POST /api/admin/articles/autofill  — AI auto-fill SEO metadata from title + content */
+router.post("/articles/autofill", async (req, res) => {
+  const { title, content } = req.body as { title?: string; content?: string };
+  if (!title || title.trim().length < 5) {
+    res.status(400).json({ error: "title is required" });
+    return;
+  }
+
+  const apiKey = process.env["PERPLEXITY_API_KEY"];
+  if (!apiKey) {
+    res.status(503).json({ error: "PERPLEXITY_API_KEY not configured" });
+    return;
+  }
+
+  const textSample = (content ?? "").slice(0, 1200);
+
+  const prompt = `Você é especialista em SEO para portais de notícias brasileiros e em AIO (AI Optimization) para destaque no Google e em buscas por IA.
+
+Dado o título e conteúdo de uma matéria jornalística, gere os seguintes campos de forma otimizada para SEO/AIO:
+
+TÍTULO DA MATÉRIA: ${title.trim()}
+CONTEÚDO (trecho): ${textSample || "(sem conteúdo ainda — use apenas o título)"}
+
+Retorne APENAS um objeto JSON válido (sem markdown, sem \`\`\`, sem texto extra) com exatamente estas chaves:
+{
+  "subtitle": "subtítulo editorial de 1 frase (até 120 chars), complementa o título, jornalístico",
+  "summary": "resumo/lide de 2-3 frases (até 160 chars), o mais importante do texto, linguagem direta",
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "seoTitle": "título SEO otimizado (até 60 chars), com palavra-chave principal no início",
+  "metaDesc": "meta descrição SEO (até 155 chars), inclui palavra-chave, chama atenção para clicar",
+  "slug": "slug-url-amigavel-sem-acentos-sem-espacos"
+}
+
+Regras:
+- tags: até 5 tags em português, palavras-chave relevantes para o tema, sem hashtag
+- slug: só letras minúsculas, números e hifens, sem acentos, sem caracteres especiais
+- Todos os campos em português brasileiro
+- Foco em São Bernardo do Campo / Grande ABC quando relevante`;
+
+  try {
+    const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 600,
+        search_recency_filter: "month",
+        return_citations: false,
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => resp.statusText);
+      req.log.error({ status: resp.status, errText }, "Perplexity autofill error");
+      res.status(502).json({ error: `Perplexity error: ${resp.status}` });
+      return;
+    }
+
+    const data = await resp.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = data.choices?.[0]?.message?.content ?? "";
+
+    // Strip markdown code fences if present
+    const clean = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(clean) as Record<string, unknown>;
+    } catch {
+      req.log.warn({ raw }, "autofill JSON parse failed, attempting extraction");
+      // Fallback: extract JSON object from response
+      const match = raw.match(/\{[\s\S]*\}/);
+      if (!match) {
+        res.status(502).json({ error: "Resposta da IA não contém JSON válido" });
+        return;
+      }
+      parsed = JSON.parse(match[0]) as Record<string, unknown>;
+    }
+
+    res.json({
+      subtitle:  typeof parsed["subtitle"]  === "string" ? parsed["subtitle"]  : "",
+      summary:   typeof parsed["summary"]   === "string" ? parsed["summary"]   : "",
+      tags:      Array.isArray(parsed["tags"]) ? (parsed["tags"] as unknown[]).filter((t): t is string => typeof t === "string").slice(0, 5) : [],
+      seoTitle:  typeof parsed["seoTitle"]  === "string" ? parsed["seoTitle"]  : "",
+      metaDesc:  typeof parsed["metaDesc"]  === "string" ? parsed["metaDesc"]  : "",
+      slug:      typeof parsed["slug"]      === "string" ? parsed["slug"]      : "",
+    });
+  } catch (err: unknown) {
+    req.log.error({ err }, "autofill failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "autofill failed" });
+  }
+});
+
 // ─── Publish ─────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/publish/:id  — mark article as published */
