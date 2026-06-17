@@ -183,6 +183,21 @@ export interface SocialConfig {
   lastPublishedAt?: string;
 }
 
+export type PerplexityAutoMode = "none" | "draft" | "published";
+
+export interface PerplexityTopic {
+  id: string;
+  name: string;
+  query: string;
+  category: string;
+  active: boolean;
+  scheduleHours: number;
+  maxResults: number;
+  autoMode: PerplexityAutoMode;
+  lastRunAt?: string;
+  createdAt: string;
+}
+
 interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
@@ -193,6 +208,7 @@ interface StoreData {
   rssSources: RssSource[];
   rssPrompts?: RssPrompts;
   socialConfig?: SocialConfig;
+  perplexityTopics?: PerplexityTopic[];
   seedVersion?: number;
 }
 
@@ -611,5 +627,31 @@ export const store = {
     _store.socialConfig = { ...(_store.socialConfig ?? {}), ...data };
     saveStore(_store);
     return { ..._store.socialConfig };
+  },
+
+  // Perplexity Topics
+  getPerplexityTopics: (): PerplexityTopic[] => [...(_store.perplexityTopics ?? [])],
+  createPerplexityTopic: (data: Omit<PerplexityTopic, "id" | "createdAt">): PerplexityTopic => {
+    const topic: PerplexityTopic = { ...data, id: randomUUID(), createdAt: new Date().toISOString() };
+    if (!_store.perplexityTopics) _store.perplexityTopics = [];
+    _store.perplexityTopics.push(topic);
+    saveStore(_store);
+    return topic;
+  },
+  updatePerplexityTopic: (id: string, data: Partial<Omit<PerplexityTopic, "id" | "createdAt">>): PerplexityTopic | null => {
+    if (!_store.perplexityTopics) _store.perplexityTopics = [];
+    const idx = _store.perplexityTopics.findIndex((t) => t.id === id);
+    if (idx === -1) return null;
+    _store.perplexityTopics[idx] = { ..._store.perplexityTopics[idx]!, ...data };
+    saveStore(_store);
+    return _store.perplexityTopics[idx]!;
+  },
+  deletePerplexityTopic: (id: string): boolean => {
+    if (!_store.perplexityTopics) return false;
+    const before = _store.perplexityTopics.length;
+    _store.perplexityTopics = _store.perplexityTopics.filter((t) => t.id !== id);
+    const deleted = _store.perplexityTopics.length < before;
+    if (deleted) saveStore(_store);
+    return deleted;
   },
 };

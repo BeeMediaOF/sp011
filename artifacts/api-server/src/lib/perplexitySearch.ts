@@ -1,11 +1,12 @@
 /**
  * Perplexity Sonar API — busca notícias recentes sobre um tema
- * e retorna artigos estruturados prontos para reescrita pela IA.
+ * e retorna artigos estruturados com título real, resumo e texto completo.
+ * Prioriza fontes sociais: Google News, X (Twitter), Instagram, portais de notícia.
  */
 
 export interface PerplexityArticle {
   title: string;
-  excerpt: string;
+  summary: string;
   fullText: string;
   sourceUrl: string;
   sourceName: string;
@@ -25,78 +26,117 @@ function getApiKey(): string {
   return key;
 }
 
-function parseCitations(
-  answer: string,
+/** Deriva um nome legível de domínio a partir de uma URL */
+function sourceName(url: string): string {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, "");
+    // Friendly names for common sources
+    const map: Record<string, string> = {
+      "twitter.com": "Twitter/X",
+      "x.com": "Twitter/X",
+      "instagram.com": "Instagram",
+      "facebook.com": "Facebook",
+      "tiktok.com": "TikTok",
+      "youtube.com": "YouTube",
+      "news.google.com": "Google News",
+      "g1.globo.com": "G1",
+      "uol.com.br": "UOL",
+      "folha.uol.com.br": "Folha de S.Paulo",
+      "estadao.com.br": "Estadão",
+      "oglobo.globo.com": "O Globo",
+      "r7.com": "R7",
+      "band.uol.com.br": "Band",
+      "metropoles.com": "Metrópoles",
+      "correiobraziliense.com.br": "Correio Braziliense",
+    };
+    if (map[hostname]) return map[hostname];
+    const parts = hostname.split(".");
+    const name = parts[parts.length - 2] ?? hostname;
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  } catch {
+    return "Fonte";
+  }
+}
+
+interface RawArticle {
+  title?: string;
+  summary?: string;
+  full_text?: string;
+  source_url?: string;
+  source_name?: string;
+}
+
+function parseStructuredResponse(
+  raw: string,
   citations: string[]
 ): PerplexityArticle[] {
-  // Split answer by citation markers [1], [2], …
-  // Each paragraph that ends with [N] is treated as one article block
-  const paragraphs = answer
-    .split(/\n+/)
-    .map((p) => p.trim())
-    .filter((p) => p.length > 30);
+  // Try to parse JSON array from response
+  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
+    ?? raw.match(/(\[\s*\{[\s\S]*\}\s*\])/);
 
-  const articles: PerplexityArticle[] = [];
-  const seen = new Set<string>();
-
-  // Build one article per citation
-  citations.forEach((url, idx) => {
-    if (seen.has(url)) return;
-    seen.add(url);
-
-    const num = idx + 1;
-    // Collect paragraphs that reference this citation
-    const related = paragraphs.filter((p) => p.includes(`[${num}]`));
-    const text = related
-      .map((p) => p.replace(/\[\d+\]/g, "").trim())
-      .join("\n\n");
-
-    if (!text && idx > 0) return; // skip empty non-first entries
-
-    // Extract title: first sentence of first related paragraph, or generic
-    const firstParagraph = related[0] ?? paragraphs[idx] ?? "";
-    const titleMatch = firstParagraph.match(/^([^.!?\n]{10,120})[.!?]/);
-    const title = titleMatch
-      ? titleMatch[1]!.replace(/\[\d+\]/g, "").trim()
-      : `Notícia ${num}`;
-
-    // Derive source name from URL
-    let sourceName = "Fonte desconhecida";
+  if (jsonMatch) {
     try {
-      const hostname = new URL(url).hostname.replace(/^www\./, "");
-      sourceName = hostname.split(".")[0] ?? hostname;
-      sourceName = sourceName.charAt(0).toUpperCase() + sourceName.slice(1);
-    } catch {}
-
-    articles.push({
-      title,
-      excerpt: text.slice(0, 200),
-      fullText: text || firstParagraph.replace(/\[\d+\]/g, "").trim(),
-      sourceUrl: url,
-      sourceName,
-      imageUrl: "",
-      publishedAt: new Date().toISOString(),
-    });
-  });
-
-  // Fallback: if citations empty, create one article from the whole answer
-  if (articles.length === 0 && answer.trim().length > 50) {
-    const cleanAnswer = answer.replace(/\[\d+\]/g, "").trim();
-    const lines = cleanAnswer.split(/\n+/).filter((l) => l.length > 20);
-    const titleMatch = cleanAnswer.match(/^([^.!?\n]{10,120})[.!?]/);
-    articles.push({
-      title: titleMatch ? titleMatch[1]!.trim() : "Resultado da busca",
-      excerpt: cleanAnswer.slice(0, 200),
-      fullText: cleanAnswer,
-      sourceUrl: citations[0] ?? "",
-      sourceName: "Perplexity",
-      imageUrl: "",
-      publishedAt: new Date().toISOString(),
-    });
-    void lines;
+      const arr = JSON.parse(jsonMatch[1]!) as RawArticle[];
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.map((item, i) => ({
+          title:       (item.title      ?? "").trim() || `Notícia ${i + 1}`,
+          summary:     (item.summary    ?? "").trim(),
+          fullText:    (item.full_text  ?? item.summary ?? "").trim(),
+          sourceUrl:   (item.source_url ?? citations[i] ?? "").trim(),
+          sourceName:  (item.source_name ?? sourceName(item.source_url ?? citations[i] ?? "")).trim(),
+          imageUrl:    "",
+          publishedAt: new Date().toISOString(),
+        }));
+      }
+    } catch { /* fallback below */ }
   }
 
-  return articles;
+  // Fallback: split by numbered headers ## 1. / **1.** / 1.
+  const blocks = raw.split(/(?=(?:^|\n)(?:#{1,3}\s*\d+\.|(?:\*\*\d+\.?\*\*)|(?:^|\n)\d+\.))/m)
+    .map(b => b.trim())
+    .filter(b => b.length > 40);
+
+  if (blocks.length > 1) {
+    return blocks.slice(0, 10).map((block, i) => {
+      // Extract title: first line or bold first sentence
+      const titleMatch =
+        block.match(/^(?:#{1,3}\s*\d+\.\s*)(.+)$/m)
+        ?? block.match(/^\*\*(.+?)\*\*/m)
+        ?? block.match(/^\d+\.\s+(.+)$/m);
+      const title = titleMatch
+        ? titleMatch[1]!.replace(/\*\*/g, "").trim()
+        : block.split("\n")[0]?.slice(0, 120).trim() ?? `Notícia ${i + 1}`;
+
+      const body = block
+        .replace(/^(?:#{1,3}\s*\d+\..*|^\*\*.*?\*\*|\d+\..*)/m, "")
+        .replace(/\[\d+\]/g, "")
+        .trim();
+
+      const url = citations[i] ?? "";
+      return {
+        title,
+        summary:     body.slice(0, 280).trim(),
+        fullText:    body,
+        sourceUrl:   url,
+        sourceName:  sourceName(url),
+        imageUrl:    "",
+        publishedAt: new Date().toISOString(),
+      };
+    });
+  }
+
+  // Last resort: one article from full answer
+  const clean = raw.replace(/\[\d+\]/g, "").trim();
+  const firstSentence = clean.match(/^([^.!?\n]{10,140})[.!?]/)?.[1]?.trim() ?? "Resultado da busca";
+  return [{
+    title:       firstSentence,
+    summary:     clean.slice(0, 300),
+    fullText:    clean,
+    sourceUrl:   citations[0] ?? "",
+    sourceName:  sourceName(citations[0] ?? ""),
+    imageUrl:    "",
+    publishedAt: new Date().toISOString(),
+  }];
 }
 
 export async function searchNews(
@@ -106,17 +146,27 @@ export async function searchNews(
   const apiKey = getApiKey();
 
   const systemPrompt =
-    "Você é um assistente de pesquisa jornalística. " +
-    "Busque as notícias mais recentes sobre o tema solicitado. " +
-    "Para cada notícia encontrada, escreva um parágrafo completo com os fatos principais, " +
-    "citando a fonte com [N]. Apresente no máximo " +
-    maxResults +
-    " notícias distintas. " +
+    "Você é um jornalista pesquisador especializado em notícias locais brasileiras. " +
+    "Busque notícias recentes sobre o tema solicitado priorizando fontes como: " +
+    "Google News, Twitter/X, Instagram, portais de notícia locais e regionais. " +
+    "IMPORTANTE: Responda APENAS com um array JSON válido, sem texto extra, no seguinte formato:\n" +
+    "[\n" +
+    "  {\n" +
+    '    "title": "Título completo e específico da notícia",\n' +
+    '    "summary": "Resumo em 2-3 frases com os fatos principais",\n' +
+    '    "full_text": "Texto completo com todos os detalhes da notícia",\n' +
+    '    "source_url": "URL completa da fonte",\n' +
+    '    "source_name": "Nome do veículo ou rede social"\n' +
+    "  }\n" +
+    "]\n" +
+    "Retorne exatamente " + maxResults + " itens. Priorize notícias das últimas 48 horas. " +
+    "Inclua notícias de redes sociais (X/Twitter, Instagram) quando disponíveis. " +
     "Responda em português brasileiro.";
 
   const userPrompt =
     `Busque as ${maxResults} notícias mais recentes e relevantes sobre: "${query}". ` +
-    "Para cada notícia, apresente um parágrafo detalhado com os principais fatos.";
+    "Priorize: Google News, Twitter/X, Instagram, portais de notícia locais. " +
+    "Retorne somente o array JSON conforme solicitado.";
 
   const body = {
     model: "sonar",
@@ -125,7 +175,7 @@ export async function searchNews(
       { role: "user",   content: userPrompt },
     ],
     max_tokens: 4096,
-    search_recency_filter: "week",
+    search_recency_filter: "day",
     return_citations: true,
     return_related_questions: false,
   };
@@ -150,10 +200,10 @@ export async function searchNews(
     citations?: string[];
   };
 
-  const rawAnswer = data.choices?.[0]?.message?.content ?? "";
+  const rawAnswer  = data.choices?.[0]?.message?.content ?? "";
   const citations: string[] = data.citations ?? [];
 
-  const articles = parseCitations(rawAnswer, citations).slice(0, maxResults);
+  const articles = parseStructuredResponse(rawAnswer, citations).slice(0, maxResults);
 
   return { query, articles, rawAnswer };
 }
