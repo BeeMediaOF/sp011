@@ -1,0 +1,415 @@
+{
+  "project": "SBC Agora",
+  "screen": "Artigos",
+  "type": "admin_dashboard_page",
+  "language": "pt-BR",
+  "style": {
+    "theme": "minimalista",
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "textColor": "#0F172A",
+    "mutedText": "#64748B",
+    "borderColor": "#E2E8F0",
+    "successColor": "#16A34A",
+    "warningColor": "#F59E0B",
+    "infoColor": "#2563EB",
+    "dangerColor": "#E71D36",
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)",
+    "layoutMood": "clean, editorial, SaaS premium"
+  },
+  "layout": {
+    "width": "desktop_full",
+    "aspectRatio": "16:9",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "name": "SBC Agora",
+        "tagline": "A notícia em tempo real",
+        "colors": {
+          "SBC": "#0B2A66",
+          "Agora": "#E71D36"
+        }
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": false
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart",
+          "active": false
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text",
+          "active": true
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square",
+          "active": false
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid",
+          "active": false
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone",
+          "active": false
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users",
+          "active": false
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss",
+          "active": false
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share",
+          "active": false
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings",
+          "active": false,
+          "hasDropdown": true
+        }
+      ],
+      "footer": [
+        {
+          "label": "Ver site",
+          "icon": "globe",
+          "action": "open_site"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out",
+          "action": "logout"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "88px",
+      "background": "#FFFFFF",
+      "title": "Artigos",
+      "search": {
+        "placeholder": "Buscar no portal...",
+        "icon": "search"
+      },
+      "dateSelector": {
+        "label": "23 de maio de 2025",
+        "icon": "calendar",
+        "hasDropdown": true
+      },
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin",
+        "hasDropdown": true
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "gridGap": "24px",
+      "sections": [
+        {
+          "type": "article_stats",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Publicados",
+              "value": "286",
+              "variation": "+12,4%",
+              "comparison": "vs últimos 7 dias",
+              "trend": "up",
+              "icon": "file-text",
+              "iconColor": "green",
+              "background": "#ECFDF5"
+            },
+            {
+              "title": "Rascunhos",
+              "value": "128",
+              "variation": "+8,7%",
+              "comparison": "vs últimos 7 dias",
+              "trend": "up",
+              "icon": "file",
+              "iconColor": "orange",
+              "background": "#FFF7ED"
+            },
+            {
+              "title": "Agendados",
+              "value": "34",
+              "variation": "+6,1%",
+              "comparison": "vs últimos 7 dias",
+              "trend": "up",
+              "icon": "calendar",
+              "iconColor": "purple",
+              "background": "#F5F3FF"
+            },
+            {
+              "title": "Arquivados",
+              "value": "56",
+              "variation": "+3,2%",
+              "comparison": "vs últimos 7 dias",
+              "trend": "up",
+              "icon": "archive",
+              "iconColor": "gray",
+              "background": "#F1F5F9"
+            }
+          ]
+        },
+        {
+          "type": "article_management_panel",
+          "component": "table_with_filters",
+          "filters": {
+            "search": {
+              "placeholder": "Buscar artigos...",
+              "icon": "search"
+            },
+            "status": {
+              "label": "Status",
+              "selected": "Todos",
+              "options": ["Todos", "Publicado", "Rascunho", "Agendado", "Arquivado"]
+            },
+            "category": {
+              "label": "Categoria",
+              "selected": "Todas",
+              "options": ["Todas", "Cidades", "Educação", "Trânsito", "Cultura", "Esportes", "Saúde", "Meio Ambiente"]
+            },
+            "date": {
+              "label": "Data",
+              "selected": "Todos os períodos",
+              "options": ["Todos os períodos", "Hoje", "Últimos 7 dias", "Últimos 30 dias"]
+            }
+          },
+          "primaryAction": {
+            "label": "Novo artigo",
+            "icon": "plus",
+            "style": "solid_red",
+            "action": "create_article"
+          },
+          "table": {
+            "columns": [
+              {
+                "label": "Título",
+                "key": "title",
+                "type": "article_with_thumbnail"
+              },
+              {
+                "label": "Categoria",
+                "key": "category",
+                "type": "category_badge"
+              },
+              {
+                "label": "Autor",
+                "key": "author",
+                "type": "text"
+              },
+              {
+                "label": "Data",
+                "key": "date",
+                "type": "datetime",
+                "sortable": true
+              },
+              {
+                "label": "Status",
+                "key": "status",
+                "type": "status_badge"
+              },
+              {
+                "label": "Views",
+                "key": "views",
+                "type": "number"
+              },
+              {
+                "label": "Ações",
+                "key": "actions",
+                "type": "icons"
+              }
+            ],
+            "rows": [
+              {
+                "id": 1,
+                "title": "Prefeitura de São Bernardo lança pacote de investimentos em educação e infraestrutura",
+                "thumbnail": "urban_city",
+                "category": {
+                  "name": "Cidades",
+                  "icon": "map-pin",
+                  "color": "#2563EB"
+                },
+                "author": "Administrador",
+                "date": "23 mai, 2025",
+                "time": "10:45",
+                "status": {
+                  "label": "Publicado",
+                  "color": "green"
+                },
+                "views": "12.842",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 2,
+                "title": "Tarifa do transporte público em SBC não terá aumento em 2025, confirma prefeitura",
+                "thumbnail": "public_transport",
+                "category": {
+                  "name": "Cidades",
+                  "icon": "map-pin",
+                  "color": "#2563EB"
+                },
+                "author": "Administrador",
+                "date": "23 mai, 2025",
+                "time": "09:30",
+                "status": {
+                  "label": "Publicado",
+                  "color": "green"
+                },
+                "views": "8.765",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 3,
+                "title": "SBC abre 1.200 novas vagas em creches para o segundo semestre",
+                "thumbnail": "classroom",
+                "category": {
+                  "name": "Educação",
+                  "icon": "school",
+                  "color": "#F97316"
+                },
+                "author": "Administrador",
+                "date": "22 mai, 2025",
+                "time": "16:20",
+                "status": {
+                  "label": "Rascunho",
+                  "color": "orange"
+                },
+                "views": "-",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 4,
+                "title": "Trânsito sofre alterações no centro a partir de próxima semana",
+                "thumbnail": "traffic_road",
+                "category": {
+                  "name": "Trânsito",
+                  "icon": "traffic-cone",
+                  "color": "#16A34A"
+                },
+                "author": "Administrador",
+                "date": "23 mai, 2025",
+                "time": "08:15",
+                "status": {
+                  "label": "Publicado",
+                  "color": "green"
+                },
+                "views": "6.412",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 5,
+                "title": "Festival de Inverno 2025 acontece em julho com shows nacionais",
+                "thumbnail": "concert_stage",
+                "category": {
+                  "name": "Cultura",
+                  "icon": "music",
+                  "color": "#7C3AED"
+                },
+                "author": "Administrador",
+                "date": "22 mai, 2025",
+                "time": "14:05",
+                "status": {
+                  "label": "Agendado",
+                  "color": "blue"
+                },
+                "views": "4.321",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 6,
+                "title": "SBC vence fora de casa e assume liderança do grupo na Série A2",
+                "thumbnail": "soccer_field",
+                "category": {
+                  "name": "Esportes",
+                  "icon": "trophy",
+                  "color": "#16A34A"
+                },
+                "author": "Administrador",
+                "date": "22 mai, 2025",
+                "time": "11:15",
+                "status": {
+                  "label": "Publicado",
+                  "color": "green"
+                },
+                "views": "7.893",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 7,
+                "title": "Campanha de vacinação contra a gripe é ampliada em São Bernardo",
+                "thumbnail": "vaccination",
+                "category": {
+                  "name": "Saúde",
+                  "icon": "heart",
+                  "color": "#EF4444"
+                },
+                "author": "Administrador",
+                "date": "21 mai, 2025",
+                "time": "17:40",
+                "status": {
+                  "label": "Publicado",
+                  "color": "green"
+                },
+                "views": "5.210",
+                "actions": ["view", "edit", "more"]
+              },
+              {
+                "id": 8,
+                "title": "Parque Estoril ganha nova área de lazer e pista de caminhada revitalizada",
+                "thumbnail": "park_green_area",
+                "category": {
+                  "name": "Meio Ambiente",
+                  "icon": "leaf",
+                  "color": "#22C55E"
+                },
+                "author": "Administrador",
+                "date": "21 mai, 2025",
+                "time": "15:10",
+                "status": {
+                  "label": "Arquivado",
+                  "color": "gray"
+                },
+                "views": "2.156",
+                "actions": ["view", "edit", "more"]
+              }
+            ],
+            "pagination": {
+              "summary": "Mostrando 1 a 8 de 286 artigos",
+              "currentPage": 1,
+              "pages": [1, 2, 3, "...", 36],
+              "hasPrevious": true,
+              "hasNext": true
+            }
+          }
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma página Artigos minimalista para o painel administrativo do portal SBC Agora, seguindo o mesmo visual premium do dashboard: sidebar branca com o item Artigos ativo em vermelho, topbar limpa com busca, data, notificações e perfil do administrador. No conteúdo, exiba cards de resumo para Publicados, Rascunhos, Agendados e Arquivados. Abaixo, crie uma área de gestão de artigos com busca, filtros de status, categoria e data, botão vermelho Novo artigo e uma tabela elegante com thumbnails, título, categoria, autor, data, status, views e ações. Use cards brancos, cantos arredondados, sombras suaves, muito respiro e textos em português."
+}

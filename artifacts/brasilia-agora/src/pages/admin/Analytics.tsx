@@ -153,7 +153,7 @@ export default function Analytics() {
   const kpis = [
     {
       label:   "Visualizações de página",
-      value:   stats.totals.month.toLocaleString("pt-BR"),
+      value:   (stats.totals?.month ?? 0).toLocaleString("pt-BR"),
       pct:     "+14,3%",
       trend:   "up",
       sub:     "vs últimos 30 dias",
@@ -351,7 +351,7 @@ export default function Analytics() {
                 </PieChart>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-sm font-bold text-[#0F172A] leading-none">
-                    {stats.totals.month.toLocaleString("pt-BR")}
+                    {(stats.totals?.month ?? 0).toLocaleString("pt-BR")}
                   </p>
                   <p className="text-[9px] text-slate-400 mt-0.5">views</p>
                 </div>
