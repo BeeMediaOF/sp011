@@ -1,7 +1,7 @@
 /**
- * Perplexity Sonar API — busca notícias recentes sobre um tema
- * e retorna artigos estruturados com título real, resumo e texto completo.
- * Prioriza fontes sociais: Google News, X (Twitter), Instagram, portais de notícia.
+ * Perplexity Sonar API — busca notícias recentes sobre um tema.
+ * Usa formato de lista numerada (não JSON) que o modelo retorna de forma confiável.
+ * Prioriza: Google News, X/Twitter, portais regionais.
  */
 
 export interface PerplexityArticle {
@@ -26,114 +26,147 @@ function getApiKey(): string {
   return key;
 }
 
-/** Deriva um nome legível de domínio a partir de uma URL */
-function sourceName(url: string): string {
+function deriveSourceName(url: string): string {
+  if (!url) return "Fonte desconhecida";
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, "");
-    // Friendly names for common sources
-    const map: Record<string, string> = {
-      "twitter.com": "Twitter/X",
-      "x.com": "Twitter/X",
-      "instagram.com": "Instagram",
-      "facebook.com": "Facebook",
-      "tiktok.com": "TikTok",
-      "youtube.com": "YouTube",
+    const KNOWN: Record<string, string> = {
+      "twitter.com": "Twitter/X", "x.com": "Twitter/X",
+      "instagram.com": "Instagram", "facebook.com": "Facebook",
+      "tiktok.com": "TikTok", "youtube.com": "YouTube",
       "news.google.com": "Google News",
-      "g1.globo.com": "G1",
-      "uol.com.br": "UOL",
+      "g1.globo.com": "G1", "uol.com.br": "UOL",
       "folha.uol.com.br": "Folha de S.Paulo",
-      "estadao.com.br": "Estadão",
-      "oglobo.globo.com": "O Globo",
-      "r7.com": "R7",
-      "band.uol.com.br": "Band",
+      "estadao.com.br": "Estadão", "oglobo.globo.com": "O Globo",
+      "r7.com": "R7", "band.uol.com.br": "Band",
       "metropoles.com": "Metrópoles",
       "correiobraziliense.com.br": "Correio Braziliense",
+      "tvsaobernardo.com.br": "TV São Bernardo",
+      "folhadoabc.com.br": "Folha do ABC",
+      "diariodogrande.com.br": "Diário do Grande ABC",
     };
-    if (map[hostname]) return map[hostname];
+    if (KNOWN[hostname]) return KNOWN[hostname];
     const parts = hostname.split(".");
-    const name = parts[parts.length - 2] ?? hostname;
-    return name.charAt(0).toUpperCase() + name.slice(1);
+    const n = parts.length >= 2 ? parts[parts.length - 2]! : hostname;
+    return n.charAt(0).toUpperCase() + n.slice(1);
   } catch {
     return "Fonte";
   }
 }
 
-interface RawArticle {
-  title?: string;
-  summary?: string;
-  full_text?: string;
-  source_url?: string;
-  source_name?: string;
-}
+/**
+ * Parses Perplexity's natural language response into structured articles.
+ *
+ * Confirmed Perplexity format:
+ *   • **TÍTULO** — RESUMO completo aqui. [N]
+ *
+ * Uses line-by-line processing (not one big regex) for reliability.
+ */
+function parseResponse(raw: string, citations: string[]): PerplexityArticle[] {
 
-function parseStructuredResponse(
-  raw: string,
-  citations: string[]
-): PerplexityArticle[] {
-  // Try to parse JSON array from response
-  const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-    ?? raw.match(/(\[\s*\{[\s\S]*\}\s*\])/);
-
-  if (jsonMatch) {
-    try {
-      const arr = JSON.parse(jsonMatch[1]!) as RawArticle[];
-      if (Array.isArray(arr) && arr.length > 0) {
-        return arr.map((item, i) => ({
-          title:       (item.title      ?? "").trim() || `Notícia ${i + 1}`,
-          summary:     (item.summary    ?? "").trim(),
-          fullText:    (item.full_text  ?? item.summary ?? "").trim(),
-          sourceUrl:   (item.source_url ?? citations[i] ?? "").trim(),
-          sourceName:  (item.source_name ?? sourceName(item.source_url ?? citations[i] ?? "")).trim(),
-          imageUrl:    "",
-          publishedAt: new Date().toISOString(),
-        }));
-      }
-    } catch { /* fallback below */ }
+  function makeArticle(title: string, summary: string, citIdx: number): PerplexityArticle {
+    const clean = (s: string) => s.replace(/\*\*/g, "").replace(/\[\d+\]/g, "").trim();
+    const t = clean(title);
+    const s = clean(summary);
+    const url = citIdx >= 0 && citIdx < citations.length ? (citations[citIdx] ?? "") : "";
+    return {
+      title:       t,
+      summary:     s,
+      fullText:    s ? `${t} — ${s}` : t,
+      sourceUrl:   url,
+      sourceName:  deriveSourceName(url),
+      imageUrl:    "",
+      publishedAt: new Date().toISOString(),
+    };
   }
 
-  // Fallback: split by numbered headers ## 1. / **1.** / 1.
-  const blocks = raw.split(/(?=(?:^|\n)(?:#{1,3}\s*\d+\.|(?:\*\*\d+\.?\*\*)|(?:^|\n)\d+\.))/m)
-    .map(b => b.trim())
-    .filter(b => b.length > 40);
+  function parseLine(line: string, fallbackCitIdx: number): PerplexityArticle | null {
+    // Remove leading bullet (•, -, *)
+    let text = line.replace(/^[•\-\*]\s+/, "").trim();
+    if (text.length < 10) return null;
 
-  if (blocks.length > 1) {
-    return blocks.slice(0, 10).map((block, i) => {
-      // Extract title: first line or bold first sentence
-      const titleMatch =
-        block.match(/^(?:#{1,3}\s*\d+\.\s*)(.+)$/m)
-        ?? block.match(/^\*\*(.+?)\*\*/m)
-        ?? block.match(/^\d+\.\s+(.+)$/m);
-      const title = titleMatch
-        ? titleMatch[1]!.replace(/\*\*/g, "").trim()
-        : block.split("\n")[0]?.slice(0, 120).trim() ?? `Notícia ${i + 1}`;
+    // Extract trailing citation [N]
+    const citMatch = text.match(/\[(\d+)\]\.?\s*$/);
+    const citIdx = citMatch ? parseInt(citMatch[1]!, 10) - 1 : fallbackCitIdx;
+    text = text.replace(/\[\d+\]\.?\s*$/, "").trim();
 
-      const body = block
-        .replace(/^(?:#{1,3}\s*\d+\..*|^\*\*.*?\*\*|\d+\..*)/m, "")
-        .replace(/\[\d+\]/g, "")
-        .trim();
+    // Try: **TITLE** — SUMMARY  (primary Perplexity format)
+    const boldDash = text.match(/^\*\*(.+?)\*\*\s*[—–-]\s*([\s\S]+)$/);
+    if (boldDash) {
+      return makeArticle(boldDash[1]!.trim(), boldDash[2]!.trim(), citIdx);
+    }
 
-      const url = citations[i] ?? "";
-      return {
-        title,
-        summary:     body.slice(0, 280).trim(),
-        fullText:    body,
-        sourceUrl:   url,
-        sourceName:  sourceName(url),
-        imageUrl:    "",
-        publishedAt: new Date().toISOString(),
-      };
+    // Try: **TITLE**  (bold only, no dash)
+    const boldOnly = text.match(/^\*\*(.+?)\*\*\s*([\s\S]*)$/);
+    if (boldOnly && boldOnly[1]!.length > 5) {
+      return makeArticle(boldOnly[1]!.trim(), boldOnly[2]!.trim(), citIdx);
+    }
+
+    // Try: plain text with em-dash separator
+    const dashIdx = text.indexOf(" — ");
+    if (dashIdx > 10) {
+      return makeArticle(text.slice(0, dashIdx), text.slice(dashIdx + 3), citIdx);
+    }
+
+    // Fallback: whole line as title, look for ". Capital" to split
+    const dotIdx = text.search(/\.\s+[A-ZÁÀÂÃÉÊÍÓÔÕÚÜÇ]/);
+    if (dotIdx > 10 && dotIdx < 160) {
+      return makeArticle(text.slice(0, dotIdx + 1), text.slice(dotIdx + 1), citIdx);
+    }
+
+    return makeArticle(text, "", citIdx);
+  }
+
+  // ── Primary: find all bullet lines (each may span one line)
+  const bulletLines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^[•\-\*]\s+/.test(l));
+
+  if (bulletLines.length >= 1) {
+    const articles = bulletLines
+      .map((l, i) => parseLine(l, i))
+      .filter((a): a is PerplexityArticle => a !== null);
+    if (articles.length >= 1) return articles;
+  }
+
+  // ── Fallback: numbered items  1. TEXT [N]
+  const numberedLines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => /^\d+[\.\)]\s+/.test(l));
+
+  if (numberedLines.length >= 2) {
+    const articles = numberedLines.map((l, i) => {
+      const text = l.replace(/^\d+[\.\)]\s+/, "").trim();
+      return parseLine(`• ${text}`, i);
+    }).filter((a): a is PerplexityArticle => a !== null);
+    if (articles.length >= 2) return articles;
+  }
+
+  // ── Fallback: paragraph blocks
+  const paragraphs = raw
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/\[\d+\]/g, "").replace(/\*\*/g, "").replace(/^[•\-\*]\s+/, "").trim())
+    .filter((p) => p.length > 40 && !/^#{1,3}\s/.test(p));
+
+  if (paragraphs.length >= 1) {
+    return paragraphs.slice(0, 10).map((p, i) => {
+      const dashIdx = p.indexOf(" — ");
+      const title   = dashIdx > 10 ? p.slice(0, dashIdx).trim() : p.split("\n")[0]?.slice(0, 160) ?? "";
+      const summary = dashIdx > 10 ? p.slice(dashIdx + 3).trim() : p.split("\n").slice(1).join(" ");
+      return makeArticle(title, summary, Math.min(i, citations.length - 1));
     });
   }
 
-  // Last resort: one article from full answer
-  const clean = raw.replace(/\[\d+\]/g, "").trim();
-  const firstSentence = clean.match(/^([^.!?\n]{10,140})[.!?]/)?.[1]?.trim() ?? "Resultado da busca";
+  // ── Last resort
+  const clean = raw.replace(/\[\d+\]/g, "").replace(/\*\*/g, "").trim();
   return [{
-    title:       firstSentence,
+    title:       clean.split("\n")[0]?.slice(0, 160) ?? "Resultado da busca",
     summary:     clean.slice(0, 300),
     fullText:    clean,
     sourceUrl:   citations[0] ?? "",
-    sourceName:  sourceName(citations[0] ?? ""),
+    sourceName:  deriveSourceName(citations[0] ?? ""),
     imageUrl:    "",
     publishedAt: new Date().toISOString(),
   }];
@@ -145,28 +178,21 @@ export async function searchNews(
 ): Promise<PerplexitySearchResult> {
   const apiKey = getApiKey();
 
+  // Prompt instructs bullet list — matches what Perplexity naturally returns.
+  // We do NOT ask for JSON here because the model often ignores it.
   const systemPrompt =
-    "Você é um jornalista pesquisador especializado em notícias locais brasileiras. " +
-    "Busque notícias recentes sobre o tema solicitado priorizando fontes como: " +
-    "Google News, Twitter/X, Instagram, portais de notícia locais e regionais. " +
-    "IMPORTANTE: Responda APENAS com um array JSON válido, sem texto extra, no seguinte formato:\n" +
-    "[\n" +
-    "  {\n" +
-    '    "title": "Título completo e específico da notícia",\n' +
-    '    "summary": "Resumo em 2-3 frases com os fatos principais",\n' +
-    '    "full_text": "Texto completo com todos os detalhes da notícia",\n' +
-    '    "source_url": "URL completa da fonte",\n' +
-    '    "source_name": "Nome do veículo ou rede social"\n' +
-    "  }\n" +
-    "]\n" +
-    "Retorne exatamente " + maxResults + " itens. Priorize notícias das últimas 48 horas. " +
-    "Inclua notícias de redes sociais (X/Twitter, Instagram) quando disponíveis. " +
-    "Responda em português brasileiro.";
+    "Você é um jornalista pesquisador especializado em notícias brasileiras. " +
+    "Ao receber um tema, retorne as últimas notícias encontradas na web, priorizando: " +
+    "portais regionais, Google News, Twitter/X, Instagram e portais de notícia locais. " +
+    "Responda em português brasileiro com uma lista de bullets (•) numerados, " +
+    "um por notícia, no seguinte formato:\n" +
+    "• Título completo e específico da notícia. Resumo em 1-2 frases com os fatos principais. [N]\n\n" +
+    "Use sempre o número da citação [N] ao final de cada item. " +
+    "Não inclua texto introdutório ou conclusivo — apenas a lista de bullets.";
 
   const userPrompt =
     `Busque as ${maxResults} notícias mais recentes e relevantes sobre: "${query}". ` +
-    "Priorize: Google News, Twitter/X, Instagram, portais de notícia locais. " +
-    "Retorne somente o array JSON conforme solicitado.";
+    "Inclua notícias das últimas 48 horas. Priorize fontes locais e redes sociais.";
 
   const body = {
     model: "sonar",
@@ -174,8 +200,8 @@ export async function searchNews(
       { role: "system", content: systemPrompt },
       { role: "user",   content: userPrompt },
     ],
-    max_tokens: 4096,
-    search_recency_filter: "day",
+    max_tokens: 3000,
+    search_recency_filter: "week",
     return_citations: true,
     return_related_questions: false,
   };
@@ -203,7 +229,7 @@ export async function searchNews(
   const rawAnswer  = data.choices?.[0]?.message?.content ?? "";
   const citations: string[] = data.citations ?? [];
 
-  const articles = parseStructuredResponse(rawAnswer, citations).slice(0, maxResults);
+  const articles = parseResponse(rawAnswer, citations).slice(0, maxResults);
 
   return { query, articles, rawAnswer };
 }
