@@ -465,24 +465,69 @@ export default function Settings() {
               </div>
             </div>
 
-            {/* Admin panel logo */}
+            {/* Login screen logo */}
+            <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
+              <SectionHeader icon={<LayoutDashboard size={15}/>} label="Logo da Tela de Login"/>
+              <p className="text-xs text-[#94A3B8]">Exibido na tela de login do painel. Se não definido, usa o logo do portal. Recomendado: PNG transparente, fundo escuro.</p>
+              <input
+                ref={adminLogoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) { const r = new FileReader(); r.onload = ev => setField("loginLogoBase64", ev.target?.result as string); r.readAsDataURL(f); }
+                }}
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => adminLogoRef.current?.click()}
+                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
+                >
+                  Selecionar logo
+                </button>
+                {settings.loginLogoBase64 ? (
+                  <div className="relative bg-[#0B2A66] rounded-xl p-2">
+                    <img src={settings.loginLogoBase64} alt="Login logo" className="h-8 max-w-[140px] object-contain"/>
+                    <button
+                      onClick={() => setField("loginLogoBase64", undefined)}
+                      className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                    >&times;</button>
+                  </div>
+                ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do portal</p>}
+              </div>
+            </div>
+
+            {/* Admin sidebar logo */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<LayoutDashboard size={15}/>} label="Logo do Painel Admin (sidebar)"/>
-              <p className="text-xs text-[#94A3B8]">Substitui o logo na sidebar e tela de login. Recomendado: PNG transparente, 300×80px.</p>
-              <input ref={adminLogoRef} type="file" accept="image/*" className="hidden"
-                onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => setField("adminLogoBase64", ev.target?.result as string); r.readAsDataURL(f); }}}/>
+              <p className="text-xs text-[#94A3B8]">Exibido na barra lateral do painel. Se não definido, usa o logo do portal. Recomendado: PNG transparente, 300×80px.</p>
+              <input
+                ref={bylineLogoRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f) { const r = new FileReader(); r.onload = ev => setField("adminLogoBase64", ev.target?.result as string); r.readAsDataURL(f); }
+                }}
+              />
               <div className="flex items-center gap-3">
-                <button onClick={() => adminLogoRef.current?.click()}
-                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
+                <button
+                  onClick={() => bylineLogoRef.current?.click()}
+                  className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
+                >
                   Selecionar logo
                 </button>
                 {settings.adminLogoBase64 ? (
                   <div className="relative bg-[#0B2A66] rounded-xl p-2">
-                    <img src={settings.adminLogoBase64} alt="Admin logo" className="h-8 max-w-[120px] object-contain"/>
-                    <button onClick={() => setField("adminLogoBase64", undefined)}
-                      className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">&times;</button>
+                    <img src={settings.adminLogoBase64} alt="Sidebar logo" className="h-8 max-w-[140px] object-contain"/>
+                    <button
+                      onClick={() => setField("adminLogoBase64", undefined)}
+                      className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                    >&times;</button>
                   </div>
-                ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do site</p>}
+                ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do portal</p>}
               </div>
             </div>
 

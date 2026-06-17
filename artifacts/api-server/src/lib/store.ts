@@ -72,6 +72,7 @@ export interface SiteSettings {
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
   adminLogoBase64?: string;
+  loginLogoBase64?: string;
   adminSidebarColor?: string;
   adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";

@@ -98,6 +98,14 @@ export const adminApi = {
     req<{ success: boolean }>("PUT", `/users/${id}/password`, { password }),
   deleteUser: (id: number) => req<{ success: boolean }>("DELETE", `/users/${id}`),
 
+  // Permissions (admin only)
+  getEditorPermissions: () =>
+    req<{ permissions: EditorPermission[] }>("GET", "/permissions"),
+  setEditorPermission: (key: string, enabled: boolean) =>
+    req<{ key: string; enabled: boolean }>("PUT", `/permissions/${key}`, { enabled }),
+  getMyPermissions: () =>
+    req<{ permissions: string[] }>("GET", "/permissions/me"),
+
   // Logs (admin only)
   getAuditLogs: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";
@@ -214,6 +222,7 @@ export interface SiteSettings {
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
   adminLogoBase64?: string;
+  loginLogoBase64?: string;
   adminSidebarColor?: string;
   adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
@@ -267,6 +276,14 @@ export interface Columnist {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface EditorPermission {
+  key: string;
+  label: string;
+  group: string;
+  description: string;
+  enabled: boolean;
 }
 
 export interface ContactInfo {

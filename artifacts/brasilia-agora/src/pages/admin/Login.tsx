@@ -17,10 +17,9 @@ export default function Login() {
   useEffect(() => {
     fetch("/api/site")
       .then((r) => r.json())
-      .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string }) => {
-        if (data.adminLogoBase64 || data.logoBase64) {
-          setLogoSrc(data.adminLogoBase64 || data.logoBase64 || logoFallback);
-        }
+      .then((data: { loginLogoBase64?: string; adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string }) => {
+        const logo = data.loginLogoBase64 || data.adminLogoBase64 || data.logoBase64;
+        if (logo) setLogoSrc(logo);
         if (data.adminSidebarColor) setSidebarColor(data.adminSidebarColor);
       })
       .catch(() => {});

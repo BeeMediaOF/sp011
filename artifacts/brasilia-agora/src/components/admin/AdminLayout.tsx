@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Settings, LogOut,
@@ -10,29 +10,33 @@ import {
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 import { getStoredUser, clearAuth } from "../../pages/Admin";
+import { adminApi } from "../../lib/adminApi";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
+// permKey: null  → admin-only, never shown to editors
+// permKey: string → editor needs that permission enabled
 
 const NAV_MAIN = [
-  { label: "Dashboard",    icon: LayoutDashboard, path: "/admin",              roles: ["admin", "editor"] },
-  { label: "Analytics",    icon: BarChart2,        path: "/admin/analytics",   roles: ["admin", "editor"] },
-  { label: "Artigos",      icon: FileText,         path: "/admin/artigos",     roles: ["admin"] },
-  { label: "Novo Artigo",  icon: Newspaper,        path: "/admin/artigos/novo",roles: ["admin", "editor"] },
-  { label: "Menu",         icon: Menu,             path: "/admin/menu",        roles: ["admin", "editor"] },
-  { label: "Blocos Home",  icon: LayoutGrid,       path: "/admin/home-blocos", roles: ["admin"] },
-  { label: "Propagandas",  icon: Megaphone,        path: "/admin/propagandas", roles: ["admin", "editor"] },
-  { label: "Colunistas",   icon: Users,            path: "/admin/colunistas",  roles: ["admin"] },
-  { label: "Fontes RSS",   icon: Rss,              path: "/admin/rss",         roles: ["admin"] },
-  { label: "Perplexity",   icon: Zap,              path: "/admin/perplexity",  roles: ["admin"] },
-  { label: "Redes Sociais",icon: Share2,           path: "/admin/redes-sociais", roles: ["admin"] },
-  { label: "Usuários",     icon: UserCircle,       path: "/admin/usuarios",    roles: ["admin"] },
-  { label: "Logs",         icon: ClipboardList,    path: "/admin/logs",        roles: ["admin"] },
+  { label: "Dashboard",     icon: LayoutDashboard, path: "/admin",               permKey: "dashboard.view" },
+  { label: "Analytics",     icon: BarChart2,        path: "/admin/analytics",    permKey: "analytics.view" },
+  { label: "Artigos",       icon: FileText,         path: "/admin/artigos",      permKey: "articles.view" },
+  { label: "Novo Artigo",   icon: Newspaper,        path: "/admin/artigos/novo", permKey: "articles.create" },
+  { label: "Menu",          icon: Menu,             path: "/admin/menu",         permKey: "menu.view" },
+  { label: "Blocos Home",   icon: LayoutGrid,       path: "/admin/home-blocos",  permKey: "home_blocks.view" },
+  { label: "Propagandas",   icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
+  { label: "Colunistas",    icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
+  { label: "Fontes RSS",    icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
+  { label: "Perplexity",    icon: Zap,              path: "/admin/perplexity",   permKey: null },
+  { label: "Redes Sociais", icon: Share2,           path: "/admin/redes-sociais",permKey: "social.view" },
+  { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
+  { label: "Logs",          icon: ClipboardList,    path: "/admin/logs",         permKey: "logs.view" },
 ];
 
 const NAV_CONFIG = [
-  { label: "Webhook",        icon: Webhook,     path: "/admin/webhook",        roles: ["admin"] },
-  { label: "Segurança",      icon: ShieldCheck, path: "/admin/seguranca",      roles: ["admin"] },
-  { label: "Configurações",  icon: Settings,    path: "/admin/configuracoes",  roles: ["admin"] },
+  { label: "Webhook",             icon: Webhook,     path: "/admin/webhook",     permKey: null },
+  { label: "Segurança",           icon: ShieldCheck, path: "/admin/seguranca",   permKey: "security.view" },
+  { label: "Configurações",       icon: Settings,    path: "/admin/configuracoes",permKey: "settings.view" },
+  { label: "Permissões do Editor",icon: KeyRound,    path: "/admin/permissoes",  permKey: null },
 ];
 
 interface AdminLayoutProps {
@@ -44,6 +48,7 @@ interface AdminLayoutProps {
 
 const LS_SIDEBAR = "admin_sidebar_color";
 const LS_ACCENT  = "admin_accent_color";
+const LS_PERMS   = "editor_permissions_cache";
 
 let _cachedLogo: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
@@ -79,6 +84,48 @@ function usePanelTheme() {
   }, []);
 
   return { accent, logo };
+}
+
+// ─── Editor permission hook ───────────────────────────────────────────────────
+
+let _permPromise: Promise<void> | null = null;
+let _cachedPerms: Set<string> | null = null;
+
+function useEditorPermissions(role: string): { permSet: Set<string>; loaded: boolean } {
+  const [permSet, setPermSet] = useState<Set<string>>(() => {
+    if (role !== "editor") return new Set<string>();
+    try {
+      const raw = localStorage.getItem(LS_PERMS);
+      if (raw) return new Set<string>(JSON.parse(raw) as string[]);
+    } catch {}
+    return new Set<string>();
+  });
+  const [loaded, setLoaded] = useState(role !== "editor" || _cachedPerms !== null);
+
+  const fetchPerms = useCallback(() => {
+    if (role !== "editor") return;
+    if (_cachedPerms) { setPermSet(_cachedPerms); setLoaded(true); return; }
+    if (!_permPromise) {
+      _permPromise = adminApi.getMyPermissions()
+        .then(({ permissions }) => {
+          _cachedPerms = new Set(permissions);
+          try { localStorage.setItem(LS_PERMS, JSON.stringify(permissions)); } catch {}
+          setPermSet(_cachedPerms);
+          setLoaded(true);
+        })
+        .catch(() => { _permPromise = null; setLoaded(true); });
+    }
+  }, [role]);
+
+  useEffect(() => { fetchPerms(); }, [fetchPerms]);
+
+  return { permSet, loaded };
+}
+
+function invalidatePermissionsCache() {
+  _cachedPerms = null;
+  _permPromise = null;
+  try { localStorage.removeItem(LS_PERMS); } catch {}
 }
 
 function formatDate() {
@@ -261,8 +308,16 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
   const user = getStoredUser();
   const role = user?.role ?? "editor";
 
-  const visibleMain   = NAV_MAIN.filter((i) => i.roles.includes(role));
-  const visibleConfig = NAV_CONFIG.filter((i) => i.roles.includes(role));
+  const { permSet, loaded } = useEditorPermissions(role);
+
+  function canSee(permKey: string | null): boolean {
+    if (role === "admin") return true;
+    if (permKey === null) return false;
+    return permSet.has(permKey);
+  }
+
+  const visibleMain   = NAV_MAIN.filter((i) => canSee(i.permKey));
+  const visibleConfig = NAV_CONFIG.filter((i) => canSee(i.permKey));
   const inConfig      = visibleConfig.some((i) => location.startsWith(i.path));
 
   useEffect(() => {
@@ -271,6 +326,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
 
   function handleLogout() {
     clearAuth();
+    invalidatePermissionsCache();
     navigate("/admin/login");
   }
 
@@ -312,7 +368,9 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
         {role === "editor" && (
           <div className="mx-3 mt-3 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
             <p className="text-[11px] font-semibold text-amber-700">Acesso Editor</p>
-            <p className="text-[10px] text-amber-600 mt-0.5">Algumas áreas estão restritas</p>
+            <p className="text-[10px] text-amber-600 mt-0.5">
+              {loaded ? `${permSet.size} permissões ativas` : "Carregando permissões..."}
+            </p>
           </div>
         )}
 
@@ -320,7 +378,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
         <nav className="flex-1 py-4 space-y-0.5 pr-2">
           {visibleMain.map(({ label, icon: Icon, path }) => navItem(label, Icon, path))}
 
-          {/* Configurações group (admin only) */}
+          {/* Configurações group */}
           {visibleConfig.length > 0 && (
             <div className="pt-3">
               <button

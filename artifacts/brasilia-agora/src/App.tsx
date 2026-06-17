@@ -47,6 +47,7 @@ import PerplexitySearch from "@/pages/admin/PerplexitySearch";
 import UsersManager from "@/pages/admin/UsersManager";
 import Logs from "@/pages/admin/Logs";
 import SecurityCheckup from "@/pages/admin/SecurityCheckup";
+import EditorPermissions from "@/pages/admin/EditorPermissions";
 
 const queryClient = new QueryClient();
 
@@ -148,6 +149,9 @@ function Router() {
       </Route>
       <Route path="/admin/seguranca">
         <RequireAdmin><SecurityCheckup /></RequireAdmin>
+      </Route>
+      <Route path="/admin/permissoes">
+        <RequireAdmin><EditorPermissions /></RequireAdmin>
       </Route>
 
       {/* Editor + Admin routes */}

@@ -16,6 +16,7 @@ import socialRouter from "./social";
 import perplexityRouter from "./perplexity";
 import usersRouter from "./users";
 import logsRouter from "./logs";
+import permissionsRouter from "./permissions";
 
 const router: IRouter = Router();
 
@@ -35,5 +36,6 @@ router.use("/admin/social", socialRouter);
 router.use("/admin/perplexity", perplexityRouter);
 router.use("/admin/users", usersRouter);
 router.use("/admin/logs", logsRouter);
+router.use("/admin/permissions", permissionsRouter);
 
 export default router;
