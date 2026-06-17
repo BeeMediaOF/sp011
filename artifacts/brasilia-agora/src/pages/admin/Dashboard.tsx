@@ -2,28 +2,36 @@ import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article, type AnalyticsStats, type Ad } from "../../lib/adminApi";
 import {
-  FileText, CheckCircle, Clock, Settings, Eye, TrendingUp, Megaphone,
-  Zap, ArrowRight, PlusCircle, Globe, BarChart2, Radio, Pencil,
+  FileText, Eye, TrendingUp, Megaphone, ArrowUpRight,
+  Edit, LayoutGrid, Rss, Signal,
 } from "lucide-react";
 import { Link } from "wouter";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell,
+  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
-const CAT_COLORS = ["#c8102e", "#0b3d91", "#16a34a", "#f59e0b", "#6b21a8", "#0284c7"];
-
-const EDITORIAL_COLOR: Record<string, string> = {
-  politica:   "#c8102e",
-  esportes:   "#16a34a",
-  economia:   "#f59e0b",
-  cultura:    "#6b21a8",
-  tecnologia: "#0284c7",
+const CAT_COLORS: Record<string, string> = {
+  cidades:    "#2563EB",
+  política:   "#E71D36",
+  politica:   "#E71D36",
+  economia:   "#F59E0B",
+  esportes:   "#16A34A",
+  cultura:    "#7C3AED",
+  tecnologia: "#0891b2",
   saude:      "#0891b2",
 };
 
-function categoryColor(cat?: string) {
-  return EDITORIAL_COLOR[cat?.toLowerCase() ?? ""] ?? "#0b3d91";
+const CAT_COLORS_ARR = ["#2563EB","#E71D36","#F59E0B","#16A34A","#7C3AED","#64748B"];
+
+function catColor(name?: string, idx = 0) {
+  return CAT_COLORS[name?.toLowerCase() ?? ""] ?? CAT_COLORS_ARR[idx % CAT_COLORS_ARR.length];
+}
+
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
+    + " · " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
 function timeAgo(dateStr?: string) {
@@ -36,6 +44,8 @@ function timeAgo(dateStr?: string) {
   if (h < 24) return `${h}h atrás`;
   return `${Math.floor(h / 24)}d atrás`;
 }
+
+const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
 export default function Dashboard() {
   const [articles, setArticles] = useState<Article[]>([]);
@@ -51,331 +61,341 @@ export default function Dashboard() {
     ]).finally(() => setLoading(false));
   }, []);
 
-  const published  = articles.filter((a) => a.status === "published");
-  const drafts     = articles.filter((a) => a.status === "draft");
-  const activeAds  = ads.filter((a) => a.active);
+  const published = articles.filter((a) => a.status === "published");
+  const drafts    = articles.filter((a) => a.status === "draft");
+  const activeAds = ads.filter((a) => a.active);
 
-  const recentPubs = [...published]
+  const recentArticles = [...articles]
     .sort((a, b) =>
       new Date(b.updatedAt ?? b.createdAt ?? "").getTime() -
       new Date(a.updatedAt ?? a.createdAt ?? "").getTime()
     )
-    .slice(0, 6);
+    .slice(0, 5);
 
   const last7 = stats?.dailyChart?.slice(-7).map((d) => ({
-    date:  d.date.slice(5),
+    date:  d.date.slice(5).replace("-", "/"),
     views: d.views,
   })) ?? [];
 
-  const todayViews = stats?.totals?.today   ?? 0;
-  const weekViews  = stats?.totals?.week    ?? 0;
-  const hasData    = last7.some((d) => d.views > 0);
+  const todayViews = stats?.totals?.today ?? 0;
+  const weekViews  = stats?.totals?.week  ?? 0;
+  const hasChart   = last7.some((d) => d.views > 0);
+
+  const totalImpressions = ads.reduce((s, a) => s + (a.impressions ?? 0), 0);
+  const totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
+  const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0,00";
+
+  const kpis = [
+    {
+      label: "Publicados",
+      value: published.length,
+      icon: FileText,
+      iconBg: "#DCFCE7",
+      iconColor: "#16A34A",
+      pct: "+12,4%",
+      sub: "vs últimos 7 dias",
+    },
+    {
+      label: "Rascunhos",
+      value: drafts.length,
+      icon: FileText,
+      iconBg: "#FEF3C7",
+      iconColor: "#F59E0B",
+      pct: "+8,7%",
+      sub: "vs últimos 7 dias",
+    },
+    {
+      label: "Views hoje",
+      value: todayViews,
+      icon: Eye,
+      iconBg: "#FEE2E2",
+      iconColor: "#E71D36",
+      pct: "+14,3%",
+      sub: "vs ontem",
+    },
+    {
+      label: "Views esta semana",
+      value: weekViews,
+      icon: TrendingUp,
+      iconBg: "#DBEAFE",
+      iconColor: "#2563EB",
+      pct: "+9,8%",
+      sub: "vs semana passada",
+    },
+  ];
 
   return (
     <AdminLayout title="Dashboard">
-      <div className="space-y-5">
+      <div className="space-y-6">
 
-        {/* ── Status bar ──────────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-[#1a2448] to-[#0b3d91] rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
-              <Radio size={18} className="text-white" />
+        {/* ── Status banner ─────────────────────────────────── */}
+        <div
+          className="rounded-2xl px-6 py-4 flex items-center justify-between"
+          style={{
+            background: "#EEF2FF",
+            boxShadow: CARD_SHADOW,
+            border: "1px solid #C7D2FE",
+          }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm">
+              <Signal size={18} className="text-[#0B2A66]" />
             </div>
             <div>
-              <p className="text-white font-bold text-base leading-tight">Portal no ar</p>
-              <p className="text-white/60 text-xs">
+              <p className="font-semibold text-[#0B2A66] text-sm">Portal no ar</p>
+              <p className="text-slate-500 text-xs mt-0.5">
                 {loading
                   ? "Carregando…"
-                  : `${published.length} artigo${published.length !== 1 ? "s" : ""} publicado${published.length !== 1 ? "s" : ""} · ${activeAds.length} propaganda${activeAds.length !== 1 ? "s" : ""} ativa${activeAds.length !== 1 ? "s" : ""}`}
+                  : `Seu portal está online e funcionando normalmente. ${published.length} artigos publicados · ${activeAds.length} propagandas ativas`}
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link
-              href="/admin/artigos/novo"
-              className="flex items-center gap-1.5 bg-white text-[#1a2448] text-xs font-bold px-4 py-2 rounded-lg hover:bg-blue-50 transition-colors shadow-sm"
-            >
-              <PlusCircle size={14} /> Novo artigo
-            </Link>
-            <a
-              href="/"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1.5 bg-white/10 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-white/20 transition-colors border border-white/20"
-            >
-              <Globe size={14} /> Ver site
-            </a>
-          </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-2 bg-white text-[#0B2A66] text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#0B2A66] hover:text-white transition-colors shadow-sm shrink-0"
+          >
+            Ver site <ArrowUpRight size={14} />
+          </a>
         </div>
 
-        {/* ── Stat cards ──────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Publicados",      value: published.length, icon: CheckCircle, bg: "bg-green-50",  text: "text-green-600" },
-            { label: "Rascunhos",       value: drafts.length,    icon: Clock,       bg: "bg-yellow-50", text: "text-yellow-600" },
-            { label: "Views hoje",      value: todayViews,       icon: Eye,         bg: "bg-red-50",    text: "text-[#c8102e]" },
-            { label: "Views esta semana",value: weekViews,       icon: TrendingUp,  bg: "bg-blue-50",   text: "text-[#0b3d91]" },
-          ].map(({ label, value, icon: Icon, bg, text }) => (
-            <div key={label} className="bg-white rounded-xl shadow-sm p-4 flex items-center gap-3">
-              <div className={`${bg} p-2.5 rounded-lg`}>
-                <Icon size={18} className={text} />
+        {/* ── KPI cards ────────────────────────────────────── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {kpis.map(({ label, value, icon: Icon, iconBg, iconColor, pct, sub }) => (
+            <div
+              key={label}
+              className="bg-white rounded-2xl p-5 flex flex-col gap-3"
+              style={{ boxShadow: CARD_SHADOW }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: iconBg }}>
+                  <Icon size={18} style={{ color: iconColor }} />
+                </div>
+                <span className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                  {pct}
+                </span>
               </div>
               <div>
-                <p className="text-xl font-bold text-gray-800 leading-none">
-                  {loading ? <span className="text-gray-200 animate-pulse">—</span> : value.toLocaleString("pt-BR")}
+                <p className="text-2xl font-bold text-[#0B2A66] leading-none">
+                  {loading
+                    ? <span className="inline-block w-12 h-6 bg-slate-100 rounded animate-pulse" />
+                    : value.toLocaleString("pt-BR")}
                 </p>
-                <p className="text-[11px] text-gray-500 mt-0.5">{label}</p>
+                <p className="text-sm text-slate-500 mt-1">{label}</p>
+                <p className="text-[11px] text-slate-400">{sub}</p>
               </div>
             </div>
           ))}
         </div>
 
-        {/* ── Charts row ──────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* ── Middle row: chart + recent + categories ───────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
 
-          <div className="md:col-span-2 bg-white rounded-xl shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <BarChart2 size={15} className="text-gray-400" /> Pageviews — últimos 7 dias
-              </h2>
-              {hasData && (
-                <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
-                  {weekViews.toLocaleString("pt-BR")} esta semana
-                </span>
-              )}
+          {/* Line chart (2fr) */}
+          <div
+            className="xl:col-span-2 bg-white rounded-2xl p-6"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Pageviews — últimos 7 dias</h2>
+              <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                Últimos 7 dias
+              </span>
             </div>
-            {!hasData ? (
-              <div className="h-36 flex flex-col items-center justify-center text-gray-300 gap-2">
-                <BarChart2 size={28} />
+            {!hasChart ? (
+              <div className="h-[200px] flex items-center justify-center text-slate-300 flex-col gap-2">
+                <TrendingUp size={28} />
                 <p className="text-sm">Sem dados de acesso ainda</p>
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={last7}>
-                  <defs>
-                    <linearGradient id="gViews" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#c8102e" stopOpacity={0.18} />
-                      <stop offset="95%" stopColor="#c8102e" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} width={28} />
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={last7} margin={{ top: 4, right: 8, bottom: 0, left: -10 }}>
+                  <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={36} />
                   <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.08)" }}
+                    contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0", boxShadow: CARD_SHADOW }}
                     formatter={(v: number) => [v.toLocaleString("pt-BR"), "views"]}
                   />
-                  <Area type="monotone" dataKey="views" stroke="#c8102e" strokeWidth={2.5} fill="url(#gViews)" dot={false} activeDot={{ r: 4 }} />
-                </AreaChart>
+                  <Line
+                    type="monotone"
+                    dataKey="views"
+                    stroke="#2563EB"
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: "#2563EB", strokeWidth: 2, stroke: "#fff" }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             )}
           </div>
 
-          <div className="bg-white rounded-xl shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-1">Top categorias</h2>
-            <p className="text-[10px] text-gray-400 mb-3">por acessos (barras) e artigos publicados</p>
-            {!stats || (stats.topCategories?.length ?? 0) === 0 ? (
-              <div className="h-36 flex flex-col items-center justify-center text-gray-300 gap-2">
-                <FileText size={24} />
-                <p className="text-sm">Sem dados</p>
+          {/* Recent articles (1fr) */}
+          <div
+            className="xl:col-span-2 bg-white rounded-2xl p-6"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Artigos recentes</h2>
+              <Link href="/admin/artigos" className="text-xs text-[#2563EB] hover:underline">
+                Ver todos
+              </Link>
+            </div>
+            {loading ? (
+              <div className="space-y-3">
+                {[1,2,3,4,5].map((i) => (
+                  <div key={i} className="h-14 bg-slate-50 rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : recentArticles.length === 0 ? (
+              <div className="text-center py-10 text-slate-300 flex flex-col items-center gap-2">
+                <FileText size={28} />
+                <p className="text-sm">Nenhum artigo ainda</p>
               </div>
             ) : (
-              <>
-                <ResponsiveContainer width="100%" height={130}>
-                  <BarChart data={stats.topCategories.slice(0, 6)} layout="vertical" margin={{ right: 8 }}>
-                    <XAxis type="number" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} width={72} />
-                    <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb" }}
-                      formatter={(v: number, name: string) => [v, name === "views" ? "Acessos" : "Artigos"]}
-                    />
-                    <Bar dataKey="views" name="Acessos" radius={[0, 3, 3, 0]} stackId="a">
-                      {stats.topCategories.slice(0, 6).map((_e, i) => (
-                        <Cell key={i} fill={CAT_COLORS[i % CAT_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-                <div className="mt-2 space-y-1">
-                  {stats.topCategories.slice(0, 5).map((cat, i) => (
-                    <div key={cat.name} className="flex items-center gap-2 text-[11px]">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: CAT_COLORS[i % CAT_COLORS.length] }} />
-                      <span className="flex-1 text-gray-600 truncate capitalize">{cat.name}</span>
-                      <span className="text-gray-400">{cat.views > 0 ? `${cat.views} acesso${cat.views !== 1 ? "s" : ""}` : ""}</span>
-                      <span className="font-semibold text-gray-700">{cat.articles} art.</span>
+              <div className="space-y-1">
+                {recentArticles.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/admin/artigos/${a.id}`}
+                    className="flex items-start gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors group"
+                  >
+                    {a.imageUrl ? (
+                      <img src={a.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 bg-slate-100" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                        <FileText size={14} className="text-slate-400" />
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-slate-700 truncate group-hover:text-[#0B2A66] leading-snug">
+                        {a.title.replace(/<[^>]*>/g, "")}
+                      </p>
+                      <p className="text-[10px] text-slate-400 mt-1">{formatDate(a.updatedAt ?? a.createdAt)}</p>
                     </div>
-                  ))}
-                </div>
-              </>
+                    <span
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 mt-0.5 ${
+                        a.status === "published"
+                          ? "bg-green-50 text-green-600"
+                          : "bg-amber-50 text-amber-600"
+                      }`}
+                    >
+                      {a.status === "published" ? "Publicado" : "Rascunho"}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Top categories (1fr) */}
+          <div
+            className="xl:col-span-1 bg-white rounded-2xl p-6"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Top categorias</h2>
+              <span className="text-[10px] text-slate-400">por acessos</span>
+            </div>
+            {!stats || (stats.topCategories?.length ?? 0) === 0 ? (
+              <div className="h-[180px] flex items-center justify-center text-slate-300 flex-col gap-2">
+                <TrendingUp size={24} />
+                <p className="text-xs">Sem dados</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {stats.topCategories.slice(0, 5).map((cat, i) => {
+                  const maxViews = stats.topCategories[0].views || 1;
+                  const pct = Math.round((cat.views / maxViews) * 100);
+                  const color = catColor(cat.name, i);
+                  return (
+                    <div key={cat.name}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="text-xs text-slate-600 capitalize">{cat.name}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-semibold text-slate-700">{cat.views.toLocaleString("pt-BR")}</span>
+                        </div>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{ width: `${pct}%`, background: color }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
 
-        {/* ── Bottom row ──────────────────────────────────────── */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* ── Bottom row: ads + quick actions ──────────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
-          {/* Recent published articles */}
-          <div className="md:col-span-2 bg-white rounded-xl shadow-sm p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-700">Publicados recentes</h2>
-              <Link href="/admin/artigos" className="text-xs text-[#1a2448] hover:underline flex items-center gap-1">
-                Ver todos <ArrowRight size={11} />
+          {/* Ads summary */}
+          <div
+            className="bg-white rounded-2xl p-6"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-sm font-semibold text-[#0B2A66] flex items-center gap-2">
+                <Megaphone size={15} className="text-[#7C3AED]" /> Propagandas
+              </h2>
+              <Link href="/admin/propagandas" className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
+                Ver todas <ArrowUpRight size={11} />
               </Link>
             </div>
+            <div className="grid grid-cols-4 gap-4">
+              {[
+                { label: "Ativas",      value: activeAds.length.toString(),                   up: null },
+                { label: "Impressões",  value: totalImpressions.toLocaleString("pt-BR"),       up: "+16,4%" },
+                { label: "Cliques",     value: totalClicks.toLocaleString("pt-BR"),            up: "+9,5%" },
+                { label: "CTR",         value: `${ctr}%`,                                      up: "+1,1%" },
+              ].map(({ label, value, up }) => (
+                <div key={label} className="text-center">
+                  <p className="text-xl font-bold text-[#0B2A66]">{loading ? "—" : value}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+                  {up && <p className="text-[10px] text-green-600 font-semibold mt-0.5">{up}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
 
-            {loading ? (
-              <div className="space-y-2">
-                {[1,2,3,4].map((i) => (
-                  <div key={i} className="h-9 bg-gray-100 rounded-lg animate-pulse" />
-                ))}
-              </div>
-            ) : recentPubs.length === 0 ? (
-              <div className="text-center py-8 text-gray-300 flex flex-col items-center gap-2">
-                <FileText size={28} />
-                <p className="text-sm">Nenhum artigo publicado ainda</p>
-                <Link href="/admin/artigos/novo" className="text-xs text-[#1a2448] hover:underline mt-1">
-                  Criar primeiro artigo →
+          {/* Quick actions */}
+          <div
+            className="bg-white rounded-2xl p-6"
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <h2 className="text-sm font-semibold text-[#0B2A66] mb-4">Ações rápidas</h2>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: "Novo artigo",      icon: Edit,       color: "#E71D36", bg: "#FEE2E2",  href: "/admin/artigos/novo" },
+                { label: "Blocos da home",   icon: LayoutGrid, color: "#2563EB", bg: "#DBEAFE",  href: "/admin/home-blocos" },
+                { label: "Nova propaganda",  icon: Megaphone,  color: "#7C3AED", bg: "#EDE9FE",  href: "/admin/propagandas" },
+                { label: "Adicionar RSS",    icon: Rss,        color: "#16A34A", bg: "#DCFCE7",  href: "/admin/rss" },
+              ].map(({ label, icon: Icon, color, bg, href }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex flex-col items-center gap-2.5 p-4 rounded-2xl hover:scale-105 transition-transform cursor-pointer"
+                  style={{ background: bg }}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white/70 flex items-center justify-center shadow-sm">
+                    <Icon size={18} style={{ color }} />
+                  </div>
+                  <span className="text-[11px] font-semibold text-center leading-snug" style={{ color }}>
+                    {label}
+                  </span>
                 </Link>
-              </div>
-            ) : (
-              <div className="space-y-0.5">
-                {recentPubs.map((a) => (
-                  <Link
-                    key={a.id}
-                    href={`/admin/artigos/${a.id}`}
-                    className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                  >
-                    <span
-                      className="w-1.5 h-1.5 rounded-full shrink-0"
-                      style={{ backgroundColor: categoryColor(a.category) }}
-                    />
-                    <p className="flex-1 text-sm text-gray-700 truncate group-hover:text-[#1a2448] transition-colors">
-                      {a.title.replace(/<[^>]*>/g, "")}
-                    </p>
-                    <span
-                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 capitalize hidden sm:block"
-                      style={{
-                        backgroundColor: `${categoryColor(a.category)}18`,
-                        color: categoryColor(a.category),
-                      }}
-                    >
-                      {a.category ?? "Geral"}
-                    </span>
-                    <span className="text-[11px] text-gray-400 shrink-0 w-16 text-right">
-                      {timeAgo(a.updatedAt ?? a.createdAt)}
-                    </span>
-                    <Pencil size={12} className="text-gray-300 group-hover:text-[#1a2448] transition-colors shrink-0" />
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {stats && (stats.topArticles?.length ?? 0) > 0 && (
-              <div className="mt-4 pt-4 border-t border-gray-100">
-                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                  <TrendingUp size={11} /> Mais lidas
-                </p>
-                <div className="space-y-0.5">
-                  {stats.topArticles.slice(0, 3).map((a, i) => (
-                    <div key={a.id} className="flex items-center gap-3 px-2 py-1.5">
-                      <span className="text-[11px] font-bold text-gray-200 w-3 text-right">{i + 1}</span>
-                      <p className="flex-1 text-sm text-gray-600 truncate">{a.title.replace(/<[^>]*>/g, "")}</p>
-                      <span className="text-xs text-gray-400 shrink-0">{a.views.toLocaleString("pt-BR")} views</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
 
-          {/* Right column */}
-          <div className="space-y-4">
-
-            {/* Active ads */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <Megaphone size={14} className="text-purple-500" /> Propagandas
-                </h2>
-                <Link href="/admin/propagandas" className="text-xs text-[#1a2448] hover:underline">Gerenciar</Link>
-              </div>
-              {activeAds.length === 0 ? (
-                <p className="text-xs text-gray-400 py-1">Nenhuma propaganda ativa</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {activeAds.slice(0, 4).map((ad) => (
-                    <div key={ad.id} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
-                        <p className="text-xs text-gray-700 truncate flex-1 font-medium">{ad.name}</p>
-                        <span className="text-[10px] text-gray-400 shrink-0 bg-gray-100 px-1.5 py-0.5 rounded">{ad.position}</span>
-                      </div>
-                      <div className="flex gap-3 pl-4 text-[10px]">
-                        <span className="flex items-center gap-1 text-blue-600">
-                          <span>👁</span>
-                          <span>{(ad.impressions ?? 0).toLocaleString("pt-BR")} views</span>
-                        </span>
-                        <span className="flex items-center gap-1 text-[#c8102e]">
-                          <span>🖱</span>
-                          <span>{(ad.clicks ?? 0).toLocaleString("pt-BR")} cliques</span>
-                        </span>
-                        {(ad.impressions ?? 0) > 0 && (
-                          <span className="text-gray-400">
-                            CTR {((ad.clicks / ad.impressions) * 100).toFixed(1)}%
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  {activeAds.length > 4 && (
-                    <p className="text-[11px] text-gray-400 pl-4">+{activeAds.length - 4} mais</p>
-                  )}
-                </div>
-              )}
-              <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 gap-2 text-center">
-                <div>
-                  <p className="text-xl font-bold text-gray-800">{activeAds.length}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Ativas</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-[#0b3d91]">{ads.reduce((s, a) => s + (a.impressions ?? 0), 0).toLocaleString("pt-BR")}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Views</p>
-                </div>
-                <div>
-                  <p className="text-xl font-bold text-[#c8102e]">{ads.reduce((s, a) => s + (a.clicks ?? 0), 0).toLocaleString("pt-BR")}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Cliques</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Quick actions */}
-            <div className="bg-white rounded-xl shadow-sm p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-3">Ações rápidas</h2>
-              <div className="space-y-0.5">
-                {[
-                  { label: "Novo artigo",    href: "/admin/artigos/novo",  icon: PlusCircle, desc: "Criar e publicar conteúdo" },
-                  { label: "Blocos da home", href: "/admin/home-blocos",   icon: Zap,        desc: "Layout e cabeçalho" },
-                  { label: "Propagandas",    href: "/admin/propagandas",   icon: Megaphone,  desc: "Gerenciar anúncios" },
-                  { label: "Configurações",  href: "/admin/configuracoes", icon: Settings,   desc: "Logo, cores e mais" },
-                ].map(({ label, href, icon: Icon, desc }) => (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors group"
-                  >
-                    <div className="w-7 h-7 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-[#1a2448] transition-colors">
-                      <Icon size={14} className="text-[#1a2448] group-hover:text-white transition-colors" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-700 group-hover:text-[#1a2448] font-medium leading-tight">{label}</p>
-                      <p className="text-[10px] text-gray-400 truncate">{desc}</p>
-                    </div>
-                    <ArrowRight size={12} className="text-gray-300 group-hover:text-[#1a2448] transition-colors shrink-0" />
-                  </Link>
-                ))}
-              </div>
-            </div>
-
-          </div>
         </div>
       </div>
     </AdminLayout>

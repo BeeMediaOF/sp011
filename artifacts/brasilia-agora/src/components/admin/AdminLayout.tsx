@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Image, Settings, LogOut,
-  ChevronLeft, ChevronRight, Globe, Newspaper, Webhook, Megaphone,
-  Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap, ChevronDown,
+  ChevronRight, Globe, Newspaper, Webhook, Megaphone,
+  Users, Mail, BarChart2, LayoutGrid, Rss, Share2, Zap,
+  ChevronDown, Bell, Search, ExternalLink,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 
@@ -22,23 +23,16 @@ const NAV_MAIN = [
 ];
 
 const NAV_CONFIG = [
-  { label: "Webhook",           icon: Webhook,  path: "/admin/webhook" },
-  { label: "Logo do Painel",    icon: Image,    path: "/admin/logo" },
-  { label: "Informações do Site", icon: Globe,  path: "/admin/configuracoes" },
-  { label: "Contato",           icon: Mail,     path: "/admin/contato" },
+  { label: "Webhook",             icon: Webhook, path: "/admin/webhook" },
+  { label: "Logo do Painel",      icon: Image,   path: "/admin/logo" },
+  { label: "Informações do Site", icon: Globe,   path: "/admin/configuracoes" },
+  { label: "Contato",             icon: Mail,    path: "/admin/contato" },
 ];
 
 interface AdminLayoutProps {
   children: React.ReactNode;
   title: string;
   noPadding?: boolean;
-}
-
-interface PanelTheme {
-  logo: string;
-  sidebar: string;
-  accent: string;
-  accentText: string;
 }
 
 const LS_SIDEBAR = "admin_sidebar_color";
@@ -54,54 +48,43 @@ export function saveAdminThemeToStorage(sidebar: string, accent: string) {
   } catch {}
 }
 
-function readAdminThemeFromStorage() {
-  try {
-    return {
-      sidebar: localStorage.getItem(LS_SIDEBAR) || "#1a2448",
-      accent:  localStorage.getItem(LS_ACCENT)  || "#c8102e",
-    };
-  } catch {
-    return { sidebar: "#1a2448", accent: "#c8102e" };
-  }
-}
-
-function usePanelTheme(): PanelTheme {
-  const [theme, setTheme] = useState<PanelTheme>(() => {
-    const { sidebar, accent } = readAdminThemeFromStorage();
-    return { logo: _cachedLogo || logoFallback, sidebar, accent, accentText: "#ffffff" };
+function usePanelTheme() {
+  const [accent, setAccent] = useState(() => {
+    try { return localStorage.getItem(LS_ACCENT) || "#E71D36"; } catch { return "#E71D36"; }
   });
+  const [logo, setLogo] = useState(_cachedLogo || logoFallback);
 
   useEffect(() => {
     if (!_fetchPromise) {
       _fetchPromise = fetch("/api/site")
         .then((r) => r.json())
         .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
-          const sidebar = data.adminSidebarColor || "#1a2448";
-          const accent  = data.adminAccentColor  || "#c8102e";
-          _cachedLogo   = data.adminLogoBase64 || data.logoBase64 || logoFallback;
-          saveAdminThemeToStorage(sidebar, accent);
-          setTheme({ logo: _cachedLogo, sidebar, accent, accentText: "#ffffff" });
+          const ac = data.adminAccentColor || "#E71D36";
+          _cachedLogo = data.adminLogoBase64 || data.logoBase64 || logoFallback;
+          saveAdminThemeToStorage(data.adminSidebarColor || "#0B2A66", ac);
+          setAccent(ac);
+          setLogo(_cachedLogo);
         })
         .catch(() => { _fetchPromise = null; });
     } else {
-      if (_cachedLogo) {
-        setTheme((prev) => ({ ...prev, logo: _cachedLogo! }));
-      }
+      if (_cachedLogo) setLogo(_cachedLogo);
     }
   }, []);
 
-  return theme;
+  return { accent, logo };
+}
+
+function formatDate() {
+  return new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
 
 export default function AdminLayout({ children, title, noPadding }: AdminLayoutProps) {
-  const [collapsed, setCollapsed] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [location, navigate] = useLocation();
-  const theme = usePanelTheme();
+  const { accent, logo } = usePanelTheme();
 
   const inConfig = NAV_CONFIG.some((i) => location.startsWith(i.path));
 
-  // Auto-open config group when on a config page
   useEffect(() => {
     if (inConfig) setConfigOpen(true);
   }, [inConfig]);
@@ -111,7 +94,7 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
     navigate("/admin/login");
   }
 
-  function navLink(label: string, Icon: React.ElementType, path: string) {
+  function navItem(label: string, Icon: React.ElementType, path: string, indent = false) {
     const active = path === "/admin"
       ? location === "/admin"
       : location.startsWith(path) && path !== "/admin";
@@ -119,98 +102,140 @@ export default function AdminLayout({ children, title, noPadding }: AdminLayoutP
       <Link
         key={path}
         href={path}
-        className={`flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors cursor-pointer
-          ${active ? "font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}`}
-        style={active ? { backgroundColor: theme.accent, color: theme.accentText } : {}}
+        className={`flex items-center gap-3 py-2.5 pr-4 text-sm transition-colors rounded-r-xl relative
+          ${indent ? "pl-8" : "pl-5"}
+          ${active
+            ? "text-[#0B2A66] font-semibold bg-[#EEF2FF]"
+            : "text-slate-500 hover:text-[#0B2A66] hover:bg-slate-50"
+          }`}
       >
-        <Icon size={18} className="shrink-0" />
-        {!collapsed && <span>{label}</span>}
+        {active && (
+          <span
+            className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full"
+            style={{ backgroundColor: accent }}
+          />
+        )}
+        <Icon size={17} className={active ? "text-[#0B2A66]" : "text-slate-400"} />
+        <span className="truncate">{label}</span>
       </Link>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      <aside
-        className={`flex flex-col text-white transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}
-        style={{ backgroundColor: theme.sidebar }}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 py-4 border-b border-white/10 min-h-[56px]">
-          {!collapsed && (
-            <div className="h-9 flex items-center shrink-0">
-              <img src={theme.logo} alt="Logo" className="h-9 w-auto object-contain max-w-[152px]" />
-            </div>
-          )}
-          <button
-            onClick={() => setCollapsed((c) => !c)}
-            className="text-white/70 hover:text-white transition-colors ml-auto shrink-0"
-          >
-            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-          </button>
+    <div className="flex h-screen" style={{ background: "#F7F9FC", fontFamily: "Inter, sans-serif" }}>
+
+      {/* ── Sidebar ──────────────────────────────── */}
+      <aside className="w-[260px] shrink-0 bg-white border-r border-slate-100 flex flex-col h-full overflow-y-auto">
+
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-slate-100">
+          <img src={logo} alt="SBC Agora" className="h-9 w-auto object-contain" />
+          <p className="text-[10px] text-slate-400 mt-1 tracking-wide">A notícia em tempo real</p>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 py-4 space-y-0.5 overflow-y-auto">
-          {NAV_MAIN.map(({ label, icon: Icon, path }) => navLink(label, Icon, path))}
+        <nav className="flex-1 py-4 space-y-0.5 pr-2">
+          {NAV_MAIN.map(({ label, icon: Icon, path }) => navItem(label, Icon, path))}
 
           {/* Configurações group */}
-          <div className="pt-2">
+          <div className="pt-3">
             <button
-              onClick={() => !collapsed && setConfigOpen((o) => !o)}
-              className={`w-full flex items-center gap-3 px-4 py-2.5 mx-2 rounded-lg text-sm transition-colors
-                ${inConfig ? "text-white font-semibold" : "text-white/70 hover:bg-white/10 hover:text-white"}
-                ${collapsed ? "cursor-default" : "cursor-pointer"}`}
-              style={{ width: collapsed ? undefined : "calc(100% - 16px)" }}
+              onClick={() => setConfigOpen((o) => !o)}
+              className={`w-full flex items-center gap-3 pl-5 pr-4 py-2.5 text-sm transition-colors rounded-r-xl
+                ${inConfig ? "text-[#0B2A66] font-semibold bg-[#EEF2FF]" : "text-slate-500 hover:text-[#0B2A66] hover:bg-slate-50"}`}
             >
-              <Settings size={18} className="shrink-0" />
-              {!collapsed && (
-                <>
-                  <span className="flex-1 text-left">Configurações</span>
-                  <ChevronDown
-                    size={14}
-                    className={`transition-transform shrink-0 ${configOpen ? "rotate-180" : ""}`}
-                  />
-                </>
+              {inConfig && (
+                <span
+                  className="absolute left-0 w-[3px] rounded-r-full"
+                  style={{ backgroundColor: accent, top: "4px", bottom: "4px" }}
+                />
               )}
+              <Settings size={17} className={inConfig ? "text-[#0B2A66]" : "text-slate-400"} />
+              <span className="flex-1 text-left">Configurações</span>
+              <ChevronDown size={13} className={`transition-transform ${configOpen ? "rotate-180" : ""}`} />
             </button>
 
-            {/* Sub-items */}
-            {(configOpen || collapsed) && (
-              <div className={`mt-0.5 ${collapsed ? "" : "pl-3"}`}>
-                {NAV_CONFIG.map(({ label, icon: Icon, path }) => navLink(label, Icon, path))}
+            {configOpen && (
+              <div className="mt-0.5 space-y-0.5">
+                {NAV_CONFIG.map(({ label, icon: Icon, path }) => navItem(label, Icon, path, true))}
               </div>
             )}
           </div>
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-white/10 p-4 space-y-2">
+        <div className="border-t border-slate-100 px-3 py-4 space-y-1">
           <a
             href="/"
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-3 px-2 py-2 rounded-lg text-white/60 hover:text-white hover:bg-white/10 text-sm transition-colors"
+            className="flex items-center gap-3 pl-5 pr-4 py-2.5 rounded-r-xl text-sm text-slate-500 hover:text-[#0B2A66] hover:bg-slate-50 transition-colors"
           >
-            <Globe size={18} className="shrink-0" />
-            {!collapsed && <span>Ver site</span>}
+            <ExternalLink size={16} className="text-slate-400" />
+            <span>Ver site</span>
           </a>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-2 py-2 rounded-lg text-white/60 hover:text-red-400 hover:bg-white/10 text-sm transition-colors"
+            className="w-full flex items-center gap-3 pl-5 pr-4 py-2.5 rounded-r-xl text-sm text-slate-500 hover:text-red-500 hover:bg-red-50 transition-colors"
           >
-            <LogOut size={18} className="shrink-0" />
-            {!collapsed && <span>Sair</span>}
+            <LogOut size={16} className="text-slate-400" />
+            <span>Sair</span>
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white border-b px-6 py-4 flex items-center justify-between shadow-sm">
-          <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
-          <span className="text-xs text-gray-400">Painel Administrativo</span>
+      {/* ── Main ───────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Topbar */}
+        <header className="h-[72px] bg-white border-b border-slate-100 px-8 flex items-center gap-6 shrink-0">
+          <h1 className="text-xl font-bold text-[#0B2A66] shrink-0">{title}</h1>
+
+          {/* Search */}
+          <div className="flex-1 max-w-sm">
+            <div className="relative">
+              <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar no portal..."
+                className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] transition-colors placeholder:text-slate-400"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 ml-auto">
+            {/* Date */}
+            <span className="text-sm text-slate-500 hidden lg:block">{formatDate()}</span>
+
+            {/* Notifications */}
+            <button className="relative p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-colors">
+              <Bell size={18} />
+              <span
+                className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+                style={{ backgroundColor: accent }}
+              />
+            </button>
+
+            {/* User */}
+            <div className="flex items-center gap-3">
+              <div
+                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                style={{ backgroundColor: "#0B2A66" }}
+              >
+                AD
+              </div>
+              <div className="hidden lg:block">
+                <p className="text-sm font-semibold text-slate-800 leading-none">Administrador</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">Super Admin</p>
+              </div>
+            </div>
+          </div>
         </header>
-        <main className={`flex-1 overflow-hidden ${noPadding ? "" : "overflow-y-auto p-6"}`}>{children}</main>
+
+        {/* Content */}
+        <main className={`flex-1 overflow-hidden ${noPadding ? "" : "overflow-y-auto p-8"}`}>
+          {children}
+        </main>
       </div>
     </div>
   );

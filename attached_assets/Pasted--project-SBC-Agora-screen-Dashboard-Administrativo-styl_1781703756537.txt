@@ -1,0 +1,321 @@
+{
+  "project": "SBC Agora",
+  "screen": "Dashboard Administrativo",
+  "style": {
+    "theme": "minimalista",
+    "layout": "desktop web app",
+    "background": "#F7F9FC",
+    "primaryColor": "#0B2A66",
+    "secondaryColor": "#E71D36",
+    "accentColors": {
+      "green": "#16A34A",
+      "orange": "#F59E0B",
+      "blue": "#2563EB",
+      "purple": "#7C3AED",
+      "gray": "#64748B"
+    },
+    "font": "Inter, sans-serif",
+    "borderRadius": "16px",
+    "shadow": "0 8px 24px rgba(15, 23, 42, 0.06)"
+  },
+  "layout": {
+    "type": "admin_dashboard",
+    "sidebar": {
+      "position": "left",
+      "width": "260px",
+      "background": "#FFFFFF",
+      "logo": {
+        "text": "SBC Agora",
+        "tagline": "A notícia em tempo real"
+      },
+      "menu": [
+        {
+          "label": "Dashboard",
+          "icon": "home",
+          "active": true
+        },
+        {
+          "label": "Analytics",
+          "icon": "bar-chart"
+        },
+        {
+          "label": "Artigos",
+          "icon": "file-text"
+        },
+        {
+          "label": "Novo Artigo",
+          "icon": "plus-square"
+        },
+        {
+          "label": "Blocos Home",
+          "icon": "grid"
+        },
+        {
+          "label": "Propagandas",
+          "icon": "megaphone"
+        },
+        {
+          "label": "Colunistas",
+          "icon": "users"
+        },
+        {
+          "label": "Fontes RSS",
+          "icon": "rss"
+        },
+        {
+          "label": "Redes Sociais",
+          "icon": "share-2"
+        },
+        {
+          "label": "Configurações",
+          "icon": "settings"
+        }
+      ],
+      "footerActions": [
+        {
+          "label": "Ver site",
+          "icon": "external-link"
+        },
+        {
+          "label": "Sair",
+          "icon": "log-out"
+        }
+      ]
+    },
+    "topbar": {
+      "height": "88px",
+      "background": "#FFFFFF",
+      "title": "Dashboard",
+      "search": {
+        "placeholder": "Buscar no portal..."
+      },
+      "dateSelector": "23 de maio de 2025",
+      "notifications": {
+        "icon": "bell",
+        "count": 3
+      },
+      "user": {
+        "avatar": "AD",
+        "name": "Administrador",
+        "role": "Super Admin"
+      }
+    },
+    "content": {
+      "padding": "32px",
+      "sections": [
+        {
+          "type": "status_banner",
+          "title": "Portal no ar",
+          "description": "Seu portal está online e funcionando normalmente.",
+          "icon": "signal",
+          "button": "Ver site"
+        },
+        {
+          "type": "kpi_grid",
+          "columns": 4,
+          "cards": [
+            {
+              "title": "Publicados",
+              "value": "286",
+              "variation": "+12,4%",
+              "comparison": "vs últimos 7 dias",
+              "icon": "file-text",
+              "color": "green"
+            },
+            {
+              "title": "Rascunhos",
+              "value": "128",
+              "variation": "+8,7%",
+              "comparison": "vs últimos 7 dias",
+              "icon": "file",
+              "color": "orange"
+            },
+            {
+              "title": "Views hoje",
+              "value": "74.913",
+              "variation": "+14,3%",
+              "comparison": "vs ontem",
+              "icon": "eye",
+              "color": "red"
+            },
+            {
+              "title": "Views esta semana",
+              "value": "12.842",
+              "variation": "+9,8%",
+              "comparison": "vs semana passada",
+              "icon": "trending-up",
+              "color": "blue"
+            }
+          ]
+        },
+        {
+          "type": "dashboard_grid",
+          "columns": "2fr 1fr 1fr",
+          "items": [
+            {
+              "component": "line_chart",
+              "title": "Pageviews — últimos 7 dias",
+              "filter": "Últimos 7 dias",
+              "data": [
+                {
+                  "date": "17 Mai",
+                  "value": 10000
+                },
+                {
+                  "date": "18 Mai",
+                  "value": 17000
+                },
+                {
+                  "date": "19 Mai",
+                  "value": 15500
+                },
+                {
+                  "date": "20 Mai",
+                  "value": 23500
+                },
+                {
+                  "date": "21 Mai",
+                  "value": 16500
+                },
+                {
+                  "date": "22 Mai",
+                  "value": 16000
+                },
+                {
+                  "date": "23 Mai",
+                  "value": 22800
+                }
+              ]
+            },
+            {
+              "component": "recent_articles",
+              "title": "Artigos recentes",
+              "button": "Ver todos",
+              "articles": [
+                {
+                  "title": "Prefeitura anuncia novo pacote de investimentos para a educação",
+                  "date": "23 Mai, 2025",
+                  "time": "10:45",
+                  "status": "Publicado"
+                },
+                {
+                  "title": "Trânsito sofre alterações no centro a partir da próxima semana",
+                  "date": "23 Mai, 2025",
+                  "time": "09:30",
+                  "status": "Publicado"
+                },
+                {
+                  "title": "Nova tecnologia 5G começa a ser testada em SBC",
+                  "date": "22 Mai, 2025",
+                  "time": "16:20",
+                  "status": "Rascunho"
+                },
+                {
+                  "title": "Confira a programação completa do Festival de Inverno 2025",
+                  "date": "22 Mai, 2025",
+                  "time": "14:05",
+                  "status": "Publicado"
+                }
+              ]
+            },
+            {
+              "component": "top_categories",
+              "title": "Top categorias",
+              "button": "Ver todas",
+              "categories": [
+                {
+                  "name": "Cidades",
+                  "views": "45.832",
+                  "percentage": "35,6%",
+                  "color": "blue"
+                },
+                {
+                  "name": "Política",
+                  "views": "28.119",
+                  "percentage": "21,9%",
+                  "color": "red"
+                },
+                {
+                  "name": "Economia",
+                  "views": "20.334",
+                  "percentage": "16,8%",
+                  "color": "orange"
+                },
+                {
+                  "name": "Esportes",
+                  "views": "18.765",
+                  "percentage": "14,6%",
+                  "color": "green"
+                },
+                {
+                  "name": "Cultura",
+                  "views": "15.406",
+                  "percentage": "11,9%",
+                  "color": "purple"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "bottom_grid",
+          "columns": "1fr 1fr",
+          "items": [
+            {
+              "component": "ads_summary",
+              "title": "Propagandas",
+              "metrics": [
+                {
+                  "label": "Ativas",
+                  "value": "24"
+                },
+                {
+                  "label": "Impressões",
+                  "value": "245.672",
+                  "variation": "+16,4%"
+                },
+                {
+                  "label": "Cliques",
+                  "value": "12.842",
+                  "variation": "+9,5%"
+                },
+                {
+                  "label": "CTR",
+                  "value": "5,23%",
+                  "variation": "+1,1%"
+                }
+              ]
+            },
+            {
+              "component": "quick_actions",
+              "title": "Ações rápidas",
+              "actions": [
+                {
+                  "label": "Novo artigo",
+                  "icon": "edit",
+                  "color": "red"
+                },
+                {
+                  "label": "Blocos da home",
+                  "icon": "grid",
+                  "color": "blue"
+                },
+                {
+                  "label": "Nova propaganda",
+                  "icon": "megaphone",
+                  "color": "purple"
+                },
+                {
+                  "label": "Adicionar fonte RSS",
+                  "icon": "rss",
+                  "color": "green"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "prompt": "Crie uma interface web minimalista e moderna para o painel administrativo do portal SBC Agora. Use fundo claro, sidebar branca com ícones finos, destaque vermelho apenas no item ativo, topbar limpa com busca, data, notificações e perfil do administrador. No conteúdo, exiba um banner discreto informando que o portal está no ar, quatro cards de métricas, gráfico de pageviews dos últimos 7 dias, lista de artigos recentes, top categorias com barras horizontais, resumo de propagandas e ações rápidas. O visual deve ser premium, editorial, limpo, com bastante respiro, cantos arredondados, sombras suaves e identidade em azul-marinho, vermelho e branco."
+}
