@@ -8,16 +8,17 @@ import {
   Save, Globe, FileSearch, UserCircle, Image, LayoutDashboard, BarChart2,
   Monitor, Smartphone, Tag, Upload, CheckCircle, AlertCircle, Minus, Plus,
   Mail, Phone, MapPin, Building2, FileText, Youtube,
-  RefreshCw, Sparkles,
+  RefreshCw, Sparkles, Link2,
 } from "lucide-react";
 
-type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato";
+type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "informacoes", label: "Informações do Site" },
   { id: "logo",        label: "Logo & Imagens" },
   { id: "aparencia",   label: "Aparência" },
   { id: "contato",     label: "Contato & Redes" },
+  { id: "conexoes",    label: "Conexões" },
 ];
 
 const CARD = "bg-white rounded-2xl overflow-hidden";
@@ -324,27 +325,6 @@ export default function Settings() {
                   </div>
                 </div>
 
-                {/* Tracking */}
-                <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<BarChart2 size={15}/>} label="Rastreamento &amp; Analytics"/>
-                  <Field label="Google Analytics 4 — Measurement ID" hint={undefined}>
-                    <input value={settings.ga4MeasurementId ?? ""} onChange={e => setField("ga4MeasurementId", e.target.value)}
-                      className={INPUT + " font-mono"} placeholder="G-XXXXXXXXXX"/>
-                    <p className="text-[11px] text-[#94A3B8] mt-1">GA4 → Admin → Data Streams → Web → Measurement ID</p>
-                  </Field>
-                  <Field label="Facebook Pixel ID">
-                    <input value={settings.facebookPixelId ?? ""} onChange={e => setField("facebookPixelId", e.target.value)}
-                      className={INPUT + " font-mono"} placeholder="123456789012345"/>
-                    <p className="text-[11px] text-[#94A3B8] mt-1">Meta Business Suite → Events Manager → Pixels</p>
-                  </Field>
-                  {(settings.ga4MeasurementId || settings.facebookPixelId) && (
-                    <div className="flex flex-wrap gap-2">
-                      {settings.ga4MeasurementId && <Badge color="orange">GA4 ativo — {settings.ga4MeasurementId}</Badge>}
-                      {settings.facebookPixelId  && <Badge color="blue">Pixel ativo — {settings.facebookPixelId}</Badge>}
-                    </div>
-                  )}
-                </div>
-
                 {/* Device visibility */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
                   <SectionHeader icon={<Tag size={15}/>} label="Visibilidade por dispositivo"/>
@@ -629,6 +609,82 @@ export default function Settings() {
                   onChange={v => setField("footerBgColor", v)}
                   preview="Rodapé"/>
               </div>
+            </div>
+
+            <SaveBar saving={savingSettings} onSave={saveSettings}/>
+          </div>
+        )}
+
+        {/* ── CONEXÕES ────────────────────────────────────────── */}
+        {activeTab === "conexoes" && (
+          <div className="max-w-2xl space-y-5">
+            <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
+              <SectionHeader icon={<Link2 size={15}/>} label="Google Tag Manager"/>
+              <p className="text-xs text-[#94A3B8]">
+                Insira o ID do contêiner GTM. O snippet será injetado automaticamente em todas as páginas.
+              </p>
+              <Field label="Container ID">
+                <input
+                  value={settings.gtmId ?? ""}
+                  onChange={e => setField("gtmId", e.target.value)}
+                  className={INPUT + " font-mono"}
+                  placeholder="GTM-XXXXXXX"
+                />
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  Google Tag Manager → Workspace → ID do contêiner (ex: GTM-P6QN99MB)
+                </p>
+              </Field>
+              {settings.gtmId && (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
+                  <CheckCircle size={15}/> GTM ativo — {settings.gtmId}
+                </div>
+              )}
+            </div>
+
+            <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
+              <SectionHeader icon={<BarChart2 size={15}/>} label="Meta / Facebook Pixel"/>
+              <p className="text-xs text-[#94A3B8]">
+                ID do pixel do Facebook para rastreamento de conversões e públicos no Meta Ads.
+              </p>
+              <Field label="Pixel ID">
+                <input
+                  value={settings.facebookPixelId ?? ""}
+                  onChange={e => setField("facebookPixelId", e.target.value)}
+                  className={INPUT + " font-mono"}
+                  placeholder="123456789012345"
+                />
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  Meta Business Suite → Events Manager → Pixels → ID do Pixel
+                </p>
+              </Field>
+              {settings.facebookPixelId && (
+                <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-4 py-3 text-sm">
+                  <CheckCircle size={15}/> Pixel ativo — {settings.facebookPixelId}
+                </div>
+              )}
+            </div>
+
+            <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
+              <SectionHeader icon={<BarChart2 size={15}/>} label="Google Analytics 4"/>
+              <p className="text-xs text-[#94A3B8]">
+                Measurement ID do GA4 para análise de tráfego e comportamento de usuários.
+              </p>
+              <Field label="Measurement ID">
+                <input
+                  value={settings.ga4MeasurementId ?? ""}
+                  onChange={e => setField("ga4MeasurementId", e.target.value)}
+                  className={INPUT + " font-mono"}
+                  placeholder="G-XXXXXXXXXX"
+                />
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  GA4 → Admin → Data Streams → Web → Measurement ID
+                </p>
+              </Field>
+              {settings.ga4MeasurementId && (
+                <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl px-4 py-3 text-sm">
+                  <CheckCircle size={15}/> GA4 ativo — {settings.ga4MeasurementId}
+                </div>
+              )}
             </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings}/>
