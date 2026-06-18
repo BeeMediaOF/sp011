@@ -118,7 +118,7 @@ router.post("/fetch", async (req, res) => {
     } catch (err) {
       allArticles.push({
         sourceId: src.id, sourceName: src.name, category: src.category,
-        title: `Erro: ${String(err)}`, link: "", pubDate: "",
+        title: `Erro: ${err instanceof Error ? err.message : String(err)}`, link: "", pubDate: "",
         imageUrl: "", excerpt: "", fullText: "", isDuplicate: false,
       });
     }
@@ -147,7 +147,9 @@ router.post("/rewrite", async (req, res) => {
       subtitle:  result.subtitle ?? "",
     });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = msg.startsWith("QUOTA_COOLDOWN:") ? 429 : 500;
+    res.status(status).json({ error: msg });
   }
 });
 
@@ -172,7 +174,9 @@ router.post("/run", async (req, res) => {
     const count = await processDueSource(src);
     res.json({ processed: count });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = msg.startsWith("QUOTA_COOLDOWN:") ? 429 : 500;
+    res.status(status).json({ error: msg });
   }
 });
 

@@ -1,0 +1,48 @@
+Atue como um Desenvolvedor Full-Stack Sênior e Arquiteto de Software.
+
+Preciso desenvolver um sistema completo de Blog com Painel Administrativo. O código deve ser limpo, modular, rápido e pronto para ser hospedado na Hostinger (preferencialmente usando Node.js no backend, React/Next.js no frontend e MySQL ou PostgreSQL no banco de dados).
+
+O foco principal é a persistência real dos dados (zero cache "fantasma" ou desatualizado no front-end após edições) e reusabilidade, pois usarei essa exata mesma estrutura (código-fonte) para vários outros blogs, mudando apenas as credenciais do banco de dados de cada cliente.
+
+Gere a estrutura, o backend, o frontend e os scripts de criação do Banco de Dados (migrations ou SQL puro) considerando os seguintes requisitos:
+
+1. Banco de Dados e Reusabilidade (Arquitetura)
+
+Crie todas as tabelas necessárias (Users, Settings, Posts, Ads, Analytics, etc).
+
+O sistema deve se conectar ao banco exclusivamente via arquivo .env. Para duplicar o blog para outro cliente, eu devo precisar apenas criar um novo banco na Hostinger e alterar o .env.
+
+Gere um script de inicialização (seed ou migration) para que eu possa criar as tabelas rapidamente na Hostinger.
+
+2. Painel Administrativo e Autenticação
+
+Tela de Login e Senha segura (usando JWT e senhas criptografadas com bcrypt).
+
+Configurações do Site: O cliente deve poder cadastrar a Logo do site no painel. Se não houver logo cadastrada (null), o front-end deve ocultar o espaço da logo ou renderizar apenas texto.
+
+3. Gestão de Anúncios e Analytics
+
+Anúncios (Ads): Crie uma tabela e uma interface no painel para cadastrar propagandas (scripts do Adsense, banners em imagem ou links). Isso deve ser renderizado dinamicamente no blog.
+
+Analytics: Crie uma tabela dedicada para salvar dados de acesso, comportamento do usuário e métricas básicas do blog (pageviews, cliques, etc).
+
+4. Editor de Blocos de Notícias (Frontend Fluido)
+
+No painel, a edição dos blocos de notícias e alteração de formatos de exibição deve ser extremamente rápida e fluida.
+
+Use "Optimistic UI" ou atualizações de estado imediatas no React: quando eu alterar o formato de um bloco, a pré-visualização deve mudar na hora, sem precisar recarregar a página inteira.
+
+5. Performance e Sincronia de Dados (Fim do "Dado Fantasma")
+
+O sistema precisa ser rápido e responsivo.
+
+Configure a invalidação de cache correta (se usar React Query, SWR ou Next.js revalidation). Quando eu atualizar, excluir ou editar qualquer item no painel, a chamada de API deve garantir que o banco de dados seja atualizado e o frontend busque a informação nova imediatamente. Se eu der F5, o dado antigo NÃO pode aparecer.
+
+Por favor, comece estruturando as tabelas do banco de dados (SQL ou schema do ORM escolhido) e a estrutura de pastas do projeto.
+
+💡 Dicas extras para o seu projeto:
+Hostinger e Banco de Dados: Como você vai hospedar na Hostinger, o banco de dados mais fácil e comum de gerenciar lá é o MySQL. O prompt já orienta a IA a preparar o projeto pensando nisso.
+
+Envio de Imagens: Para a logo e imagens das notícias, garanta que a IA crie uma rota de upload de arquivos (usando bibliotecas como Multer no Node.js) que salve os arquivos em uma pasta pública ou em um serviço de armazenamento, para que a Hostinger consiga renderizar direitinho.
+
+Se a IA parar na metade: IAs de código às vezes atingem o limite de caracteres. Se ela parar de gerar o código do nada, basta digitar "Continue exatamente de onde parou" e ela seguirá com as tabelas e telas.

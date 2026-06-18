@@ -25,7 +25,8 @@ router.post("/search", async (req, res) => {
     const result = await searchNews(query.trim(), maxResults ?? 5);
     res.json(result);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: msg });
   }
 });
 
@@ -43,7 +44,9 @@ router.post("/rewrite", async (req, res) => {
       subtitle:  result.subtitle  ?? "",
     });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = msg.startsWith("QUOTA_COOLDOWN:") ? 429 : 500;
+    res.status(status).json({ error: msg });
   }
 });
 
@@ -191,7 +194,9 @@ router.post("/topics/:id/run", async (req, res) => {
 
     res.json({ processed: articles.length, articles });
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const msg = err instanceof Error ? err.message : String(err);
+    const status = msg.startsWith("QUOTA_COOLDOWN:") ? 429 : 500;
+    res.status(status).json({ error: msg });
   }
 });
 

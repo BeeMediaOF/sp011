@@ -118,7 +118,7 @@ export default function PerplexitySearch() {
         publishing: false, published: false, error: null,
         category: "cidade", status: "draft",
       })));
-    } catch (err) { setSearchError(String(err)); }
+    } catch (err) { setSearchError(err instanceof Error ? err.message : String(err)); }
     finally { setSearching(false); }
   }
 
@@ -135,7 +135,7 @@ export default function PerplexitySearch() {
         sourceName: s.article.sourceName,
       });
       patchArticle(idx, { rewriting: false, rewritten: res, expanded: true });
-    } catch (err) { patchArticle(idx, { rewriting: false, error: String(err) }); }
+    } catch (err) { patchArticle(idx, { rewriting: false, error: err instanceof Error ? err.message : String(err) }); }
   }
 
   async function doPublish(idx: number, rw: RewriteResult) {
@@ -149,7 +149,7 @@ export default function PerplexitySearch() {
         sourceName: s.article.sourceName, status: s.status,
       });
       patchArticle(idx, { publishing: false, published: true });
-    } catch (err) { patchArticle(idx, { publishing: false, error: String(err) }); }
+    } catch (err) { patchArticle(idx, { publishing: false, error: err instanceof Error ? err.message : String(err) }); }
   }
 
   async function handleRewriteAndPublish(idx: number) {
@@ -162,7 +162,7 @@ export default function PerplexitySearch() {
       });
       patchArticle(idx, { rewriting: false, rewritten: rw });
       await doPublish(idx, rw);
-    } catch (err) { patchArticle(idx, { rewriting: false, error: String(err) }); }
+    } catch (err) { patchArticle(idx, { rewriting: false, error: err instanceof Error ? err.message : String(err) }); }
   }
 
   // ── Topic form ──
@@ -186,7 +186,7 @@ export default function PerplexitySearch() {
         setTopics((prev) => [...prev, res.topic]);
       }
       setShowForm(false);
-    } catch (err) { setFormError(String(err)); }
+    } catch (err) { setFormError(err instanceof Error ? err.message : String(err)); }
     finally { setSaving(false); }
   }
 
@@ -214,7 +214,7 @@ export default function PerplexitySearch() {
       // refresh lastRunAt
       setTopics((prev) => prev.map((x) => x.id === t.id ? { ...x, lastRunAt: new Date().toISOString() } : x));
     } catch (err) {
-      setRunResult((p) => ({ ...p, [t.id]: `Erro: ${String(err)}` }));
+      setRunResult((p) => ({ ...p, [t.id]: `Erro: ${err instanceof Error ? err.message : String(err)}` }));
     } finally { setRunningId(null); }
   }
 
@@ -575,11 +575,22 @@ function ArticleCard({ s, idx, onPatch, onRewrite, onRewriteAndPublish, onPublis
           </div>
         )}
 
-        {s.error && (
-          <div className="mt-2 flex items-center gap-2 text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-            <AlertCircle size={12} className="shrink-0" />{s.error}
-          </div>
-        )}
+        {s.error && (() => {
+          const isQuota = s.error.startsWith("QUOTA_COOLDOWN:");
+          const msg = isQuota ? s.error.replace("QUOTA_COOLDOWN:", "").trim() : s.error;
+          return (
+            <div className={`mt-2 flex items-center gap-2 text-xs rounded-lg px-3 py-2 ${
+              isQuota
+                ? "text-amber-700 bg-amber-50 border border-amber-200"
+                : "text-red-600 bg-red-50 border border-red-200"
+            }`}>
+              {isQuota
+                ? <Clock size={12} className="shrink-0" />
+                : <AlertCircle size={12} className="shrink-0" />}
+              {msg}
+            </div>
+          );
+        })()}
       </div>
 
       {s.expanded && (
