@@ -154,6 +154,12 @@ function getGeminiFree() {
   return new GoogleGenAI({ apiKey, httpOptions: { baseUrl: baseURL } });
 }
 
+function getGeminiDirect() {
+  const apiKey = process.env["GEMINI_API_KEY"];
+  if (!apiKey) throw new Error("GEMINI_API_KEY não configurada. Adicione sua chave gratuita do Google AI Studio em aistudio.google.com.");
+  return new GoogleGenAI({ apiKey });
+}
+
 export interface RewriteResult {
   content: string;
   keywords: string;
@@ -326,7 +332,9 @@ export async function rewriteWithAI(
   await enforceCallInterval();
 
   const settings = store.getSettings();
-  const provider = settings.rssAiProvider ?? "gemini_paid";
+  // Default: gemini_direct (GEMINI_API_KEY env var, Google AI Studio free tier)
+  // Falls back to gemini_paid (settings key) or gemini_free (Replit integration)
+  const provider = settings.rssAiProvider ?? (process.env["GEMINI_API_KEY"] ? "gemini_direct" : "gemini_paid");
   const prompt   = customPrompt
     ? applyPromptTemplate(customPrompt, title, text, sourceName, giveCredit)
     : buildPrompt(title, text, sourceName, giveCredit);
@@ -355,6 +363,18 @@ export async function rewriteWithAI(
       const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
       return data.choices?.[0]?.message?.content ?? "";
     });
+  } else if (provider === "gemini_direct") {
+    // Google AI Studio free tier — uses GEMINI_API_KEY env var, no Replit credits
+    const ai    = getGeminiDirect();
+    const model = settings.rssAiModel || "gemini-2.0-flash";
+    raw = await withRetry(async () => {
+      const resp = await ai.models.generateContent({
+        model,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        config: { maxOutputTokens: 8192 },
+      });
+      return resp.text ?? "";
+    });
   } else if (provider === "gemini_paid") {
     const apiKey = settings.geminiApiKey || settings.rssAiApiKey;
     if (!apiKey) throw new Error("API key do Gemini não configurada. Configure em Configurações → API Gemini.");
@@ -369,7 +389,7 @@ export async function rewriteWithAI(
       return resp.text ?? "";
     });
   } else {
-    // Default: gemini_free (Replit integration)
+    // gemini_free: Replit AI Integrations (uses Replit credits)
     const ai    = getGeminiFree();
     const model = settings.rssAiModel || "gemini-2.0-flash";
     raw = await withRetry(async () => {
