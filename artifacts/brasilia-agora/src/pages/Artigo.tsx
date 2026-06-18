@@ -1,40 +1,14 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { useArticle } from "../hooks/useArticles";
+import { useArticle, useArticles } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
-import {
-  brasilArticles,
-  mundoArticles,
-  politicaArticles,
-  economiaArticles,
-  esporteArticles,
-  culturaArticles,
-  saudeArticles,
-  tecnologiaArticles,
-  dfArticles,
-} from "../data/mockData";
-
-const ALL_MOCK = [
-  ...brasilArticles,
-  ...mundoArticles,
-  ...politicaArticles,
-  ...economiaArticles,
-  ...esporteArticles,
-  ...culturaArticles,
-  ...saudeArticles,
-  ...tecnologiaArticles,
-  ...dfArticles,
-];
-
-const MAIS_LIDAS = ALL_MOCK.slice(0, 8);
-
 
 const editoriaColor: Record<string, string> = {
   brasil: "#16a34a",
@@ -49,38 +23,41 @@ const editoriaColor: Record<string, string> = {
 };
 
 function ArticleSidebar() {
+  const { articles } = useArticles();
+  const maisLidas = articles.slice(0, 8);
+
   return (
     <aside className="w-full lg:w-[300px] shrink-0 space-y-6">
       {/* Mais Lidas */}
-      <div className="border border-gray-100 rounded-sm overflow-hidden">
-        <div className="flex items-center gap-2 bg-[#1a1a1a] px-4 py-3">
-          <div className="w-1 h-4 bg-[#c8102e]" />
-          <h3 className="text-white text-[13px] font-bold uppercase tracking-wider">
-            Mais Lidas
-          </h3>
-        </div>
-        <div className="divide-y divide-gray-100">
-          {MAIS_LIDAS.map((item, idx) => (
-            <Link
-              key={item.id}
-              href={`/artigo/${item.id}`}
-              className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group"
-            >
-              <span
-                className="text-[22px] font-black leading-none shrink-0 mt-0.5"
-                style={{
-                  color: idx < 3 ? "#c8102e" : "#d1d5db",
-                }}
+      {maisLidas.length > 0 && (
+        <div className="border border-gray-100 rounded-sm overflow-hidden">
+          <div className="flex items-center gap-2 bg-[#1a1a1a] px-4 py-3">
+            <div className="w-1 h-4 bg-[#c8102e]" />
+            <h3 className="text-white text-[13px] font-bold uppercase tracking-wider">
+              Mais Lidas
+            </h3>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {maisLidas.map((item, idx) => (
+              <Link
+                key={item.id}
+                href={`/artigo/${item.slug || item.id}`}
+                className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group"
               >
-                {idx + 1}
-              </span>
-              <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
-                dangerouslySetInnerHTML={{ __html: item.title }}
-              />
-            </Link>
-          ))}
+                <span
+                  className="text-[22px] font-black leading-none shrink-0 mt-0.5"
+                  style={{ color: idx < 3 ? "#c8102e" : "#d1d5db" }}
+                >
+                  {idx + 1}
+                </span>
+                <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
+                  dangerouslySetInnerHTML={{ __html: item.title }}
+                />
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Propaganda sidebar — gerenciada pelo painel */}
       <div className="sticky top-24">
@@ -111,38 +88,10 @@ function ArticleSkeleton() {
 export default function Artigo() {
   const { slug } = useParams();
 
-  /* ── Resolução instantânea via mock ───────────────────────────────── */
-  const mockFallback = useMemo(
-    () => ALL_MOCK.find((a) => a.id === slug) ?? null,
-    [slug]
-  );
-
-  const { article: apiArticle, loading } = useArticle(slug ?? "");
+  const { article, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
   const { trackArticle, trackShare } = useAnalytics();
   useScrollDepth(slug);
-
-  /* Usa API se disponível, senão converte o mock para o mesmo shape */
-  const article = apiArticle
-    ? apiArticle
-    : mockFallback
-    ? {
-        id: mockFallback.id,
-        title: mockFallback.title,
-        subtitle: mockFallback.summary,
-        content: mockFallback.summary +
-          " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Pellentesque euismod, nisi vel consectetur interdum, nisl nisi aliquam nisl, nec aliquam nisl nisl sit amet nisl. Sed euismod, nisl vel consectetur interdum, nisl nisi aliquam nisl. " +
-          "Vivamus lacinia odio vitae vestibulum. Donec in efficitur leo, in commodo odio. Morbi imperdiet, augue quis sagittis pulvinar, sapien odio blandit nisi, id venenatis justo purus volutpat enim. " +
-          "Praesent commodo cursus magna, vel scelerisque nisl consectetur et. Nullam quis risus eget urna mollis ornare vel eu leo. Donec ullamcorper nulla non metus auctor fringilla.",
-        category: mockFallback.chapeu.toLowerCase(),
-        tag: mockFallback.chapeu,
-        imageUrl: typeof mockFallback.image === "string"
-          ? mockFallback.image
-          : (mockFallback.image as { src?: string })?.src ?? "",
-        author: mockFallback.author,
-        publishedAt: new Date().toISOString(),
-      }
-    : null;
 
   /* Track article once resolved */
   useEffect(() => {
@@ -152,8 +101,7 @@ export default function Artigo() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id]);
 
-  /* Mostra skeleton apenas se não tem mock e a API ainda carrega */
-  const showSkeleton = loading && !mockFallback;
+  const showSkeleton = loading;
 
   const chapeuColor =
     editoriaColor[article?.category?.toLowerCase() ?? ""] ?? "#c8102e";

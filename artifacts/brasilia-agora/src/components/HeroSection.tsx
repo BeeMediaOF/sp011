@@ -70,19 +70,6 @@ function relativeTime(iso: string): string {
   return `${days} dia${days > 1 ? "s" : ""} atrás`;
 }
 
-// ─── Fallback mock data (shown when API has no articles yet) ──────────────────
-const MOCK_FEATURED: FeaturedItem[] = [
-  { id: "hero-1", img: heroImg,          chapeu: "POLÍTICA",  chapeuColor: "#1d4ed8", title: "Câmara Legislativa aprova projeto que cria o programa Morar DF",              summary: "Iniciativa prevê subsídio para famílias de baixa renda adquirirem a casa própria no Distrito Federal.", time: "2 horas atrás", author: "Redação" },
-  { id: "hero-2", img: politicaFeatImg,  chapeu: "ECONOMIA",  chapeuColor: "#b45309", title: "DF bate recorde de exportações no primeiro semestre e lidera crescimento nacional", summary: "Brasília é eleita melhor cidade para investir no Brasil em 2025 segundo ranking nacional.", time: "3 horas atrás", author: "Redação" },
-  { id: "hero-3", img: studentsImg,      chapeu: "EDUCAÇÃO",  chapeuColor: "#0b3d91", title: "Escolas públicas do DF alcançam melhores índices no IDEB 2023",               summary: "Resultado coloca o Distrito Federal entre os três melhores sistemas educacionais do país.", time: "5 horas atrás", author: "Redação" },
-];
-
-const MOCK_SECONDARY: SecondaryItem[] = [
-  { id: "df-3",  img: trafficImg,  chapeu: "TRÂNSITO",  chapeuColor: "#ea580c", title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília" },
-  { id: "pol-3", img: policeImg,   chapeu: "SEGURANÇA", chapeuColor: "#dc2626", title: "Polícia Civil prende grupo suspeito de furtos no Plano Piloto" },
-  { id: "sau-1", img: hospitalImg, chapeu: "SAÚDE",     chapeuColor: "#16a34a", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
-  { id: "df-4",  img: busImg,      chapeu: "DF",        chapeuColor: "#0b3d91", title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
-];
 
 // ─── Card de destaque ─────────────────────────────────────────────────────────
 function FeaturedCard({
@@ -212,39 +199,37 @@ export default function HeroSection() {
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
 
-  const featured: FeaturedItem[] = sorted.length >= 3
-    ? sorted.slice(0, 3).map((a, i) => ({
-        id:          a.id,
-        slug:        a.slug || a.id,
-        img:         a.imageUrl || FALLBACK_IMGS[i % FALLBACK_IMGS.length]!,
-        chapeu:      a.tag || a.category.toUpperCase(),
-        chapeuColor: chapeuColor(a.category),
-        title:       a.title,
-        summary:     a.subtitle,
-        time:        relativeTime(a.publishedAt),
-        author:      a.author,
-      }))
-    : MOCK_FEATURED;
+  const featured: FeaturedItem[] = sorted.slice(0, 3).map((a, i) => ({
+    id:          a.id,
+    slug:        a.slug || a.id,
+    img:         a.imageUrl || FALLBACK_IMGS[i % FALLBACK_IMGS.length]!,
+    chapeu:      a.tag || a.category.toUpperCase(),
+    chapeuColor: chapeuColor(a.category),
+    title:       a.title,
+    summary:     a.subtitle,
+    time:        relativeTime(a.publishedAt),
+    author:      a.author,
+  }));
 
-  const secondary: SecondaryItem[] = sorted.length >= 4
-    ? sorted.slice(3, 7).map((a, i) => ({
-        id:          a.id,
-        slug:        a.slug || a.id,
-        img:         a.imageUrl || FALLBACK_IMGS[(i + 3) % FALLBACK_IMGS.length]!,
-        chapeu:      a.tag || a.category.toUpperCase(),
-        chapeuColor: chapeuColor(a.category),
-        title:       a.title,
-      }))
-    : MOCK_SECONDARY;
+  const secondary: SecondaryItem[] = sorted.slice(3, 7).map((a, i) => ({
+    id:          a.id,
+    slug:        a.slug || a.id,
+    img:         a.imageUrl || FALLBACK_IMGS[(i + 3) % FALLBACK_IMGS.length]!,
+    chapeu:      a.tag || a.category.toUpperCase(),
+    chapeuColor: chapeuColor(a.category),
+    title:       a.title,
+  }));
+
+  if (!loading && featured.length === 0) return null;
 
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
       <div className="block lg:hidden mb-5">
-        <MobileCarousel items={featured} />
+        {featured.length > 0 && <MobileCarousel items={featured} />}
       </div>
 
       <div className="hidden lg:block mb-5">
-        <DesktopGrid items={featured} />
+        {featured.length > 0 && <DesktopGrid items={featured} />}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">

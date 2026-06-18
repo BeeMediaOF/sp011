@@ -16,16 +16,6 @@ import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 
-import {
-  brasilArticles,
-  mundoArticles,
-  esporteArticles,
-  culturaArticles,
-  saudeArticles,
-  tecnologiaArticles,
-  dfArticles,
-} from "../data/mockData";
-
 // ─── Colors per section ───────────────────────────────────────────────────────
 const EDITORIA_COLORS: Record<string, string> = {
   brasil:     "#16a34a",
@@ -43,18 +33,6 @@ const EDITORIA_COLORS: Record<string, string> = {
   economia:   "#b45309",
   colunas:    "#7c3aed",
   geral:      "#6b7280",
-};
-
-const FALLBACK_DATA: Record<string, typeof brasilArticles> = {
-  brasil:     brasilArticles,
-  mundo:      mundoArticles,
-  esporte:    esporteArticles,
-  esportes:   esporteArticles,
-  cultura:    culturaArticles,
-  saude:      saudeArticles,
-  tecnologia: tecnologiaArticles,
-  df:         dfArticles,
-  cidade:     dfArticles,
 };
 
 const DEFAULT_BLOCKS: HomeBlock[] = [
@@ -77,26 +55,22 @@ type SectionArticle = {
   image: string; chapeu: string; author: string; time: string;
 };
 
-function useArticlesByCategory(category: string, fallback: SectionArticle[]): SectionArticle[] {
+function useArticlesByCategory(category: string): SectionArticle[] {
   const { articles } = useArticles();
-  const real = articles.filter((a) =>
-    a.category.toLowerCase().includes(category.toLowerCase())
-  );
-  if (real.length > 0) {
-    return real.map((a) => ({
+  return articles
+    .filter((a) => a.category.toLowerCase().includes(category.toLowerCase()))
+    .map((a) => ({
       id: a.id,
       slug: a.slug || a.id,
       title: a.title,
       summary: a.subtitle,
-      image: a.imageUrl || (fallback[0]?.image ?? brasilArticles[0].image),
+      image: a.imageUrl || "",
       chapeu: a.tag || category.toUpperCase(),
       author: a.author,
       time: new Date(a.publishedAt).toLocaleDateString("pt-BR", {
         day: "numeric", month: "short",
       }),
     }));
-  }
-  return fallback;
 }
 
 // ─── Custom block renderer ────────────────────────────────────────────────────
@@ -304,25 +278,20 @@ export default function Home() {
   const visibleBlocks = isAdminPreview ? previewBlocks : baseBlocks.filter((b) => b.visible);
 
   function getArticles(cat: string): SectionArticle[] {
-    const fallback = FALLBACK_DATA[cat] ?? brasilArticles;
-    const real = articles.filter((a) =>
-      a.category.toLowerCase().includes(cat.toLowerCase())
-    );
-    if (real.length > 0) {
-      return real.map((a) => ({
+    return articles
+      .filter((a) => a.category.toLowerCase().includes(cat.toLowerCase()))
+      .map((a) => ({
         id: a.id,
         slug: a.slug || a.id,
         title: a.title,
         summary: a.subtitle,
-        image: a.imageUrl || (fallback[0]?.image ?? brasilArticles[0].image),
+        image: a.imageUrl || "",
         chapeu: a.tag || cat.toUpperCase(),
         author: a.author,
         time: new Date(a.publishedAt).toLocaleDateString("pt-BR", {
           day: "numeric", month: "short",
         }),
       }));
-    }
-    return fallback;
   }
 
   function handlePreviewDragStart(idx: number) {
