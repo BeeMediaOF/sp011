@@ -1,12 +1,6 @@
 uploads = []
 
 [[generated]]
-id = "yj8jkA3GIpA8ey-Lb4nXh"
-uri = "file://artifacts/brasilia-agora/src/assets/images/hero.png"
-type = "image"
-title = "Aerial view Congresso Nacional"
-
-[[generated]]
 id = "kb-DjTN_-WwbcWyGE92hs"
 uri = "file://artifacts/brasilia-agora/src/assets/images/traffic.png"
 type = "image"

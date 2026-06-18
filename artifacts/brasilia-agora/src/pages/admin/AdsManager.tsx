@@ -97,6 +97,210 @@ function emptyForm() {
 
 type StatusFilter = "todos" | "ativo" | "pausado";
 
+// ─── Ad Form Modal ────────────────────────────────────────────────────────────
+function AdFormModal({
+  editingId,
+  form,
+  setForm,
+  saving,
+  dragOver,
+  setDragOver,
+  fileRef,
+  onClose,
+  onSubmit,
+  onFile,
+}: {
+  editingId: string | null;
+  form: ReturnType<typeof emptyForm>;
+  setForm: React.Dispatch<React.SetStateAction<ReturnType<typeof emptyForm>>>;
+  saving: boolean;
+  dragOver: boolean;
+  setDragOver: (v: boolean) => void;
+  fileRef: React.RefObject<HTMLInputElement>;
+  onClose: () => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onFile: (f: File) => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(15,23,42,0.5)" }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        style={{ boxShadow: "0 24px 64px rgba(15,23,42,0.2)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-[#0F172A]">
+              {editingId ? "Editar propaganda" : "Nova propaganda"}
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {editingId ? "Atualize as informações do anúncio." : "Preencha os dados para criar um novo anúncio."}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={onSubmit} className="p-6 space-y-5">
+          {/* Nome */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+              Nome da propaganda <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="Ex.: Banner Topo"
+              required
+              autoFocus
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+            />
+          </div>
+
+          {/* Posição */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+              Posição <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={form.position}
+              onChange={(e) => setForm((f) => ({ ...f, position: e.target.value as AdPosition }))}
+              required
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
+            >
+              <option value="">Selecione a posição</option>
+              {POSITION_OPTIONS.slice(0, 11).map((p) => (
+                <option key={p.value} value={p.value}>{p.label} — {p.format}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Formato (derivado da posição) */}
+          {form.position && (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+              <Info size={13} className="text-blue-500 shrink-0" />
+              <span className="text-xs text-blue-700">
+                Formato recomendado: <strong>{FORMAT_LABELS[form.position] ?? "—"} px</strong>
+              </span>
+            </div>
+          )}
+
+          {/* Destino URL */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+              URL de destino <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={form.link}
+              onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
+              placeholder="https://..."
+              type="url"
+              required
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+            />
+          </div>
+
+          {/* Arquivo do anúncio */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+              Imagem do anúncio <span className="text-red-500">*</span>
+            </label>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,.gif"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); }}
+            />
+            {form.preview ? (
+              <div className="relative rounded-xl border border-gray-200 overflow-hidden">
+                <img src={form.preview} alt="Preview" className="w-full max-h-36 object-contain bg-gray-50" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForm((f) => ({ ...f, preview: "" }));
+                    if (fileRef.current) fileRef.current.value = "";
+                  }}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) onFile(f);
+                }}
+                onClick={() => fileRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-8 cursor-pointer transition-colors ${
+                  dragOver ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                <Upload size={22} className={dragOver ? "text-[#0B2A66]" : "text-gray-400"} />
+                <p className="text-xs text-center text-gray-500 leading-relaxed">
+                  Arraste e solte a imagem aqui<br />
+                  <span className="text-[#0B2A66] font-medium">ou clique para selecionar</span>
+                </p>
+                <p className="text-[10px] text-gray-400">JPG, PNG, GIF — máx. 5MB</p>
+              </div>
+            )}
+          </div>
+
+          {/* Status toggle */}
+          <div className="flex items-center justify-between py-3 border-t border-gray-100">
+            <div>
+              <span className="text-sm font-medium text-[#0F172A]">Status</span>
+              <p className="text-xs text-gray-500 mt-0.5">{form.active ? "Anúncio visível no portal" : "Anúncio pausado"}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500">{form.active ? "Ativo" : "Pausado"}</span>
+              <ToggleSwitch
+                checked={form.active}
+                onChange={() => setForm((f) => ({ ...f, active: !f.active }))}
+              />
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !form.name.trim() || !form.position || !form.link.trim() || !form.preview}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: "#E71D36" }}
+            >
+              {saving ? "Salvando…" : editingId ? "Atualizar" : "Criar propaganda"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function AdsManager() {
   const [ads, setAds]           = useState<Ad[]>([]);
@@ -105,13 +309,14 @@ export default function AdsManager() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [currentPage, setCurrentPage]   = useState(1);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm]           = useState(emptyForm());
-  const [dragOver, setDragOver]   = useState(false);
-  const [saving, setSaving]       = useState(false);
+  const [modalOpen, setModalOpen]   = useState(false);
+  const [editingId, setEditingId]   = useState<string | null>(null);
+  const [form, setForm]             = useState(emptyForm());
+  const [dragOver, setDragOver]     = useState(false);
+  const [saving, setSaving]         = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const PAGE_SIZE = 6;
+  const PAGE_SIZE = 8;
 
   const load = async () => {
     setLoading(true);
@@ -173,14 +378,23 @@ export default function AdsManager() {
     setForm((f) => ({ ...f, preview: b64 }));
   }
 
-  function startEdit(ad: Ad) {
-    setEditingId(ad.id);
-    setForm({ name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active });
-  }
-
-  function resetForm() {
+  function openNew() {
     setEditingId(null);
     setForm(emptyForm());
+    setModalOpen(true);
+  }
+
+  function openEdit(ad: Ad) {
+    setEditingId(ad.id);
+    setForm({ name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active });
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditingId(null);
+    setForm(emptyForm());
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -199,7 +413,7 @@ export default function AdsManager() {
           imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
         });
       }
-      resetForm();
+      closeModal();
       await load();
     } catch (err) {
       alert((err as Error).message);
@@ -211,6 +425,22 @@ export default function AdsManager() {
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title="Propagandas">
+
+      {modalOpen && (
+        <AdFormModal
+          editingId={editingId}
+          form={form}
+          setForm={setForm}
+          saving={saving}
+          dragOver={dragOver}
+          setDragOver={setDragOver}
+          fileRef={fileRef as React.RefObject<HTMLInputElement>}
+          onClose={closeModal}
+          onSubmit={(e) => { void handleSubmit(e); }}
+          onFile={handleFile}
+        />
+      )}
+
       <div className="space-y-6">
 
         {/* ══ Stat cards ══════════════════════════════════════════════════════ */}
@@ -268,379 +498,225 @@ export default function AdsManager() {
           </div>
         </div>
 
-        {/* ══ 2-column grid ═══════════════════════════════════════════════════ */}
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-6 items-start">
+        {/* ══ Table card ══════════════════════════════════════════════════════ */}
+        <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
 
-          {/* ── LEFT: table panel ──────────────────────────────────────────── */}
-          <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+          {/* Filter bar */}
+          <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar propagandas..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">Status</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
+              >
+                <option value="todos">Todos</option>
+                <option value="ativo">Ativo</option>
+                <option value="pausado">Pausado</option>
+              </select>
+            </div>
+            <button
+              onClick={openNew}
+              className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: "#E71D36" }}
+            >
+              <Plus size={16} />
+              Nova propaganda
+            </button>
+          </div>
 
-            {/* Filter bar */}
-            <div className="px-5 py-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
-              <div className="relative flex-1 max-w-xs">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar propagandas..."
-                  className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500 font-medium">Status</span>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                  className="text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
-                >
-                  <option value="todos">Todos</option>
-                  <option value="ativo">Ativo</option>
-                  <option value="pausado">Pausado</option>
-                </select>
-              </div>
+          {/* Table body */}
+          {loading ? (
+            <div className="py-16 text-center text-sm text-gray-400">Carregando propagandas…</div>
+          ) : filtered.length === 0 ? (
+            <div className="py-20 flex flex-col items-center gap-4 text-gray-400">
+              <Megaphone size={36} className="text-gray-200" />
+              <p className="text-sm">Nenhuma propaganda encontrada</p>
               <button
-                onClick={resetForm}
-                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                onClick={openNew}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
                 style={{ backgroundColor: "#E71D36" }}
               >
-                <Plus size={16} />
-                Nova propaganda
+                <Plus size={15} /> Criar primeira propaganda
               </button>
             </div>
-
-            {/* Table body */}
-            {loading ? (
-              <div className="py-16 text-center text-sm text-gray-400">Carregando propagandas…</div>
-            ) : filtered.length === 0 ? (
-              <div className="py-16 text-center text-sm text-gray-400">Nenhuma propaganda encontrada</div>
-            ) : (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Status</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Ações</th>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
+                      <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Status</th>
+                      <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginated.map((ad, i) => (
+                      <tr
+                        key={ad.id}
+                        className={`hover:bg-gray-50/50 transition-colors ${i < paginated.length - 1 ? "border-b border-gray-50" : ""}`}
+                      >
+                        {/* Propaganda */}
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center">
+                              {ad.imageBase64 ? (
+                                <img src={ad.imageBase64} alt={ad.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <ImageIcon size={14} className="text-gray-300" />
+                              )}
+                            </div>
+                            <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{ad.name}</span>
+                          </div>
+                        </td>
+                        {/* Posição */}
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                          {POSITION_LABELS[ad.position] ?? ad.position}
+                        </td>
+                        {/* Formato */}
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
+                          {FORMAT_LABELS[ad.position] ?? "—"}
+                        </td>
+                        {/* Impressões */}
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                          {fmtNum(ad.impressions ?? 0)}
+                        </td>
+                        {/* Cliques */}
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                          {fmtNum(ad.clicks ?? 0)}
+                        </td>
+                        {/* CTR */}
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
+                          {calcCTR(ad.clicks ?? 0, ad.impressions ?? 0)}
+                        </td>
+                        {/* Status */}
+                        <td className="px-4 py-3 text-center">
+                          <StatusBadge active={ad.active} />
+                        </td>
+                        {/* Ações */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => openEdit(ad)}
+                              title="Editar"
+                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                            <ToggleSwitch
+                              checked={ad.active}
+                              onChange={() => { void toggleActive(ad); }}
+                            />
+                            <button
+                              onClick={() => { void handleDelete(ad.id); }}
+                              title="Excluir"
+                              className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {paginated.map((ad, i) => (
-                        <tr
-                          key={ad.id}
-                          className={`hover:bg-gray-50/50 transition-colors ${i < paginated.length - 1 ? "border-b border-gray-50" : ""} ${editingId === ad.id ? "bg-blue-50/30" : ""}`}
-                        >
-                          {/* Propaganda */}
-                          <td className="px-5 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center">
-                                {ad.imageBase64 ? (
-                                  <img src={ad.imageBase64} alt={ad.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <ImageIcon size={14} className="text-gray-300" />
-                                )}
-                              </div>
-                              <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{ad.name}</span>
-                            </div>
-                          </td>
-                          {/* Posição */}
-                          <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                            {POSITION_LABELS[ad.position] ?? ad.position}
-                          </td>
-                          {/* Formato */}
-                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                            {FORMAT_LABELS[ad.position] ?? "—"}
-                          </td>
-                          {/* Impressões */}
-                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                            {fmtNum(ad.impressions ?? 0)}
-                          </td>
-                          {/* Cliques */}
-                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                            {fmtNum(ad.clicks ?? 0)}
-                          </td>
-                          {/* CTR */}
-                          <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                            {calcCTR(ad.clicks ?? 0, ad.impressions ?? 0)}
-                          </td>
-                          {/* Status */}
-                          <td className="px-4 py-3 text-center">
-                            <StatusBadge active={ad.active} />
-                          </td>
-                          {/* Ações */}
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center gap-1.5">
-                              <button
-                                onClick={() => startEdit(ad)}
-                                title="Editar"
-                                className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
-                                  editingId === ad.id
-                                    ? "border-[#0B2A66] bg-[#0B2A66] text-white"
-                                    : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66]"
-                                }`}
-                              >
-                                <Pencil size={13} />
-                              </button>
-                              <ToggleSwitch
-                                checked={ad.active}
-                                onChange={() => { void toggleActive(ad); }}
-                              />
-                              <button
-                                onClick={() => { void handleDelete(ad.id); }}
-                                title="Excluir"
-                                className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Pagination */}
-                <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
-                  <p className="text-xs text-gray-500">
-                    Mostrando {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length} propagandas
-                  </p>
-                  {totalPages > 1 && (
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft size={14} />
-                      </button>
-                      {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
-                        const page = i + 1;
-                        return (
-                          <button
-                            key={page}
-                            onClick={() => setCurrentPage(page)}
-                            className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                              currentPage === page
-                                ? "bg-[#0B2A66] text-white"
-                                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                            }`}
-                          >
-                            {page}
-                          </button>
-                        );
-                      })}
-                      {totalPages > 4 && (
-                        <>
-                          <span className="text-gray-400 text-xs px-1">…</span>
-                          <button
-                            onClick={() => setCurrentPage(totalPages)}
-                            className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
-                              currentPage === totalPages
-                                ? "bg-[#0B2A66] text-white"
-                                : "border border-gray-200 text-gray-600 hover:bg-gray-50"
-                            }`}
-                          >
-                            {totalPages}
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* ── RIGHT: form + tips ─────────────────────────────────────────── */}
-          <div className="space-y-4">
-
-            {/* Form card */}
-            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
-              <div className="mb-4">
-                <h3 className="font-semibold text-[#0F172A]">
-                  {editingId ? "Editar propaganda" : "Adicionar nova propaganda"}
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {editingId ? "Atualize as informações do anúncio." : "Preencha os dados para criar um novo anúncio."}
-                </p>
+                    ))}
+                  </tbody>
+                </table>
               </div>
 
-              <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
-                {/* Nome */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                    Nome da propaganda <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    placeholder="Ex.: Banner Topo"
-                    required
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
-                  />
-                </div>
-
-                {/* Posição */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                    Posição <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={form.position}
-                    onChange={(e) => setForm((f) => ({ ...f, position: e.target.value as AdPosition }))}
-                    required
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white"
-                  >
-                    <option value="">Selecione a posição</option>
-                    {POSITION_OPTIONS.slice(0, 11).map((p) => (
-                      <option key={p.value} value={p.value}>{p.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Formato (derivado da posição) */}
-                {form.position && (
-                  <div>
-                    <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Formato recomendado</label>
-                    <div className="px-3 py-2.5 text-sm border border-gray-100 rounded-xl bg-gray-50 text-gray-600">
-                      {FORMAT_LABELS[form.position] ?? "—"} px
-                    </div>
+              {/* Pagination */}
+              <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between gap-4 flex-wrap">
+                <p className="text-xs text-gray-500">
+                  Mostrando {filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filtered.length)} de {filtered.length} propagandas
+                </p>
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => {
+                      const page = i + 1;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                            currentPage === page
+                              ? "bg-[#0B2A66] text-white"
+                              : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                    {totalPages > 4 && (
+                      <>
+                        <span className="text-gray-400 text-xs px-1">…</span>
+                        <button
+                          onClick={() => setCurrentPage(totalPages)}
+                          className={`w-8 h-8 rounded-lg text-xs font-medium transition-colors ${
+                            currentPage === totalPages
+                              ? "bg-[#0B2A66] text-white"
+                              : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                          }`}
+                        >
+                          {totalPages}
+                        </button>
+                      </>
+                    )}
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 )}
-
-                {/* Destino URL */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                    Destino (URL) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    value={form.link}
-                    onChange={(e) => setForm((f) => ({ ...f, link: e.target.value }))}
-                    placeholder="https://..."
-                    type="url"
-                    required
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
-                  />
-                </div>
-
-                {/* Arquivo do anúncio */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
-                    Arquivo do anúncio <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*,.gif"
-                    className="hidden"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) { void handleFile(f); } }}
-                  />
-                  {form.preview ? (
-                    <div className="relative rounded-xl border border-gray-200 overflow-hidden">
-                      <img src={form.preview} alt="Preview" className="w-full max-h-28 object-contain bg-gray-50" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setForm((f) => ({ ...f, preview: "" }));
-                          if (fileRef.current) fileRef.current.value = "";
-                        }}
-                        className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center text-gray-600 hover:text-red-500"
-                      >
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div
-                      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragOver(false);
-                        const f = e.dataTransfer.files?.[0];
-                        if (f) { void handleFile(f); }
-                      }}
-                      onClick={() => fileRef.current?.click()}
-                      className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-6 cursor-pointer transition-colors ${
-                        dragOver ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      <Upload size={20} className={dragOver ? "text-[#0B2A66]" : "text-gray-400"} />
-                      <p className="text-xs text-center text-gray-500 leading-relaxed">
-                        Arraste e solte o arquivo aqui<br />
-                        <span className="text-[#0B2A66] font-medium">ou clique para selecionar</span>
-                      </p>
-                      <p className="text-[10px] text-gray-400">Formatos aceitos: JPG, PNG, GIF (máx. 5MB)</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Status toggle */}
-                <div className="flex items-center justify-between py-2 border-t border-gray-100">
-                  <span className="text-sm font-medium text-[#0F172A]">Status</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{form.active ? "Ativo" : "Pausado"}</span>
-                    <ToggleSwitch
-                      checked={form.active}
-                      onChange={() => setForm((f) => ({ ...f, active: !f.active }))}
-                    />
-                  </div>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="flex-1 px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving || !form.name.trim() || !form.position || !form.link.trim() || !form.preview}
-                    className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: "#E71D36" }}
-                  >
-                    {saving ? "Salvando…" : editingId ? "Atualizar" : "Salvar propaganda"}
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Tips card */}
-            <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-              <div className="flex items-center gap-2 mb-3">
-                <Info size={14} className="text-blue-600" />
-                <span className="text-xs font-semibold text-blue-700">Dicas</span>
               </div>
-              <ul className="space-y-1.5">
-                {[
-                  "Use formatos responsivos para melhor experiência.",
-                  "Verifique o tamanho máximo do arquivo (5MB).",
-                  "Anúncios inativos não serão exibidos no site.",
-                ].map((tip, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
-                    <span className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                    {tip}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-          </div>
+            </>
+          )}
         </div>
+
+        {/* Tips */}
+        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
+          <div className="flex items-center gap-2 mb-3">
+            <Info size={14} className="text-blue-600" />
+            <span className="text-xs font-semibold text-blue-700">Dicas</span>
+          </div>
+          <ul className="flex flex-wrap gap-x-8 gap-y-1.5">
+            {[
+              "Use formatos responsivos para melhor experiência.",
+              "Verifique o tamanho máximo do arquivo (5MB).",
+              "Anúncios inativos não serão exibidos no site.",
+              "O botão liga/desliga na tabela ativa ou pausa sem abrir o formulário.",
+            ].map((tip, i) => (
+              <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+                <span className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
+
       </div>
     </AdminLayout>
   );
