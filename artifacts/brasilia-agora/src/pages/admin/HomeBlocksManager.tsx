@@ -21,7 +21,7 @@ type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
-type Tab = "blocks" | "header" | "footer" | "settings";
+type Tab = "blocks" | "header" | "footer" | "settings" | "styles";
 type FilterTab = "all" | "visible" | "hidden";
 type ResponsiveMode = "desktop" | "tablet" | "mobile";
 
@@ -147,6 +147,214 @@ const FOOTER_PRESETS: { id: FooterStyle; label: string; desc: string }[] = [
   { id: "dark",    label: "Escuro",  desc: "Fundo preto, colunas com links, newsletter" },
   { id: "light",   label: "Claro",   desc: "Fundo branco, colunas com links, borda vermelha" },
   { id: "minimal", label: "Minimal", desc: "Apenas uma linha com copyright e links" },
+];
+
+// ─── Home style presets ───────────────────────────────────────────────────────
+interface HomeStylePreset {
+  id: string;
+  name: string;
+  desc: string;
+  tag: string;
+  tagColor: string;
+  tagBg: string;
+  accentColor: string;
+  headerStyle: HeaderStyle;
+  footerStyle: FooterStyle;
+  headerBgColor: string;
+  footerBgColor: string;
+  blocks: HomeBlock[];
+  diagram: React.ReactNode;
+}
+
+const HOME_STYLE_PRESETS: HomeStylePreset[] = [
+  {
+    id: "padrao",
+    name: "Padrão",
+    tag: "CLÁSSICO",
+    tagColor: "#1e40af", tagBg: "#DBEAFE",
+    accentColor: "#0B2A66",
+    desc: "Layout equilibrado com hero, seções em grade e colunistas.",
+    headerStyle: "standard", footerStyle: "dark",
+    headerBgColor: "#ffffff", footerBgColor: "#000000",
+    blocks: [
+      { id: "hero",       name: "Hero / Destaques", visible: true,  order: 0 },
+      { id: "brasil",     name: "Brasil",           visible: true,  order: 1, layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "mais-lidas", name: "Mais Lidas",       visible: true,  order: 2 },
+      { id: "mundo",      name: "Mundo",            visible: true,  order: 3, layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: true,  order: 4, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: true,  order: 5, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: true,  order: 6, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: true,  order: 7, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: true,  order: 8, layout: "cultura", color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",       visible: true,  order: 9 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: true,  order: 10 },
+    ],
+    diagram: (
+      <div className="flex flex-col gap-0.5 w-full h-full">
+        <div className="w-full h-5 bg-current rounded opacity-40" />
+        <div className="flex gap-0.5 flex-1">
+          {[0,1,2,3].map(i=><div key={i} className="flex-1 bg-current rounded opacity-25"/>)}
+        </div>
+        <div className="flex gap-0.5 h-3">
+          {[0,1,2,3].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "portal",
+    name: "Portal",
+    tag: "HARD NEWS",
+    tagColor: "#9a3412", tagBg: "#FEE2E2",
+    accentColor: "#E71D36",
+    desc: "Forte no hero manchete, poucos blocos, ticker de últimas.",
+    headerStyle: "compact", footerStyle: "dark",
+    headerBgColor: "#0B2A66", footerBgColor: "#000000",
+    blocks: [
+      { id: "hero",       name: "Manchete Principal", visible: true,  order: 0, layout: "manchete" },
+      { id: "brasil",     name: "Brasil",             visible: true,  order: 1, layout: "featured", color: "#16a34a", category: "brasil" },
+      { id: "mais-lidas", name: "Mais Lidas",         visible: true,  order: 2 },
+      { id: "mundo",      name: "Mundo",              visible: true,  order: 3, layout: "grid",     color: "#6b21a8", category: "mundo" },
+      { id: "df",         name: "DF",                 visible: true,  order: 4, layout: "duplo",    color: "#0b3d91", category: "cidade" },
+      { id: "colunistas", name: "Colunistas",         visible: true,  order: 5 },
+      { id: "ultimas",    name: "Últimas Notícias",   visible: true,  order: 6 },
+      { id: "esporte",    name: "Esporte",            visible: false, order: 7, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",            visible: false, order: 8, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "saude",      name: "Saúde",              visible: false, order: 9, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",         visible: false, order: 10, layout: "grid",   color: "#0284c7", category: "tecnologia" },
+    ],
+    diagram: (
+      <div className="flex flex-col gap-0.5 w-full h-full">
+        <div className="w-full h-7 bg-current rounded opacity-50" />
+        <div className="flex gap-0.5 flex-1">
+          <div className="flex-[2] bg-current rounded opacity-35"/>
+          <div className="flex-1 flex flex-col gap-0.5">
+            {[0,1,2].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+          </div>
+        </div>
+        <div className="w-full h-2 bg-current rounded opacity-20" />
+      </div>
+    ),
+  },
+  {
+    id: "magazine",
+    name: "Magazine",
+    tag: "DENSO",
+    tagColor: "#065f46", tagBg: "#D1FAE5",
+    accentColor: "#10B981",
+    desc: "Muitas editorias visíveis, grade densa, mosaico no hero.",
+    headerStyle: "standard", footerStyle: "light",
+    headerBgColor: "#ffffff", footerBgColor: "#f8fafc",
+    blocks: [
+      { id: "hero",       name: "Destaques",    visible: true,  order: 0,  layout: "mosaico" },
+      { id: "brasil",     name: "Brasil",       visible: true,  order: 1,  layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "esporte",    name: "Esporte",      visible: true,  order: 2,  layout: "duplo",   color: "#dc2626", category: "esportes" },
+      { id: "mais-lidas", name: "Mais Lidas",   visible: true,  order: 3 },
+      { id: "mundo",      name: "Mundo",        visible: true,  order: 4,  layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "cultura",    name: "Cultura",      visible: true,  order: 5,  layout: "grid",    color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",           visible: true,  order: 6,  layout: "grid",    color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",        visible: true,  order: 7,  layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",   visible: true,  order: 8,  layout: "grid",    color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",   visible: true,  order: 9 },
+      { id: "ultimas",    name: "Últimas",      visible: true,  order: 10 },
+    ],
+    diagram: (
+      <div className="flex flex-col gap-0.5 w-full h-full">
+        <div className="flex gap-0.5 h-4">
+          <div className="flex-[2] bg-current rounded opacity-45"/>
+          <div className="flex-[2] grid grid-cols-2 gap-0.5">
+            {[0,1,2,3].map(i=><div key={i} className="bg-current rounded opacity-25"/>)}
+          </div>
+        </div>
+        <div className="flex gap-0.5 flex-1">
+          {[0,1,2,3].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+        </div>
+        <div className="flex gap-0.5 flex-1">
+          {[0,1,2,3].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: "editorial",
+    name: "Editorial",
+    tag: "OPINIÃO",
+    tagColor: "#4c1d95", tagBg: "#EDE9FE",
+    accentColor: "#7C3AED",
+    desc: "Foco em texto e colunistas, header centralizado, rodapé mínimo.",
+    headerStyle: "centered", footerStyle: "minimal",
+    headerBgColor: "#0f172a", footerBgColor: "#0f172a",
+    blocks: [
+      { id: "hero",       name: "Destaque Principal", visible: true,  order: 0, layout: "featured" },
+      { id: "brasil",     name: "Brasil",             visible: true,  order: 1, layout: "featured",  color: "#16a34a", category: "brasil" },
+      { id: "colunistas", name: "Colunistas",         visible: true,  order: 2 },
+      { id: "cultura",    name: "Cultura",            visible: true,  order: 3, layout: "cultura",   color: "#0d9488", category: "cultura" },
+      { id: "mundo",      name: "Mundo",              visible: true,  order: 4, layout: "featured",  color: "#6b21a8", category: "mundo" },
+      { id: "ultimas",    name: "Últimas Notícias",   visible: true,  order: 5 },
+      { id: "mais-lidas", name: "Mais Lidas",         visible: false, order: 6 },
+      { id: "esporte",    name: "Esporte",            visible: false, order: 7, layout: "grid", color: "#dc2626", category: "esportes" },
+      { id: "df",         name: "DF",                 visible: false, order: 8, layout: "duplo", color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",              visible: false, order: 9, layout: "grid", color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",         visible: false, order: 10, layout: "grid", color: "#0284c7", category: "tecnologia" },
+    ],
+    diagram: (
+      <div className="flex flex-col gap-0.5 w-full h-full">
+        <div className="flex gap-0.5 h-5">
+          <div className="flex-[2] bg-current rounded opacity-45"/>
+          <div className="flex-1 flex flex-col gap-0.5">
+            {[0,1,2].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+          </div>
+        </div>
+        <div className="flex gap-0.5 flex-1">
+          <div className="flex-[2] bg-current rounded opacity-35"/>
+          <div className="flex-1 flex flex-col gap-0.5">
+            {[0,1,2].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+          </div>
+        </div>
+        <div className="w-full h-2 bg-current rounded opacity-15" />
+      </div>
+    ),
+  },
+  {
+    id: "minimalista",
+    name: "Minimalista",
+    tag: "LIMPO",
+    tagColor: "#374151", tagBg: "#F3F4F6",
+    accentColor: "#6B7280",
+    desc: "Poucos blocos, muito espaço, foco total no conteúdo principal.",
+    headerStyle: "compact", footerStyle: "minimal",
+    headerBgColor: "#ffffff", footerBgColor: "#18181b",
+    blocks: [
+      { id: "hero",       name: "Destaques",        visible: true,  order: 0, layout: "duplo" },
+      { id: "mais-lidas", name: "Mais Lidas",       visible: true,  order: 1 },
+      { id: "brasil",     name: "Brasil",           visible: true,  order: 2, layout: "featured", color: "#16a34a", category: "brasil" },
+      { id: "colunistas", name: "Colunistas",       visible: true,  order: 3 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: true,  order: 4 },
+      { id: "mundo",      name: "Mundo",            visible: false, order: 5, layout: "grid", color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: false, order: 6, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: false, order: 7, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: false, order: 8, layout: "duplo", color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: false, order: 9, layout: "grid", color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 10, layout: "grid", color: "#0284c7", category: "tecnologia" },
+    ],
+    diagram: (
+      <div className="flex flex-col gap-1 w-full h-full justify-center">
+        <div className="flex gap-0.5 h-5">
+          <div className="flex-1 bg-current rounded opacity-45"/>
+          <div className="flex-1 bg-current rounded opacity-45"/>
+        </div>
+        <div className="flex gap-0.5 h-3">
+          {[0,1,2,3].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+        </div>
+        <div className="flex gap-0.5 h-5">
+          <div className="flex-[2] bg-current rounded opacity-35"/>
+          <div className="flex-1 flex flex-col gap-0.5">
+            {[0,1,2].map(i=><div key={i} className="flex-1 bg-current rounded opacity-20"/>)}
+          </div>
+        </div>
+      </div>
+    ),
+  },
 ];
 
 // ─── Extended block form ──────────────────────────────────────────────────────
@@ -452,6 +660,8 @@ export default function HomeBlocksManager() {
   const [logoStatus, setLogoStatus]     = useState<"idle" | "ok" | "err">("idle");
   const [history, setHistory]           = useState<HomeBlock[][]>([]);
   const [historyIdx, setHistoryIdx]     = useState(-1);
+  const [applyingPreset, setApplyingPreset] = useState<string | null>(null);
+  const [appliedPreset, setAppliedPreset]   = useState<string | null>(null);
 
   const logoInputRef  = useRef<HTMLInputElement>(null);
   const saveTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -546,6 +756,32 @@ export default function HomeBlocksManager() {
       } catch { } finally { setSaving(false); }
     }, delay);
   }, []);
+
+  async function applyPreset(preset: HomeStylePreset) {
+    setApplyingPreset(preset.id);
+    try {
+      const ordered = preset.blocks.map((b, i) => ({ ...b, order: i }));
+      await adminApi.updateSettings({
+        homeBlocks:    ordered,
+        headerStyle:   preset.headerStyle,
+        footerStyle:   preset.footerStyle,
+        headerBgColor: preset.headerBgColor,
+        footerBgColor: preset.footerBgColor,
+      });
+      setBlocks(ordered);
+      setHeaderStyle(preset.headerStyle);
+      setFooterStyle(preset.footerStyle);
+      setHeaderBgColor(preset.headerBgColor);
+      setFooterBgColor(preset.footerBgColor);
+      pushHistory(ordered);
+      invalidateSiteCache();
+      iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
+      setAppliedPreset(preset.id);
+      setSaved(true);
+      setTimeout(() => { setSaved(false); setAppliedPreset(null); }, 2500);
+      setTab("blocks");
+    } catch { } finally { setApplyingPreset(null); }
+  }
 
   async function saveAll() {
     setSaving(true);
@@ -733,12 +969,12 @@ export default function HomeBlocksManager() {
 
         {/* ══ Tabs ════════════════════════════════════════════════════════════ */}
         <div className="shrink-0 flex border-b border-[#E2E8F0] bg-white px-6">
-          {(["blocks","header","footer","settings"] as Tab[]).map((t) => (
+          {(["styles","blocks","header","footer","settings"] as Tab[]).map((t) => (
             <button key={t} onClick={() => { setTab(t); setShowAdd(false); }}
               className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t ? "text-[#0B2A66] border-[#0B2A66]" : "text-[#64748B] border-transparent hover:text-[#0F172A]"
               }`}>
-              {t === "blocks" ? "Blocos" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
+              {t === "styles" ? "Estilos" : t === "blocks" ? "Blocos" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
             </button>
           ))}
         </div>
@@ -748,6 +984,84 @@ export default function HomeBlocksManager() {
 
           {/* ── Left panel ──────────────────────────────────────────────────── */}
           <div className="w-[320px] shrink-0 flex flex-col border-r border-[#E2E8F0] bg-white overflow-hidden">
+
+            {/* ── STYLES tab ── */}
+            {tab === "styles" && (
+              <div className="flex-1 overflow-y-auto">
+                <div className="px-4 pt-4 pb-3 border-b border-[#E2E8F0]">
+                  <span className="text-[13px] font-bold text-[#0F172A]">Estilos da Home</span>
+                  <p className="text-[11px] text-[#64748B] mt-0.5">Escolha um dos 5 estilos prontos. Após aplicar, você pode editar cada bloco normalmente.</p>
+                </div>
+                <div className="px-3 py-3 space-y-2">
+                  {HOME_STYLE_PRESETS.map((preset) => {
+                    const isApplying = applyingPreset === preset.id;
+                    const wasApplied = appliedPreset === preset.id;
+                    return (
+                      <div key={preset.id}
+                        className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden hover:border-[#CBD5E1] transition-all"
+                        style={{ boxShadow: "0 2px 8px rgba(15,23,42,0.04)" }}>
+                        <div className="flex gap-0 h-[108px]">
+                          {/* Color accent + diagram */}
+                          <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 rounded-l-2xl" style={{ backgroundColor: preset.accentColor + "18", color: preset.accentColor }}>
+                            <div className="w-full h-full">
+                              {preset.diagram}
+                            </div>
+                          </div>
+                          {/* Info */}
+                          <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5 mb-0.5">
+                                <span className="text-[13px] font-bold text-[#0F172A]">{preset.name}</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                                  style={{ backgroundColor: preset.tagBg, color: preset.tagColor }}>
+                                  {preset.tag}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-[#64748B] leading-snug">{preset.desc}</p>
+                              <div className="flex gap-1 mt-1.5">
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                  {preset.headerStyle === "standard" ? "⊞ Padrão" : preset.headerStyle === "compact" ? "— Compacto" : "⊟ Centralizado"}
+                                </span>
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                  {preset.footerStyle === "dark" ? "🌑 Rodapé escuro" : preset.footerStyle === "light" ? "☀ Rodapé claro" : "— Minimal"}
+                                </span>
+                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                  {preset.blocks.filter(b => b.visible).length} blocos
+                                </span>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => applyPreset(preset)}
+                              disabled={!!applyingPreset}
+                              className="mt-1.5 w-full flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-bold rounded-xl transition-colors disabled:opacity-50"
+                              style={{
+                                backgroundColor: wasApplied ? "#16a34a" : preset.accentColor,
+                                color: "#fff",
+                              }}>
+                              {isApplying ? (
+                                <><RefreshCw size={11} className="animate-spin" /> Aplicando…</>
+                              ) : wasApplied ? (
+                                <><CheckCircle size={11} /> Aplicado!</>
+                              ) : (
+                                <><Layers size={11} /> Aplicar estilo</>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="px-4 pb-4">
+                  <div className="flex items-start gap-2.5 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl">
+                    <Palette size={13} className="text-[#D97706] mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-[#92400E] leading-relaxed">
+                      Aplicar um estilo substitui os blocos, cabeçalho e rodapé atuais. Use <strong>Desfazer</strong> para voltar.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* ── BLOCKS tab ── */}
             {tab === "blocks" && (
