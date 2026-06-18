@@ -10,6 +10,7 @@ import {
   MoreHorizontal, Heading2, Heading3, ImagePlus,
   GalleryHorizontal, AlertCircle, Wand2, Plus, Trash2,
   Youtube, Play, RefreshCw, Pencil,
+  ClipboardPaste, AlignLeft, Zap,
 } from "lucide-react";
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -83,6 +84,12 @@ export default function ArticleEdit() {
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState("");
   const [dragOver, setDragOver]       = useState(false);
+
+  // ── Paste / format modal ─────────────────────────────────────
+  const [pasteOpen, setPasteOpen]     = useState(false);
+  const [pasteRaw, setPasteRaw]       = useState("");
+  const [pasteMode, setPasteMode]     = useState<"replace" | "append">("replace");
+  const [fillingSeo, setFillingSeo]   = useState(false);
 
   // ── Content block modals ────────────────────────────────────
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -229,6 +236,92 @@ export default function ArticleEdit() {
     const t = v.trim();
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
     setTagInput("");
+  }
+
+  // ── Text formatting helpers ───────────────────────────────────
+  function toTitleCase(s: string) {
+    const lower = ["de","do","da","dos","das","e","em","o","a","os","as","com","por","para","ao","aos"];
+    return s.toLowerCase().replace(/\b\w+/g, (w, i) =>
+      i === 0 || !lower.includes(w) ? w.charAt(0).toUpperCase() + w.slice(1) : w
+    );
+  }
+
+  function formatParagraphText(raw: string): string {
+    const lines = raw.split(/\r?\n/);
+    const paras: string[] = [];
+    let current: string[] = [];
+
+    function flush() {
+      if (!current.length) return;
+      const text = current.join(" ").trim();
+      current = [];
+      if (!text) return;
+
+      // ALL CAPS heading (only letters/accented + spaces + digits + punct, no lowercase)
+      const noAccents = text.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const isAllCaps = /^[A-Z0-9\s:–—.,'"""]{3,}$/.test(noAccents) && !/[a-z]/.test(noAccents) && text.length <= 80;
+      if (isAllCaps) { paras.push(`## ${toTitleCase(text)}`); return; }
+
+      // Numbered heading pattern: "1. HEADING" or "I. HEADING"
+      const numberedCaps = text.match(/^(\d+\.|[IVX]+\.)\s+(.+)$/);
+      if (numberedCaps && !/[a-z]/.test(numberedCaps[2]!)) {
+        paras.push(`## ${toTitleCase(numberedCaps[2]!)}`); return;
+      }
+
+      // Bullet point
+      if (/^[-•·*]\s/.test(text)) { paras.push(`- ${text.slice(2).trim()}`); return; }
+
+      paras.push(text);
+    }
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) { flush(); } else { current.push(trimmed); }
+    }
+    flush();
+    return paras.join("\n\n");
+  }
+
+  function handlePasteInsert() {
+    const formatted = formatParagraphText(pasteRaw);
+    if (!formatted) return;
+    if (pasteMode === "replace") {
+      setField("content", formatted);
+    } else {
+      const existing = (form.content ?? "").trimEnd();
+      setField("content", existing ? `${existing}\n\n${formatted}` : formatted);
+    }
+    setPasteOpen(false);
+    setPasteRaw("");
+  }
+
+  function handleFormatContent() {
+    const current = form.content ?? "";
+    if (!current.trim()) return;
+    setField("content", formatParagraphText(current));
+  }
+
+  async function triggerSeoFill() {
+    const title   = form.title ?? "";
+    const content = form.content ?? "";
+    if (!title.trim()) return;
+    setFillingSeo(true);
+    try {
+      const ai = await adminApi.autofillArticle(title, content);
+      if (ai.subtitle && !form.subtitle?.trim()) { setField("subtitle", ai.subtitle); setAiFilledFields((s) => new Set([...s, "subtitle"])); }
+      if (ai.summary)   { setField("keywords", ai.summary);  setAiFilledFields((s) => new Set([...s, "summary"])); }
+      if (ai.tags?.length) { setTags(ai.tags); setAiFilledFields((s) => new Set([...s, "tags"])); }
+      if (ai.seoTitle)  { setSeoTitle(ai.seoTitle.slice(0, 60)); setAiFilledFields((s) => new Set([...s, "seoTitle"])); }
+      if (ai.metaDesc)  { setSeoDesc(ai.metaDesc.slice(0, 160)); setAiFilledFields((s) => new Set([...s, "metaDesc"])); }
+      if (ai.slug && isNew) { setSlug(ai.slug.slice(0, 80)); setAiFilledFields((s) => new Set([...s, "slug"])); }
+      setSuccess("SEO / AIO preenchido com IA!");
+      setTimeout(() => setSuccess(""), 2500);
+    } catch {
+      setError("Erro ao preencher SEO com IA");
+      setTimeout(() => setError(""), 2500);
+    } finally {
+      setFillingSeo(false);
+    }
   }
 
   // ── Block insertion helpers ───────────────────────────────────
@@ -567,24 +660,39 @@ export default function ArticleEdit() {
 
                   {[
                     { id: "link",  Icon: LinkIcon,  title: "Link" },
-                    { id: "image", Icon: ImageIcon, title: "Imagem", noAction: true },
-                    { id: "video", Icon: Video,     title: "Vídeo",  noAction: true },
-                    { id: "table", Icon: Table,     title: "Tabela", noAction: true },
-                    { id: "more",  Icon: MoreHorizontal, title: "Mais", noAction: true },
-                  ].map(({ id, Icon, title, noAction }) => (
+                  ].map(({ id, Icon, title }) => (
                     <button
                       key={id}
                       type="button"
                       title={title}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        if (!noAction) insertFormat(id as Parameters<typeof insertFormat>[0]);
-                      }}
+                      onMouseDown={(e) => { e.preventDefault(); insertFormat(id as Parameters<typeof insertFormat>[0]); }}
                       className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-[#0B2A66] transition-colors"
                     >
                       <Icon size={13} />
                     </button>
                   ))}
+
+                  <div className="w-px h-4 bg-slate-200 mx-1" />
+
+                  {/* Colar texto formatado */}
+                  <button
+                    type="button"
+                    title="Colar texto formatado"
+                    onMouseDown={(e) => { e.preventDefault(); setPasteRaw(""); setPasteOpen(true); }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 transition-colors"
+                  >
+                    <ClipboardPaste size={12} /> Colar texto
+                  </button>
+
+                  {/* Formatar parágrafos */}
+                  <button
+                    type="button"
+                    title="Formatar parágrafos automaticamente"
+                    onMouseDown={(e) => { e.preventDefault(); handleFormatContent(); }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    <AlignLeft size={12} /> Formatar
+                  </button>
                 </div>
 
                 <textarea
@@ -1090,7 +1198,22 @@ export default function ArticleEdit() {
 
           {/* ── SEO card ──────────────────────────────────────────── */}
           <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
-            <h3 className="text-sm font-semibold text-[#0B2A66]">SEO</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[#0B2A66]">SEO / AIO / Palavras-chave</h3>
+              <button
+                type="button"
+                onClick={() => { void triggerSeoFill(); }}
+                disabled={fillingSeo || !form.title?.trim()}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl text-white transition-colors disabled:opacity-50"
+                style={{ background: "linear-gradient(135deg,#7c3aed,#4f46e5)" }}
+                title={!form.title?.trim() ? "Preencha o título primeiro" : "Preencher SEO, AIO e palavras-chave com IA"}
+              >
+                {fillingSeo
+                  ? <><Loader2 size={11} className="animate-spin" /> Gerando…</>
+                  : <><Zap size={11} /> Gerar com IA</>
+                }
+              </button>
+            </div>
 
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
@@ -1109,12 +1232,12 @@ export default function ArticleEdit() {
 
             <div>
               <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-                Meta descrição {aiFilledFields.has("metaDesc") && <AiBadge />}
+                Meta descrição / AIO {aiFilledFields.has("metaDesc") && <AiBadge />}
               </label>
               <textarea
                 value={seoDesc}
                 onChange={(e) => { userEditedRef.current.add("metaDesc"); setSeoDesc(e.target.value.slice(0, 160)); }}
-                placeholder="Descrição para mecanismos de busca (opcional)"
+                placeholder="Descrição otimizada para buscadores e IA (AIO)"
                 rows={3}
                 className={`w-full px-4 py-3 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors ${
                   aiFilledFields.has("metaDesc") ? "border-purple-200" : "border-slate-200"
@@ -1122,9 +1245,116 @@ export default function ArticleEdit() {
               />
               <p className="text-[10px] text-slate-400 text-right mt-0.5">{seoDesc.length}/160</p>
             </div>
+
+            <div>
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
+                Palavras-chave {aiFilledFields.has("summary") && <AiBadge />}
+              </label>
+              <textarea
+                value={form.keywords ?? ""}
+                onChange={(e) => { userEditedRef.current.add("summary"); setField("keywords", e.target.value); }}
+                placeholder="Ex: turismo, São Paulo, economia, desenvolvimento"
+                rows={2}
+                className={`w-full px-4 py-3 text-sm border rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors ${
+                  aiFilledFields.has("summary") ? "border-purple-200" : "border-slate-200"
+                }`}
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">Separe por vírgula · a IA preenche automaticamente</p>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ══ Paste text modal ══════════════════════════════════════════ */}
+      {pasteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: "90vh", boxShadow: "0 24px 64px rgba(0,0,0,0.22)" }}>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <ClipboardPaste size={16} className="text-[#2563EB]" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-800">Colar texto formatado</h4>
+                  <p className="text-[11px] text-slate-400">Cole texto de qualquer fonte — formatamos os parágrafos automaticamente</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setPasteOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 min-h-0">
+              <textarea
+                value={pasteRaw}
+                onChange={(e) => setPasteRaw(e.target.value)}
+                placeholder="Cole o texto aqui (de Word, Google Docs, site, e-mail…)"
+                autoFocus
+                className="w-full h-56 px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#2563EB] bg-slate-50 placeholder:text-slate-400 resize-none leading-relaxed transition-colors"
+              />
+
+              {/* Live preview */}
+              {pasteRaw.trim() && (
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">Pré-visualização formatada</p>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm text-slate-700 leading-relaxed max-h-44 overflow-y-auto space-y-3 whitespace-pre-wrap font-sans">
+                    {formatParagraphText(pasteRaw).split("\n\n").map((p, i) =>
+                      p.startsWith("## ")
+                        ? <p key={i} className="font-bold text-[#0B2A66] text-base">{p.slice(3)}</p>
+                        : p.startsWith("- ")
+                        ? <p key={i} className="pl-3 border-l-2 border-slate-300 text-slate-600">{p.slice(2)}</p>
+                        : <p key={i}>{p}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Mode toggle */}
+              <div className="flex gap-3">
+                {(["replace", "append"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setPasteMode(m)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+                      pasteMode === m
+                        ? "border-[#2563EB] bg-blue-50 text-[#2563EB]"
+                        : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {m === "replace" ? "⟲ Substituir conteúdo atual" : "＋ Adicionar ao final"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 shrink-0">
+              <p className="text-[11px] text-slate-400">
+                {pasteRaw.trim()
+                  ? `${formatParagraphText(pasteRaw).split("\n\n").length} parágrafos detectados`
+                  : "Aguardando texto…"}
+              </p>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setPasteOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePasteInsert}
+                  disabled={!pasteRaw.trim()}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-[#2563EB] hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  Formatar e inserir
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

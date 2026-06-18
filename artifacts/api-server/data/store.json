@@ -2961,7 +2961,7 @@
       "autoMode": "rewrite_publish",
       "id": "02e999e8-6af2-4013-989a-38c99b57ce21",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:37:51.669Z",
+      "lastFetchedAt": "2026-06-18T12:44:36.311Z",
       "fetchLimit": 1
     },
     {
@@ -2985,7 +2985,7 @@
       "autoMode": "rewrite_publish",
       "id": "ca38abc8-54b3-4bb5-916b-397c13614ee6",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:38:08.045Z",
+      "lastFetchedAt": "2026-06-18T12:44:52.814Z",
       "fetchLimit": 1
     },
     {
@@ -3010,7 +3010,7 @@
       "id": "2fa4b7ee-2a4c-4a49-8618-ca1c35d72a10",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T11:38:24.275Z"
+      "lastFetchedAt": "2026-06-18T12:45:08.765Z"
     },
     {
       "name": "Correio Braziliense – Saúde",
@@ -3033,7 +3033,7 @@
       "autoMode": "rewrite_publish",
       "id": "ef604be2-61d7-455b-9256-d0b31c0450eb",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:38:41.045Z",
+      "lastFetchedAt": "2026-06-18T12:45:26.037Z",
       "fetchLimit": 1
     },
     {
@@ -3090,7 +3090,7 @@
       "autoMode": "rewrite_publish",
       "id": "d3b820f3-ac9f-4042-8e0c-a49e7b7b5713",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:38:57.541Z",
+      "lastFetchedAt": "2026-06-18T12:45:42.132Z",
       "fetchLimit": 1
     },
     {
@@ -3103,7 +3103,7 @@
       "autoMode": "rewrite_publish",
       "id": "e952a24d-f4c5-48e9-b4c6-7b509d83b738",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:38:59.440Z",
+      "lastFetchedAt": "2026-06-18T12:45:43.003Z",
       "fetchLimit": 1
     },
     {
@@ -3116,7 +3116,7 @@
       "autoMode": "rewrite_publish",
       "id": "a75cbb8f-edcc-44a5-a83b-ac7383521388",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:39:01.042Z",
+      "lastFetchedAt": "2026-06-18T12:45:43.623Z",
       "fetchLimit": 1
     },
     {
@@ -3129,7 +3129,7 @@
       "autoMode": "rewrite_publish",
       "id": "43788d01-c651-4745-bf45-0cf326ccaa5b",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T11:39:02.487Z",
+      "lastFetchedAt": "2026-06-18T12:45:45.219Z",
       "fetchLimit": 1
     },
     {
@@ -3143,7 +3143,7 @@
       "id": "1c321751-f353-40f1-b934-5a21101d83ef",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T11:39:03.066Z"
+      "lastFetchedAt": "2026-06-18T12:45:45.541Z"
     },
     {
       "name": "Jornal de Brasília – DF",
