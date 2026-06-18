@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 
+
 const router = Router();
 
 export interface AnalyticsEvent {
@@ -54,6 +55,12 @@ router.post("/event", (req, res) => {
     scrollDepth,
     platform,
   });
+
+  // Persist category views to disk so counts survive server restarts
+  if (type === "category" && category) {
+    store.trackCategoryView(category);
+  }
+
   res.json({ ok: true });
 });
 
@@ -114,8 +121,13 @@ router.get("/stats", authMiddleware, (_req, res) => {
         articleMap[ev.articleId]!.views++;
       }
 
-      // category
+        // category from pageview (article pages carry category)
       if (ev.category) catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
+    }
+
+    // ── category click ────────────────────────────────────────────────
+    if (ev.type === "category" && ev.category) {
+      catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
     }
 
     // ── read ──────────────────────────────────────────────────────────
@@ -154,15 +166,21 @@ router.get("/stats", authMiddleware, (_req, res) => {
       avgTime: rs > 0 ? Math.round(rt / rs) : undefined,
     }));
 
-  // Top categories with article counts
+  // Top categories: merge in-memory counts + persistent store counts (survive restarts)
+  const persistedViews = store.getCategoryViews();
+  const mergedCatMap: Record<string, number> = { ...persistedViews };
+  for (const [cat, count] of Object.entries(catMap)) {
+    mergedCatMap[cat] = (mergedCatMap[cat] ?? 0) + count;
+  }
+
   const publishedArticles = store.getArticles().filter((a) => a.status === "published");
   const articleCountByCategory: Record<string, number> = {};
   for (const a of publishedArticles) {
     if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;
   }
-  const allCatNames = new Set([...Object.keys(catMap), ...Object.keys(articleCountByCategory)]);
+  const allCatNames = new Set([...Object.keys(mergedCatMap), ...Object.keys(articleCountByCategory)]);
   const topCategories = Array.from(allCatNames)
-    .map((name) => ({ name, views: catMap[name] ?? 0, articles: articleCountByCategory[name] ?? 0 }))
+    .map((name) => ({ name, views: mergedCatMap[name] ?? 0, articles: articleCountByCategory[name] ?? 0 }))
     .sort((a, b) => (b.views || b.articles) - (a.views || a.articles))
     .slice(0, 10);
 

@@ -5,6 +5,7 @@ import Footer from "../components/Footer";
 import CategoryPage from "../components/CategoryPage";
 import type { Article as CategoryArticle } from "../components/CategoryPage";
 import type { Article as ApiArticle } from "../lib/adminApi";
+import { useAnalytics } from "../hooks/useAnalytics";
 
 function relativeTime(dateStr: string): string {
   const now = Date.now();
@@ -28,6 +29,13 @@ interface Props {
 export default function CategoryArchivePage({ category, slug, color }: Props) {
   const [articles, setArticles] = useState<CategoryArticle[]>([]);
   const [loading, setLoading]   = useState(true);
+  const { trackCategory } = useAnalytics();
+
+  // Track category view when user lands on this page
+  useEffect(() => {
+    trackCategory(slug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug]);
 
   useEffect(() => {
     fetch("/api/articles")

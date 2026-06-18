@@ -217,6 +217,7 @@ interface StoreData {
   rssPrompts?: RssPrompts;
   socialConfig?: SocialConfig;
   perplexityTopics?: PerplexityTopic[];
+  categoryViews?: Record<string, number>;
   seedVersion?: number;
 }
 
@@ -635,6 +636,14 @@ export const store = {
     _store.socialConfig = { ...(_store.socialConfig ?? {}), ...data };
     saveStore(_store);
     return { ..._store.socialConfig };
+  },
+
+  // Category Views (persistent)
+  getCategoryViews: (): Record<string, number> => ({ ...(_store.categoryViews ?? {}) }),
+  trackCategoryView: (category: string): void => {
+    if (!_store.categoryViews) _store.categoryViews = {};
+    _store.categoryViews[category] = (_store.categoryViews[category] ?? 0) + 1;
+    saveStore(_store);
   },
 
   // Perplexity Topics
