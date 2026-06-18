@@ -236,6 +236,11 @@ export default function RSSManager() {
   const [aiSaving, setAiSaving]       = useState(false);
   const [aiSaved, setAiSaved]         = useState(false);
   const [aiError, setAiError]         = useState("");
+  const [aiQuota, setAiQuota]         = useState<{
+    usedToday: number; dailyLimit: number; remaining: number;
+    isQuotaExhausted: boolean; isOnCooldown: boolean;
+    cooldownRemainingMs: number; cooldownUntil: number | null;
+  } | null>(null);
 
   // ── Sources ──
   const [sources, setSources]         = useState<RssSource[]>([]);
@@ -329,6 +334,15 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadAiQuota = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}api/admin/ai-quota`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (res.ok) setAiQuota(await res.json());
+    } catch { /* ignore */ }
+  }, []);
+
   const loadSources = useCallback(async () => {
     try {
       const d = await apiFetch<{ sources: RssSource[] }>("/sources");
@@ -368,12 +382,15 @@ export default function RSSManager() {
 
   useEffect(() => {
     void loadAiSettings();
+    void loadAiQuota();
     void loadSources();
     void loadMenuCategories();
     void loadRssStats();
     void loadPrompts();
     void loadLogs();
-  }, [loadAiSettings, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs]);
+    const quotaInterval = setInterval(() => void loadAiQuota(), 15_000);
+    return () => clearInterval(quotaInterval);
+  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -1434,6 +1451,57 @@ export default function RSSManager() {
                       {aiSaved ? "✓ Salvo!" : aiSaving ? "Salvando…" : "Salvar Configuração de IA"}
                     </button>
                   </form>
+
+                  {/* Quota indicator */}
+                  {aiQuota && (
+                    <div className={`rounded-xl p-3.5 border text-xs ${
+                      aiQuota.isOnCooldown
+                        ? "bg-red-50 border-red-200"
+                        : aiQuota.isQuotaExhausted
+                          ? "bg-orange-50 border-orange-200"
+                          : aiQuota.remaining <= 3
+                            ? "bg-amber-50 border-amber-200"
+                            : "bg-slate-50 border-slate-200"
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-slate-700 flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${
+                            aiQuota.isOnCooldown || aiQuota.isQuotaExhausted ? "bg-red-500" :
+                            aiQuota.remaining <= 3 ? "bg-amber-500" : "bg-green-500"
+                          }`}/>
+                          Quota de IA hoje
+                        </span>
+                        <span className={`font-bold ${
+                          aiQuota.isQuotaExhausted || aiQuota.isOnCooldown ? "text-red-600" :
+                          aiQuota.remaining <= 3 ? "text-amber-600" : "text-slate-600"
+                        }`}>
+                          {aiQuota.usedToday} / {aiQuota.dailyLimit}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-200 rounded-full h-1.5 mb-2">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            aiQuota.isQuotaExhausted || aiQuota.isOnCooldown ? "bg-red-500" :
+                            aiQuota.remaining <= 3 ? "bg-amber-500" : "bg-green-500"
+                          }`}
+                          style={{ width: `${Math.min(100, (aiQuota.usedToday / aiQuota.dailyLimit) * 100)}%` }}
+                        />
+                      </div>
+                      {aiQuota.isOnCooldown ? (
+                        <p className="text-red-600 font-medium">
+                          ⏳ Aguardando {Math.ceil(aiQuota.cooldownRemainingMs / 1_000)}s — limite temporário da API
+                        </p>
+                      ) : aiQuota.isQuotaExhausted ? (
+                        <p className="text-orange-700 font-medium">
+                          🚫 Limite diário atingido. Reinicia à meia-noite (UTC).
+                        </p>
+                      ) : (
+                        <p className="text-slate-500">
+                          {aiQuota.remaining} requisição{aiQuota.remaining !== 1 ? "ões" : ""} restante{aiQuota.remaining !== 1 ? "s" : ""} hoje · reseta à meia-noite
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Prompts */}
                   <div className="border-t border-slate-100 pt-4">

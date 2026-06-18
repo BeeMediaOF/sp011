@@ -216,7 +216,75 @@ function parseRewriteResult(raw: string): RewriteResult {
   }
 }
 
-/** Retry helper — retries on 503/UNAVAILABLE up to maxAttempts times */
+// ─── AI Quota Manager ─────────────────────────────────────────────────────────
+
+const DEFAULT_DAILY_LIMIT = 18; // safety margin under the 20 free-tier req/day
+const MIN_CALL_INTERVAL_MS = 3_000; // 3 s between successive AI calls
+
+interface QuotaState {
+  dateKey: string;
+  usedToday: number;
+  cooldownUntil: number; // ms timestamp; 0 = no cooldown
+}
+
+let _quota: QuotaState = { dateKey: "", usedToday: 0, cooldownUntil: 0 };
+let _lastCallTime = 0;
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function refreshDay() {
+  const today = todayKey();
+  if (_quota.dateKey !== today) {
+    _quota = { dateKey: today, usedToday: 0, cooldownUntil: 0 };
+  }
+}
+
+function parseCooldownMs(errMsg: string): number {
+  const m = errMsg.match(/retry[^\d]*(\d+(?:\.\d+)?)\s*s/i);
+  if (m) return Math.ceil(parseFloat(m[1]!) * 1_000) + 3_000; // +3s buffer
+  return 65_000;
+}
+
+export function getAIQuotaStatus() {
+  refreshDay();
+  const now = Date.now();
+  const dailyLimit = DEFAULT_DAILY_LIMIT;
+  const cooldownRemainingMs = Math.max(0, _quota.cooldownUntil - now);
+  return {
+    usedToday: _quota.usedToday,
+    dailyLimit,
+    remaining: Math.max(0, dailyLimit - _quota.usedToday),
+    isQuotaExhausted: _quota.usedToday >= dailyLimit,
+    isOnCooldown: cooldownRemainingMs > 0,
+    cooldownRemainingMs,
+    cooldownUntil: _quota.cooldownUntil || null,
+  };
+}
+
+function checkQuota() {
+  refreshDay();
+  const now = Date.now();
+  if (now < _quota.cooldownUntil) {
+    const secs = Math.ceil((_quota.cooldownUntil - now) / 1_000);
+    throw new Error(`QUOTA_COOLDOWN:Limite de requisições atingido. Aguardando ${secs}s antes de chamar a AI novamente.`);
+  }
+  if (_quota.usedToday >= DEFAULT_DAILY_LIMIT) {
+    throw new Error(`QUOTA_EXHAUSTED:Limite diário de ${DEFAULT_DAILY_LIMIT} requisições de AI atingido. Tente novamente amanhã.`);
+  }
+}
+
+async function enforceCallInterval() {
+  const now = Date.now();
+  const wait = MIN_CALL_INTERVAL_MS - (now - _lastCallTime);
+  if (_lastCallTime > 0 && wait > 0) {
+    await new Promise(r => setTimeout(r, wait));
+  }
+  _lastCallTime = Date.now();
+}
+
+/** Retry helper — retries on 503/UNAVAILABLE; on 429 sets cooldown and throws immediately */
 async function withRetry<T>(
   fn: () => Promise<T>,
   maxAttempts = 3,
@@ -229,15 +297,22 @@ async function withRetry<T>(
     } catch (err) {
       lastErr = err;
       const msg = String(err);
+
+      // On 429: set cooldown and abort immediately — do NOT retry
+      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")) {
+        const cooldownMs = parseCooldownMs(msg);
+        _quota.cooldownUntil = Date.now() + cooldownMs;
+        logger.warn({ cooldownMs, msg }, "AI quota exceeded — cooldown set");
+        throw new Error(`QUOTA_COOLDOWN:Cota da API de AI esgotada. Aguardando ${Math.ceil(cooldownMs / 1_000)}s.`);
+      }
+
       const isRetryable =
         msg.includes("503") ||
         msg.includes("UNAVAILABLE") ||
         msg.includes("overloaded") ||
-        msg.includes("high demand") ||
-        msg.includes("rate limit") ||
-        msg.includes("429");
+        msg.includes("high demand");
       if (!isRetryable || attempt === maxAttempts) throw err;
-      const delay = baseDelayMs * attempt; // 5s, 10s, 15s
+      const delay = baseDelayMs * attempt;
       await new Promise((r) => setTimeout(r, delay));
     }
   }
@@ -247,6 +322,9 @@ async function withRetry<T>(
 export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
+  checkQuota();
+  await enforceCallInterval();
+
   const settings = store.getSettings();
   const provider = settings.rssAiProvider ?? "gemini_paid";
   const prompt   = customPrompt
@@ -304,6 +382,7 @@ export async function rewriteWithAI(
     });
   }
 
+  _quota.usedToday++;
   return parseRewriteResult(raw);
 }
 

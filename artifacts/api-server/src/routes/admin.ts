@@ -8,7 +8,7 @@ import {
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
-import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot } from "../lib/rssProcessor.js";
+import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot, getAIQuotaStatus } from "../lib/rssProcessor.js";
 import { YoutubeTranscript } from "youtube-transcript";
 
 const router = Router();
@@ -389,6 +389,11 @@ router.put("/menu", (req, res) => {
 /** GET /api/admin/settings */
 router.get("/settings", (_req, res) => {
   res.json({ settings: store.getSettings() });
+});
+
+/** GET /api/admin/ai-quota */
+router.get("/ai-quota", authMiddleware, (_req, res) => {
+  res.json(getAIQuotaStatus());
 });
 
 /** PUT /api/admin/settings */
