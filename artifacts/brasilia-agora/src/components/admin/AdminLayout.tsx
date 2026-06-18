@@ -32,13 +32,13 @@ const NAV_MAIN = [
   { label: "Perplexity",    icon: Zap,              path: "/admin/perplexity",   permKey: null },
   { label: "Redes Sociais", icon: Share2,           path: "/admin/redes-sociais",permKey: "social.view" },
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
-  { label: "Logs",          icon: ClipboardList,    path: "/admin/configuracoes?tab=logs", permKey: "logs.view" },
 ];
 
 const NAV_CONFIG = [
-  { label: "Webhook",             icon: Webhook,     path: "/admin/configuracoes?tab=webhook",           permKey: null },
-  { label: "Segurança",           icon: ShieldCheck, path: "/admin/configuracoes?tab=seguranca",         permKey: "security.view" },
-  { label: "Permissões do Editor",icon: KeyRound,    path: "/admin/configuracoes?tab=permissoes",        permKey: null },
+  { label: "Webhook",             icon: Webhook,      path: "/admin/configuracoes?tab=webhook",          permKey: null },
+  { label: "Segurança",           icon: ShieldCheck,  path: "/admin/configuracoes?tab=seguranca",        permKey: "security.view" },
+  { label: "Permissões do Editor",icon: KeyRound,     path: "/admin/configuracoes?tab=permissoes",       permKey: null },
+  { label: "Logs",                icon: ClipboardList,path: "/admin/configuracoes?tab=logs",             permKey: "logs.view" },
 ];
 
 interface AdminLayoutProps {
