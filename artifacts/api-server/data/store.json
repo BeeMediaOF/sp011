@@ -2830,7 +2830,7 @@
       "autoMode": "rewrite_publish",
       "id": "5f0d05e9-6570-4b32-8408-b06154a936cc",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:43:27.774Z",
+      "lastFetchedAt": "2026-06-18T13:56:22.546Z",
       "fetchLimit": 1
     },
     {
@@ -2843,7 +2843,7 @@
       "autoMode": "rewrite_publish",
       "id": "ff71d8f1-56c2-42c5-aaad-0d678e38a530",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:43:28.637Z",
+      "lastFetchedAt": "2026-06-18T13:56:23.231Z",
       "fetchLimit": 1
     },
     {
@@ -2856,7 +2856,7 @@
       "autoMode": "rewrite_publish",
       "id": "e3dc7dc9-18e6-4c36-9b57-f92ea90c1ecc",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:43:45.433Z",
+      "lastFetchedAt": "2026-06-18T13:56:40.211Z",
       "fetchLimit": 1
     },
     {
@@ -2891,7 +2891,7 @@
       "autoMode": "rewrite_publish",
       "id": "3ec2ca71-8c36-4e2d-91f6-a43c0525c28a",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:44:02.087Z",
+      "lastFetchedAt": "2026-06-18T13:56:56.798Z",
       "fetchLimit": 1
     },
     {
@@ -2927,7 +2927,7 @@
       "id": "b667791a-6101-40ee-85e9-ec91a7e0cf65",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T12:44:19.865Z"
+      "lastFetchedAt": "2026-06-18T13:57:14.602Z"
     },
     {
       "name": "Notícias ao Minuto – Cultura",
@@ -2961,7 +2961,7 @@
       "autoMode": "rewrite_publish",
       "id": "02e999e8-6af2-4013-989a-38c99b57ce21",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:44:36.311Z",
+      "lastFetchedAt": "2026-06-18T13:57:31.529Z",
       "fetchLimit": 1
     },
     {
@@ -2985,7 +2985,7 @@
       "autoMode": "rewrite_publish",
       "id": "ca38abc8-54b3-4bb5-916b-397c13614ee6",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:44:52.814Z",
+      "lastFetchedAt": "2026-06-18T13:57:48.008Z",
       "fetchLimit": 1
     },
     {
@@ -3010,7 +3010,7 @@
       "id": "2fa4b7ee-2a4c-4a49-8618-ca1c35d72a10",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T12:45:08.765Z"
+      "lastFetchedAt": "2026-06-18T13:58:03.982Z"
     },
     {
       "name": "Correio Braziliense – Saúde",
@@ -3033,7 +3033,7 @@
       "autoMode": "rewrite_publish",
       "id": "ef604be2-61d7-455b-9256-d0b31c0450eb",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:45:26.037Z",
+      "lastFetchedAt": "2026-06-18T13:58:20.220Z",
       "fetchLimit": 1
     },
     {
@@ -3090,7 +3090,7 @@
       "autoMode": "rewrite_publish",
       "id": "d3b820f3-ac9f-4042-8e0c-a49e7b7b5713",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:45:42.132Z",
+      "lastFetchedAt": "2026-06-18T13:58:36.735Z",
       "fetchLimit": 1
     },
     {
@@ -3103,7 +3103,7 @@
       "autoMode": "rewrite_publish",
       "id": "e952a24d-f4c5-48e9-b4c6-7b509d83b738",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:45:43.003Z",
+      "lastFetchedAt": "2026-06-18T13:58:37.673Z",
       "fetchLimit": 1
     },
     {
@@ -3116,7 +3116,7 @@
       "autoMode": "rewrite_publish",
       "id": "a75cbb8f-edcc-44a5-a83b-ac7383521388",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:45:43.623Z",
+      "lastFetchedAt": "2026-06-18T13:58:38.311Z",
       "fetchLimit": 1
     },
     {
@@ -3129,7 +3129,7 @@
       "autoMode": "rewrite_publish",
       "id": "43788d01-c651-4745-bf45-0cf326ccaa5b",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T12:45:45.219Z",
+      "lastFetchedAt": "2026-06-18T13:58:40.515Z",
       "fetchLimit": 1
     },
     {
@@ -3143,7 +3143,7 @@
       "id": "1c321751-f353-40f1-b934-5a21101d83ef",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T12:45:45.541Z"
+      "lastFetchedAt": "2026-06-18T13:58:40.778Z"
     },
     {
       "name": "Jornal de Brasília – DF",

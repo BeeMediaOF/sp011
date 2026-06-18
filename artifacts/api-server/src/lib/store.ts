@@ -81,6 +81,9 @@ export interface SiteSettings {
   rssAiModel?: string;
   rssAiOutputPrompt?: string;
   diffbotApiKey?: string;
+  geminiApiKey?: string;
+  openaiApiKey?: string;
+  youtubeApiKey?: string;
   bylineName?: string;
   bylineLogoBase64?: string;
 }

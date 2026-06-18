@@ -89,6 +89,9 @@ interface AiSettings {
   hasKey: boolean;
   outputPrompt: string;
   hasDiffbotKey: boolean;
+  hasGeminiKey: boolean;
+  hasOpenaiKey: boolean;
+  hasYoutubeKey: boolean;
 }
 
 const AI_PROVIDERS = [
@@ -149,8 +152,14 @@ export default function MaquinaArtigos() {
   const [cfgApiKey, setCfgApiKey]             = useState("");
   const [cfgDiffbotKey, setCfgDiffbotKey]     = useState("");
   const [cfgOutputPrompt, setCfgOutputPrompt] = useState("");
+  const [cfgGeminiKey, setCfgGeminiKey]       = useState("");
+  const [cfgOpenaiKey, setCfgOpenaiKey]       = useState("");
+  const [cfgYoutubeKey, setCfgYoutubeKey]     = useState("");
   const [showApiKey, setShowApiKey]           = useState(false);
   const [showDiffbotKey, setShowDiffbotKey]   = useState(false);
+  const [showGeminiKey, setShowGeminiKey]     = useState(false);
+  const [showOpenaiKey, setShowOpenaiKey]     = useState(false);
+  const [showYoutubeKey, setShowYoutubeKey]   = useState(false);
 
   const urlInputRef = useRef<HTMLInputElement>(null);
 
@@ -171,6 +180,9 @@ export default function MaquinaArtigos() {
       setCfgModel(d.model);
       setCfgApiKey("");
       setCfgDiffbotKey("");
+      setCfgGeminiKey("");
+      setCfgOpenaiKey("");
+      setCfgYoutubeKey("");
       setCfgOutputPrompt(d.outputPrompt || "");
     } catch {
       toast({ title: "Erro ao carregar configurações", variant: "destructive" });
@@ -184,8 +196,11 @@ export default function MaquinaArtigos() {
     try {
       const token = localStorage.getItem("admin_token") ?? "";
       const body: Record<string, string> = { provider: cfgProvider, model: cfgModel };
-      if (cfgApiKey) body["apiKey"] = cfgApiKey;
-      if (cfgDiffbotKey) body["diffbotApiKey"] = cfgDiffbotKey;
+      if (cfgApiKey)      body["apiKey"]       = cfgApiKey;
+      if (cfgDiffbotKey)  body["diffbotApiKey"] = cfgDiffbotKey;
+      if (cfgGeminiKey)   body["geminiApiKey"]  = cfgGeminiKey;
+      if (cfgOpenaiKey)   body["openaiApiKey"]  = cfgOpenaiKey;
+      if (cfgYoutubeKey)  body["youtubeApiKey"] = cfgYoutubeKey;
       body["outputPrompt"] = cfgOutputPrompt;
       const r = await fetch("/api/admin/rss/ai-settings", {
         method: "PUT",
@@ -195,12 +210,18 @@ export default function MaquinaArtigos() {
       if (!r.ok) throw new Error();
       setCfgApiKey("");
       setCfgDiffbotKey("");
+      setCfgGeminiKey("");
+      setCfgOpenaiKey("");
+      setCfgYoutubeKey("");
       setAiSettings(prev => prev ? {
         ...prev,
         provider: cfgProvider,
         model: cfgModel,
         hasKey: !!cfgApiKey || prev.hasKey,
         hasDiffbotKey: !!cfgDiffbotKey || prev.hasDiffbotKey,
+        hasGeminiKey:  !!cfgGeminiKey  || prev.hasGeminiKey,
+        hasOpenaiKey:  !!cfgOpenaiKey  || prev.hasOpenaiKey,
+        hasYoutubeKey: !!cfgYoutubeKey || prev.hasYoutubeKey,
         outputPrompt: cfgOutputPrompt,
       } : prev);
       toast({ title: "Configurações salvas!" });
@@ -422,6 +443,135 @@ export default function MaquinaArtigos() {
                   <p className="text-[11px] text-slate-400 leading-relaxed">
                     Com a chave configurada, a extração de artigos e a transcrição de vídeos do YouTube usam a API do Diffbot.
                     Sem ela, o sistema usa scraping próprio. <a href="https://www.diffbot.com" target="_blank" rel="noopener noreferrer" className="text-[#0B2A66] hover:underline">diffbot.com</a>
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+
+              {/* ── Gemini API Key ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-blue-500">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">API Gemini</p>
+                    <p className="text-[11px] text-slate-400">Google AI Studio — geração de artigos com Gemini</p>
+                  </div>
+                  {aiSettings?.hasGeminiKey && (
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400">
+                      ✓ Configurado
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Key size={11} /> API Key
+                    {aiSettings?.hasGeminiKey && <span className="text-green-600 dark:text-green-400 text-[10px]">· salvo (deixe em branco para manter)</span>}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showGeminiKey ? "text" : "password"}
+                      value={cfgGeminiKey}
+                      onChange={e => setCfgGeminiKey(e.target.value)}
+                      placeholder={aiSettings?.hasGeminiKey ? "••••••••••••••••" : "AIza..."}
+                      className="w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/25 focus:border-blue-500 font-mono transition-colors"
+                    />
+                    <button type="button" onClick={() => setShowGeminiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showGeminiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Obtenha em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-[#0B2A66] hover:underline">aistudio.google.com</a>. Usado quando o provedor "Gemini (pago)" está selecionado.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+
+              {/* ── ChatGPT (OpenAI) API Key ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="text-emerald-600">
+                      <path d="M20.5 11c0-5.247-4.253-9.5-9.5-9.5S1.5 5.753 1.5 11c0 4.48 3.097 8.23 7.282 9.223l-.282.277H7v1.5h10v-1.5h-1.5l-.282-.277C19.403 19.23 22.5 15.48 22.5 11h-2z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">API ChatGPT</p>
+                    <p className="text-[11px] text-slate-400">OpenAI — GPT-4o, GPT-4o-mini e demais modelos</p>
+                  </div>
+                  {aiSettings?.hasOpenaiKey && (
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400">
+                      ✓ Configurado
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Key size={11} /> API Key
+                    {aiSettings?.hasOpenaiKey && <span className="text-green-600 dark:text-green-400 text-[10px]">· salvo (deixe em branco para manter)</span>}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showOpenaiKey ? "text" : "password"}
+                      value={cfgOpenaiKey}
+                      onChange={e => setCfgOpenaiKey(e.target.value)}
+                      placeholder={aiSettings?.hasOpenaiKey ? "••••••••••••••••" : "sk-..."}
+                      className="w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-500 font-mono transition-colors"
+                    />
+                    <button type="button" onClick={() => setShowOpenaiKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showOpenaiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Obtenha em <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-[#0B2A66] hover:underline">platform.openai.com</a>. Usado quando o provedor "ChatGPT (OpenAI)" está selecionado.
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+
+              {/* ── YouTube API Key ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-red-500">
+                      <path d="M23.5 6.19a3.02 3.02 0 0 0-2.12-2.14C19.54 3.5 12 3.5 12 3.5s-7.54 0-9.38.55A3.02 3.02 0 0 0 .5 6.19C0 8.04 0 12 0 12s0 3.96.5 5.81a3.02 3.02 0 0 0 2.12 2.14C4.46 20.5 12 20.5 12 20.5s7.54 0 9.38-.55a3.02 3.02 0 0 0 2.12-2.14C24 15.96 24 12 24 12s0-3.96-.5-5.81zM9.75 15.02V8.98L15.5 12l-5.75 3.02z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">API YouTube</p>
+                    <p className="text-[11px] text-slate-400">YouTube Data API v3 — transcrição e metadados de vídeos</p>
+                  </div>
+                  {aiSettings?.hasYoutubeKey && (
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400">
+                      ✓ Configurado
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Key size={11} /> API Key
+                    {aiSettings?.hasYoutubeKey && <span className="text-green-600 dark:text-green-400 text-[10px]">· salvo (deixe em branco para manter)</span>}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showYoutubeKey ? "text" : "password"}
+                      value={cfgYoutubeKey}
+                      onChange={e => setCfgYoutubeKey(e.target.value)}
+                      placeholder={aiSettings?.hasYoutubeKey ? "••••••••••••••••" : "AIza..."}
+                      className="w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/25 focus:border-red-500 font-mono transition-colors"
+                    />
+                    <button type="button" onClick={() => setShowYoutubeKey(v => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                      {showYoutubeKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Obtenha em <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener noreferrer" className="text-[#0B2A66] hover:underline">Google Cloud Console</a>. Permite buscar títulos, descrições e legendas de vídeos do YouTube.
                   </p>
                 </div>
               </div>

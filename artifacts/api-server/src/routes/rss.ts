@@ -221,19 +221,23 @@ router.post("/import", (req, res) => {
 router.get("/ai-settings", (_req, res) => {
   const s = store.getSettings();
   res.json({
-    provider:     s.rssAiProvider ?? "gemini_free",
-    model:        s.rssAiModel ?? "",
-    hasKey:       !!s.rssAiApiKey,
-    outputPrompt: s.rssAiOutputPrompt ?? "",
-    hasDiffbotKey: !!s.diffbotApiKey,
+    provider:       s.rssAiProvider ?? "gemini_free",
+    model:          s.rssAiModel ?? "",
+    hasKey:         !!s.rssAiApiKey,
+    outputPrompt:   s.rssAiOutputPrompt ?? "",
+    hasDiffbotKey:  !!s.diffbotApiKey,
+    hasGeminiKey:   !!s.geminiApiKey,
+    hasOpenaiKey:   !!s.openaiApiKey,
+    hasYoutubeKey:  !!s.youtubeApiKey,
   });
 });
 
 /** PUT /api/admin/rss/ai-settings */
 router.put("/ai-settings", (req, res) => {
-  const { provider, model, apiKey, outputPrompt, diffbotApiKey } = req.body as {
+  const { provider, model, apiKey, outputPrompt, diffbotApiKey, geminiApiKey, openaiApiKey, youtubeApiKey } = req.body as {
     provider?: string; model?: string; apiKey?: string;
     outputPrompt?: string; diffbotApiKey?: string;
+    geminiApiKey?: string; openaiApiKey?: string; youtubeApiKey?: string;
   };
   const update: Record<string, string | undefined> = {};
   if (provider) update["rssAiProvider"] = provider;
@@ -241,6 +245,9 @@ router.put("/ai-settings", (req, res) => {
   if (apiKey !== undefined) update["rssAiApiKey"] = apiKey || undefined;
   if (outputPrompt !== undefined) update["rssAiOutputPrompt"] = outputPrompt || undefined;
   if (diffbotApiKey !== undefined) update["diffbotApiKey"] = diffbotApiKey || undefined;
+  if (geminiApiKey !== undefined) update["geminiApiKey"] = geminiApiKey || undefined;
+  if (openaiApiKey !== undefined) update["openaiApiKey"] = openaiApiKey || undefined;
+  if (youtubeApiKey !== undefined) update["youtubeApiKey"] = youtubeApiKey || undefined;
   store.updateSettings(update as Parameters<typeof store.updateSettings>[0]);
   res.json({ ok: true });
 });
