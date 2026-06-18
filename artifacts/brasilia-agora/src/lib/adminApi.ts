@@ -244,7 +244,7 @@ export interface AnalyticsStats {
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
   topArticles: { id: string; title: string; views: number }[];
-  topCategories: { name: string; views: number; articles: number }[];
+  topCategories: { name: string; views: number; clicks: number; articles: number }[];
   devices: { mobile: number; desktop: number; tablet: number };
 }
 

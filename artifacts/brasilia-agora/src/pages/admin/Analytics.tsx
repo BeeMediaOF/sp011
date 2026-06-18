@@ -17,7 +17,7 @@ interface Stats {
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
   topArticles: { id: string; title: string; views: number; avgTime?: number }[];
-  topCategories: { name: string; views: number; articles: number }[];
+  topCategories: { name: string; views: number; clicks: number; articles: number }[];
   devices: { mobile: number; desktop: number; tablet: number };
   scrollDepthChart?: { depth: number; count: number }[];
   referrerChart?: { name: string; value: number }[];
@@ -146,7 +146,7 @@ export default function Analytics() {
   const totalRef = referrers.reduce((s, r) => s + r.value, 0) || 1;
 
   const topCats = stats.topCategories ?? [];
-  const maxCatViews = topCats[0]?.views || 1;
+  const maxCatViews = topCats[0] ? ((topCats[0].clicks || 0) + (topCats[0].views || 0)) || 1 : 1;
 
   const topArts = stats.topArticles ?? [];
 
@@ -441,9 +441,11 @@ export default function Analytics() {
               <div className="space-y-3 mt-2">
                 {topCats.slice(0, 6).map((cat, i) => {
                   const color = catColor(cat.name, i);
-                  const pct = ((cat.views / maxCatViews) * 100).toFixed(1);
-                  const clicks = Math.round(cat.views * (0.22 - i * 0.02));
-                  const articles = cat.articles ?? Math.max(1, Math.round(cat.views / 120));
+                  const totalActivity = (cat.clicks || 0) + (cat.views || 0);
+                  const maxActivity = topCats[0] ? ((topCats[0].clicks || 0) + (topCats[0].views || 0)) || 1 : 1;
+                  const pct = ((totalActivity / maxActivity) * 100).toFixed(1);
+                  const clicks = cat.clicks ?? 0;
+                  const articles = cat.articles ?? 0;
                   return (
                     <div key={cat.name}>
                       <div className="grid grid-cols-[1fr_64px_64px_64px_48px] gap-2 items-center mb-1">
@@ -460,7 +462,7 @@ export default function Analytics() {
                         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md w-fit" style={{ backgroundColor: color + "22", color }}>{pct}%</span>
                       </div>
                       <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-4">
-                        <div className="h-full rounded-full" style={{ width: `${(cat.views / maxCatViews) * 100}%`, background: color }} />
+                        <div className="h-full rounded-full" style={{ width: `${(totalActivity / maxCatViews) * 100}%`, background: color }} />
                       </div>
                     </div>
                   );

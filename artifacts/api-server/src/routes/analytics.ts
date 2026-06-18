@@ -78,7 +78,8 @@ router.get("/stats", authMiddleware, (_req, res) => {
 
   const byHour: number[]                = Array(24).fill(0);
   const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
-  const catMap:     Record<string, number> = {};
+  const catViewMap:  Record<string, number> = {}; // pageviews with category (article reads)
+  const catClickMap: Record<string, number> = {}; // explicit category-tab clicks
   const deviceMap:  Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
   const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
   const scrollMap:  Record<number, number>  = { 25: 0, 50: 0, 75: 0, 100: 0 };
@@ -121,13 +122,13 @@ router.get("/stats", authMiddleware, (_req, res) => {
         articleMap[ev.articleId]!.views++;
       }
 
-        // category from pageview (article pages carry category)
-      if (ev.category) catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
+        // category from pageview (article reads in that category)
+      if (ev.category) catViewMap[ev.category] = (catViewMap[ev.category] ?? 0) + 1;
     }
 
-    // ── category click ────────────────────────────────────────────────
+    // ── category click (user navigated to the category page) ──────────
     if (ev.type === "category" && ev.category) {
-      catMap[ev.category] = (catMap[ev.category] ?? 0) + 1;
+      catClickMap[ev.category] = (catClickMap[ev.category] ?? 0) + 1;
     }
 
     // ── read ──────────────────────────────────────────────────────────
@@ -167,10 +168,11 @@ router.get("/stats", authMiddleware, (_req, res) => {
     }));
 
   // Top categories: merge in-memory counts + persistent store counts (survive restarts)
-  const persistedViews = store.getCategoryViews();
-  const mergedCatMap: Record<string, number> = { ...persistedViews };
-  for (const [cat, count] of Object.entries(catMap)) {
-    mergedCatMap[cat] = (mergedCatMap[cat] ?? 0) + count;
+  // persistedClicks holds explicit category-page navigation events saved to disk
+  const persistedClicks = store.getCategoryViews();
+  const mergedClickMap: Record<string, number> = { ...persistedClicks };
+  for (const [cat, count] of Object.entries(catClickMap)) {
+    mergedClickMap[cat] = (mergedClickMap[cat] ?? 0) + count;
   }
 
   const publishedArticles = store.getArticles().filter((a) => a.status === "published");
@@ -178,10 +180,19 @@ router.get("/stats", authMiddleware, (_req, res) => {
   for (const a of publishedArticles) {
     if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;
   }
-  const allCatNames = new Set([...Object.keys(mergedCatMap), ...Object.keys(articleCountByCategory)]);
+  const allCatNames = new Set([
+    ...Object.keys(catViewMap),
+    ...Object.keys(mergedClickMap),
+    ...Object.keys(articleCountByCategory),
+  ]);
   const topCategories = Array.from(allCatNames)
-    .map((name) => ({ name, views: mergedCatMap[name] ?? 0, articles: articleCountByCategory[name] ?? 0 }))
-    .sort((a, b) => (b.views || b.articles) - (a.views || a.articles))
+    .map((name) => ({
+      name,
+      views:   catViewMap[name]    ?? 0,
+      clicks:  mergedClickMap[name] ?? 0,
+      articles: articleCountByCategory[name] ?? 0,
+    }))
+    .sort((a, b) => (b.clicks + b.views || b.articles) - (a.clicks + a.views || a.articles))
     .slice(0, 10);
 
   const dailyChart  = Object.entries(byDay).map(([date, views]) => ({ date, views }));
