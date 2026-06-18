@@ -36,7 +36,6 @@ const NAV_MAIN = [
 ];
 
 const NAV_CONFIG = [
-  { label: "Configurações",       icon: Settings,    path: "/admin/configuracoes",                       permKey: "settings.view" },
   { label: "Webhook",             icon: Webhook,     path: "/admin/configuracoes?tab=webhook",           permKey: null },
   { label: "Segurança",           icon: ShieldCheck, path: "/admin/configuracoes?tab=seguranca",         permKey: "security.view" },
   { label: "Permissões do Editor",icon: KeyRound,    path: "/admin/configuracoes?tab=permissoes",        permKey: null },
