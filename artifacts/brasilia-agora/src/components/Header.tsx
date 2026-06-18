@@ -91,12 +91,30 @@ function TickerBar() {
   );
 }
 
+// ─── Hook para medir altura do header fixo ────────────────────────────────────
+function useHeaderHeight(ref: React.RefObject<HTMLDivElement | null>) {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setHeight(el.getBoundingClientRect().height);
+    const ro = new ResizeObserver(() => {
+      setHeight(el.getBoundingClientRect().height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [ref]);
+  return height;
+}
+
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
   const { settings }            = useSite();
   const [location]              = useLocation();
   const [menuOpen, setMenu]     = useState(false);
   const [searchOpen, setSearch] = useState(false);
+  const fixedRef                = useRef<HTMLDivElement>(null);
+  const headerHeight            = useHeaderHeight(fixedRef);
 
   const style = settings?.headerStyle ?? "standard";
 
@@ -114,21 +132,183 @@ export default function Header() {
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
-      <div className="sticky top-0 z-50">
+      <>
+        <div ref={fixedRef} className="fixed top-0 left-0 right-0 z-50 w-full">
+          <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
+            <div className="max-w-[1280px] mx-auto px-4 h-11 flex items-center gap-2">
+              <button
+                onClick={() => setMenu(v => !v)}
+                className="text-gray-500 hover:text-gray-900 transition-colors p-1 shrink-0 rounded lg:hidden"
+              >
+                {menuOpen ? <X size={18} /> : <Menu size={18} />}
+              </button>
+
+              <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
+                <img
+                  src={logoImg}
+                  alt={settings?.siteName ?? "SBC Agora"}
+                  style={{ height: settings?.logoSize ? settings.logoSize * 0.65 : 30 }}
+                  className="w-auto object-contain block"
+                />
+              </Link>
+
+              <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
+                {navItems.map(({ label, path }) => (
+                  <Link
+                    key={path}
+                    href={path}
+                    className={`text-[12px] font-bold px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+
+              <div className="flex-1 lg:hidden" />
+
+              <div className="flex items-center gap-1 ml-auto">
+                {searchOpen ? (
+                  <>
+                    <input autoFocus type="text" placeholder="Pesquisar..."
+                      className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
+                    />
+                    <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
+                      <X size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => setSearch(true)} className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
+                    <Search size={15} />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {menuOpen && (
+              <div className="lg:hidden bg-white border-t border-gray-200">
+                <ul className="max-w-[1280px] mx-auto px-4 py-2 flex flex-col gap-0.5">
+                  {navItems.map(({ label, path }) => (
+                    <li key={path}>
+                      <Link href={path} onClick={() => setMenu(false)}
+                        className={`flex items-center gap-3 py-2 px-2 rounded text-[13px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
+                      >
+                        <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </header>
+        </div>
+        <div style={{ height: headerHeight }} aria-hidden="true" />
+      </>
+    );
+  }
+
+  // ── Centered style ─────────────────────────────────────────────────────────
+  if (style === "centered") {
+    return (
+      <>
+        <div ref={fixedRef} className="fixed top-0 left-0 right-0 z-50 w-full">
+          <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
+            {/* Top row: logo centered */}
+            <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-center relative">
+              <button
+                onClick={() => setMenu(v => !v)}
+                className="absolute left-4 text-gray-500 hover:text-gray-900 p-1.5 rounded lg:hidden"
+              >
+                {menuOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+
+              <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
+                <img
+                  src={logoImg}
+                  alt={settings?.siteName ?? "SBC Agora"}
+                  style={{ height: settings?.logoSize ?? 48 }}
+                  className="w-auto object-contain block"
+                />
+              </Link>
+
+              <button
+                onClick={() => setSearch(v => !v)}
+                className="absolute right-4 text-gray-500 hover:text-gray-900 p-1.5 rounded"
+              >
+                <Search size={17} />
+              </button>
+            </div>
+
+            {/* Nav row below logo */}
+            <div className="hidden lg:block border-t border-gray-100 bg-[#1a2448]">
+              <nav className="max-w-[1280px] mx-auto px-4 flex items-center justify-center gap-1">
+                {navItems.map(({ label, path }) => (
+                  <Link
+                    key={path}
+                    href={path}
+                    className={`text-[12px] font-bold px-4 py-2 whitespace-nowrap transition-colors text-white/80 hover:text-white hover:bg-white/10 ${isActive(path) ? "text-white border-b-2 border-[#c8102e]" : ""}`}
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            </div>
+
+            {searchOpen && (
+              <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
+                <input autoFocus type="text" placeholder="Pesquisar..."
+                  className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
+                />
+                <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            {menuOpen && (
+              <div className="lg:hidden bg-white border-t border-gray-200">
+                <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
+                  {navItems.map(({ label, path }) => (
+                    <li key={path}>
+                      <Link href={path} onClick={() => setMenu(false)}
+                        className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
+                      >
+                        <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </header>
+          <TickerBar />
+        </div>
+        <div style={{ height: headerHeight }} aria-hidden="true" />
+      </>
+    );
+  }
+
+  // ── Standard style (default) ───────────────────────────────────────────────
+  return (
+    <>
+      <div ref={fixedRef} className="fixed top-0 left-0 right-0 z-50 w-full">
         <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-          <div className="max-w-[1280px] mx-auto px-4 h-11 flex items-center gap-2">
+          <div className="max-w-[1280px] mx-auto px-4 py-2 flex items-center gap-3">
+
             <button
               onClick={() => setMenu(v => !v)}
-              className="text-gray-500 hover:text-gray-900 transition-colors p-1 shrink-0 rounded lg:hidden"
+              className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded"
+              aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
             >
-              {menuOpen ? <X size={18} /> : <Menu size={18} />}
+              {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
+            <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
               <img
                 src={logoImg}
                 alt={settings?.siteName ?? "SBC Agora"}
-                style={{ height: settings?.logoSize ? settings.logoSize * 0.65 : 30 }}
+                style={{ height: settings?.logoSize ?? 48 }}
                 className="w-auto object-contain block"
               />
             </Link>
@@ -138,7 +318,7 @@ export default function Header() {
                 <Link
                   key={path}
                   href={path}
-                  className={`text-[12px] font-bold px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
+                  className={`text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 text-center ml-[4px] mr-[4px] ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
                 >
                   {label}
                 </Link>
@@ -150,16 +330,25 @@ export default function Header() {
             <div className="flex items-center gap-1 ml-auto">
               {searchOpen ? (
                 <>
-                  <input autoFocus type="text" placeholder="Pesquisar..."
-                    className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Pesquisar..."
+                    className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
                   />
-                  <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
-                    <X size={14} />
+                  <button
+                    onClick={() => setSearch(false)}
+                    className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
+                  >
+                    <X size={15} />
                   </button>
                 </>
               ) : (
-                <button onClick={() => setSearch(true)} className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
-                  <Search size={15} />
+                <button
+                  onClick={() => setSearch(true)}
+                  className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
+                >
+                  <Search size={17} />
                 </button>
               )}
             </div>
@@ -167,91 +356,20 @@ export default function Header() {
 
           {menuOpen && (
             <div className="lg:hidden bg-white border-t border-gray-200">
-              <ul className="max-w-[1280px] mx-auto px-4 py-2 flex flex-col gap-0.5">
-                {navItems.map(({ label, path }) => (
-                  <li key={path}>
-                    <Link href={path} onClick={() => setMenu(false)}
-                      className={`flex items-center gap-3 py-2 px-2 rounded text-[13px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
-                    >
-                      <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </header>
-      </div>
-    );
-  }
-
-  // ── Centered style ─────────────────────────────────────────────────────────
-  if (style === "centered") {
-    return (
-      <div className="sticky top-0 z-50">
-        <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-          {/* Top row: logo centered */}
-          <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-center relative">
-            <button
-              onClick={() => setMenu(v => !v)}
-              className="absolute left-4 text-gray-500 hover:text-gray-900 p-1.5 rounded lg:hidden"
-            >
-              {menuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-
-            <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
-              <img
-                src={logoImg}
-                alt={settings?.siteName ?? "SBC Agora"}
-                style={{ height: settings?.logoSize ?? 48 }}
-                className="w-auto object-contain block"
-              />
-            </Link>
-
-            <button
-              onClick={() => setSearch(v => !v)}
-              className="absolute right-4 text-gray-500 hover:text-gray-900 p-1.5 rounded"
-            >
-              <Search size={17} />
-            </button>
-          </div>
-
-          {/* Nav row below logo */}
-          <div className="hidden lg:block border-t border-gray-100 bg-[#1a2448]">
-            <nav className="max-w-[1280px] mx-auto px-4 flex items-center justify-center gap-1">
-              {navItems.map(({ label, path }) => (
-                <Link
-                  key={path}
-                  href={path}
-                  className={`text-[12px] font-bold px-4 py-2 whitespace-nowrap transition-colors text-white/80 hover:text-white hover:bg-white/10 ${isActive(path) ? "text-white border-b-2 border-[#c8102e]" : ""}`}
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-
-          {searchOpen && (
-            <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
-              <input autoFocus type="text" placeholder="Pesquisar..."
-                className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
-              />
-              <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
-                <X size={16} />
-              </button>
-            </div>
-          )}
-
-          {menuOpen && (
-            <div className="lg:hidden bg-white border-t border-gray-200">
               <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
                 {navItems.map(({ label, path }) => (
                   <li key={path}>
-                    <Link href={path} onClick={() => setMenu(false)}
-                      className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
+                    <Link
+                      href={path}
+                      onClick={() => setMenu(false)}
+                      className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${
+                        isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"
+                      }`}
                     >
-                      <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
+                      <span
+                        className="w-1 h-4 rounded-full shrink-0"
+                        style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }}
+                      />
                       {label}
                     </Link>
                   </li>
@@ -262,98 +380,7 @@ export default function Header() {
         </header>
         <TickerBar />
       </div>
-    );
-  }
-
-  // ── Standard style (default) ───────────────────────────────────────────────
-  return (
-    <div className="sticky top-0 z-50">
-      <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-        <div className="max-w-[1280px] mx-auto px-4 py-2 flex items-center gap-3">
-
-          <button
-            onClick={() => setMenu(v => !v)}
-            className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded"
-            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
-          >
-            {menuOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-
-          <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
-            <img
-              src={logoImg}
-              alt={settings?.siteName ?? "Bee News"}
-              style={{ height: settings?.logoSize ?? 48 }}
-              className="w-auto object-contain block"
-            />
-          </Link>
-
-          <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
-            {navItems.map(({ label, path }) => (
-              <Link
-                key={path}
-                href={path}
-                className={`text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 text-center ml-[4px] mr-[4px] ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex-1 lg:hidden" />
-
-          <div className="flex items-center gap-1 ml-auto">
-            {searchOpen ? (
-              <>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder="Pesquisar..."
-                  className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
-                />
-                <button
-                  onClick={() => setSearch(false)}
-                  className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
-                >
-                  <X size={15} />
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setSearch(true)}
-                className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
-              >
-                <Search size={17} />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {menuOpen && (
-          <div className="lg:hidden bg-white border-t border-gray-200">
-            <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
-              {navItems.map(({ label, path }) => (
-                <li key={path}>
-                  <Link
-                    href={path}
-                    onClick={() => setMenu(false)}
-                    className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${
-                      isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <span
-                      className="w-1 h-4 rounded-full shrink-0"
-                      style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }}
-                    />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </header>
-      <TickerBar />
-    </div>
+      <div style={{ height: headerHeight }} aria-hidden="true" />
+    </>
   );
 }
