@@ -1,0 +1,127 @@
+/* maa-news-pro.css — v1.0.3 */
+.maa-news{
+  font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans","Liberation Sans",sans-serif;
+  color:#111;
+}
+
+/* Cards / títulos */
+.maa-news .card{
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:16px;
+  margin:12px 0;
+  box-shadow:0 1px 2px rgba(16,24,40,.04);
+}
+.maa-news h3{margin:0 0 10px 0;font-size:18px}
+
+/* Grids utilitários */
+.maa-news .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.maa-news .grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.maa-news .grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px}
+/* grid principal de 2 colunas da aba */
+.maa-news .grid-2-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+
+/* Form */
+.maa-news label{display:block;font-weight:600;margin:0 0 4px 0}
+.maa-news input[type=text],
+.maa-news input[type=url],
+.maa-news input[type=number],
+.maa-news input[type=time],
+.maa-news select,
+.maa-news textarea{
+  width:100%;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border:1px solid #e5e7eb;
+  border-radius:10px;
+  background:#fff;
+}
+.maa-news textarea{min-height:120px}
+
+/* Segmented radios (IA provider) */
+.maa-news .seg{display:flex;gap:10px;align-items:center}
+.maa-news .seg label{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px;background:#fafafa
+}
+
+/* Helpers */
+.maa-news .inline{display:flex;align-items:center;gap:8px}
+.maa-news .mt{margin-top:10px}
+.maa-news .muted{color:#6b7280}
+.maa-news .muted.tiny{font-size:12px}
+
+/* Botões */
+.maa-news .btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:9px 14px;border:1px solid #e5e7eb;border-radius:10px;
+  background:#f8fafc;cursor:pointer;transition:.15s
+}
+.maa-news .btn:hover{filter:brightness(.98)}
+.maa-news .btn.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+.maa-news .btn.secondary{background:#f3f4f6}
+.maa-news .btn.tiny{padding:6px 8px;font-size:12px}
+.maa-news .btn.danger{border-color:#ef4444;background:#fff;color:#ef4444}
+
+/* Indicador simples de carregamento ao lado do botão */
+.maa-news .maa-busy{
+  margin-left:8px;
+  font-size:12px;
+  color:#2563eb;
+}
+.maa-news .maa-busy:before{
+  content:"";
+  display:inline-block;
+  width:10px;height:10px;
+  border:2px solid currentColor;
+  border-right-color:transparent;
+  border-radius:50%;
+  margin-right:6px;
+  vertical-align:-2px;
+  animation:maa-spin 1s linear infinite;
+}
+@keyframes maa-spin{to{transform:rotate(360deg)}}
+
+/* Lista de feeds */
+.maa-news .feeds .empty{padding:12px;color:#6b7280}
+.maa-news .feed-card{
+  border:1px solid #e5e7eb;border-radius:12px;padding:12px;margin:10px 0;background:#fff
+}
+.maa-news .feed-card .head{
+  display:flex;gap:8px;align-items:center;justify-content:space-between
+}
+.maa-news .feed-card .head .url{font-size:12px;color:#6b7280;margin-left:8px}
+.maa-news .feed-card .meta{font-size:12px;color:#6b7280;margin-top:6px}
+
+/* Ações (inclui botão de status na mesma linha) */
+.maa-news .feed-card .actions{
+  margin-top:10px;
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap
+}
+/* Botão de status (Ativo/Inativo) */
+.maa-news .btn.status{
+  border:1px solid #d1d5db;background:#f9fafb;color:#374151
+}
+.maa-news .btn.status.on{
+  background:#10b981;border-color:#10b981;color:#fff
+}
+.maa-news .btn.status.off{
+  background:#e5e7eb;border-color:#e5e7eb;color:#374151
+}
+
+/* (Legado) badges */
+.maa-news .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;margin-left:8px}
+.maa-news .badge.on{background:#dcfce7;color:#065f46}
+.maa-news .badge.off{background:#fee2e2;color:#991b1b}
+
+/* Prévia de extração */
+.maa-news .extract-preview .pre{
+  white-space:pre-wrap;border:1px dashed #e5e7eb;padding:10px;border-radius:10px;background:#fcfcfc
+}
+
+/* Responsivo */
+@media (max-width:980px){
+  .maa-news .grid-4,.maa-news .grid-3,.maa-news .grid-2{grid-template-columns:1fr}
+  .maa-news .grid-2-col{grid-template-columns:1fr}
+}

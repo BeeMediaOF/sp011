@@ -1,0 +1,359 @@
+/* ==========================================================================
+   MAA — Mass Generator UI (maa-mass.css)
+   Scope everything under .maa3 to avoid leaking into WP admin styles
+   ========================================================================== */
+
+/* ---------- Theme tokens (Light by default) ---------- */
+.maa3{
+  --bg:        #f7faff;
+  --card:      #ffffff;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --line:      #e5e7eb;
+  --line-2:    #dbe2ea;
+
+  --brand:     #2563eb;  /* blue */
+  --brand-2:   #7c3aed;  /* purple */
+  --ok:        #059669;
+  --warn:      #f59e0b;
+  --danger:    #ef4444;
+
+  /* surfaces */
+  background: linear-gradient(180deg,#f7faff 0%, #f3f4f7 100%);
+  padding: 16px;
+  border-radius: 14px;
+  color: var(--text);
+}
+
+.maa3 *{ box-sizing: border-box; }
+
+/* Optional dark-mode auto */
+@media (prefers-color-scheme: dark){
+  .maa3{
+    --bg:      #0e1117;
+    --card:    #101828;
+    --text:    #e5e7eb;
+    --muted:   #94a3b8;
+    --line:    #1f2937;
+    --line-2:  #2b3445;
+    background: linear-gradient(180deg,#0e1117 0%, #0b1220 100%);
+  }
+}
+
+/* ---------- Page header ---------- */
+.maa3 .header{
+  display:flex; justify-content:space-between; align-items:center; gap:12px;
+  padding:14px 16px;
+  background: linear-gradient(180deg,#ffffff 0%, #f9fafb 100%);
+  border:1px solid var(--line);
+  border-radius:12px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .header{ background: linear-gradient(180deg,#0f172a 0%, #0d1422 100%); }
+}
+.maa3 .header h2{ margin:0; font-size:18px; font-weight:700; letter-spacing:.2px; }
+.maa3 .hint{ color:var(--muted); font-size:12px; }
+.maa3 .chip{
+  font-size:12px; color:var(--text);
+  background:#e0f2fe; border:1px solid #bae6fd; padding:6px 10px; border-radius:999px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .chip{ background:#072d3c; border-color:#164e63; color:#cfe8f5; }
+}
+
+/* ---------- Top navigation (tabs) ---------- */
+.maa3 .topnav{
+  margin-top:14px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+}
+.maa3 .tabs{
+  display:flex; flex-wrap:wrap; gap:8px;
+}
+.maa3 .tab{
+  appearance:none; border:0; background:transparent; color:var(--muted);
+  padding:10px 12px; border-radius:10px; cursor:pointer; font-weight:700;
+  border:1px solid transparent;
+}
+.maa3 .tab:hover{ color:var(--text); }
+.maa3 .tab[aria-selected="true"],
+.maa3 .tab.is-active{
+  color:var(--text);
+  background:#fff;
+  border-color: var(--line-2);
+  box-shadow: 0 0 0 2px rgba(37,99,235,.08) inset;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .tab[aria-selected="true"], .maa3 .tab.is-active{
+    background:#0f172a; border-color:#243044;
+  }
+}
+/* sections that are not the active tab can be hidden via [hidden] attribute */
+.maa3 .section[hidden]{ display:none !important; }
+
+/* ---------- Layout (row with two cards) ---------- */
+.maa3 .grid-top{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; margin-top:16px; }
+@media (max-width: 1100px){ .maa3 .grid-top{ grid-template-columns:1fr; } }
+
+.maa3 .card{
+  background: var(--card);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px;
+}
+
+/* ---------- Form elements ---------- */
+.maa3 label{ display:block; font-size:12px; color:#475569; margin:8px 0 6px; }
+@media (prefers-color-scheme: dark){ .maa3 label{ color:#94a3b8; } }
+
+.maa3 textarea,
+.maa3 select{
+  width:100%;
+  background:#fff;
+  border:1px solid var(--line-2);
+  border-radius:10px;
+  padding:10px 12px;
+  color:var(--text);
+}
+@media (prefers-color-scheme: dark){
+  .maa3 textarea, .maa3 select{ background:#0f172a; border-color:#243044; color:#e5e7eb; }
+}
+.maa3 textarea:focus,
+.maa3 select:focus{
+  outline:none;
+  border-color:#bfdbfe;
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+/* segmented provider control */
+.maa3 .seg{
+  display:inline-grid; grid-auto-flow:column; gap:6px;
+  background:#f1f5f9; border:1px solid var(--line); border-radius:12px; padding:5px;
+}
+@media (prefers-color-scheme: dark){ .maa3 .seg{ background:#0f172a; border-color:#243044; } }
+.maa3 .seg button{
+  appearance:none; background:transparent; border:0; padding:8px 12px; border-radius:8px;
+  cursor:pointer; font-weight:600; color:#334155;
+}
+@media (prefers-color-scheme: dark){ .maa3 .seg button{ color:#cbd5e1; } }
+.maa3 .seg button[aria-pressed="true"]{
+  background:#fff; border:1px solid var(--line-2); color:#111827;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .seg button[aria-pressed="true"]{ background:#0b1320; border-color:#2a3a56; color:#e2e8f0; }
+}
+
+/* buttons */
+.maa3 .btn{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:9px 12px; border-radius:10px;
+  border:1px solid var(--line-2); background:#fff; color:#111827;
+  cursor:pointer; text-decoration:none; font-weight:600;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .btn{ background:#0f172a; color:#e5e7eb; border-color:#243044; }
+}
+.maa3 .btn:hover{ filter:brightness(0.98); }
+.maa3 .btn.primary{
+  background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
+  border:0; color:#fff; font-weight:700;
+}
+.maa3 .btn:disabled{ opacity:.6; cursor:not-allowed; }
+
+/* ---------- Queue (full width card below) ---------- */
+.maa3 .queue-wrap{ margin-top:16px; }
+.maa3 .q-list{ display:grid; gap:12px; }
+.maa3 .q-empty{ padding:10px; color:#64748b; font-style:italic; }
+
+.maa3 .q-card{
+  background:#fff;
+  border:1px dashed #cbd5e1;
+  border-radius:10px;
+  padding:12px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .q-card{ background:#0f172a; border-color:#2a3a56; }
+}
+
+.maa3 .q-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.maa3 .badge{
+  font-size:10px; color:var(--text);
+  background:#e2e8f0; border:1px solid #cbd5e1; padding:2px 6px; border-radius:999px; letter-spacing:.2px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .badge{ background:#1e293b; border-color:#334155; color:#cbd5e1; }
+}
+.maa3 .q-title{ font-weight:700; color:var(--text); }
+.maa3 .q-body{
+  margin-top:6px; font-size:13px; line-height:1.5; max-height:120px; overflow:auto; color:#334155;
+}
+@media (prefers-color-scheme: dark){ .maa3 .q-body{ color:#cbd5e1; } }
+.maa3 .q-actions a{ color:var(--danger); text-decoration:none; font-size:12px; }
+
+/* nicer scrollbars for queue content (webkit only) */
+.maa3 .q-body::-webkit-scrollbar{ height:8px; width:8px; }
+.maa3 .q-body::-webkit-scrollbar-thumb{ background:#cbd5e1; border-radius:8px; }
+@media (prefers-color-scheme: dark){
+  .maa3 .q-body::-webkit-scrollbar-thumb{ background:#334155; }
+}
+
+/* ---------- Execution & progress ---------- */
+.maa3 .exec{ margin-top:16px; display:grid; gap:12px; }
+
+.maa3 .bar{
+  height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden;
+}
+@media (prefers-color-scheme: dark){ .maa3 .bar{ background:#1f2937; } }
+.maa3 .bar > i{
+  display:block; height:100%; width:0%;
+  background: linear-gradient(90deg,#22c55e 0%, #3b82f6 50%, #8b5cf6 100%);
+}
+
+.maa3 .stat{
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size:12px; color:#334155;
+}
+@media (prefers-color-scheme: dark){ .maa3 .stat{ color:#cbd5e1; } }
+
+.maa3 .history{
+  max-height:240px; overflow:auto;
+  border:1px solid var(--line);
+  border-radius:10px; padding:10px; background:#fff;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .history{ background:#0f172a; border-color:#243044; }
+}
+.maa3 .history .ok{ color:var(--ok); }
+.maa3 .history .err{ color:var(--danger); }
+
+/* utility */
+.maa3 .sr-only{
+  position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0;
+}
+/* Evita que a aba ativa "pule" sobre o cabeçalho */
+.maa3 .header{
+  position: relative;
+  z-index: 2;           /* garante o header acima de qualquer sombra/aba */
+  margin-bottom: 20px;  /* espaço claro abaixo do header */
+}
+
+/* Barra de abas logo abaixo do header, sem sobrepor */
+.maa3 .maa-topnav{
+  position: relative;
+  z-index: 1;
+  margin-top: 20px;      /* afasta das bordas do header */
+}
+
+/* Remove qualquer deslocamento vertical residual nas abas */
+.maa3 .maa-topnav .tab{
+  transform: none;
+}
+
+/* Opcional: suaviza a transição da aba ativa sem "invadir" o header */
+.maa3 .maa-topnav .tab.is-active{
+  box-shadow: 0 1px 0 0 #fff inset, 0 0 0 1px #cbd5e1;
+}
+/* ====================================================================== */
+/* FORÇA FUNDO BRANCO EM TODAS AS ÁREAS INTERNAS DOS CARDS E FORMULÁRIOS */
+/* ====================================================================== */
+
+.maa3 .card,
+.maa3 .card *,
+.maa3 .form,
+.maa3 .form *,
+.maa3 form *,
+.maa3 .q-card,
+.maa3 .q-card *,
+.maa3 .history,
+.maa3 .history *,
+.maa3 textarea,
+.maa3 select,
+.maa3 input,
+.maa3 .seg,
+.maa3 .seg button,
+.maa3 .q-body,
+.maa3 .topnav,
+.maa3 .tabs,
+.maa3 .tab {
+  background-color: #ffffff !important;
+}
+
+/* Mantém o texto escuro mesmo em temas com dark-mode nativo */
+.maa3 .card,
+.maa3 .card *,
+.maa3 form,
+.maa3 form *,
+.maa3 .q-card,
+.maa3 .history,
+.maa3 .history *,
+.maa3 textarea,
+.maa3 select,
+.maa3 input {
+  color: #0f172a !important;
+}
+/* ====================================================================== */
+/* FORÇA O HEADER PRINCIPAL DO PLUGIN A FICAR CLARO — MESMO NO DARK MODE */
+/* ====================================================================== */
+
+/* container externo que envolve o título "Artigos Automáticos" */
+.wrap .maa-header,
+.wrap .maa-header *,
+.maa-header,
+.maa-header * {
+    background: #ffffff !important;
+    color: #0f172a !important;
+}
+
+/* Se houver borda escura do tema, limpa */
+.wrap .maa-header {
+    border: 1px solid #dbe2ea !important;
+}
+
+/* botão "Processa em fila" */
+.wrap .maa-header .btn,
+.maa-header .btn {
+    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%) !important;
+    color: #ffffff !important;
+    border: none !important;
+}
+
+/* Tabs logo abaixo também precisam ficar claras */
+.wrap .nav-tab-wrapper,
+.wrap .nav-tab-wrapper *,
+.nav-tab-wrapper,
+.nav-tab-wrapper * {
+    background: #ffffff !important;
+    color: #0f172a !important;
+}
+/* ===========================================================
+   FORÇA O TOPO "Artigos Automáticos" EM TEMA CLARO SEMPRE
+   =========================================================== */
+
+/* Container geral do módulo */
+body.wp-admin .wrap .maa3{
+  background: linear-gradient(180deg,#f7faff 0%, #f3f4f7 100%) !important;
+  border-radius: 14px !important;
+  color-scheme: light !important;
+}
+
+/* Header com o título + chip */
+body.wp-admin .wrap .maa3 .header{
+  background: linear-gradient(180deg,#ffffff 0%, #f9fafb 100%) !important;
+  border: 1px solid #e5e7eb !important;
+  color: #0f172a !important;
+}
+
+/* Título e subtítulo sempre em texto escuro */
+body.wp-admin .wrap .maa3 .header h2,
+body.wp-admin .wrap .maa3 .header .hint{
+  color: #0f172a !important;
+}
+
+/* Chip “Processa em fila” claro também */
+body.wp-admin .wrap .maa3 .header .chip{
+  background: #e0f2fe !important;
+  border: 1px solid #bae6fd !important;
+  color: #0f172a !important;
+}

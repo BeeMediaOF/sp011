@@ -2420,7 +2420,7 @@
       "autoMode": "rewrite_publish",
       "id": "60ca8e43-8b82-4afc-af3a-31ec63e7054c",
       "createdAt": "2026-06-15T22:28:35.591Z",
-      "lastFetchedAt": "2026-06-18T13:52:10.022Z",
+      "lastFetchedAt": "2026-06-18T15:10:49.879Z",
       "fetchLimit": 1
     },
     {
@@ -2433,7 +2433,7 @@
       "autoMode": "rewrite_publish",
       "id": "f3e13620-f45a-4223-967b-51a5159f6bed",
       "createdAt": "2026-06-15T22:29:09.321Z",
-      "lastFetchedAt": "2026-06-18T13:52:26.485Z",
+      "lastFetchedAt": "2026-06-18T15:11:06.125Z",
       "fetchLimit": 1
     },
     {
@@ -2446,7 +2446,7 @@
       "autoMode": "rewrite_publish",
       "id": "fe6ce31d-2d2c-410b-8bad-76c839e89d9a",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:52:42.759Z",
+      "lastFetchedAt": "2026-06-18T15:11:22.506Z",
       "fetchLimit": 1
     },
     {
@@ -2459,7 +2459,7 @@
       "autoMode": "rewrite_publish",
       "id": "2bf26a57-1058-4723-b7b3-1159a8ee12f9",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:52:59.211Z",
+      "lastFetchedAt": "2026-06-18T15:11:38.757Z",
       "fetchLimit": 1
     },
     {
@@ -2472,7 +2472,7 @@
       "autoMode": "rewrite_publish",
       "id": "0d204475-6992-417a-adc1-30882d08cd32",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:53:15.144Z",
+      "lastFetchedAt": "2026-06-18T15:11:54.727Z",
       "fetchLimit": 1
     },
     {
@@ -2509,7 +2509,7 @@
       "autoMode": "rewrite_publish",
       "id": "e03d66f6-4b27-461f-98b0-ce47f48b6baa",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:53:34.292Z",
+      "lastFetchedAt": "2026-06-18T15:12:14.062Z",
       "fetchLimit": 1
     },
     {
@@ -2522,7 +2522,7 @@
       "autoMode": "rewrite_publish",
       "id": "1ca4508c-2587-4a22-a98f-b85d59ad326a",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:53:52.367Z",
+      "lastFetchedAt": "2026-06-18T15:12:29.924Z",
       "fetchLimit": 1
     },
     {
@@ -2535,7 +2535,7 @@
       "autoMode": "rewrite_publish",
       "id": "dfb17c69-6003-4c3b-bd32-f10c94bcd3c5",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:53:52.805Z",
+      "lastFetchedAt": "2026-06-18T15:12:30.248Z",
       "fetchLimit": 1
     },
     {
@@ -2548,7 +2548,7 @@
       "autoMode": "rewrite_publish",
       "id": "efb051d3-b19c-4a27-b170-c860f1990585",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:54:09.875Z",
+      "lastFetchedAt": "2026-06-18T15:12:46.310Z",
       "fetchLimit": 1
     },
     {
@@ -2561,7 +2561,7 @@
       "autoMode": "rewrite_publish",
       "id": "74be6c5b-d92e-4c4a-a6b8-2055d6131d58",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:54:10.310Z",
+      "lastFetchedAt": "2026-06-18T15:12:46.540Z",
       "fetchLimit": 1
     },
     {
@@ -2574,7 +2574,7 @@
       "autoMode": "rewrite_publish",
       "id": "e5875032-77ed-4244-9a21-dd811b7f608f",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:54:26.382Z",
+      "lastFetchedAt": "2026-06-18T15:13:02.196Z",
       "fetchLimit": 1
     },
     {
@@ -2598,7 +2598,7 @@
       "autoMode": "rewrite_publish",
       "id": "4273e63a-711f-4e6f-be20-f4d09e273357",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:54:43.048Z",
+      "lastFetchedAt": "2026-06-18T15:13:17.734Z",
       "fetchLimit": 1
     },
     {
@@ -2622,7 +2622,7 @@
       "autoMode": "rewrite_publish",
       "id": "ce8aa13f-79a8-4c49-bd4a-f364a8871cd1",
       "createdAt": "2026-06-16T13:29:06.164Z",
-      "lastFetchedAt": "2026-06-18T13:54:59.673Z",
+      "lastFetchedAt": "2026-06-18T15:13:34.178Z",
       "fetchLimit": 1
     },
     {
@@ -2778,7 +2778,7 @@
       "autoMode": "rewrite_publish",
       "id": "048ee987-03fa-450c-bb1c-0a4715752b9d",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:55:16.553Z",
+      "lastFetchedAt": "2026-06-18T15:13:50.453Z",
       "fetchLimit": 1
     },
     {
@@ -2791,7 +2791,7 @@
       "autoMode": "rewrite_publish",
       "id": "0903d139-652a-475b-9996-0babe38e0669",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:55:33.581Z",
+      "lastFetchedAt": "2026-06-18T15:14:06.604Z",
       "fetchLimit": 1
     },
     {
@@ -2804,7 +2804,7 @@
       "autoMode": "rewrite_publish",
       "id": "5209bbe5-9430-412e-abcb-bc2929da9d5f",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:55:49.593Z",
+      "lastFetchedAt": "2026-06-18T15:14:22.622Z",
       "fetchLimit": 1
     },
     {
@@ -2817,7 +2817,7 @@
       "autoMode": "rewrite_publish",
       "id": "33973143-3e84-40c4-acc7-7f9a6215240d",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:56:06.065Z",
+      "lastFetchedAt": "2026-06-18T15:14:39.599Z",
       "fetchLimit": 1
     },
     {
@@ -2830,7 +2830,7 @@
       "autoMode": "rewrite_publish",
       "id": "5f0d05e9-6570-4b32-8408-b06154a936cc",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:56:22.546Z",
+      "lastFetchedAt": "2026-06-18T15:14:56.460Z",
       "fetchLimit": 1
     },
     {
@@ -2843,7 +2843,7 @@
       "autoMode": "rewrite_publish",
       "id": "ff71d8f1-56c2-42c5-aaad-0d678e38a530",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:56:23.231Z",
+      "lastFetchedAt": "2026-06-18T15:14:57.292Z",
       "fetchLimit": 1
     },
     {
@@ -2856,7 +2856,7 @@
       "autoMode": "rewrite_publish",
       "id": "e3dc7dc9-18e6-4c36-9b57-f92ea90c1ecc",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:56:40.211Z",
+      "lastFetchedAt": "2026-06-18T15:14:58.419Z",
       "fetchLimit": 1
     },
     {
@@ -2891,7 +2891,7 @@
       "autoMode": "rewrite_publish",
       "id": "3ec2ca71-8c36-4e2d-91f6-a43c0525c28a",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:56:56.798Z",
+      "lastFetchedAt": "2026-06-18T15:15:14.300Z",
       "fetchLimit": 1
     },
     {
@@ -2927,7 +2927,7 @@
       "id": "b667791a-6101-40ee-85e9-ec91a7e0cf65",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T13:57:14.602Z"
+      "lastFetchedAt": "2026-06-18T15:15:30.311Z"
     },
     {
       "name": "Notícias ao Minuto – Cultura",
@@ -2961,7 +2961,7 @@
       "autoMode": "rewrite_publish",
       "id": "02e999e8-6af2-4013-989a-38c99b57ce21",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:57:31.529Z",
+      "lastFetchedAt": "2026-06-18T15:15:46.645Z",
       "fetchLimit": 1
     },
     {
@@ -2985,7 +2985,7 @@
       "autoMode": "rewrite_publish",
       "id": "ca38abc8-54b3-4bb5-916b-397c13614ee6",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:57:48.008Z",
+      "lastFetchedAt": "2026-06-18T15:16:03.110Z",
       "fetchLimit": 1
     },
     {
@@ -3010,7 +3010,7 @@
       "id": "2fa4b7ee-2a4c-4a49-8618-ca1c35d72a10",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T13:58:03.982Z"
+      "lastFetchedAt": "2026-06-18T15:16:19.484Z"
     },
     {
       "name": "Correio Braziliense – Saúde",

@@ -604,14 +604,16 @@ router.post("/article-from-url", async (req, res) => {
           imageUrl = diffbot.imageUrl;
         }
       }
-      // Fallback to cheerio scraping
+      // Fallback to cheerio scraping — also captures og:description for context
+      let scrapedDescription = "";
       if (!text) {
-        const scraped = await scrapeArticle(url);
-        text     = scraped.text;
-        imageUrl = imageUrl || scraped.imageUrl;
+        const scraped    = await scrapeArticle(url);
+        text             = scraped.text;
+        imageUrl         = imageUrl || scraped.imageUrl;
+        scrapedDescription = scraped.description;
       }
-      // Try og:title / og:image if still missing
-      if (!title || !imageUrl) {
+      // Try og:title / og:image / og:description if still missing
+      if (!title || !imageUrl || !scrapedDescription) {
         try {
           const pageRes = await fetch(url, {
             headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
@@ -632,10 +634,24 @@ router.post("/article-from-url", async (req, res) => {
                 /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
                 /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/.exec(html)?.[1] ?? "";
             }
+            if (!scrapedDescription) {
+              scrapedDescription =
+                /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
+                /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:description["']/.exec(html)?.[1] ??
+                /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
+                /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']description["']/.exec(html)?.[1] ?? "";
+            }
           }
         } catch { /* ignore */ }
       }
       try { sourceName = new URL(url).hostname.replace(/^www\./, ""); } catch { sourceName = "Web"; }
+
+      // Always prepend og:description so the AI has the correct topic anchor even
+      // when the article body was paywalled, JS-rendered, or partially extracted.
+      // This prevents generating completely off-topic content.
+      if (scrapedDescription && !text.includes(scrapedDescription.slice(0, 40))) {
+        text = scrapedDescription + (text ? "\n\n" + text : "");
+      }
     }
 
     if (!title && !text) {

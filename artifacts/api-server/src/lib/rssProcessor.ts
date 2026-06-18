@@ -351,22 +351,28 @@ export async function scrapeWithDiffbot(
 // ─── Scraping ─────────────────────────────────────────────────────────────────
 
 /** Fetch article URL and extract og:image + full text body */
-export async function scrapeArticle(url: string): Promise<{ text: string; imageUrl: string }> {
+export async function scrapeArticle(url: string): Promise<{ text: string; imageUrl: string; description: string }> {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
       signal: AbortSignal.timeout(12_000),
     });
-    if (!res.ok) return { text: "", imageUrl: "" };
+    if (!res.ok) return { text: "", imageUrl: "", description: "" };
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // 1. Featured image — prefer og:image over anything else
+    // 1. Featured image + description from meta tags (always available, even on paywalled pages)
     const imageUrl =
       $("meta[property='og:image']").attr("content") ??
       $("meta[name='twitter:image']").attr("content") ??
       $("meta[property='og:image:secure_url']").attr("content") ??
       $("meta[name='thumbnail']").attr("content") ??
+      "";
+
+    const description =
+      $("meta[property='og:description']").attr("content") ??
+      $("meta[name='description']").attr("content") ??
+      $("meta[name='twitter:description']").attr("content") ??
       "";
 
     // 2. Remove noise — structural elements + common Brazilian news site widgets
@@ -377,19 +383,27 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       "figure figcaption","noscript",
       // Agência Brasil / EBC specific
       ".destaques-ebc",".radio-agencia",".tv-brasil",
+      // Related / recommended articles sections
       ".relacionadas",".related",".related-news",
       ".mais-noticias",".mais-lidas",".mais-conteudo",
       ".ver-mais",".leia-mais",".read-more",
+      "[class*='read-more']","[class*='leia-mais']","[class*='relacionad']",
+      "[class*='recommended']","[class*='sugest']","[class*='widget']",
+      // Social / newsletter
       ".tags-list",".tags",".article-tags",
       ".compartilhe",".share",".social-share",
       ".newsletter",".newsletter-box",
       ".breadcrumb",".breadcrumbs",
-      // G1, UOL, Folha
+      // Ad slots
       ".gpt-ad",".gam-ad","[id*='gpt']","[id*='taboola']",
+      "[data-type='_mgwidget']","[class*='mgwidget']",
+      // Paywall UI elements
       ".paywall",".subscription",".premium-content",
       ".edicao",".edition-bar",
       ".article-footer",".post-footer",
-      "[class*='recommend']","[class*='sugest']","[class*='widget']",
+      // InfoMoney / Brazilian financial news specifics
+      ".wp-block-infomoney-blocks-infomoney-read-more",
+      "[class*='infomoney-read-more']",
     ].join(",")).remove();
 
     // 3. Article body selectors (priority order)
@@ -403,6 +417,9 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       ".main-content main", "main",
     ];
 
+    // Ad-separator patterns to skip at paragraph level
+    const AD_SEPARATOR = /^(continua depois da publicidade|continua após (a )?publicidade|publicidade|advertisement|sponsored content|conteúdo patrocinado)$/i;
+
     /** Extract paragraphs from an element, preserving structure */
     function extractParagraphs(el: ReturnType<typeof $>): string {
       const paras: string[] = [];
@@ -410,6 +427,8 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
         const tag  = (node as { tagName?: string }).tagName?.toLowerCase() ?? "p";
         const t    = $(node).text().replace(/\s+/g, " ").trim();
         if (t.length < 20) return;
+        // Skip ad separators that appear mid-article
+        if (AD_SEPARATOR.test(t)) return;
         if (tag === "h2" || tag === "h3" || tag === "h4") {
           paras.push(`## ${t}`);
         } else if (tag === "li") {
@@ -432,16 +451,22 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
     }
 
     // 4. Fallback: gather all <p> text preserving paragraph breaks
+    //    Prefer article/main-scoped paragraphs to avoid related-article snippets
     if (!text) {
-      text = $("p")
+      const pSource = $("article").length ? $("article") : $("main").length ? $("main") : $("body");
+      text = pSource
+        .find("p")
         .map((_i, el) => $(el).text().replace(/\s+/g, " ").trim())
         .get()
-        .filter((t) => t.length > 50)
+        .filter((t) => t.length > 50 && !AD_SEPARATOR.test(t))
         .join("\n\n");
     }
 
     // 5. Post-processing: truncate at common "end of article" sentinels
     //    (inline navigation/widgets that DOM removal didn't catch)
+    //    NOTE: "Publicidade" is intentionally excluded — it appears mid-article
+    //    as "Continua depois da publicidade" on many Brazilian sites and is
+    //    handled at paragraph level by AD_SEPARATOR above.
     const SENTINELS = [
       /\bRelacionadas?\b/,
       /\bVer mais\b/i,
@@ -453,7 +478,6 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       /\bContinuar lendo\b/i,
       /\bLeia (também|mais)\b/i,
       /\bEdi[çc][aã]o:\s/i,
-      /\bPublicidade\b/i,
       /\bNewsletter\b/i,
       /^Tags?:/im,
     ];
@@ -478,9 +502,9 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       .replace(/\s{2,}/g, " ")
       .trim();
 
-    return { text: text.slice(0, 8000), imageUrl };
+    return { text: text.slice(0, 8000), imageUrl, description };
   } catch {
-    return { text: "", imageUrl: "" };
+    return { text: "", imageUrl: "", description: "" };
   }
 }
 
