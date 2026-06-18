@@ -37,18 +37,32 @@ router.get("/", (_req, res) => {
  */
 router.post("/", authMiddleware, async (req, res) => {
   const {
-    title, subtitle, content, category, tag, imageUrl, author,
+    id, title, subtitle, content, category, tag, imageUrl, author,
   } = req.body as {
-    title?: string; subtitle?: string; content?: string; category?: string;
+    id?: string; title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string;
   };
+
+  // If caller sent an article ID but no title → publish existing draft (same as POST /api/publish/:id)
+  if (id?.trim() && !title?.trim()) {
+    const article = await articleService.updateArticle(id.trim(), {
+      status: "published",
+      publishedAt: new Date().toISOString(),
+    });
+    if (!article) {
+      res.status(404).json({ ok: false, error: "Artigo não encontrado", id: id.trim() });
+      return;
+    }
+    res.json({ ok: true, message: "Artigo publicado com sucesso", article });
+    return;
+  }
 
   if (!title?.trim()) {
     res.status(400).json({
       ok: false,
-      error: "O campo 'title' é obrigatório",
+      error: "O campo 'title' é obrigatório (ou envie 'id' para publicar um rascunho existente)",
       required_fields: ["title"],
-      optional_fields: ["subtitle", "content", "category", "tag", "imageUrl", "author"],
+      optional_fields: ["id", "subtitle", "content", "category", "tag", "imageUrl", "author"],
     });
     return;
   }
