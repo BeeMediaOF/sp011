@@ -6,7 +6,8 @@ import {
   Bot, Link2, Youtube, Globe, Sparkles, RefreshCw,
   CheckCircle, AlertCircle, ClipboardPaste, ArrowRight,
   FileText, Image, Tag, Send, BookOpen, ChevronDown, ChevronUp,
-  ExternalLink, Pencil, X,
+  ExternalLink, Pencil, X, Settings, Key, Eye, EyeOff, Save,
+  Cpu, MessageSquare, Zap,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -80,6 +81,41 @@ function saveHistory(entries: HistoryEntry[]) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
+// ─── AI Settings panel ────────────────────────────────────────────────────────
+
+interface AiSettings {
+  provider: "gemini_free" | "gemini_paid" | "openai";
+  model: string;
+  hasKey: boolean;
+  outputPrompt: string;
+  hasDiffbotKey: boolean;
+}
+
+const AI_PROVIDERS = [
+  { value: "gemini_free",  label: "Gemini (grátis via Replit)", hint: "Sem necessidade de chave" },
+  { value: "gemini_paid",  label: "Gemini (pago)",              hint: "Requer chave da Google AI" },
+  { value: "openai",       label: "ChatGPT (OpenAI)",           hint: "Requer chave da OpenAI" },
+] as const;
+
+const DEFAULT_OUTPUT_PROMPT = `Você é um jornalista brasileiro experiente. Reescreva o conteúdo abaixo como um artigo jornalístico completo, profissional e original em português do Brasil.
+
+Fonte: {sourceName}
+Título original: {title}
+
+Conteúdo:
+{text}
+
+INSTRUÇÕES:
+- Escreva em português do Brasil, tom jornalístico
+- Crie um título atraente e objetivo
+- Escreva um subtítulo/lide que resuma o principal
+- Desenvolva o conteúdo em parágrafos bem estruturados
+- Não copie frases literais da fonte
+{creditLine}
+
+Responda APENAS em JSON válido com este formato:
+{"title":"...","subtitle":"...","content":"<p>...</p><p>...</p>","keywords":"palavra1, palavra2, palavra3","slug":"slug-do-artigo"}`;
+
 export default function MaquinaArtigos() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -103,10 +139,82 @@ export default function MaquinaArtigos() {
   const [saving, setSaving]         = useState(false);
   const [history, setHistory]       = useState<HistoryEntry[]>(loadHistory);
 
+  // ── Settings state ──
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSaving, setSettingsSaving]   = useState(false);
+  const [aiSettings, setAiSettings]           = useState<AiSettings | null>(null);
+  const [cfgProvider, setCfgProvider]         = useState<AiSettings["provider"]>("gemini_free");
+  const [cfgModel, setCfgModel]               = useState("");
+  const [cfgApiKey, setCfgApiKey]             = useState("");
+  const [cfgDiffbotKey, setCfgDiffbotKey]     = useState("");
+  const [cfgOutputPrompt, setCfgOutputPrompt] = useState("");
+  const [showApiKey, setShowApiKey]           = useState(false);
+  const [showDiffbotKey, setShowDiffbotKey]   = useState(false);
+
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   const sourceType = detectSourceType(url);
   const sourceBadge = sourceType ? SOURCE_BADGE[sourceType] : null;
+
+  async function loadAiSettings() {
+    setSettingsLoading(true);
+    try {
+      const token = localStorage.getItem("admin_token") ?? "";
+      const r = await fetch("/api/admin/rss/ai-settings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json() as AiSettings;
+      setAiSettings(d);
+      setCfgProvider(d.provider);
+      setCfgModel(d.model);
+      setCfgApiKey("");
+      setCfgDiffbotKey("");
+      setCfgOutputPrompt(d.outputPrompt || "");
+    } catch {
+      toast({ title: "Erro ao carregar configurações", variant: "destructive" });
+    } finally {
+      setSettingsLoading(false);
+    }
+  }
+
+  async function saveAiSettings() {
+    setSettingsSaving(true);
+    try {
+      const token = localStorage.getItem("admin_token") ?? "";
+      const body: Record<string, string> = { provider: cfgProvider, model: cfgModel };
+      if (cfgApiKey) body["apiKey"] = cfgApiKey;
+      if (cfgDiffbotKey) body["diffbotApiKey"] = cfgDiffbotKey;
+      body["outputPrompt"] = cfgOutputPrompt;
+      const r = await fetch("/api/admin/rss/ai-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error();
+      setCfgApiKey("");
+      setCfgDiffbotKey("");
+      setAiSettings(prev => prev ? {
+        ...prev,
+        provider: cfgProvider,
+        model: cfgModel,
+        hasKey: !!cfgApiKey || prev.hasKey,
+        hasDiffbotKey: !!cfgDiffbotKey || prev.hasDiffbotKey,
+        outputPrompt: cfgOutputPrompt,
+      } : prev);
+      toast({ title: "Configurações salvas!" });
+    } catch {
+      toast({ title: "Erro ao salvar configurações", variant: "destructive" });
+    } finally {
+      setSettingsSaving(false);
+    }
+  }
+
+  function toggleSettings() {
+    if (!showSettings && !aiSettings) loadAiSettings();
+    setShowSettings(v => !v);
+  }
 
   async function pasteFromClipboard() {
     try {
@@ -239,13 +347,210 @@ export default function MaquinaArtigos() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0B2A66] to-[#1a4db8] flex items-center justify-center shrink-0 shadow-lg">
             <Bot size={22} className="text-white" />
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Máquina de Artigos</h1>
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">Máquina de Artigos</h1>
+              <button
+                onClick={toggleSettings}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-colors ${
+                  showSettings
+                    ? "bg-[#0B2A66] text-white border-[#0B2A66]"
+                    : "border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800"
+                }`}
+              >
+                <Settings size={14} />
+                Configurações
+              </button>
+            </div>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Cole a URL de qualquer notícia, artigo ou vídeo do YouTube e gere um artigo completo com IA em segundos.
             </p>
           </div>
         </div>
+
+        {/* ── Settings panel ── */}
+        {showSettings && (
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                <Settings size={15} className="text-[#0B2A66] dark:text-blue-400" />
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Configurações de IA e Extração</span>
+              </div>
+              {settingsLoading && <RefreshCw size={14} className="animate-spin text-slate-400" />}
+            </div>
+
+            <div className="p-6 space-y-6">
+
+              {/* ── Diffbot section ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-orange-50 dark:bg-orange-950/40 flex items-center justify-center">
+                    <Zap size={14} className="text-orange-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Diffbot</p>
+                    <p className="text-[11px] text-slate-400">Extração avançada de artigos e transcrição de vídeos com IA</p>
+                  </div>
+                  {aiSettings?.hasDiffbotKey && (
+                    <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400">
+                      ✓ Configurado
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Key size={11} /> API Token
+                    {aiSettings?.hasDiffbotKey && <span className="text-green-600 dark:text-green-400 text-[10px]">· salvo (deixe em branco para manter)</span>}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showDiffbotKey ? "text" : "password"}
+                      value={cfgDiffbotKey}
+                      onChange={e => setCfgDiffbotKey(e.target.value)}
+                      placeholder={aiSettings?.hasDiffbotKey ? "••••••••••••••••" : "Cole seu token Diffbot aqui"}
+                      className="w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25 focus:border-[#0B2A66] font-mono transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDiffbotKey(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      {showDiffbotKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Com a chave configurada, a extração de artigos e a transcrição de vídeos do YouTube usam a API do Diffbot.
+                    Sem ela, o sistema usa scraping próprio. <a href="https://www.diffbot.com" target="_blank" rel="noopener noreferrer" className="text-[#0B2A66] hover:underline">diffbot.com</a>
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+
+              {/* ── AI provider section ── */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center">
+                    <Cpu size={14} className="text-[#0B2A66] dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Modelo de IA</p>
+                    <p className="text-[11px] text-slate-400">Motor que gera o texto dos artigos</p>
+                  </div>
+                </div>
+
+                {/* Provider selector */}
+                <div className="grid grid-cols-3 gap-2">
+                  {AI_PROVIDERS.map(p => (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => { setCfgProvider(p.value); setCfgModel(""); }}
+                      className={`flex flex-col gap-0.5 px-3 py-2.5 rounded-xl border text-left transition-all ${
+                        cfgProvider === p.value
+                          ? "border-[#0B2A66] bg-[#EEF2FF] dark:bg-blue-950/40 dark:border-blue-500"
+                          : "border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500"
+                      }`}
+                    >
+                      <span className={`text-xs font-semibold ${cfgProvider === p.value ? "text-[#0B2A66] dark:text-blue-300" : "text-slate-700 dark:text-slate-300"}`}>
+                        {p.label}
+                      </span>
+                      <span className="text-[10px] text-slate-400">{p.hint}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* API key — only for paid providers */}
+                {cfgProvider !== "gemini_free" && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Key size={11} /> Chave de API {cfgProvider === "openai" ? "(OpenAI)" : "(Google AI)"}
+                      {aiSettings?.hasKey && <span className="text-green-600 dark:text-green-400 text-[10px]">· salvo</span>}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        value={cfgApiKey}
+                        onChange={e => setCfgApiKey(e.target.value)}
+                        placeholder={aiSettings?.hasKey ? "••••••••••••••••" : cfgProvider === "openai" ? "sk-..." : "AIza..."}
+                        className="w-full pr-10 pl-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25 focus:border-[#0B2A66] font-mono transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Model name */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Cpu size={11} /> Modelo (opcional)
+                  </label>
+                  <input
+                    type="text"
+                    value={cfgModel}
+                    onChange={e => setCfgModel(e.target.value)}
+                    placeholder={cfgProvider === "openai" ? "gpt-4o-mini" : "gemini-2.5-flash"}
+                    className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-slate-700" />
+
+              {/* ── Output prompt ── */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center">
+                    <MessageSquare size={14} className="text-purple-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Prompt de saída</p>
+                    <p className="text-[11px] text-slate-400">Instruções para a IA ao gerar cada artigo</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCfgOutputPrompt(DEFAULT_OUTPUT_PROMPT)}
+                    className="text-[11px] text-[#0B2A66] hover:underline dark:text-blue-400"
+                  >
+                    Restaurar padrão
+                  </button>
+                </div>
+                <div className="space-y-1.5">
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Use <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">{"{title}"}</code>,{" "}
+                    <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">{"{text}"}</code>,{" "}
+                    <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">{"{sourceName}"}</code> e{" "}
+                    <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-[10px]">{"{creditLine}"}</code> no prompt. Deixe vazio para usar o padrão.
+                  </p>
+                  <textarea
+                    value={cfgOutputPrompt}
+                    onChange={e => setCfgOutputPrompt(e.target.value)}
+                    rows={10}
+                    placeholder="Deixe vazio para usar o prompt padrão…"
+                    className="w-full px-3 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl text-xs font-mono bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 resize-y focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                  />
+                </div>
+              </div>
+
+              {/* Save button */}
+              <button
+                onClick={saveAiSettings}
+                disabled={settingsSaving}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0B2A66] text-white font-semibold text-sm hover:bg-[#0a2255] disabled:opacity-50 transition-colors shadow-md"
+              >
+                {settingsSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                {settingsSaving ? "Salvando…" : "Salvar configurações"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ── Input card ── */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-5 shadow-sm">

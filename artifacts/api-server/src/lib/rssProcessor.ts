@@ -284,6 +284,50 @@ export async function rewriteWithAI(
   return parseRewriteResult(raw);
 }
 
+// ─── Diffbot scraping ─────────────────────────────────────────────────────────
+
+interface DiffbotArticle {
+  title?: string;
+  text?: string;
+  html?: string;
+  images?: Array<{ url?: string; primary?: boolean }>;
+}
+
+interface DiffbotResponse {
+  objects?: DiffbotArticle[];
+  errorCode?: number;
+  error?: string;
+}
+
+/**
+ * Extracts an article using the Diffbot Article API.
+ * Returns null if the key is not configured or the request fails.
+ */
+export async function scrapeWithDiffbot(
+  url: string,
+  apiKey: string,
+): Promise<{ title: string; text: string; imageUrl: string } | null> {
+  try {
+    const endpoint = `https://api.diffbot.com/v3/article?url=${encodeURIComponent(url)}&token=${encodeURIComponent(apiKey)}&discussion=false`;
+    const res = await fetch(endpoint, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) return null;
+    const data = await res.json() as DiffbotResponse;
+    if (data.errorCode || !data.objects?.length) return null;
+    const obj = data.objects[0];
+    const imageUrl =
+      obj.images?.find((i) => i.primary)?.url ??
+      obj.images?.[0]?.url ??
+      "";
+    return {
+      title:    obj.title ?? "",
+      text:     obj.text  ?? "",
+      imageUrl,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Scraping ─────────────────────────────────────────────────────────────────
 
 /** Fetch article URL and extract og:image + full text body */

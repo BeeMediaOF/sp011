@@ -221,21 +221,26 @@ router.post("/import", (req, res) => {
 router.get("/ai-settings", (_req, res) => {
   const s = store.getSettings();
   res.json({
-    provider: s.rssAiProvider ?? "gemini_free",
-    model:    s.rssAiModel ?? "",
-    hasKey:   !!s.rssAiApiKey,
+    provider:     s.rssAiProvider ?? "gemini_free",
+    model:        s.rssAiModel ?? "",
+    hasKey:       !!s.rssAiApiKey,
+    outputPrompt: s.rssAiOutputPrompt ?? "",
+    hasDiffbotKey: !!s.diffbotApiKey,
   });
 });
 
 /** PUT /api/admin/rss/ai-settings */
 router.put("/ai-settings", (req, res) => {
-  const { provider, model, apiKey } = req.body as {
+  const { provider, model, apiKey, outputPrompt, diffbotApiKey } = req.body as {
     provider?: string; model?: string; apiKey?: string;
+    outputPrompt?: string; diffbotApiKey?: string;
   };
   const update: Record<string, string | undefined> = {};
   if (provider) update["rssAiProvider"] = provider;
   if (model !== undefined) update["rssAiModel"] = model;
   if (apiKey !== undefined) update["rssAiApiKey"] = apiKey || undefined;
+  if (outputPrompt !== undefined) update["rssAiOutputPrompt"] = outputPrompt || undefined;
+  if (diffbotApiKey !== undefined) update["diffbotApiKey"] = diffbotApiKey || undefined;
   store.updateSettings(update as Parameters<typeof store.updateSettings>[0]);
   res.json({ ok: true });
 });

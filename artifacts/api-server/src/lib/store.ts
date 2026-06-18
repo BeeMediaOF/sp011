@@ -79,6 +79,8 @@ export interface SiteSettings {
   rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
   rssAiApiKey?: string;
   rssAiModel?: string;
+  rssAiOutputPrompt?: string;
+  diffbotApiKey?: string;
   bylineName?: string;
   bylineLogoBase64?: string;
 }

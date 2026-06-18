@@ -7,7 +7,7 @@ import {
 } from "../middlewares/auth.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
-import { rewriteWithAI, scrapeArticle } from "../lib/rssProcessor.js";
+import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot } from "../lib/rssProcessor.js";
 
 const router = Router();
 
@@ -566,6 +566,9 @@ router.post("/article-from-url", async (req, res) => {
   }
 
   const isYouTube = /youtube\.com|youtu\.be/.test(url);
+  const settings  = store.getSettings();
+  const diffbotKey = settings.diffbotApiKey;
+  const outputPrompt = settings.rssAiOutputPrompt;
 
   try {
     let title = "";
@@ -574,31 +577,54 @@ router.post("/article-from-url", async (req, res) => {
     let sourceName = "";
 
     if (isYouTube) {
-      const yt = await scrapeYouTube(url);
-      title      = yt.title;
-      text       = yt.text;
-      imageUrl   = yt.imageUrl;
+      // Try Diffbot first for YouTube (extracts transcript/description better)
+      if (diffbotKey) {
+        const diffbot = await scrapeWithDiffbot(url, diffbotKey);
+        if (diffbot && (diffbot.title || diffbot.text)) {
+          title    = diffbot.title;
+          text     = diffbot.text;
+          imageUrl = diffbot.imageUrl;
+        }
+      }
+      // Fallback to oEmbed + page scrape
+      if (!title) {
+        const yt = await scrapeYouTube(url);
+        title    = title    || yt.title;
+        text     = text     || yt.text;
+        imageUrl = imageUrl || yt.imageUrl;
+      }
       sourceName = "YouTube";
     } else {
-      // Scrape article page
-      const scraped = await scrapeArticle(url);
-      text          = scraped.text;
-      imageUrl      = scraped.imageUrl;
-
-      // Try to get og:title from the URL
-      try {
-        const pageRes = await fetch(url, {
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (pageRes.ok) {
-          const html = await pageRes.text();
-          const ogTitle   = /<meta property="og:title" content="([^"]+)"/.exec(html)?.[1] ?? "";
-          const metaTitle = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1] ?? "";
-          title = ogTitle || metaTitle;
+      // Web article — try Diffbot first
+      if (diffbotKey) {
+        const diffbot = await scrapeWithDiffbot(url, diffbotKey);
+        if (diffbot && (diffbot.title || diffbot.text)) {
+          title    = diffbot.title;
+          text     = diffbot.text;
+          imageUrl = diffbot.imageUrl;
         }
-      } catch { /* ignore */ }
-
+      }
+      // Fallback to cheerio scraping
+      if (!text) {
+        const scraped = await scrapeArticle(url);
+        text     = scraped.text;
+        imageUrl = imageUrl || scraped.imageUrl;
+      }
+      // Try og:title if still missing
+      if (!title) {
+        try {
+          const pageRes = await fetch(url, {
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (pageRes.ok) {
+            const html = await pageRes.text();
+            const ogTitle   = /<meta property="og:title" content="([^"]+)"/.exec(html)?.[1] ?? "";
+            const metaTitle = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1] ?? "";
+            title = ogTitle || metaTitle;
+          }
+        } catch { /* ignore */ }
+      }
       try { sourceName = new URL(url).hostname.replace(/^www\./, ""); } catch { sourceName = "Web"; }
     }
 
@@ -607,12 +633,13 @@ router.post("/article-from-url", async (req, res) => {
       return;
     }
 
-    // Generate article with AI
+    // Generate article with AI (use custom output prompt if configured)
     const result = await rewriteWithAI(
       title || "Notícia sem título",
       text || title,
       sourceName,
       giveCredit ?? false,
+      outputPrompt || undefined,
     );
 
     res.json({
