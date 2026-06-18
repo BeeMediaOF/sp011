@@ -252,7 +252,22 @@ function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSav
     const f = e.target.files?.[0];
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPreview(ev.target?.result as string);
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      // Resize to max 256×256 JPEG before storing — keeps base64 under ~50kb
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 256;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        setPreview(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = dataUrl;
+    };
     reader.readAsDataURL(f);
   }
 

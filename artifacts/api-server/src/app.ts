@@ -72,7 +72,8 @@ app.use((req, _res, next) => {
     req.path.includes("/avatar") ||
     req.path.includes("/favicon") ||
     req.path.includes("/og-image") ||
-    req.path.includes("/ads");
+    req.path.includes("/ads") ||
+    req.path.endsWith("/me");    // profile update can carry avatarBase64
   express.json({ limit: isUploadRoute ? "10mb" : "512kb" })(req, _res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
