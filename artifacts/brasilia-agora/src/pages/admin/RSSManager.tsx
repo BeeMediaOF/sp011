@@ -96,9 +96,9 @@ const AUTO_MODE_OPTS: { label: string; value: AutoMode; desc: string }[] = [
   { value: "rewrite_publish",  label: "IA → Publicar",             desc: "Reescreve e publica" },
 ];
 const AI_PROVIDERS: { label: string; value: AiProvider; desc: string }[] = [
-  { value: "gemini_free", label: "Gemini Gratuito (Replit)", desc: "Sem custo de API key — usa créditos Replit" },
-  { value: "gemini_paid", label: "Gemini Pago (Google)",     desc: "Use sua própria API key do Google AI" },
-  { value: "openai",      label: "ChatGPT (OpenAI)",         desc: "Use sua própria API key da OpenAI" },
+  { value: "gemini_paid", label: "Gemini — Google AI Studio", desc: "Chave própria · tier gratuito disponível" },
+  { value: "openai",      label: "ChatGPT — OpenAI",          desc: "Chave própria da OpenAI" },
+  { value: "gemini_free", label: "Gemini via Replit",         desc: "Usa créditos do plano Replit" },
 ];
 const OPENAI_MODELS = ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo"];
 const GEMINI_MODELS = ["gemini-2.5-flash","gemini-2.5-pro","gemini-3-flash-preview","gemini-3.1-pro-preview"];
@@ -230,7 +230,7 @@ function PromptEditor({
 
 export default function RSSManager() {
   // ── AI Settings ──
-  const [aiSettings, setAiSettings]   = useState<AiSettings>({ provider: "gemini_free", model: "", hasKey: false });
+  const [aiSettings, setAiSettings]   = useState<AiSettings>({ provider: "gemini_paid", model: "", hasKey: false });
   const [aiApiKey, setAiApiKey]       = useState("");
   const [showApiKey, setShowApiKey]   = useState(false);
   const [aiSaving, setAiSaving]       = useState(false);
@@ -1414,6 +1414,16 @@ export default function RSSManager() {
                             {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
                           </button>
                         </div>
+                        {aiSettings.provider === "gemini_paid" && (
+                          <p className="text-[10px] text-slate-400 mt-1">
+                            Chave gratuita em{" "}
+                            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                              className="text-purple-600 underline hover:text-purple-700">
+                              aistudio.google.com/apikey
+                            </a>
+                            {" "}— tier gratuito: 15 req/min, 1.500 req/dia
+                          </p>
+                        )}
                       </div>
                     )}
                     {aiError && <p className="text-xs text-red-500">{aiError}</p>}

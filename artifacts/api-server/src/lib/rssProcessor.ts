@@ -245,7 +245,7 @@ export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
   const settings = store.getSettings();
-  const provider = settings.rssAiProvider ?? "gemini_free";
+  const provider = settings.rssAiProvider ?? "gemini_paid";
   const prompt   = customPrompt
     ? applyPromptTemplate(customPrompt, title, text, sourceName, giveCredit)
     : buildPrompt(title, text, sourceName, giveCredit);
