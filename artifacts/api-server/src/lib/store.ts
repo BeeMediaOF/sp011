@@ -222,6 +222,7 @@ interface StoreData {
   socialConfig?: SocialConfig;
   perplexityTopics?: PerplexityTopic[];
   categoryViews?: Record<string, number>;
+  articleViews?: Record<string, { title: string; views: number }>;
   seedVersion?: number;
 }
 
@@ -668,6 +669,15 @@ export const store = {
   trackCategoryView: (category: string): void => {
     if (!_store.categoryViews) _store.categoryViews = {};
     _store.categoryViews[category] = (_store.categoryViews[category] ?? 0) + 1;
+    saveStore(_store);
+  },
+
+  // Article Views (persistent — survives restarts)
+  getArticleViews: (): Record<string, { title: string; views: number }> => ({ ...(_store.articleViews ?? {}) }),
+  trackArticleView: (articleId: string, title: string): void => {
+    if (!_store.articleViews) _store.articleViews = {};
+    const cur = _store.articleViews[articleId];
+    _store.articleViews[articleId] = { title: title || cur?.title || articleId, views: (cur?.views ?? 0) + 1 };
     saveStore(_store);
   },
 

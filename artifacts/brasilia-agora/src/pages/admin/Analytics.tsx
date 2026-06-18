@@ -8,6 +8,7 @@ import {
 import {
   Eye, Users, Clock, TrendingDown, TrendingUp, ArrowUpRight,
   ArrowDownRight, FileText, Info, Smartphone, Monitor, Tablet,
+  RefreshCw, Download,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -89,20 +90,103 @@ function EmptyState({ label }: { label: string }) {
 }
 
 export default function Analytics() {
-  const [stats,   setStats]   = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(false);
-  const [geoTab,  setGeoTab]  = useState<"cidades" | "estados">("cidades");
+  const [stats,      setStats]      = useState<Stats | null>(null);
+  const [loading,    setLoading]    = useState(true);
+  const [error,      setError]      = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated,setLastUpdated]= useState<Date | null>(null);
+  const [geoTab,     setGeoTab]     = useState<"cidades" | "estados">("cidades");
+
+  const fetchStats = React.useCallback(async (silent = false) => {
+    if (silent) setRefreshing(true);
+    const token = localStorage.getItem("admin_token");
+    try {
+      const r    = await fetch("/api/analytics/stats", { headers: { Authorization: `Bearer ${token}` } });
+      const data = await r.json() as Stats;
+      setStats(data);
+      setLastUpdated(new Date());
+      if (!silent) setLoading(false);
+    } catch {
+      if (!silent) { setError(true); setLoading(false); }
+    } finally {
+      if (silent) setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const token = localStorage.getItem("admin_token");
-    fetch("/api/analytics/stats", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.json())
-      .then(data => { setStats(data); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
-  }, []);
+    void fetchStats(false);
+    const interval = setInterval(() => { void fetchStats(true); }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchStats]);
+
+  function exportPDF() {
+    if (!stats) return;
+    const now = new Date().toLocaleString("pt-BR");
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Relatório Analytics — ${now}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; color: #0f172a; padding: 32px; background: #fff; }
+    h1 { color: #0B2A66; font-size: 22px; border-bottom: 3px solid #E71D36; padding-bottom: 10px; margin-bottom: 6px; }
+    .sub { color: #64748b; font-size: 12px; margin-bottom: 24px; }
+    h2 { color: #0B2A66; font-size: 13px; font-weight: 700; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+    .kpi { flex: 1; min-width: 120px; padding: 14px; background: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0; }
+    .kpi-val { font-size: 26px; font-weight: 800; color: #0B2A66; }
+    .kpi-lbl { font-size: 11px; color: #64748b; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f1f5f9; padding: 8px 12px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #64748b; font-weight: 700; }
+    td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; }
+    tr:last-child td { border: none; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+    .footer { margin-top: 40px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #94a3b8; font-size: 11px; }
+    @page { margin: 18mm; }
+  </style>
+</head>
+<body>
+  <h1>Relatório de Analytics</h1>
+  <p class="sub">Gerado em ${now}</p>
+
+  <h2>Resumo de Tráfego</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-val">${stats.totals.today.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Hoje</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.totals.week.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 7 dias</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.totals.month.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 30 dias</div></div>
+    <div class="kpi"><div class="kpi-val">${(stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR")}</div><div class="kpi-lbl">Usuários únicos</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.engagement?.bounceRate ?? 0}%</div><div class="kpi-lbl">Taxa de rejeição</div></div>
+  </div>
+
+  <h2>Artigos com mais visualizações</h2>
+  <table>
+    <tr><th>#</th><th>Artigo</th><th>Visualizações</th><th>Tempo médio</th></tr>
+    ${stats.topArticles.map((a, i) => `<tr><td>${i + 1}</td><td>${a.title.replace(/<[^>]*>/g, "")}</td><td>${a.views.toLocaleString("pt-BR")}</td><td>${a.avgTime ? Math.floor(a.avgTime / 60) + "m " + (a.avgTime % 60) + "s" : "—"}</td></tr>`).join("")}
+  </table>
+
+  <h2>Desempenho por Categoria</h2>
+  <table>
+    <tr><th>Categoria</th><th>Views</th><th>Cliques</th><th>Artigos</th></tr>
+    ${stats.topCategories.map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString("pt-BR")}</td><td>${c.clicks.toLocaleString("pt-BR")}</td><td>${c.articles}</td></tr>`).join("")}
+  </table>
+
+  ${(stats.topCities ?? []).length > 0 ? `
+  <h2>Top Cidades</h2>
+  <table>
+    <tr><th>Cidade</th><th>Views</th></tr>
+    ${(stats.topCities ?? []).map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString("pt-BR")}</td></tr>`).join("")}
+  </table>` : ""}
+
+  <div class="footer">Portal SBC Agora · Relatório gerado automaticamente pelo sistema de analytics</div>
+</body>
+</html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 500);
+  }
 
   if (loading) {
     return (
@@ -196,6 +280,38 @@ export default function Analytics() {
   return (
     <AdminLayout title="Analytics">
       <div className="space-y-6">
+
+        {/* ── Toolbar ───────────────────────────────────────────── */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
+              Ao vivo
+            </div>
+            {lastUpdated && (
+              <span className="text-xs text-slate-400">
+                Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { void fetchStats(true); }}
+              disabled={refreshing}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={12} className={refreshing ? "animate-spin" : ""}/>
+              Atualizar
+            </button>
+            <button
+              onClick={exportPDF}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#0B2A66] rounded-xl hover:bg-[#0a2255] transition-colors"
+            >
+              <Download size={12}/>
+              Exportar PDF
+            </button>
+          </div>
+        </div>
 
         {/* ── KPI cards ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -674,7 +790,7 @@ export default function Analytics() {
         </div>
 
         <p className="text-xs text-slate-400 text-center pb-2">
-          Dados coletados de visitantes · Armazenamento em memória (reinicia com o servidor)
+          Dados coletados de visitantes · Views por artigo e por categoria persistidos em disco · Atualização automática a cada 30s
         </p>
       </div>
     </AdminLayout>

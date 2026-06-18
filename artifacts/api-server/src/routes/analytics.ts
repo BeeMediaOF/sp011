@@ -97,6 +97,11 @@ router.post("/event", (req, res) => {
     store.trackCategoryView(category);
   }
 
+  // Persist article views to disk so counts survive server restarts
+  if (type === "pageview" && articleId && title) {
+    store.trackArticleView(articleId, title);
+  }
+
   res.json({ ok: true });
 });
 
@@ -203,13 +208,23 @@ router.get("/stats", authMiddleware, async (_req, res) => {
   const bounceRate      = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
   const readCompletions = scrollMap[100] ?? 0;
 
-  const topArticles = Object.entries(articleMap)
-    .sort((a, b) => b[1].views - a[1].views)
-    .slice(0, 10)
-    .map(([id, { title, views, totalReadTime: rt, readSessions: rs }]) => ({
-      id, title, views,
-      avgTime: rs > 0 ? Math.round(rt / rs) : undefined,
-    }));
+  // Merge in-memory article stats with persisted views (survive restarts)
+  const persistedArticleViews = store.getArticleViews();
+  const allArticleIds = new Set([...Object.keys(articleMap), ...Object.keys(persistedArticleViews)]);
+  const mergedArticles = Array.from(allArticleIds).map(id => {
+    const mem  = articleMap[id];
+    const disk = persistedArticleViews[id];
+    // Use disk views as source of truth (all-time); in-mem only for engagement metrics
+    return {
+      id,
+      title:   disk?.title   ?? mem?.title ?? id,
+      views:   disk?.views   ?? mem?.views ?? 0,
+      avgTime: mem && mem.readSessions > 0 ? Math.round(mem.totalReadTime / mem.readSessions) : undefined,
+    };
+  });
+  const topArticles = mergedArticles
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 10);
 
   // Top categories: merge in-memory counts + persistent store counts (survive restarts)
   // persistedClicks holds explicit category-page navigation events saved to disk
