@@ -44,6 +44,8 @@ export interface MenuItem {
   path: string;
   order: number;
   visible: boolean;
+  newTab?: boolean;
+  highlight?: boolean;
 }
 
 export interface HomeBlock {

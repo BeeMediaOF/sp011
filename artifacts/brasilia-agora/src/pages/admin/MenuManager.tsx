@@ -51,6 +51,8 @@ export default function MenuManager() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [applied, setApplied]   = useState(false);
 
   const [tab, setTab]           = useState<Tab>("principal");
   const [device, setDevice]     = useState<DevicePreview>("desktop");
@@ -98,8 +100,28 @@ export default function MenuManager() {
     setItems((prev) => prev.map((it) => it.id === selected ? { ...it, ...patch } : it));
   }
 
-  function applyEditToSelected() {
-    updateSelected({ label: editLabel, path: editPath, visible: editVisible });
+  async function applyEditToSelected() {
+    if (!selected) return;
+    // Apply all fields to local state first
+    const patch: Partial<MenuItem> = {
+      label: editLabel.trim() || "Item sem nome",
+      path: editPath.trim() || "/",
+      visible: editVisible,
+      newTab: editNewTab,
+      highlight: editHighlight,
+    };
+    const nextItems = items.map((it) => it.id === selected ? { ...it, ...patch } : it);
+    setItems(nextItems);
+
+    // Save immediately to the database
+    setApplying(true); setApplied(false);
+    try {
+      const ordered = nextItems.map((it, i) => ({ ...it, order: i }));
+      const { menuItems } = await adminApi.updateMenu(ordered);
+      setItems(menuItems);
+      setApplied(true);
+      setTimeout(() => setApplied(false), 2500);
+    } catch { } finally { setApplying(false); }
   }
 
   function addItem(label: string, path: string) {
@@ -586,10 +608,16 @@ export default function MenuManager() {
                 {/* Apply button */}
                 <button
                   onClick={applyEditToSelected}
-                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors"
-                  style={{ background: "#0B2A66" }}
+                  disabled={applying}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-60"
+                  style={{ background: applied ? "#16A34A" : "#0B2A66" }}
                 >
-                  <Check size={14} /> Aplicar alterações
+                  {applying
+                    ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
+                    : applied
+                    ? <><Check size={14} /> Salvo!</>
+                    : <><Check size={14} /> Aplicar alterações</>
+                  }
                 </button>
               </div>
             ) : (
