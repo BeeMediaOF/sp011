@@ -663,6 +663,11 @@ export default function HomeBlocksManager() {
   const [applyingPreset, setApplyingPreset] = useState<string | null>(null);
   const [appliedPreset, setAppliedPreset]   = useState<string | null>(null);
 
+  type PreviewBackup = { blocks: HomeBlock[]; headerStyle: HeaderStyle; footerStyle: FooterStyle; headerBgColor: string; footerBgColor: string };
+  const [previewingPreset, setPreviewingPreset] = useState<HomeStylePreset | null>(null);
+  const [previewBackup, setPreviewBackup]       = useState<PreviewBackup | null>(null);
+  const [previewApplying, setPreviewApplying]   = useState(false);
+
   const logoInputRef  = useRef<HTMLInputElement>(null);
   const saveTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -781,6 +786,62 @@ export default function HomeBlocksManager() {
       setTimeout(() => { setSaved(false); setAppliedPreset(null); }, 2500);
       setTab("blocks");
     } catch { } finally { setApplyingPreset(null); }
+  }
+
+  async function startPreviewPreset(preset: HomeStylePreset) {
+    if (previewingPreset?.id === preset.id) return;
+    setPreviewApplying(true);
+    try {
+      // Salva backup só na primeira vez (ao trocar de preset ainda em preview, mantém o backup original)
+      const backup: PreviewBackup = previewBackup ?? { blocks, headerStyle, footerStyle, headerBgColor, footerBgColor };
+      if (!previewBackup) setPreviewBackup(backup);
+
+      const ordered = preset.blocks.map((b, i) => ({ ...b, order: i }));
+      await adminApi.updateSettings({
+        homeBlocks: ordered, headerStyle: preset.headerStyle,
+        footerStyle: preset.footerStyle, headerBgColor: preset.headerBgColor,
+        footerBgColor: preset.footerBgColor,
+      });
+      setBlocks(ordered);
+      setHeaderStyle(preset.headerStyle);
+      setFooterStyle(preset.footerStyle);
+      setHeaderBgColor(preset.headerBgColor);
+      setFooterBgColor(preset.footerBgColor);
+      setPreviewingPreset(preset);
+      invalidateSiteCache();
+      setPreviewKey((k) => k + 1);
+    } catch { } finally { setPreviewApplying(false); }
+  }
+
+  async function confirmPreviewPreset() {
+    if (!previewingPreset) return;
+    pushHistory(blocks);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+    setPreviewBackup(null);
+    setPreviewingPreset(null);
+    setTab("blocks");
+  }
+
+  async function cancelPreviewPreset() {
+    if (!previewBackup) { setPreviewingPreset(null); return; }
+    setPreviewApplying(true);
+    try {
+      await adminApi.updateSettings({
+        homeBlocks: previewBackup.blocks, headerStyle: previewBackup.headerStyle,
+        footerStyle: previewBackup.footerStyle, headerBgColor: previewBackup.headerBgColor,
+        footerBgColor: previewBackup.footerBgColor,
+      });
+      setBlocks(previewBackup.blocks);
+      setHeaderStyle(previewBackup.headerStyle);
+      setFooterStyle(previewBackup.footerStyle);
+      setHeaderBgColor(previewBackup.headerBgColor);
+      setFooterBgColor(previewBackup.footerBgColor);
+      invalidateSiteCache();
+      setPreviewKey((k) => k + 1);
+      setPreviewBackup(null);
+      setPreviewingPreset(null);
+    } catch { } finally { setPreviewApplying(false); }
   }
 
   async function saveAll() {
@@ -987,78 +1048,140 @@ export default function HomeBlocksManager() {
 
             {/* ── STYLES tab ── */}
             {tab === "styles" && (
-              <div className="flex-1 overflow-y-auto">
-                <div className="px-4 pt-4 pb-3 border-b border-[#E2E8F0]">
-                  <span className="text-[13px] font-bold text-[#0F172A]">Estilos da Home</span>
-                  <p className="text-[11px] text-[#64748B] mt-0.5">Escolha um dos 5 estilos prontos. Após aplicar, você pode editar cada bloco normalmente.</p>
-                </div>
-                <div className="px-3 py-3 space-y-2">
-                  {HOME_STYLE_PRESETS.map((preset) => {
-                    const isApplying = applyingPreset === preset.id;
-                    const wasApplied = appliedPreset === preset.id;
-                    return (
-                      <div key={preset.id}
-                        className="rounded-2xl border border-[#E2E8F0] bg-white overflow-hidden hover:border-[#CBD5E1] transition-all"
-                        style={{ boxShadow: "0 2px 8px rgba(15,23,42,0.04)" }}>
-                        <div className="flex gap-0 h-[108px]">
-                          {/* Color accent + diagram */}
-                          <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 rounded-l-2xl" style={{ backgroundColor: preset.accentColor + "18", color: preset.accentColor }}>
-                            <div className="w-full h-full">
-                              {preset.diagram}
+              <div className="flex-1 overflow-y-auto flex flex-col">
+                {/* ── Preview mode banner ── */}
+                {previewingPreset ? (
+                  <div className="shrink-0 px-4 py-3 border-b border-[#0B2A66]/20" style={{ backgroundColor: previewingPreset.accentColor }}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <EyeIcon size={13} className="text-white/80 shrink-0" />
+                      <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Visualizando</span>
+                    </div>
+                    <p className="text-[14px] font-black text-white mb-3">{previewingPreset.name}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={cancelPreviewPreset} disabled={previewApplying}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors disabled:opacity-50">
+                        {previewApplying ? <RefreshCw size={11} className="animate-spin" /> : <Undo2 size={11} />}
+                        Desfazer
+                      </button>
+                      <button
+                        onClick={confirmPreviewPreset} disabled={previewApplying}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white hover:bg-white/90 rounded-xl transition-colors disabled:opacity-50"
+                        style={{ color: previewingPreset.accentColor }}>
+                        <CheckCircle size={11} /> Aplicar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="shrink-0 px-4 pt-4 pb-3 border-b border-[#E2E8F0]">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Estilos da Home</span>
+                    <p className="text-[11px] text-[#64748B] mt-0.5">Escolha um dos 5 estilos prontos. Clique em <strong>Visualizar</strong> para ver no preview ao lado.</p>
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto">
+                  <div className="px-3 py-3 space-y-2">
+                    {HOME_STYLE_PRESETS.map((preset) => {
+                      const isApplying = applyingPreset === preset.id;
+                      const wasApplied = appliedPreset === preset.id;
+                      const isPreviewing = previewingPreset?.id === preset.id;
+                      return (
+                        <div key={preset.id}
+                          className="rounded-2xl border-2 bg-white overflow-hidden transition-all"
+                          style={{
+                            borderColor: isPreviewing ? preset.accentColor : "#E2E8F0",
+                            boxShadow: isPreviewing ? `0 0 0 3px ${preset.accentColor}22` : "0 2px 8px rgba(15,23,42,0.04)",
+                          }}>
+                          {isPreviewing && (
+                            <div className="flex items-center gap-1.5 px-3 py-1.5" style={{ backgroundColor: preset.accentColor + "12" }}>
+                              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: preset.accentColor }} />
+                              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: preset.accentColor }}>
+                                Visualizando agora
+                              </span>
                             </div>
-                          </div>
-                          {/* Info */}
-                          <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
-                            <div>
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                <span className="text-[13px] font-bold text-[#0F172A]">{preset.name}</span>
-                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
-                                  style={{ backgroundColor: preset.tagBg, color: preset.tagColor }}>
-                                  {preset.tag}
-                                </span>
-                              </div>
-                              <p className="text-[11px] text-[#64748B] leading-snug">{preset.desc}</p>
-                              <div className="flex gap-1 mt-1.5">
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
-                                  {preset.headerStyle === "standard" ? "⊞ Padrão" : preset.headerStyle === "compact" ? "— Compacto" : "⊟ Centralizado"}
-                                </span>
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
-                                  {preset.footerStyle === "dark" ? "🌑 Rodapé escuro" : preset.footerStyle === "light" ? "☀ Rodapé claro" : "— Minimal"}
-                                </span>
-                                <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
-                                  {preset.blocks.filter(b => b.visible).length} blocos
-                                </span>
+                          )}
+                          <div className="flex gap-0 h-[108px]">
+                            {/* Color accent + diagram */}
+                            <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 rounded-l-2xl" style={{ backgroundColor: preset.accentColor + "18", color: preset.accentColor }}>
+                              <div className="w-full h-full">
+                                {preset.diagram}
                               </div>
                             </div>
-                            <button
-                              onClick={() => applyPreset(preset)}
-                              disabled={!!applyingPreset}
-                              className="mt-1.5 w-full flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-bold rounded-xl transition-colors disabled:opacity-50"
-                              style={{
-                                backgroundColor: wasApplied ? "#16a34a" : preset.accentColor,
-                                color: "#fff",
-                              }}>
-                              {isApplying ? (
-                                <><RefreshCw size={11} className="animate-spin" /> Aplicando…</>
-                              ) : wasApplied ? (
-                                <><CheckCircle size={11} /> Aplicado!</>
+                            {/* Info */}
+                            <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[13px] font-bold text-[#0F172A]">{preset.name}</span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider"
+                                    style={{ backgroundColor: preset.tagBg, color: preset.tagColor }}>
+                                    {preset.tag}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-[#64748B] leading-snug">{preset.desc}</p>
+                                <div className="flex gap-1 mt-1.5">
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                    {preset.headerStyle === "standard" ? "⊞ Padrão" : preset.headerStyle === "compact" ? "— Compacto" : "⊟ Centralizado"}
+                                  </span>
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                    {preset.footerStyle === "dark" ? "🌑 Escuro" : preset.footerStyle === "light" ? "☀ Claro" : "— Minimal"}
+                                  </span>
+                                  <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">
+                                    {preset.blocks.filter(b => b.visible).length} blocos
+                                  </span>
+                                </div>
+                              </div>
+
+                              {isPreviewing ? (
+                                <div className="flex gap-1.5 mt-1.5">
+                                  <button
+                                    onClick={cancelPreviewPreset} disabled={previewApplying}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-bold border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
+                                    <Undo2 size={10} /> Desfazer
+                                  </button>
+                                  <button
+                                    onClick={confirmPreviewPreset} disabled={previewApplying}
+                                    className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-bold text-white rounded-xl transition-colors disabled:opacity-50"
+                                    style={{ backgroundColor: preset.accentColor }}>
+                                    <CheckCircle size={10} /> Aplicar
+                                  </button>
+                                </div>
                               ) : (
-                                <><Layers size={11} /> Aplicar estilo</>
+                                <button
+                                  onClick={() => startPreviewPreset(preset)}
+                                  disabled={previewApplying || !!isApplying}
+                                  className="mt-1.5 w-full flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-bold rounded-xl border transition-colors disabled:opacity-50"
+                                  style={{
+                                    borderColor: wasApplied ? "#16a34a" : preset.accentColor + "50",
+                                    color:       wasApplied ? "#16a34a" : preset.accentColor,
+                                    backgroundColor: wasApplied ? "#f0fdf4" : preset.accentColor + "08",
+                                  }}>
+                                  {isApplying ? (
+                                    <><RefreshCw size={11} className="animate-spin" /> Aplicando…</>
+                                  ) : wasApplied ? (
+                                    <><CheckCircle size={11} /> Aplicado!</>
+                                  ) : previewApplying ? (
+                                    <><RefreshCw size={11} className="animate-spin" /> Carregando…</>
+                                  ) : (
+                                    <><EyeIcon size={11} /> Visualizar</>
+                                  )}
+                                </button>
                               )}
-                            </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="px-4 pb-4">
-                  <div className="flex items-start gap-2.5 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl">
-                    <Palette size={13} className="text-[#D97706] mt-0.5 shrink-0" />
-                    <p className="text-[11px] text-[#92400E] leading-relaxed">
-                      Aplicar um estilo substitui os blocos, cabeçalho e rodapé atuais. Use <strong>Desfazer</strong> para voltar.
-                    </p>
+                      );
+                    })}
                   </div>
+                  {!previewingPreset && (
+                    <div className="px-4 pb-4">
+                      <div className="flex items-start gap-2.5 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl">
+                        <Palette size={13} className="text-[#D97706] mt-0.5 shrink-0" />
+                        <p className="text-[11px] text-[#92400E] leading-relaxed">
+                          Visualize antes de aplicar. Ao aplicar, os blocos, cabeçalho e rodapé serão substituídos. Use <strong>Desfazer</strong> para voltar.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
