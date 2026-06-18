@@ -103,9 +103,18 @@ export default function ArticleEdit() {
   const [citationText, setCitationText] = useState("");
   const [citationAuthor, setCitationAuthor] = useState("");
 
-  const contentRef    = useRef<HTMLTextAreaElement>(null);
-  const imageRef      = useRef<HTMLInputElement>(null);
-  const dropRef       = useRef<HTMLDivElement>(null);
+  const [inlineImgOpen, setInlineImgOpen]     = useState(false);
+  const [inlineImgUrl, setInlineImgUrl]       = useState("");
+  const [inlineImgAlt, setInlineImgAlt]       = useState("");
+  const [inlineImgAlign, setInlineImgAlign]   = useState<"left" | "center" | "right">("center");
+
+  const [galleryUploadIdx, setGalleryUploadIdx] = useState(0);
+
+  const contentRef      = useRef<HTMLTextAreaElement>(null);
+  const imageRef        = useRef<HTMLInputElement>(null);
+  const dropRef         = useRef<HTMLDivElement>(null);
+  const galleryFileRef  = useRef<HTMLInputElement>(null);
+  const inlineImgFileRef = useRef<HTMLInputElement>(null);
   const autofillTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track which values came from user vs. autofill so we don't overwrite user edits
   const userEditedRef = useRef<Set<string>>(new Set());
@@ -381,6 +390,38 @@ export default function ArticleEdit() {
     setCitationOpen(false);
     setCitationText("");
     setCitationAuthor("");
+  }
+
+  function insertInlineImage() {
+    const url = inlineImgUrl.trim();
+    if (!url) return;
+    const alt = inlineImgAlt.trim();
+    let style = "";
+    if (inlineImgAlign === "center") style = "display:block;margin:20px auto;max-width:100%;border-radius:8px;";
+    else if (inlineImgAlign === "left") style = "float:left;margin:0 18px 12px 0;max-width:48%;border-radius:8px;";
+    else style = "float:right;margin:0 0 12px 18px;max-width:48%;border-radius:8px;";
+    const block = `<img src="${url}" alt="${alt}" style="${style}" />`;
+    appendToContent(block);
+    setInlineImgOpen(false);
+    setInlineImgUrl("");
+    setInlineImgAlt("");
+    setInlineImgAlign("center");
+  }
+
+  function handleInlineImgFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => setInlineImgUrl(e.target?.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  function handleGalleryUploadFile(file: File, idx: number) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const copy = [...galleryImages];
+      copy[idx] = e.target?.result as string;
+      setGalleryImages(copy);
+    };
+    reader.readAsDataURL(file);
   }
 
   const isPublished = form.status === "published";
@@ -748,14 +789,14 @@ export default function ArticleEdit() {
 
             {form.imageUrl ? (
               <div
-                className="group relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer"
+                className="group relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer bg-slate-100"
                 onClick={() => imageRef.current?.click()}
               >
                 <img
                   src={form.imageUrl}
                   alt="Imagem de destaque"
-                  className="w-full object-cover"
-                  style={{ maxHeight: "340px", minHeight: "160px" }}
+                  className="w-full object-contain"
+                  style={{ maxHeight: "220px" }}
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
                 {/* Hover overlay */}
@@ -818,7 +859,7 @@ export default function ArticleEdit() {
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Blocos de conteúdo</h3>
             <p className="text-xs text-slate-400 mb-4">Adicione elementos para enriquecer sua matéria.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <button
                 type="button"
                 onClick={() => { setGalleryImages([""]); setGalleryOpen(true); }}
@@ -829,7 +870,21 @@ export default function ArticleEdit() {
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-slate-700">Adicionar galeria</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Adicione uma galeria de imagens à matéria</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Galeria de imagens no corpo da matéria</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setInlineImgUrl(""); setInlineImgAlt(""); setInlineImgAlign("center"); setInlineImgOpen(true); }}
+                className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 hover:border-emerald-400/30 hover:bg-emerald-50/50 cursor-pointer transition-colors text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-emerald-50 group-hover:bg-emerald-100 transition-colors">
+                  <ImagePlus size={16} className="text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Imagem no texto</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Insira uma imagem inline no conteúdo</p>
                 </div>
               </button>
 
@@ -877,8 +932,20 @@ export default function ArticleEdit() {
                       <X size={18} />
                     </button>
                   </div>
+                  {/* Hidden file input for gallery uploads */}
+                  <input
+                    ref={galleryFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleGalleryUploadFile(f, galleryUploadIdx);
+                      e.target.value = "";
+                    }}
+                  />
                   <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
-                    <p className="text-xs text-slate-500">Cole as URLs das imagens da galeria. Cada linha será um item.</p>
+                    <p className="text-xs text-slate-500">Cole a URL ou faça upload de cada imagem da galeria.</p>
                     {galleryImages.map((img, i) => (
                       <div key={i} className="flex items-center gap-2">
                         <div className="flex-1 relative">
@@ -891,7 +958,7 @@ export default function ArticleEdit() {
                             />
                           )}
                           <input
-                            value={img}
+                            value={img.startsWith("data:") ? "(imagem enviada)" : img}
                             onChange={(e) => {
                               const copy = [...galleryImages];
                               copy[i] = e.target.value;
@@ -901,6 +968,15 @@ export default function ArticleEdit() {
                             className={`w-full py-2.5 pr-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#2563EB] bg-slate-50 placeholder:text-slate-400 transition-colors ${img.trim() ? "pl-11" : "pl-4"}`}
                           />
                         </div>
+                        {/* Upload button */}
+                        <button
+                          type="button"
+                          title="Fazer upload de imagem"
+                          onClick={() => { setGalleryUploadIdx(i); galleryFileRef.current?.click(); }}
+                          className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-[#2563EB] hover:border-[#2563EB] transition-colors shrink-0"
+                        >
+                          <ImagePlus size={15} />
+                        </button>
                         <button
                           type="button"
                           onClick={() => setGalleryImages((prev) => prev.filter((_, j) => j !== i))}
@@ -1048,6 +1124,121 @@ export default function ArticleEdit() {
                       className="px-4 py-2 text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2558] rounded-xl transition-colors disabled:opacity-50"
                     >
                       Inserir citação
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Inline image modal ─────────────────────────── */}
+            {inlineImgOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                        <ImagePlus size={15} className="text-emerald-600" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-slate-800">Imagem no texto</h4>
+                    </div>
+                    <button type="button" onClick={() => setInlineImgOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={inlineImgFileRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleInlineImgFile(f); e.target.value = ""; }}
+                  />
+
+                  <div className="px-6 py-5 space-y-4">
+                    {/* Preview */}
+                    {inlineImgUrl && (
+                      <div className="rounded-xl overflow-hidden border border-slate-100 bg-slate-50">
+                        <img
+                          src={inlineImgUrl}
+                          alt={inlineImgAlt || "preview"}
+                          className="w-full object-contain"
+                          style={{ maxHeight: "180px" }}
+                          onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Upload or URL */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-2">Imagem</label>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => inlineImgFileRef.current?.click()}
+                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0"
+                        >
+                          <ImagePlus size={13} /> Upload
+                        </button>
+                        <div className="relative flex-1">
+                          <LinkIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            value={inlineImgUrl.startsWith("data:") ? "(imagem enviada)" : inlineImgUrl}
+                            onChange={(e) => setInlineImgUrl(e.target.value)}
+                            placeholder="Ou cole a URL da imagem"
+                            autoFocus
+                            className="w-full pl-8 pr-3 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-emerald-500 bg-slate-50 placeholder:text-slate-400 transition-colors"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alt text */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1.5">
+                        Legenda / alt text <span className="font-normal text-slate-400">(opcional)</span>
+                      </label>
+                      <input
+                        value={inlineImgAlt}
+                        onChange={(e) => setInlineImgAlt(e.target.value)}
+                        placeholder="Ex: Cerimônia de posse na CLDF"
+                        className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-emerald-500 bg-slate-50 placeholder:text-slate-400 transition-colors"
+                      />
+                    </div>
+
+                    {/* Alignment */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-2">Alinhamento</label>
+                      <div className="flex gap-2">
+                        {(["left", "center", "right"] as const).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() => setInlineImgAlign(a)}
+                            className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-colors ${
+                              inlineImgAlign === a
+                                ? "bg-emerald-600 text-white border-emerald-600"
+                                : "text-slate-600 border-slate-200 hover:bg-slate-50"
+                            }`}
+                          >
+                            {a === "left" ? "Esquerda" : a === "center" ? "Centro" : "Direita"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100">
+                    <button type="button" onClick={() => setInlineImgOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={insertInlineImage}
+                      disabled={!inlineImgUrl.trim()}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Inserir imagem
                     </button>
                   </div>
                 </div>
