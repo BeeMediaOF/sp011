@@ -398,9 +398,15 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
 
       {/* Actions */}
       <div className="space-y-2 pt-1">
-        <button type="button" onClick={onApply} disabled={saving || !form.name.trim()}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0B2A66] text-white text-sm font-semibold rounded-xl hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-          {saving ? <><RefreshCw size={13} className="animate-spin" /> Salvando…</> : <><CheckCircle size={13} /> Aplicar alterações</>}
+        {/* Auto-save indicator */}
+        <div className="flex items-center justify-center gap-1.5 py-1 text-[11px] text-slate-400">
+          {saving
+            ? <><RefreshCw size={10} className="animate-spin text-[#0B2A66]" /><span className="text-[#0B2A66] font-medium">Salvando…</span></>
+            : <><CheckCircle size={10} className="text-emerald-500" /><span>Alterações salvas automaticamente</span></>}
+        </div>
+        <button type="button" onClick={onApply}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#0B2A66] text-white text-sm font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">
+          <CheckCircle size={13} /> Fechar painel
         </button>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" onClick={onDuplicate}
@@ -447,11 +453,19 @@ export default function HomeBlocksManager() {
   const [history, setHistory]           = useState<HomeBlock[][]>([]);
   const [historyIdx, setHistoryIdx]     = useState(-1);
 
-  const logoInputRef = useRef<HTMLInputElement>(null);
-  const saveTimer    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const debounceRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const blockRefs    = useRef<Record<string, HTMLDivElement | null>>({});
-  const iframeRef    = useRef<HTMLIFrameElement>(null);
+  const logoInputRef  = useRef<HTMLInputElement>(null);
+  const saveTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const blockRefs     = useRef<Record<string, HTMLDivElement | null>>({});
+  const iframeRef     = useRef<HTMLIFrameElement>(null);
+  const blocksRef     = useRef<HomeBlock[]>([]);
+  const editingIdRef  = useRef<string | null>(null);
+  const editFormRef   = useRef<BlockForm>(EMPTY_FORM);
+
+  // ── Keep refs in sync with state (fixes stale-closure bugs) ────────────────
+  useEffect(() => { blocksRef.current    = blocks;    }, [blocks]);
+  useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
+  useEffect(() => { editFormRef.current  = editForm;  }, [editForm]);
 
   // ── Load ────────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -518,7 +532,7 @@ export default function HomeBlocksManager() {
   }
 
   // ── Auto-save (debounced) ───────────────────────────────────────────────────
-  const debounceSave = useCallback((newBlocks: HomeBlock[], delay = 500) => {
+  const debounceSave = useCallback((newBlocks: HomeBlock[], delay = 400) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
@@ -526,7 +540,8 @@ export default function HomeBlocksManager() {
         await adminApi.updateSettings({ homeBlocks: newBlocks.map((b, i) => ({ ...b, order: i })) });
         invalidateSiteCache();
         setSaved(true);
-        setPreviewKey((k) => k + 1);
+        // Refresh iframe via postMessage — no full remount
+        iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
         setTimeout(() => setSaved(false), 2000);
       } catch { } finally { setSaving(false); }
     }, delay);
@@ -617,18 +632,20 @@ export default function HomeBlocksManager() {
     iframeRef.current?.contentWindow?.postMessage({ type: "block:select", blockId: block.id }, "*");
   }
 
-  // Live debounced form change
+  // Live debounced form change (uses refs to avoid stale-closure bugs)
   function handleFormChange<K extends keyof BlockForm>(key: K, val: BlockForm[K]) {
-    const nextForm = { ...editForm, [key]: val };
+    const nextForm = { ...editFormRef.current, [key]: val };
     setEditForm(nextForm);
     // Optimistic update name in block list immediately
-    if (key === "name" && editingId) {
-      setBlocks((prev) => prev.map((b) => b.id === editingId ? { ...b, name: val as string } : b));
+    if (key === "name") {
+      const id = editingIdRef.current;
+      if (id) setBlocks((prev) => prev.map((b) => b.id === id ? { ...b, name: val as string } : b));
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (!editingId) return;
-      const updated = blocks.map((b) => b.id === editingId ? {
+      const id = editingIdRef.current;
+      if (!id) return;
+      const updated = blocksRef.current.map((b) => b.id === id ? {
         ...b,
         name: nextForm.name,
         category: nextForm.categories[0] ?? nextForm.category,
@@ -636,28 +653,29 @@ export default function HomeBlocksManager() {
         color: nextForm.color,
         reverse: nextForm.reverse,
       } : b);
-      debounceSave(updated, 800);
-    }, 300);
+      // Update state so the list reflects latest changes immediately
+      setBlocks(updated);
+      debounceSave(updated);
+    }, 200);
   }
 
-  async function applyAndSave(id: string) {
-    const next = blocks.map((b) => b.id === id ? {
+  function applyAndSave(id: string) {
+    // Changes are already auto-saved via handleFormChange debounce.
+    // Just flush any pending debounce, update history and close the panel.
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const cur = editFormRef.current;
+    const next = blocksRef.current.map((b) => b.id === id ? {
       ...b,
-      name: editForm.name,
-      category: editForm.categories[0] ?? editForm.category,
-      layout: editForm.layout,
-      color: editForm.color,
-      reverse: editForm.reverse,
+      name: cur.name,
+      category: cur.categories[0] ?? cur.category,
+      layout: cur.layout,
+      color: cur.color,
+      reverse: cur.reverse,
     } : b);
-    setBlocks(next); setEditingId(null);
+    setBlocks(next);
     pushHistory(next);
-    setSaving(true);
-    try {
-      await adminApi.updateSettings({ homeBlocks: next.map((b, i) => ({ ...b, order: i })) });
-      invalidateSiteCache();
-      setSaved(true); setPreviewKey((k) => k + 1);
-      setTimeout(() => setSaved(false), 2000);
-    } catch { } finally { setSaving(false); }
+    setEditingId(null);
+    debounceSave(next, 0);
   }
 
   // ── Add block ───────────────────────────────────────────────────────────────

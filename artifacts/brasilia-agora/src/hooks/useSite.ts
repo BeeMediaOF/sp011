@@ -9,6 +9,7 @@ export interface HomeBlock {
   layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
   color?: string;
   custom?: boolean;
+  reverse?: boolean;
 }
 
 export interface MenuItem {
@@ -45,8 +46,6 @@ export interface SiteSettings {
   footerBgColor?: string;
 }
 
-// ─── localStorage persistence ─────────────────────────────────────────────────
-// Keeps last-known settings so the first render matches the saved state.
 const STORAGE_KEY = "bee_site_v1";
 
 function loadFromStorage(): SiteSettings | null {
@@ -60,7 +59,6 @@ function saveToStorage(data: SiteSettings) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
-    // Quota exceeded — store layout-critical fields only (no large blobs)
     try {
       const { logoBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64, ...slim } = data;
       void [logoBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64];
@@ -69,25 +67,32 @@ function saveToStorage(data: SiteSettings) {
   }
 }
 
-// ─── Singleton module-level cache ─────────────────────────────────────────────
-// Pre-populated from localStorage on module init — eliminates first-render flash.
 let _cache: SiteSettings | null = loadFromStorage();
 let _fetch: Promise<void> | null = null;
+const _subscribers = new Set<(s: SiteSettings) => void>();
 
-/** Refresh settings from the API immediately (call after any admin save). */
+function notifySubscribers() {
+  if (_cache) _subscribers.forEach((cb) => cb(_cache!));
+}
+
+async function doFetch() {
+  const r = await fetch("/api/site");
+  const data = await r.json() as SiteSettings;
+  _cache = data;
+  saveToStorage(data);
+  notifySubscribers();
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("message", (e) => {
+    if (e.data?.type === "settings:refresh") {
+      _fetch = doFetch().catch(() => { _fetch = null; });
+    }
+  });
+}
+
 export function invalidateSiteCache() {
-  // Start a background re-fetch so that by the time the user navigates away
-  // from the admin panel, the cache is already up to date — no flash.
-  _fetch = fetch("/api/site")
-    .then((r) => r.json())
-    .then((data: SiteSettings) => {
-      _cache = data;
-      saveToStorage(data);
-    })
-    .catch(() => {
-      _cache = null;
-      _fetch = null;
-    });
+  _fetch = doFetch().catch(() => { _fetch = null; });
 }
 
 export function useSite() {
@@ -95,27 +100,27 @@ export function useSite() {
   const [loading, setLoading] = useState(_cache === null);
 
   useEffect(() => {
-    // Render immediately from cache if available (stale-while-revalidate)
+    const subscriber = (s: SiteSettings) => {
+      setSettings(s);
+      setLoading(false);
+    };
+    _subscribers.add(subscriber);
+
     if (_cache) {
       setSettings(_cache);
       setLoading(false);
     }
 
-    // Always kick off a background refresh to stay in sync
     if (!_fetch) {
-      _fetch = fetch("/api/site")
-        .then((r) => r.json())
-        .then((data: SiteSettings) => {
-          _cache = data;
-          saveToStorage(data);
-        })
-        .catch(() => {});
+      _fetch = doFetch().catch(() => { _fetch = null; });
     }
 
     _fetch.then(() => {
       if (_cache) setSettings(_cache);
       setLoading(false);
     });
+
+    return () => { _subscribers.delete(subscriber); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
