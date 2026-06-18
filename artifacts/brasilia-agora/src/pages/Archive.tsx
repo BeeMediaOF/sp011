@@ -4,19 +4,8 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { type Article } from "../lib/adminApi";
-import { Search, Calendar, ChevronRight } from "lucide-react";
-
-const CATEGORY_DEFS = [
-  { label: "Política",   slug: "politica",   color: "#1d4ed8" },
-  { label: "Cidade",     slug: "cidade",      color: "#2563eb" },
-  { label: "Segurança",  slug: "seguran",     color: "#dc2626" },
-  { label: "Saúde",      slug: "saude",       color: "#16a34a" },
-  { label: "Transporte", slug: "transporte",  color: "#0284c7" },
-  { label: "Cultura",    slug: "cultura",     color: "#0d9488" },
-  { label: "Esportes",   slug: "esporte",     color: "#b45309" },
-  { label: "Educação",   slug: "educa",       color: "#6b21a8" },
-  { label: "Colunas",    slug: "coluna",      color: "#7c3aed" },
-];
+import { Search, Calendar } from "lucide-react";
+import { useCategories, categoryColor } from "../hooks/useCategories";
 
 function imgFallback(url: string) {
   return url || "https://placehold.co/400x260/e5e7eb/9ca3af?text=Sem+imagem";
@@ -87,6 +76,7 @@ export default function Archive() {
   const [filter, setFilter] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const { categories } = useCategories();
 
   useEffect(() => {
     fetch("/api/articles")
@@ -101,18 +91,22 @@ export default function Archive() {
       a.category.toLowerCase().includes(filter.toLowerCase());
     const matchDate = !dateFilter || a.publishedAt.startsWith(dateFilter);
     const matchCat = !activeCategory ||
+      a.category.toLowerCase() === activeCategory ||
       a.category.toLowerCase().includes(activeCategory) ||
       a.tag.toLowerCase().includes(activeCategory.toUpperCase());
     return matchText && matchDate && matchCat;
   });
 
   const recent = filtered.slice(0, 8);
-  const categoryModules = CATEGORY_DEFS.map((cat) => ({
-    ...cat,
+  const categoryModules = categories.map((cat) => ({
+    value: cat.value,
+    label: cat.label,
+    color: categoryColor(cat.value),
     articles: filtered
       .filter((a) =>
-        a.category.toLowerCase().includes(cat.slug) ||
-        a.tag.toLowerCase().includes(cat.slug)
+        a.category.toLowerCase() === cat.value ||
+        a.category.toLowerCase().includes(cat.value) ||
+        a.tag.toLowerCase().includes(cat.value)
       )
       .slice(0, 5),
   })).filter((m) => m.articles.length > 0);
@@ -180,20 +174,23 @@ export default function Archive() {
             >
               Todas
             </button>
-            {CATEGORY_DEFS.map((cat) => (
-              <button
-                key={cat.slug}
-                onClick={() => setActiveCategory(activeCategory === cat.slug ? null : cat.slug)}
-                className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider border transition-colors"
-                style={
-                  activeCategory === cat.slug
-                    ? { backgroundColor: cat.color, color: "#fff", borderColor: cat.color }
-                    : { color: cat.color, borderColor: cat.color + "55" }
-                }
-              >
-                {cat.label}
-              </button>
-            ))}
+            {categories.map((cat) => {
+              const color = categoryColor(cat.value);
+              return (
+                <button
+                  key={cat.value}
+                  onClick={() => setActiveCategory(activeCategory === cat.value ? null : cat.value)}
+                  className="px-3 py-1 text-[11px] font-bold uppercase tracking-wider border transition-colors"
+                  style={
+                    activeCategory === cat.value
+                      ? { backgroundColor: color, color: "#fff", borderColor: color }
+                      : { color: color, borderColor: color + "55" }
+                  }
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
           </div>
 
           {loading ? (
@@ -240,12 +237,9 @@ export default function Archive() {
                       </h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                      {filtered.map((a) => {
-                        const cat = CATEGORY_DEFS.find((c) =>
-                          a.category.toLowerCase().includes(c.slug) || a.tag.toLowerCase().includes(c.slug)
-                        );
-                        return <FeaturedCard key={a.id} article={a} color={cat?.color ?? "#1a1a1a"} />;
-                      })}
+                      {filtered.map((a) => (
+                        <FeaturedCard key={a.id} article={a} color={categoryColor(a.category)} />
+                      ))}
                     </div>
                   </section>
                 )}
@@ -261,11 +255,11 @@ export default function Archive() {
                         </h2>
                       </div>
                       <button
-                        onClick={() => setActiveCategory(mod.slug)}
+                        onClick={() => setActiveCategory(mod.value)}
                         className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider hover:underline"
                         style={{ color: mod.color }}
                       >
-                        Ver mais <ChevronRight size={12} />
+                        Ver mais →
                       </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
@@ -288,22 +282,24 @@ export default function Archive() {
                     <h3 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">Categorias</h3>
                   </div>
                   <div className="flex flex-col divide-y divide-gray-100">
-                    {CATEGORY_DEFS.map((cat) => {
+                    {categories.map((cat) => {
+                      const color = categoryColor(cat.value);
                       const count = articles.filter((a) =>
-                        a.category.toLowerCase().includes(cat.slug) ||
-                        a.tag.toLowerCase().includes(cat.slug)
+                        a.category.toLowerCase() === cat.value ||
+                        a.category.toLowerCase().includes(cat.value) ||
+                        a.tag.toLowerCase().includes(cat.value)
                       ).length;
                       return (
                         <button
-                          key={cat.slug}
-                          onClick={() => setActiveCategory(activeCategory === cat.slug ? null : cat.slug)}
+                          key={cat.value}
+                          onClick={() => setActiveCategory(activeCategory === cat.value ? null : cat.value)}
                           className="flex items-center justify-between py-2.5 group text-left"
                         >
                           <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: cat.color }} />
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
                             <span
                               className="text-[13px] font-semibold group-hover:underline transition-colors"
-                              style={{ color: activeCategory === cat.slug ? cat.color : "#1a1a1a" }}
+                              style={{ color: activeCategory === cat.value ? color : "#1a1a1a" }}
                             >
                               {cat.label}
                             </span>

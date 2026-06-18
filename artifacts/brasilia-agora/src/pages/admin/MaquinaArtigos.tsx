@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useCategories, categoryColor } from "../../hooks/useCategories";
 import { useLocation } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { useToast } from "../../hooks/use-toast";
@@ -23,22 +24,6 @@ interface GeneratedArticle {
   sourceUrl: string;
   sourceName: string;
 }
-
-const CATEGORIES = [
-  { value: "politica",   label: "Política",    tag: "POLÍTICA" },
-  { value: "cidade",     label: "Cidade",      tag: "CIDADE" },
-  { value: "seguranca",  label: "Segurança",   tag: "SEGURANÇA" },
-  { value: "esportes",   label: "Esportes",    tag: "ESPORTES" },
-  { value: "saude",      label: "Saúde",       tag: "SAÚDE" },
-  { value: "educacao",   label: "Educação",    tag: "EDUCAÇÃO" },
-  { value: "cultura",    label: "Cultura",     tag: "CULTURA" },
-  { value: "economia",   label: "Economia",    tag: "ECONOMIA" },
-  { value: "tecnologia", label: "Tecnologia",  tag: "TECNOLOGIA" },
-  { value: "mundo",      label: "Mundo",       tag: "MUNDO" },
-  { value: "brasil",     label: "Brasil",      tag: "BRASIL" },
-  { value: "transporte", label: "Transporte",  tag: "TRANSPORTE" },
-  { value: "geral",      label: "Geral",       tag: "GERAL" },
-];
 
 const STEPS = [
   { label: "Analisando a URL…",          icon: Link2 },
@@ -122,6 +107,7 @@ Responda APENAS em JSON válido com este formato:
 export default function MaquinaArtigos() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const { categories } = useCategories();
 
   const [url, setUrl]               = useState("");
   const [category, setCategory]     = useState("geral");
@@ -319,7 +305,7 @@ export default function MaquinaArtigos() {
     setSaving(true);
     try {
       const token = localStorage.getItem("admin_token") ?? "";
-      const cat = CATEGORIES.find(c => c.value === (result.category || category));
+      const cat = categories.find(c => c.value === (result.category || category));
       const r = await fetch("/api/admin/articles", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -755,7 +741,7 @@ export default function MaquinaArtigos() {
                 onChange={e => setCategory(e.target.value)}
                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2.5 text-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
               >
-                {CATEGORIES.map(c => (
+                {categories.map(c => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
@@ -893,7 +879,7 @@ export default function MaquinaArtigos() {
                     <div>
                       <span className="inline-block text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded"
                         style={{ backgroundColor: "#c8102e", color: "#fff" }}>
-                        {CATEGORIES.find(c => c.value === (result.category || category))?.tag ?? "GERAL"}
+                        {categories.find(c => c.value === (result.category || category))?.tag ?? (result.category || category).toUpperCase()}
                       </span>
                     </div>
                     {/* Title */}
@@ -1115,7 +1101,7 @@ export default function MaquinaArtigos() {
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
               {history.slice(0, 8).map(h => {
-                const cat = CATEGORIES.find(c => c.value === h.category);
+                const cat = categories.find(c => c.value === h.category);
                 return (
                   <div key={h.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="w-8 h-8 rounded-xl bg-[#EEF2FF] dark:bg-blue-950/40 flex items-center justify-center shrink-0">

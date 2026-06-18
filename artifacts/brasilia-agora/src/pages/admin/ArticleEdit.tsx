@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import { useCategories } from "../../hooks/useCategories";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
@@ -14,28 +15,6 @@ import {
 } from "lucide-react";
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
-
-const CATEGORIES = [
-  { value: "cidades",    label: "Cidades"    },
-  { value: "politica",   label: "Política"   },
-  { value: "economia",   label: "Economia"   },
-  { value: "esportes",   label: "Esportes"   },
-  { value: "cultura",    label: "Cultura"    },
-  { value: "transito",   label: "Trânsito"   },
-  { value: "saude",      label: "Saúde"      },
-  { value: "educacao",   label: "Educação"   },
-  { value: "brasil",     label: "Brasil"     },
-  { value: "mundo",      label: "Mundo"      },
-  { value: "tecnologia", label: "Tecnologia" },
-  { value: "geral",      label: "Geral"      },
-];
-
-const TAG_MAP: Record<string, string> = {
-  cidades:"CIDADES", politica:"POLÍTICA", economia:"ECONOMIA",
-  esportes:"ESPORTES", cultura:"CULTURA", transito:"TRÂNSITO",
-  saude:"SAÚDE", educacao:"EDUCAÇÃO", brasil:"BRASIL",
-  mundo:"MUNDO", tecnologia:"TECNOLOGIA", geral:"GERAL",
-};
 
 const empty: Partial<Article> = {
   title: "", subtitle: "", content: "", category: "geral",
@@ -67,6 +46,7 @@ export default function ArticleEdit() {
   const [matchEdit, paramsEdit]     = useRoute("/admin/artigos/:id");
   const isNew     = !matchEdit || paramsEdit?.id === "novo";
   const articleId = isNew ? null : (paramsEdit?.id ?? null);
+  const { categories } = useCategories();
 
   const [form, setForm]               = useState<Partial<Article>>(empty);
   const [slug, setSlug]               = useState("");
@@ -201,7 +181,8 @@ export default function ArticleEdit() {
 
   function handleCategoryChange(cat: string) {
     setField("category", cat);
-    setField("tag", TAG_MAP[cat] ?? cat.toUpperCase());
+    const found = categories.find((c) => c.value === cat);
+    setField("tag", found?.tag ?? cat.toUpperCase());
   }
 
   function handleImageFile(file: File) {
@@ -1308,7 +1289,7 @@ export default function ArticleEdit() {
                   className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700"
                 >
                   <option value="">Selecione uma categoria</option>
-                  {CATEGORIES.map((c) => (
+                  {categories.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
                 </select>
