@@ -8,7 +8,7 @@ import {
   CheckCircle, AlertCircle, ClipboardPaste, ArrowRight,
   FileText, Image, Tag, Send, BookOpen, ChevronDown, ChevronUp,
   ExternalLink, Pencil, X, Settings, Key, Eye, EyeOff, Save,
-  Cpu, MessageSquare, Zap,
+  Cpu, MessageSquare, Zap, Clock,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -726,11 +726,15 @@ export default function MaquinaArtigos() {
               </div>
             )}
 
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 text-sm">
-                <AlertCircle size={14} /> {error}
-              </div>
-            )}
+            {error && (() => {
+              const isQuota = error.startsWith("QUOTA_COOLDOWN:");
+              const msg = isQuota ? error.replace("QUOTA_COOLDOWN:", "").trim() : error;
+              return (
+                <div className={`flex items-center gap-2 text-sm ${isQuota ? "text-amber-700" : "text-red-600"}`}>
+                  {isQuota ? <Clock size={14} /> : <AlertCircle size={14} />} {msg}
+                </div>
+              );
+            })()}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
