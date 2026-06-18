@@ -8,7 +8,8 @@ import {
   Bold, Italic, Underline, Strikethrough, Link as LinkIcon,
   List, ListOrdered, Quote, Video, Table,
   MoreHorizontal, Heading2, Heading3, ImagePlus,
-  GalleryHorizontal, AlertCircle, Wand2,
+  GalleryHorizontal, AlertCircle, Wand2, Plus, Trash2,
+  Youtube, Play, RefreshCw, Pencil,
 } from "lucide-react";
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -82,6 +83,18 @@ export default function ArticleEdit() {
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState("");
   const [dragOver, setDragOver]       = useState(false);
+
+  // ── Content block modals ────────────────────────────────────
+  const [galleryOpen, setGalleryOpen] = useState(false);
+  const [galleryImages, setGalleryImages] = useState<string[]>([""]);
+  const [galleryInput, setGalleryInput] = useState("");
+
+  const [videoOpen, setVideoOpen] = useState(false);
+  const [videoUrl, setVideoUrl]   = useState("");
+
+  const [citationOpen, setCitationOpen] = useState(false);
+  const [citationText, setCitationText] = useState("");
+  const [citationAuthor, setCitationAuthor] = useState("");
 
   const contentRef    = useRef<HTMLTextAreaElement>(null);
   const imageRef      = useRef<HTMLInputElement>(null);
@@ -216,6 +229,65 @@ export default function ArticleEdit() {
     const t = v.trim();
     if (t && !tags.includes(t)) setTags((prev) => [...prev, t]);
     setTagInput("");
+  }
+
+  // ── Block insertion helpers ───────────────────────────────────
+  function appendToContent(block: string) {
+    const current = form.content ?? "";
+    const sep = current.trim() ? "\n\n" : "";
+    setField("content", current + sep + block);
+  }
+
+  function insertGallery() {
+    const valid = galleryImages.filter((u) => u.trim());
+    if (!valid.length) return;
+    const imgs = valid
+      .map((u) => `<img src="${u.trim()}" alt="" style="width:100%;height:200px;object-fit:cover;border-radius:8px;" />`)
+      .join("\n  ");
+    const block = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:20px 0;">\n  ${imgs}\n</div>`;
+    appendToContent(block);
+    setGalleryOpen(false);
+    setGalleryImages([""]);
+  }
+
+  function getYoutubeId(url: string) {
+    const m = url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
+    return m?.[1] ?? null;
+  }
+  function getVimeoId(url: string) {
+    const m = url.match(/vimeo\.com\/(\d+)/);
+    return m?.[1] ?? null;
+  }
+
+  function insertVideo() {
+    const url = videoUrl.trim();
+    if (!url) return;
+    let embed = "";
+    const ytId = getYoutubeId(url);
+    const vimeoId = getVimeoId(url);
+    if (ytId) {
+      embed = `<div style="position:relative;padding-bottom:56.25%;height:0;margin:20px 0;"><iframe src="https://www.youtube.com/embed/${ytId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:10px;border:0;" allowfullscreen></iframe></div>`;
+    } else if (vimeoId) {
+      embed = `<div style="position:relative;padding-bottom:56.25%;height:0;margin:20px 0;"><iframe src="https://player.vimeo.com/video/${vimeoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:10px;border:0;" allowfullscreen></iframe></div>`;
+    } else {
+      embed = `<div style="margin:20px 0;"><video src="${url}" controls style="width:100%;border-radius:10px;"></video></div>`;
+    }
+    appendToContent(embed);
+    setVideoOpen(false);
+    setVideoUrl("");
+  }
+
+  function insertCitation() {
+    const text = citationText.trim();
+    if (!text) return;
+    const footer = citationAuthor.trim()
+      ? `\n  <footer style="margin-top:10px;font-size:0.85em;color:#64748b;font-style:normal;">— ${citationAuthor.trim()}</footer>`
+      : "";
+    const block = `<blockquote style="border-left:4px solid #0B2A66;padding:14px 18px;margin:20px 0;background:#EEF2FF;border-radius:0 10px 10px 0;">\n  <p style="font-style:italic;color:#1e3a8a;margin:0;">"${text}"</p>${footer}\n</blockquote>`;
+    appendToContent(block);
+    setCitationOpen(false);
+    setCitationText("");
+    setCitationAuthor("");
   }
 
   const isPublished = form.status === "published";
@@ -533,9 +605,30 @@ export default function ArticleEdit() {
 
           {/* ── Featured image card ─────────────────────────────── */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-            <label className="block text-xs font-semibold text-slate-600 mb-3">
-              Imagem de destaque <span className="text-[#E71D36]">*</span>
-            </label>
+            <div className="flex items-center justify-between mb-3">
+              <label className="block text-xs font-semibold text-slate-600">
+                Imagem de destaque <span className="text-[#E71D36]">*</span>
+              </label>
+              {form.imageUrl && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => imageRef.current?.click()}
+                    className="flex items-center gap-1 text-[11px] font-medium text-[#2563EB] hover:underline"
+                  >
+                    <RefreshCw size={11} /> Trocar
+                  </button>
+                  <span className="text-slate-200">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setField("imageUrl", "")}
+                    className="flex items-center gap-1 text-[11px] font-medium text-red-500 hover:underline"
+                  >
+                    <Trash2 size={11} /> Remover
+                  </button>
+                </div>
+              )}
+            </div>
 
             <input
               ref={imageRef}
@@ -546,20 +639,23 @@ export default function ArticleEdit() {
             />
 
             {form.imageUrl ? (
-              <div className="relative rounded-xl overflow-hidden">
+              <div
+                className="group relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer"
+                onClick={() => imageRef.current?.click()}
+              >
                 <img
                   src={form.imageUrl}
                   alt="Imagem de destaque"
-                  className="w-full h-52 object-cover"
+                  className="w-full object-cover"
+                  style={{ maxHeight: "340px", minHeight: "160px" }}
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setField("imageUrl", "")}
-                  className="absolute top-3 right-3 w-7 h-7 bg-white rounded-full shadow-md flex items-center justify-center text-slate-500 hover:text-red-500 transition-colors"
-                >
-                  <X size={13} />
-                </button>
+                {/* Hover overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <Pencil size={14} /> Clique para trocar
+                  </div>
+                </div>
               </div>
             ) : (
               <div
@@ -576,32 +672,36 @@ export default function ArticleEdit() {
                 }`}
                 onClick={() => imageRef.current?.click()}
               >
-                <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
-                  <ImagePlus size={20} className="text-slate-400" />
+                <div className="w-14 h-14 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                  <ImagePlus size={22} className="text-slate-400" />
                 </div>
-                <p className="text-sm text-slate-500">
-                  Arraste e solte uma imagem aqui ou{" "}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); imageRef.current?.click(); }}
-                    className="text-[#2563EB] font-semibold hover:underline"
-                  >
-                    Selecionar imagem
-                  </button>
+                <p className="text-sm text-slate-600 font-medium">
+                  Arraste e solte uma imagem aqui
                 </p>
-                <p className="text-xs text-slate-400 mt-1.5">
-                  Formatos: JPG, PNG ou WebP · Tamanho recomendado: 1200×630px
+                <p className="text-xs text-slate-400 mt-1 mb-3">ou</p>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); imageRef.current?.click(); }}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2558] px-4 py-2 rounded-xl transition-colors"
+                >
+                  <ImageIcon size={14} /> Selecionar do computador
+                </button>
+                <p className="text-[11px] text-slate-400 mt-3">
+                  JPG, PNG ou WebP · Recomendado: 1200×630px
                 </p>
               </div>
             )}
 
             {/* URL input */}
-            <div className="mt-3">
+            <div className="mt-3 relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+                <LinkIcon size={13} />
+              </span>
               <input
                 value={!form.imageUrl?.startsWith("data:") ? (form.imageUrl ?? "") : ""}
                 onChange={(e) => setField("imageUrl", e.target.value)}
                 placeholder="Ou cole uma URL de imagem"
-                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                className="w-full pl-8 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
               />
             </div>
           </div>
@@ -611,25 +711,240 @@ export default function ArticleEdit() {
             <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Blocos de conteúdo</h3>
             <p className="text-xs text-slate-400 mb-4">Adicione elementos para enriquecer sua matéria.</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { icon: GalleryHorizontal, label: "Adicionar galeria",  desc: "Adicione uma galeria de imagens à matéria",    color: "#2563EB", bg: "#EEF4FF" },
-                { icon: Video,             label: "Adicionar vídeo",    desc: "Incorpore um vídeo do YouTube ou Vimeo",       color: "#E71D36", bg: "#FEE2E2" },
-                { icon: Quote,             label: "Adicionar citação",  desc: "Destaque citações importantes no texto",       color: "#0B2A66", bg: "#EEF2FF" },
-              ].map(({ icon: Icon, label, desc, color, bg }) => (
-                <div
-                  key={label}
-                  className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
-                >
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
-                    <Icon size={16} style={{ color }} />
+              <button
+                type="button"
+                onClick={() => { setGalleryImages([""]); setGalleryOpen(true); }}
+                className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 hover:border-[#2563EB]/30 hover:bg-blue-50/50 cursor-pointer transition-colors text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#EEF4FF] group-hover:bg-[#DBEAFE] transition-colors">
+                  <GalleryHorizontal size={16} className="text-[#2563EB]" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Adicionar galeria</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Adicione uma galeria de imagens à matéria</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setVideoUrl(""); setVideoOpen(true); }}
+                className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 hover:border-[#E71D36]/30 hover:bg-red-50/50 cursor-pointer transition-colors text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#FEE2E2] group-hover:bg-[#FECACA] transition-colors">
+                  <Video size={16} className="text-[#E71D36]" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Adicionar vídeo</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Incorpore um vídeo do YouTube ou Vimeo</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setCitationText(""); setCitationAuthor(""); setCitationOpen(true); }}
+                className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 hover:border-[#0B2A66]/30 hover:bg-indigo-50/50 cursor-pointer transition-colors text-left group"
+              >
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#EEF2FF] group-hover:bg-[#E0E7FF] transition-colors">
+                  <Quote size={16} className="text-[#0B2A66]" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Adicionar citação</p>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">Destaque citações importantes no texto</p>
+                </div>
+              </button>
+            </div>
+
+            {/* ── Gallery modal ──────────────────────────── */}
+            {galleryOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-[#EEF4FF] flex items-center justify-center">
+                        <GalleryHorizontal size={15} className="text-[#2563EB]" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-slate-800">Adicionar galeria</h4>
+                    </div>
+                    <button type="button" onClick={() => setGalleryOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <X size={18} />
+                    </button>
                   </div>
-                  <div>
-                    <p className="text-xs font-semibold text-slate-700">{label}</p>
-                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">{desc}</p>
+                  <div className="px-6 py-5 space-y-3 max-h-[60vh] overflow-y-auto">
+                    <p className="text-xs text-slate-500">Cole as URLs das imagens da galeria. Cada linha será um item.</p>
+                    {galleryImages.map((img, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <div className="flex-1 relative">
+                          {img.trim() && (
+                            <img
+                              src={img}
+                              alt=""
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 object-cover rounded-lg border border-slate-100"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                            />
+                          )}
+                          <input
+                            value={img}
+                            onChange={(e) => {
+                              const copy = [...galleryImages];
+                              copy[i] = e.target.value;
+                              setGalleryImages(copy);
+                            }}
+                            placeholder={`URL da imagem ${i + 1}`}
+                            className={`w-full py-2.5 pr-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#2563EB] bg-slate-50 placeholder:text-slate-400 transition-colors ${img.trim() ? "pl-11" : "pl-4"}`}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setGalleryImages((prev) => prev.filter((_, j) => j !== i))}
+                          disabled={galleryImages.length === 1}
+                          className="text-slate-300 hover:text-red-400 transition-colors disabled:opacity-30"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setGalleryImages((prev) => [...prev, ""])}
+                      className="flex items-center gap-1.5 text-xs font-semibold text-[#2563EB] hover:underline mt-1"
+                    >
+                      <Plus size={13} /> Adicionar mais imagens
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100">
+                    <button type="button" onClick={() => setGalleryOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={insertGallery}
+                      disabled={!galleryImages.some((u) => u.trim())}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-[#2563EB] hover:bg-blue-700 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Inserir galeria
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+
+            {/* ── Video modal ────────────────────────────── */}
+            {videoOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-[#FEE2E2] flex items-center justify-center">
+                        <Play size={15} className="text-[#E71D36]" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-slate-800">Adicionar vídeo</h4>
+                    </div>
+                    <button type="button" onClick={() => setVideoOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="px-6 py-5 space-y-4">
+                    <p className="text-xs text-slate-500">Cole o link do YouTube, Vimeo ou URL direta de vídeo.</p>
+                    <div className="relative">
+                      <Youtube size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={videoUrl}
+                        onChange={(e) => setVideoUrl(e.target.value)}
+                        placeholder="https://youtube.com/watch?v=..."
+                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#E71D36] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); insertVideo(); } }}
+                        autoFocus
+                      />
+                    </div>
+                    {videoUrl.trim() && (
+                      <div className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
+                        {getYoutubeId(videoUrl) ? (
+                          <span className="flex items-center gap-1 text-red-600 font-medium"><Youtube size={11} /> YouTube detectado</span>
+                        ) : getVimeoId(videoUrl) ? (
+                          <span className="flex items-center gap-1 text-blue-600 font-medium"><Play size={11} /> Vimeo detectado</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-slate-500"><Video size={11} /> Vídeo direto (MP4/WebM)</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100">
+                    <button type="button" onClick={() => setVideoOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={insertVideo}
+                      disabled={!videoUrl.trim()}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-[#E71D36] hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Inserir vídeo
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Citation modal ─────────────────────────── */}
+            {citationOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" style={{ boxShadow: "0 24px 64px rgba(0,0,0,0.18)" }}>
+                  <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-[#EEF2FF] flex items-center justify-center">
+                        <Quote size={15} className="text-[#0B2A66]" />
+                      </div>
+                      <h4 className="text-sm font-semibold text-slate-800">Adicionar citação</h4>
+                    </div>
+                    <button type="button" onClick={() => setCitationOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                      <X size={18} />
+                    </button>
+                  </div>
+                  <div className="px-6 py-5 space-y-4">
+                    {/* Live preview */}
+                    {citationText.trim() && (
+                      <div style={{ borderLeft: "4px solid #0B2A66", padding: "12px 16px", background: "#EEF2FF", borderRadius: "0 10px 10px 0", margin: "0 0 4px 0" }}>
+                        <p style={{ fontStyle: "italic", color: "#1e3a8a", margin: 0, fontSize: "0.9em" }}>"{citationText}"</p>
+                        {citationAuthor && <footer style={{ marginTop: 8, fontSize: "0.8em", color: "#64748b" }}>— {citationAuthor}</footer>}
+                      </div>
+                    )}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1.5">Texto da citação</label>
+                      <textarea
+                        value={citationText}
+                        onChange={(e) => setCitationText(e.target.value)}
+                        placeholder="Digite a citação aqui…"
+                        rows={3}
+                        autoFocus
+                        className="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 resize-none transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1.5">Autor <span className="font-normal text-slate-400">(opcional)</span></label>
+                      <input
+                        value={citationAuthor}
+                        onChange={(e) => setCitationAuthor(e.target.value)}
+                        placeholder="Ex: Presidente da República"
+                        className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-slate-100">
+                    <button type="button" onClick={() => setCitationOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={insertCitation}
+                      disabled={!citationText.trim()}
+                      className="px-4 py-2 text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2558] rounded-xl transition-colors disabled:opacity-50"
+                    >
+                      Inserir citação
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

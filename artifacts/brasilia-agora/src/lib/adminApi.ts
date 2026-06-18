@@ -64,7 +64,7 @@ export const adminApi = {
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
   getAd: (id: string) => req<{ ad: Ad }>("GET", `/ads/${id}`),
-  createAd: (data: { name: string; imageBase64: string; link: string; position: Ad["position"]; active: boolean }) =>
+  createAd: (data: { name: string; imageBase64: string; link: string; position: Ad["position"]; active: boolean; targetDevices?: ("desktop" | "mobile" | "tablet")[] }) =>
     req<{ ad: Ad }>("POST", "/ads", data),
   updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
   deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),

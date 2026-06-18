@@ -8,7 +8,7 @@ import {
   Copy, AlertTriangle, Image as ImageIcon, Layers,
   Hash, Info, Save, AlignLeft, Building2, Folder,
   Type, Layout, Smile, FileText, Megaphone, ToggleLeft, ToggleRight,
-  Plus, MoreVertical, Pencil, Copy as CopyIcon,
+  Plus, MoreVertical, Pencil, Copy as CopyIcon, Upload,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
