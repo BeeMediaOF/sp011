@@ -255,9 +255,9 @@ export async function rewriteWithAI(
       return data.choices?.[0]?.message?.content ?? "";
     });
   } else if (provider === "gemini_paid") {
-    const apiKey = settings.rssAiApiKey;
-    if (!apiKey) throw new Error("API key do Gemini não configurada");
-    const model = settings.rssAiModel || "gemini-2.5-flash";
+    const apiKey = settings.geminiApiKey || settings.rssAiApiKey;
+    if (!apiKey) throw new Error("API key do Gemini não configurada. Configure em Configurações → API Gemini.");
+    const model = settings.rssAiModel || "gemini-2.0-flash";
     const ai = new GoogleGenAI({ apiKey });
     raw = await withRetry(async () => {
       const resp = await ai.models.generateContent({
@@ -270,7 +270,7 @@ export async function rewriteWithAI(
   } else {
     // Default: gemini_free (Replit integration)
     const ai    = getGeminiFree();
-    const model = settings.rssAiModel || "gemini-2.5-flash";
+    const model = settings.rssAiModel || "gemini-2.0-flash";
     raw = await withRetry(async () => {
       const resp = await ai.models.generateContent({
         model,

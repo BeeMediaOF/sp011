@@ -610,8 +610,8 @@ router.post("/article-from-url", async (req, res) => {
         text     = scraped.text;
         imageUrl = imageUrl || scraped.imageUrl;
       }
-      // Try og:title if still missing
-      if (!title) {
+      // Try og:title / og:image if still missing
+      if (!title || !imageUrl) {
         try {
           const pageRes = await fetch(url, {
             headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
@@ -619,9 +619,19 @@ router.post("/article-from-url", async (req, res) => {
           });
           if (pageRes.ok) {
             const html = await pageRes.text();
-            const ogTitle   = /<meta property="og:title" content="([^"]+)"/.exec(html)?.[1] ?? "";
-            const metaTitle = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1] ?? "";
-            title = ogTitle || metaTitle;
+            if (!title) {
+              const ogTitle   = /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
+                                /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/.exec(html)?.[1] ?? "";
+              const metaTitle = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1] ?? "";
+              title = ogTitle || metaTitle;
+            }
+            if (!imageUrl) {
+              imageUrl =
+                /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
+                /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/.exec(html)?.[1] ??
+                /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
+                /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/.exec(html)?.[1] ?? "";
+            }
           }
         } catch { /* ignore */ }
       }

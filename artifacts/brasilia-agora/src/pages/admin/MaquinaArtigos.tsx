@@ -138,6 +138,7 @@ export default function MaquinaArtigos() {
   const [editKeywords, setEditKeywords] = useState("");
   const [editSlug, setEditSlug]         = useState("");
   const [showContent, setShowContent]   = useState(false);
+  const [previewTab, setPreviewTab]     = useState<"preview" | "edit">("preview");
 
   const [saving, setSaving]         = useState(false);
   const [history, setHistory]       = useState<HistoryEntry[]>(loadHistory);
@@ -287,6 +288,7 @@ export default function MaquinaArtigos() {
       setEditKeywords(data.keywords);
       setEditSlug(data.slug);
       setShowContent(false);
+      setPreviewTab("preview");
 
       // Save to local history
       const entry: HistoryEntry = {
@@ -823,14 +825,14 @@ export default function MaquinaArtigos() {
         {result && !loading && (
           <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
             {/* Result header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 dark:border-slate-700 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center">
                   <CheckCircle size={13} className="text-white" />
                 </div>
-                <span className="text-sm font-semibold text-green-700 dark:text-green-400">Artigo gerado com sucesso!</span>
+                <span className="text-sm font-semibold text-green-700 dark:text-green-400">Artigo gerado!</span>
                 <a href={result.sourceUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 ml-2">
+                  className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 ml-1">
                   <ExternalLink size={11} /> {result.sourceName}
                 </a>
               </div>
@@ -839,136 +841,246 @@ export default function MaquinaArtigos() {
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
-              {/* Image preview */}
-              {editImageUrl && (
-                <div className="relative group">
-                  <img
-                    src={editImageUrl}
-                    alt="Capa"
-                    className="w-full h-44 object-cover rounded-xl border border-slate-200 dark:border-slate-700"
-                    onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center">
-                    <label className="flex items-center gap-2 text-white text-sm font-medium cursor-pointer bg-black/50 px-4 py-2 rounded-lg">
-                      <Image size={14} /> Trocar imagem
-                      <input type="text" className="hidden" />
-                    </label>
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 dark:border-slate-700">
+              <button
+                onClick={() => setPreviewTab("preview")}
+                className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  previewTab === "preview"
+                    ? "border-[#0B2A66] text-[#0B2A66] dark:text-blue-300 dark:border-blue-400"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                }`}
+              >
+                <Eye size={14} /> Pré-visualização
+              </button>
+              <button
+                onClick={() => setPreviewTab("edit")}
+                className={`flex items-center gap-1.5 px-5 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  previewTab === "edit"
+                    ? "border-[#0B2A66] text-[#0B2A66] dark:text-blue-300 dark:border-blue-400"
+                    : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                }`}
+              >
+                <Pencil size={14} /> Editar campos
+              </button>
+            </div>
+
+            {/* Preview tab */}
+            {previewTab === "preview" && (
+              <div className="p-6">
+                {/* Article preview card */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden bg-white dark:bg-slate-950">
+                  {/* Featured image */}
+                  {editImageUrl && (
+                    <div className="relative">
+                      <img
+                        src={editImageUrl}
+                        alt="Capa"
+                        className="w-full max-h-72 object-cover"
+                        onError={e => { (e.target as HTMLImageElement).parentElement!.style.display = "none"; }}
+                      />
+                    </div>
+                  )}
+                  {!editImageUrl && (
+                    <div className="w-full h-24 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <span className="text-xs text-slate-400 flex items-center gap-1.5"><Image size={14} /> Sem imagem de capa</span>
+                    </div>
+                  )}
+
+                  {/* Content */}
+                  <div className="p-6 space-y-3">
+                    {/* Chapéu */}
+                    <div>
+                      <span className="inline-block text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded"
+                        style={{ backgroundColor: "#c8102e", color: "#fff" }}>
+                        {CATEGORIES.find(c => c.value === (result.category || category))?.tag ?? "GERAL"}
+                      </span>
+                    </div>
+                    {/* Title */}
+                    <h1 className="text-xl font-bold leading-tight text-slate-900 dark:text-slate-100 font-serif">
+                      {editTitle || <span className="text-slate-400 italic">Sem título</span>}
+                    </h1>
+                    {/* Subtitle */}
+                    {editSubtitle && (
+                      <p className="text-base text-slate-600 dark:text-slate-400 leading-relaxed border-l-4 border-slate-200 dark:border-slate-700 pl-4">
+                        {editSubtitle}
+                      </p>
+                    )}
+                    {/* Divider */}
+                    <div className="flex items-center gap-3 pt-1 pb-2">
+                      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                      <span className="text-[10px] text-slate-400 shrink-0">Redação</span>
+                      <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                    </div>
+                    {/* Body HTML */}
+                    <div
+                      className="prose prose-sm max-w-none dark:prose-invert text-slate-800 dark:text-slate-200
+                        prose-p:leading-relaxed prose-p:mb-4
+                        prose-h2:text-base prose-h2:font-bold prose-h2:mt-5 prose-h2:mb-2
+                        prose-h3:text-sm prose-h3:font-semibold prose-h3:mt-4 prose-h3:mb-1
+                        prose-strong:font-semibold prose-a:text-[#0B2A66] prose-a:underline"
+                      dangerouslySetInnerHTML={{ __html: editContent }}
+                    />
+                    {/* Keywords */}
+                    {editKeywords && (
+                      <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-1.5">
+                        {editKeywords.split(",").map(k => k.trim()).filter(Boolean).map(k => (
+                          <span key={k} className="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">{k}</span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
-              )}
 
-              {/* Image URL input */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Image size={12} /> URL da imagem de capa
-                </label>
-                <input
-                  type="url"
-                  value={editImageUrl}
-                  onChange={e => setEditImageUrl(e.target.value)}
-                  className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
-                  placeholder="https://exemplo.com/imagem.jpg"
-                />
-              </div>
-
-              {/* Title */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <Pencil size={12} /> Título
-                  <span className="ml-auto text-[10px] font-mono text-slate-400">{editTitle.length} chars</span>
-                </label>
-                <textarea
-                  value={editTitle}
-                  onChange={e => setEditTitle(e.target.value)}
-                  rows={2}
-                  className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm font-semibold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
-                />
-              </div>
-
-              {/* Subtitle */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                  <FileText size={12} /> Subtítulo / Lide
-                </label>
-                <textarea
-                  value={editSubtitle}
-                  onChange={e => setEditSubtitle(e.target.value)}
-                  rows={2}
-                  className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
-                />
-              </div>
-
-              {/* Keywords + slug */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Tag size={12} /> Palavras-chave
-                  </label>
-                  <input
-                    value={editKeywords}
-                    onChange={e => setEditKeywords(e.target.value)}
-                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
-                    placeholder="palavra1, palavra2…"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                    <Link2 size={12} /> Slug URL
-                  </label>
-                  <input
-                    value={editSlug}
-                    onChange={e => setEditSlug(e.target.value)}
-                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
-                    placeholder="meu-artigo-url"
-                  />
+                {/* Action buttons */}
+                <div className="flex gap-3 pt-5">
+                  <button
+                    onClick={() => saveArticle("draft")}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <FileText size={14} />}
+                    Salvar como rascunho
+                  </button>
+                  <button
+                    onClick={() => saveArticle("published")}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-50 transition-colors shadow-md"
+                  >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+                    Publicar agora
+                  </button>
                 </div>
               </div>
+            )}
 
-              {/* Content toggle */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowContent(v => !v)}
-                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <BookOpen size={14} /> Conteúdo HTML do artigo
-                  </span>
-                  {showContent ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </button>
-                {showContent && (
-                  <div className="border-t border-slate-200 dark:border-slate-700">
-                    <textarea
-                      value={editContent}
-                      onChange={e => setEditContent(e.target.value)}
-                      rows={16}
-                      className="w-full px-4 py-3 text-xs font-mono bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 resize-y focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+            {/* Edit tab */}
+            {previewTab === "edit" && (
+              <div className="p-6 space-y-5">
+                {/* Image preview */}
+                {editImageUrl && (
+                  <div className="relative group">
+                    <img
+                      src={editImageUrl}
+                      alt="Capa"
+                      className="w-full h-44 object-cover rounded-xl border border-slate-200 dark:border-slate-700"
+                      onError={e => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   </div>
                 )}
-              </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => saveArticle("draft")}
-                  disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
-                >
-                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <FileText size={14} />}
-                  Salvar como rascunho
-                </button>
-                <button
-                  onClick={() => saveArticle("published")}
-                  disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-50 transition-colors shadow-md"
-                >
-                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
-                  Publicar agora
-                </button>
+                {/* Image URL input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Image size={12} /> URL da imagem de capa
+                  </label>
+                  <input
+                    type="url"
+                    value={editImageUrl}
+                    onChange={e => setEditImageUrl(e.target.value)}
+                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                    placeholder="https://exemplo.com/imagem.jpg"
+                  />
+                </div>
+
+                {/* Title */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <Pencil size={12} /> Título
+                    <span className="ml-auto text-[10px] font-mono text-slate-400">{editTitle.length} chars</span>
+                  </label>
+                  <textarea
+                    value={editTitle}
+                    onChange={e => setEditTitle(e.target.value)}
+                    rows={2}
+                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm font-semibold bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 resize-none focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                  />
+                </div>
+
+                {/* Subtitle */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                    <FileText size={12} /> Subtítulo / Lide
+                  </label>
+                  <textarea
+                    value={editSubtitle}
+                    onChange={e => setEditSubtitle(e.target.value)}
+                    rows={2}
+                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 resize-none focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                  />
+                </div>
+
+                {/* Keywords + slug */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Tag size={12} /> Palavras-chave
+                    </label>
+                    <input
+                      value={editKeywords}
+                      onChange={e => setEditKeywords(e.target.value)}
+                      className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                      placeholder="palavra1, palavra2…"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <Link2 size={12} /> Slug URL
+                    </label>
+                    <input
+                      value={editSlug}
+                      onChange={e => setEditSlug(e.target.value)}
+                      className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 text-sm bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                      placeholder="meu-artigo-url"
+                    />
+                  </div>
+                </div>
+
+                {/* Content toggle */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowContent(v => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <BookOpen size={14} /> Conteúdo HTML do artigo
+                    </span>
+                    {showContent ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  </button>
+                  {showContent && (
+                    <div className="border-t border-slate-200 dark:border-slate-700">
+                      <textarea
+                        value={editContent}
+                        onChange={e => setEditContent(e.target.value)}
+                        rows={16}
+                        className="w-full px-4 py-3 text-xs font-mono bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-300 resize-y focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/25"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => saveArticle("draft")}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <FileText size={14} />}
+                    Salvar como rascunho
+                  </button>
+                  <button
+                    onClick={() => saveArticle("published")}
+                    disabled={saving}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-50 transition-colors shadow-md"
+                  >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <Send size={14} />}
+                    Publicar agora
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
