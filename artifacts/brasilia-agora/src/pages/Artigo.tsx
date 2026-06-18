@@ -84,7 +84,6 @@ function ArticleSidebar() {
 
       {/* Propaganda sidebar — gerenciada pelo painel */}
       <div className="sticky top-24">
-        <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
         <AdBanner slot="slot_07" placeholder="Publicidade" />
       </div>
     </aside>
@@ -631,9 +630,6 @@ export default function Artigo() {
 
                   {/* Banner horizontal — gerenciado pelo painel */}
                   <div className="mt-8">
-                    <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">
-                      Publicidade
-                    </p>
                     <AdBanner slot="slot_06" placeholder="Publicidade" />
                   </div>
                 </>
