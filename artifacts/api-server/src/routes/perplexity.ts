@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store, type PerplexityAutoMode } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 import { searchNews } from "../lib/perplexitySearch.js";
 import { rewriteWithAI } from "../lib/rssProcessor.js";
 
@@ -47,7 +48,7 @@ router.post("/rewrite", async (req, res) => {
 });
 
 /** POST /api/admin/perplexity/publish  { title, subtitle, content, … } */
-router.post("/publish", (req, res) => {
+router.post("/publish", async (req, res) => {
   const {
     title, subtitle, content, imageUrl, category, keywords, slug,
     sourceUrl, sourceName, status,
@@ -58,13 +59,13 @@ router.post("/publish", (req, res) => {
   };
 
   if (!title?.trim()) { res.status(400).json({ error: "title é obrigatório" }); return; }
-  if (store.isDuplicateArticle(title, sourceUrl, imageUrl)) {
+  if (await articleService.isDuplicateArticle(title, sourceUrl, imageUrl)) {
     res.status(409).json({ error: "Artigo duplicado — já existe um artigo com este título ou URL de origem" });
     return;
   }
 
   const cat = (category ?? "geral").toLowerCase();
-  const article = store.createArticle({
+  const article = await articleService.createArticle({
     title:         title.trim(),
     subtitle:      subtitle ?? "",
     content:       content  ?? "",
@@ -145,7 +146,7 @@ router.post("/topics/:id/run", async (req, res) => {
     const articles: unknown[] = [];
 
     for (const article of result.articles) {
-      if (store.isDuplicateArticle(article.title, article.sourceUrl)) {
+      if (await articleService.isDuplicateArticle(article.title, article.sourceUrl)) {
         articles.push({ ...article, skipped: true, reason: "duplicate" });
         continue;
       }
@@ -170,7 +171,7 @@ router.post("/topics/:id/run", async (req, res) => {
       }
 
       const cat = (topic.category ?? "geral").toLowerCase();
-      const saved = store.createArticle({
+      const saved = await articleService.createArticle({
         title,  subtitle, content,
         category:      cat,
         tag:           TAG_MAP[cat] ?? "GERAL",

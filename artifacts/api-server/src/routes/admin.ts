@@ -7,6 +7,7 @@ import {
 } from "../middlewares/auth.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot } from "../lib/rssProcessor.js";
 import { YoutubeTranscript } from "youtube-transcript";
 
@@ -175,25 +176,25 @@ router.use(authMiddleware);
 // ─── Articles ────────────────────────────────────────────────────────────────
 
 /** GET /api/admin/articles */
-router.get("/articles", (_req, res) => {
-  res.json({ articles: store.getArticles() });
+router.get("/articles", async (_req, res) => {
+  res.json({ articles: await articleService.getArticles() });
 });
 
 /** GET /api/admin/articles/:id */
-router.get("/articles/:id", (req, res) => {
-  const article = store.getArticle(req.params.id ?? "");
+router.get("/articles/:id", async (req, res) => {
+  const article = await articleService.getArticle(req.params.id ?? "");
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** POST /api/admin/articles */
-router.post("/articles", (req, res) => {
+router.post("/articles", async (req, res) => {
   const { title, subtitle, content, category, tag, imageUrl, author, status } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
   };
   if (!title) { res.status(400).json({ error: "title is required" }); return; }
-  const article = store.createArticle({
+  const article = await articleService.createArticle({
     title: title ?? "",
     subtitle: subtitle ?? "",
     content: content ?? "",
@@ -208,22 +209,22 @@ router.post("/articles", (req, res) => {
 });
 
 /** PUT /api/admin/articles/:id */
-router.put("/articles/:id", (req, res) => {
-  const article = store.updateArticle(req.params.id ?? "", req.body as Parameters<typeof store.updateArticle>[1]);
+router.put("/articles/:id", async (req, res) => {
+  const article = await articleService.updateArticle(req.params.id ?? "", req.body as Parameters<typeof articleService.updateArticle>[1]);
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** DELETE /api/admin/articles/:id */
-router.delete("/articles/:id", (req, res) => {
-  const deleted = store.deleteArticle(req.params.id ?? "");
+router.delete("/articles/:id", async (req, res) => {
+  const deleted = await articleService.deleteArticle(req.params.id ?? "");
   if (!deleted) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ success: true });
 });
 
 /** POST /api/admin/articles/:id/rewrite — re-run AI rewrite on any article */
 router.post("/articles/:id/rewrite", async (req, res) => {
-  const article = store.getArticle(req.params.id ?? "");
+  const article = await articleService.getArticle(req.params.id ?? "");
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
 
   try {
@@ -234,7 +235,7 @@ router.post("/articles/:id/rewrite", async (req, res) => {
       article.rssSourceName ?? "Redação",
       !!article.rssSourceName,
     );
-    const updated = store.updateArticle(article.id, {
+    const updated = await articleService.updateArticle(article.id, {
       content:     result.content,
       keywords:    result.keywords || undefined,
       slug:        result.slug || undefined,
@@ -344,8 +345,8 @@ Regras:
 // ─── Publish ─────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/publish/:id  — mark article as published */
-router.post("/publish/:id", (req, res) => {
-  const article = store.updateArticle(req.params.id ?? "", {
+router.post("/publish/:id", async (req, res) => {
+  const article = await articleService.updateArticle(req.params.id ?? "", {
     status: "published",
     publishedAt: new Date().toISOString(),
   });
@@ -354,15 +355,15 @@ router.post("/publish/:id", (req, res) => {
 });
 
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
-router.post("/bulk-publish", (_req, res) => {
-  const articles = store.getArticles();
+router.post("/bulk-publish", async (_req, res) => {
+  const articles = await articleService.getArticles();
   let count = 0;
-  articles.forEach((a) => {
+  for (const a of articles) {
     if (a.status === "draft") {
-      store.updateArticle(a.id, { status: "published", publishedAt: new Date().toISOString() });
+      await articleService.updateArticle(a.id, { status: "published", publishedAt: new Date().toISOString() });
       count++;
     }
-  });
+  }
   res.json({ message: `${count} article(s) published`, count });
 });
 

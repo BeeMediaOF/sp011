@@ -1,11 +1,11 @@
 import { Router } from "express";
-import { store } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 
 const router = Router();
 
 /** GET /api/categories — distinct categories from all articles (public) */
-router.get("/categories", (_req, res) => {
-  const all = store.getArticles();
+router.get("/categories", async (_req, res) => {
+  const all = await articleService.getArticles();
   const map = new Map<string, { label: string; tag: string; count: number }>();
 
   for (const a of all) {
@@ -34,8 +34,8 @@ router.get("/categories", (_req, res) => {
 });
 
 /** GET /api/articles — list published articles (public) */
-router.get("/", (_req, res) => {
-  const articles = store.getArticles()
+router.get("/", async (_req, res) => {
+  const articles = (await articleService.getArticles())
     .filter((a) => a.status === "published")
     .map((a) => ({
       id: a.id,
@@ -53,8 +53,8 @@ router.get("/", (_req, res) => {
 });
 
 /** GET /api/articles/:id — single article (public) */
-router.get("/:id", (req, res) => {
-  const article = store.getArticle(req.params.id ?? "");
+router.get("/:id", async (req, res) => {
+  const article = await articleService.getArticle(req.params.id ?? "");
   if (!article || article.status !== "published") {
     res.status(404).json({ error: "Article not found" }); return;
   }

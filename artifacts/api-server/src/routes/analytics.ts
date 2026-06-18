@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 
 
 const router = Router();
@@ -100,7 +101,7 @@ router.post("/event", (req, res) => {
 });
 
 /** GET /api/analytics/stats — admin only */
-router.get("/stats", authMiddleware, (_req, res) => {
+router.get("/stats", authMiddleware, async (_req, res) => {
   const now = Date.now();
   const DAY = 86_400_000;
 
@@ -218,7 +219,7 @@ router.get("/stats", authMiddleware, (_req, res) => {
     mergedClickMap[cat] = (mergedClickMap[cat] ?? 0) + count;
   }
 
-  const publishedArticles = store.getArticles().filter((a) => a.status === "published");
+  const publishedArticles = (await articleService.getArticles()).filter((a) => a.status === "published");
   const articleCountByCategory: Record<string, number> = {};
   for (const a of publishedArticles) {
     if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;

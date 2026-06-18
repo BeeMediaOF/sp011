@@ -4,6 +4,7 @@
  */
 
 import { store } from "./store.js";
+import { articleService } from "./articleService.js";
 import { processDueSource } from "./rssProcessor.js";
 import { searchNews } from "./perplexitySearch.js";
 import { rewriteWithAI } from "./rssProcessor.js";
@@ -62,7 +63,7 @@ async function runPerplexityCheck(): Promise<void> {
       for (const article of result.articles) {
         try {
           // Skip duplicates
-          if (store.isDuplicateArticle(article.title, article.sourceUrl)) continue;
+          if (await articleService.isDuplicateArticle(article.title, article.sourceUrl)) continue;
 
           let title    = article.title;
           let subtitle = article.summary;
@@ -83,7 +84,7 @@ async function runPerplexityCheck(): Promise<void> {
           }
 
           const cat = (topic.category ?? "geral").toLowerCase();
-          store.createArticle({
+          await articleService.createArticle({
             title,
             subtitle,
             content,

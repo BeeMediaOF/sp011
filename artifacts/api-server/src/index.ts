@@ -1,6 +1,8 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
+import { store } from "./lib/store.js";
+import { articleService } from "./lib/articleService.js";
 
 const rawPort = process.env["PORT"];
 
@@ -23,4 +25,15 @@ app.listen(port, async (err) => {
   }
   logger.info({ port }, "Server listening");
   await seedAdminUser();
+
+  // Migrate articles from store.json to DB (runs only when DB table is empty)
+  try {
+    const storeArticles = store.getArticles();
+    const migrated = await articleService.migrateFromStore(storeArticles);
+    if (migrated > 0) {
+      logger.info({ migrated }, "Migrated articles from store.json to PostgreSQL");
+    }
+  } catch (migrateErr) {
+    logger.warn({ err: migrateErr }, "Article migration skipped or failed");
+  }
 });

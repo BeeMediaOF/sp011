@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store, type RssAutoMode } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 import {
   fetchSourceArticles, rewriteWithAI, scrapeArticle,
   processDueSource, DEFAULT_PROMPT_TEMPLATE, resolvePrompt,
@@ -178,7 +179,7 @@ router.post("/run", async (req, res) => {
 // ─── Import article to store ──────────────────────────────────────────────────
 
 /** POST /api/admin/rss/import */
-router.post("/import", (req, res) => {
+router.post("/import", async (req, res) => {
   const { title, subtitle, content, category, tag, imageUrl, author, status,
     rssSourceId, rssSourceName, rssSourceUrl, aiRewritten, keywords, slug } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
@@ -189,12 +190,12 @@ router.post("/import", (req, res) => {
   if (!title) { res.status(400).json({ error: "title é obrigatório" }); return; }
 
   // Block duplicate imports
-  if (store.isDuplicateArticle(title, rssSourceUrl)) {
+  if (await articleService.isDuplicateArticle(title, rssSourceUrl)) {
     res.status(409).json({ error: "Artigo duplicado — já existe um artigo com este título ou URL de origem" });
     return;
   }
 
-  const article = store.createArticle({
+  const article = await articleService.createArticle({
     title:         title ?? "",
     subtitle:      subtitle ?? "",
     content:       content ?? "",

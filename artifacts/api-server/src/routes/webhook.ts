@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
-import { store } from "../lib/store.js";
+import { articleService } from "../lib/articleService.js";
 
 const router = Router();
 
@@ -19,7 +19,7 @@ const router = Router();
  *   imageUrl    string  optional
  *   author      string  optional  default: "Redação Brasília Hoje"
  */
-router.post("/", authMiddleware, (req, res) => {
+router.post("/", authMiddleware, async (req, res) => {
   const {
     title, subtitle, content, category, tag, imageUrl, author,
   } = req.body as {
@@ -37,7 +37,7 @@ router.post("/", authMiddleware, (req, res) => {
     return;
   }
 
-  const article = store.createArticle({
+  const article = await articleService.createArticle({
     title: title.trim(),
     subtitle: subtitle?.trim() ?? "",
     content: content?.trim() ?? "",
@@ -60,8 +60,8 @@ router.post("/", authMiddleware, (req, res) => {
  * POST /api/publish/:id
  * Publish an existing draft by ID.
  */
-router.post("/:id", authMiddleware, (req, res) => {
-  const article = store.updateArticle(req.params.id ?? "", {
+router.post("/:id", authMiddleware, async (req, res) => {
+  const article = await articleService.updateArticle(req.params.id ?? "", {
     status: "published",
     publishedAt: new Date().toISOString(),
   });

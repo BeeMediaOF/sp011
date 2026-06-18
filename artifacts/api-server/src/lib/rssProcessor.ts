@@ -7,6 +7,7 @@ import Parser from "rss-parser";
 import * as cheerio from "cheerio";
 import { GoogleGenAI } from "@google/genai";
 import { store, type RssSource, type RssAutoMode } from "./store.js";
+import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
@@ -705,7 +706,7 @@ export async function autoProcessArticle(
   if (autoMode === "none") return;
 
   // Skip duplicates — check by title, source URL, image URL, or similar wording
-  if (store.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
+  if (await articleService.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
     addLog({ type: "duplicate", sourceName, articleTitle: art.title, message: "Artigo duplicado — ignorado" });
     logger.info({ title: art.title }, "Skipping duplicate RSS article");
     return;
@@ -744,7 +745,7 @@ export async function autoProcessArticle(
   const status = (autoMode === "publish" || autoMode === "rewrite_publish")
     ? "published" : "draft";
 
-  store.createArticle({
+  await articleService.createArticle({
     title:         aiTitle    ?? art.title,
     subtitle:      aiSubtitle ?? art.excerpt.slice(0, 160),
     content,
@@ -779,7 +780,7 @@ export async function processDueSource(src: RssSource): Promise<number> {
   let processed = 0;
   for (const art of articles) {
     if (processed >= MAX_PER_ROUND) break;
-    if (store.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
+    if (await articleService.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
       logger.info({ title: art.title }, "Skipping duplicate RSS article in scheduler");
       continue;
     }
