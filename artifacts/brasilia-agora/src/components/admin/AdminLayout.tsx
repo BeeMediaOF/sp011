@@ -32,7 +32,7 @@ const NAV_MAIN = [
   { label: "Perplexity",    icon: Zap,              path: "/admin/perplexity",   permKey: null },
   { label: "Redes Sociais", icon: Share2,           path: "/admin/redes-sociais",permKey: "social.view" },
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
-  { label: "Logs",          icon: ClipboardList,    path: "/admin/logs",         permKey: "logs.view" },
+  { label: "Logs",          icon: ClipboardList,    path: "/admin/configuracoes?tab=logs", permKey: "logs.view" },
 ];
 
 const NAV_CONFIG = [

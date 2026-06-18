@@ -149,7 +149,10 @@ function Router() {
         <RequireAdmin><UsersManager /></RequireAdmin>
       </Route>
       <Route path="/admin/logs">
-        <RequireAdmin><Logs /></RequireAdmin>
+        <RequireAdmin><Settings /></RequireAdmin>
+      </Route>
+      <Route path="/admin/settings">
+        <RequireAdmin><Settings /></RequireAdmin>
       </Route>
       <Route path="/admin/seguranca">
         <RequireAdmin><SecurityCheckup /></RequireAdmin>
