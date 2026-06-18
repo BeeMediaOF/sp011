@@ -92,7 +92,10 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 
 // ─── Empty form factory ────────────────────────────────────────────────────────
 function emptyForm() {
-  return { name: "", position: "" as AdPosition | "", link: "", preview: "", active: true };
+  return {
+    name: "", position: "" as AdPosition | "", link: "", preview: "", active: true,
+    targetDevices: ["desktop", "mobile", "tablet"] as ("desktop" | "mobile" | "tablet")[],
+  };
 }
 
 type StatusFilter = "todos" | "ativo" | "pausado";
@@ -262,6 +265,33 @@ function AdFormModal({
             )}
           </div>
 
+          {/* Device targeting */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-[#0F172A]">Exibir em dispositivos</label>
+            <div className="flex gap-3">
+              {(["desktop", "mobile", "tablet"] as const).map((dev) => {
+                const icons: Record<string, string> = { desktop: "🖥️", mobile: "📱", tablet: "💊" };
+                const labels: Record<string, string> = { desktop: "Desktop", mobile: "Mobile", tablet: "Tablet" };
+                const checked = form.targetDevices.includes(dev);
+                return (
+                  <label key={dev} className={`flex-1 flex flex-col items-center gap-1.5 py-3 border-2 rounded-xl cursor-pointer transition-colors select-none ${checked ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                    <input type="checkbox" className="hidden" checked={checked} onChange={() => {
+                      setForm((f) => ({
+                        ...f,
+                        targetDevices: checked
+                          ? f.targetDevices.filter((d) => d !== dev)
+                          : [...f.targetDevices, dev],
+                      }));
+                    }} />
+                    <span className="text-lg">{icons[dev]}</span>
+                    <span className={`text-xs font-semibold ${checked ? "text-[#0B2A66]" : "text-gray-500"}`}>{labels[dev]}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-gray-400">Selecione os dispositivos onde este anúncio deve aparecer.</p>
+          </div>
+
           {/* Status toggle */}
           <div className="flex items-center justify-between py-3 border-t border-gray-100">
             <div>
@@ -386,7 +416,10 @@ export default function AdsManager() {
 
   function openEdit(ad: Ad) {
     setEditingId(ad.id);
-    setForm({ name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active });
+    setForm({
+      name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active,
+      targetDevices: ad.targetDevices && ad.targetDevices.length > 0 ? ad.targetDevices : ["desktop", "mobile", "tablet"],
+    });
     setModalOpen(true);
   }
 
@@ -406,11 +439,13 @@ export default function AdsManager() {
         await adminApi.updateAd(editingId, {
           name: form.name, link: form.link,
           imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
+          targetDevices: form.targetDevices,
         });
       } else {
         await adminApi.createAd({
           name: form.name, link: form.link,
           imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
+          targetDevices: form.targetDevices,
         });
       }
       closeModal();

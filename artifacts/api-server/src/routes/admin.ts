@@ -419,8 +419,9 @@ router.get("/ads/:id", (req, res) => {
 
 /** POST /api/admin/ads — create ad */
 router.post("/ads", (req, res) => {
-  const { name, imageBase64, link, position, active } = req.body as {
+  const { name, imageBase64, link, position, active, targetDevices } = req.body as {
     name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
+    targetDevices?: ("desktop" | "mobile" | "tablet")[];
   };
   if (!name || !imageBase64 || !link) {
     res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
@@ -434,6 +435,7 @@ router.post("/ads", (req, res) => {
     name, imageBase64, link,
     position: (VALID_POSITIONS.includes(position ?? "") ? position! : "slot_01") as Parameters<typeof store.createAd>[0]["position"],
     active: !!active,
+    targetDevices: targetDevices ?? ["desktop", "mobile", "tablet"],
   });
   res.status(201).json({ ad });
 });
@@ -492,6 +494,62 @@ router.get("/contact", (_req, res) => {
 router.put("/contact", (req, res) => {
   const info = store.updateContactInfo(req.body as Partial<ContactInfo>);
   res.json({ contactInfo: info });
+});
+
+// ─── AI SEO ──────────────────────────────────────────────────────────────────
+
+/** POST /api/admin/ai-seo — generate meta description + keywords with Perplexity */
+router.post("/ai-seo", authMiddleware, async (req, res) => {
+  const { siteName, tagline, categories } = req.body as {
+    siteName?: string; tagline?: string; categories?: string[];
+  };
+
+  const apiKey = process.env["PERPLEXITY_API_KEY"];
+  if (!apiKey) {
+    res.status(503).json({ error: "PERPLEXITY_API_KEY não configurada." });
+    return;
+  }
+
+  const prompt = `Você é um especialista em SEO para portais de notícias brasileiros.
+Gere uma meta descrição e palavras-chave otimizadas para o seguinte portal de notícias:
+
+Nome: ${siteName ?? "Portal de notícias"}
+Tagline: ${tagline ?? ""}
+Editorias: ${(categories ?? []).join(", ") || "política, cidade, esportes, saúde, cultura, educação"}
+
+Responda em JSON com exatamente este formato (sem markdown):
+{
+  "metaDescription": "descrição de até 155 caracteres, atraente e com palavras-chave relevantes",
+  "keywords": "5 a 10 palavras-chave separadas por vírgula, relevantes para o portal"
+}`;
+
+  try {
+    const r = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!r.ok) {
+      res.status(502).json({ error: "Erro ao chamar Perplexity API." });
+      return;
+    }
+
+    const data = await r.json() as { choices?: { message?: { content?: string } }[] };
+    const raw = data.choices?.[0]?.message?.content ?? "";
+    const jsonStr = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const parsed = JSON.parse(jsonStr) as { metaDescription?: string; keywords?: string };
+    res.json({ metaDescription: parsed.metaDescription ?? "", keywords: parsed.keywords ?? "" });
+  } catch {
+    res.status(500).json({ error: "Erro ao processar resposta da IA." });
+  }
 });
 
 export default router;

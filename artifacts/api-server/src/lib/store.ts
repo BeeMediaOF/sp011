@@ -107,6 +107,7 @@ export interface Ad {
   impressions: number;
   createdAt: string;
   updatedAt: string;
+  targetDevices?: ("desktop" | "mobile" | "tablet")[];
 }
 
 export type ColumnistSpecialty =

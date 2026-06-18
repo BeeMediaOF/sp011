@@ -21,8 +21,10 @@ interface SocialConfig {
   autoPublishFeed?: boolean;
   autoPublishStory?: boolean;
   autoPublishFacebook?: boolean;
+  autoPublishIntervalHours?: number;
   templateShowLogo?: boolean;
   templateShowCategory?: boolean;
+  templateCustomLogoBase64?: string;
   templateGradientFrom?: string;
   templateGradientTo?: string;
   lastPublishedAt?: string;
@@ -403,17 +405,19 @@ export default function SocialMedia() {
   const logoBase64 = settings?.logoBase64;
   const siteName   = settings?.siteName;
 
+  const effectiveLogo = cfg.templateCustomLogoBase64 ?? logoBase64;
+
   const redrawCanvas = useCallback(() => {
     if (feedCanvasRef.current) {
-      renderCanvas(feedCanvasRef.current, "feed", selArt, cfg, logoBase64, siteName);
+      renderCanvas(feedCanvasRef.current, "feed", selArt, cfg, effectiveLogo, siteName);
     }
     if (storyCanvasRef.current) {
-      renderCanvas(storyCanvasRef.current, "story", selArt, cfg, logoBase64, siteName);
+      renderCanvas(storyCanvasRef.current, "story", selArt, cfg, effectiveLogo, siteName);
     }
     if (facebookCanvasRef.current) {
-      renderCanvas(facebookCanvasRef.current, "facebook", selArt, cfg, logoBase64, siteName);
+      renderCanvas(facebookCanvasRef.current, "facebook", selArt, cfg, effectiveLogo, siteName);
     }
-  }, [selArt, cfg, logoBase64, siteName]);
+  }, [selArt, cfg, effectiveLogo, siteName]);
 
   useEffect(() => {
     if (tab === "publicar" || tab === "template") redrawCanvas();
@@ -450,8 +454,8 @@ export default function SocialMedia() {
     const storyCanvas = storyCanvasRef.current!;
 
     // Ensure canvas is rendered
-    renderCanvas(feedCanvas,  "feed",  selArt, cfg, logoBase64, siteName);
-    renderCanvas(storyCanvas, "story", selArt, cfg, logoBase64, siteName);
+    renderCanvas(feedCanvas,  "feed",  selArt, cfg, effectiveLogo, siteName);
+    renderCanvas(storyCanvas, "story", selArt, cfg, effectiveLogo, siteName);
 
     // Give it a brief moment for async image loads to complete
     await new Promise(r => setTimeout(r, 600));
@@ -652,6 +656,51 @@ export default function SocialMedia() {
                     onChange={e => setCfg(p => ({ ...p, [key]: e.target.checked }))} />
                 </label>
               ))}
+
+              {/* Interval scheduler */}
+              <div className="pt-3 border-t border-gray-100 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">Publicar a cada X horas</p>
+                    <p className="text-xs text-gray-500 mt-0.5">O site publica automaticamente um artigo nas redes a cada intervalo configurado.</p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox"
+                      className="w-4 h-4 accent-[#E71D36]"
+                      checked={!!(cfg.autoPublishIntervalHours && cfg.autoPublishIntervalHours > 0)}
+                      onChange={e => setCfg(p => ({ ...p, autoPublishIntervalHours: e.target.checked ? 4 : 0 }))} />
+                    <span className="text-xs font-medium text-gray-600">Ativar</span>
+                  </label>
+                </div>
+
+                {cfg.autoPublishIntervalHours && cfg.autoPublishIntervalHours > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {[1, 2, 4, 6, 8, 12, 24].map(h => (
+                        <button
+                          key={h}
+                          type="button"
+                          onClick={() => setCfg(p => ({ ...p, autoPublishIntervalHours: h }))}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${cfg.autoPublishIntervalHours === h ? "bg-[#E71D36] text-white border-[#E71D36]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
+                        >
+                          {h}h
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                      <Info size={13} className="text-amber-600 shrink-0" />
+                      <p className="text-xs text-amber-700">
+                        A cada <strong>{cfg.autoPublishIntervalHours} hora{cfg.autoPublishIntervalHours > 1 ? "s" : ""}</strong>, o artigo mais recente não publicado será postado automaticamente.
+                      </p>
+                    </div>
+                    {cfg.lastPublishedAt && (
+                      <p className="text-xs text-gray-500">
+                        Última publicação: {new Date(cfg.lastPublishedAt).toLocaleString("pt-BR")}
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="flex justify-end">
@@ -784,6 +833,56 @@ export default function SocialMedia() {
                       className="w-full accent-[#0B2A66] mt-1" />
                     <div className="flex justify-between text-[10px] text-[#94A3B8] mt-0.5"><span>0%</span><span>100%</span></div>
                   </div>
+                </div>
+
+                {/* Logo customizado para a máscara */}
+                <div className="space-y-2 p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-medium text-[#64748B]">Logo da máscara</label>
+                    {cfg.templateCustomLogoBase64 && (
+                      <button
+                        type="button"
+                        onClick={() => { setCfg(p => ({ ...p, templateCustomLogoBase64: undefined })); setTimeout(redrawCanvas, 80); }}
+                        className="text-[10px] text-red-500 hover:text-red-700 font-medium">
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                  {cfg.templateCustomLogoBase64 ? (
+                    <div className="flex items-center gap-3">
+                      <img src={cfg.templateCustomLogoBase64} alt="Logo customizado" className="h-10 w-auto object-contain bg-white rounded border border-[#E2E8F0] p-1" />
+                      <span className="text-xs text-green-600 font-medium">Logo personalizado ativo</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-[#64748B]">
+                      <span className="w-8 h-8 rounded bg-white border border-[#E2E8F0] flex items-center justify-center shrink-0">
+                        <ImageIcon size={14} className="text-[#94A3B8]" />
+                      </span>
+                      <span className="italic">Usando logo do portal</span>
+                    </div>
+                  )}
+                  <label className="block">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = ev => {
+                          const b64 = ev.target?.result as string;
+                          setCfg(p => ({ ...p, templateCustomLogoBase64: b64, templateShowLogo: true }));
+                          setTimeout(redrawCanvas, 80);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#0F172A] hover:bg-[#F1F5F9] cursor-pointer transition-colors">
+                      <Upload size={12} /> Subir logo diferente
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-[#94A3B8]">Use um logo adaptado para fundos escuros (versão branca/clara funciona melhor).</p>
                 </div>
 
                 {/* Estilo da tag de categoria */}

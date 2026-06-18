@@ -8,7 +8,7 @@ import {
   Save, Globe, FileSearch, UserCircle, Image, LayoutDashboard, BarChart2,
   Monitor, Smartphone, Tag, Upload, CheckCircle, AlertCircle, Minus, Plus,
   Mail, Phone, MapPin, Building2, FileText, Youtube,
-  RefreshCw,
+  RefreshCw, Sparkles,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato";
@@ -90,6 +90,34 @@ export default function Settings() {
   const [logoSize, setLogoSize]           = useState(101);
   const [logoStatus, setLogoStatus]       = useState<"idle" | "success" | "error">("idle");
   const [savingLogo, setSavingLogo]       = useState(false);
+
+  /* ── AI SEO state ── */
+  const [aiSeoLoading, setAiSeoLoading] = useState(false);
+
+  async function fillSeoWithAI() {
+    setAiSeoLoading(true);
+    try {
+      const token = localStorage.getItem("admin_token");
+      const r = await fetch("/api/admin/ai-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          siteName: settings.siteName,
+          tagline: settings.tagline,
+          categories: ["política", "cidade", "esportes", "saúde", "cultura", "educação", "transporte"],
+        }),
+      });
+      if (!r.ok) throw new Error("Erro da API");
+      const data = await r.json() as { metaDescription?: string; keywords?: string };
+      if (data.metaDescription) setSettings(p => ({ ...p, seoDescription: data.metaDescription! }));
+      if (data.keywords)       setSettings(p => ({ ...p, seoKeywords: data.keywords! }));
+      toast({ title: "SEO preenchido com IA!", description: "Revise e salve as sugestões." });
+    } catch {
+      toast({ title: "Erro ao gerar SEO", description: "Verifique a conexão e tente novamente.", variant: "destructive" });
+    } finally {
+      setAiSeoLoading(false);
+    }
+  }
 
   /* ── contact state ── */
   const [contact, setContact]         = useState<ContactInfo | null>(null);
@@ -243,7 +271,20 @@ export default function Settings() {
 
                 {/* SEO */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<FileSearch size={15}/>} label="SEO"/>
+                  <div className="flex items-center justify-between">
+                    <SectionHeader icon={<FileSearch size={15}/>} label="SEO"/>
+                    <button
+                      type="button"
+                      onClick={fillSeoWithAI}
+                      disabled={aiSeoLoading}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100 disabled:opacity-50 transition-colors"
+                    >
+                      {aiSeoLoading
+                        ? <RefreshCw size={12} className="animate-spin" />
+                        : <Sparkles size={12} />}
+                      {aiSeoLoading ? "Gerando…" : "Preencher com IA"}
+                    </button>
+                  </div>
                   <Field label="Meta descrição" hint={`${(settings.seoDescription ?? "").length}/160`}>
                     <textarea value={settings.seoDescription ?? ""} onChange={e => setField("seoDescription", e.target.value)}
                       rows={3} maxLength={160} className={INPUT + " resize-none"}

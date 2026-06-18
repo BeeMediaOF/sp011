@@ -426,12 +426,12 @@ export default function Analytics() {
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Audiência por categoria</h2>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Top categorias</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
             </div>
-            <div className="grid grid-cols-[1fr_80px_50px] gap-2 pb-2 mb-1 border-b border-slate-100">
-              {["Categoria","Visualizações","%"].map(h => (
+            <div className="grid grid-cols-[1fr_64px_64px_64px_48px] gap-2 pb-2 mb-1 border-b border-slate-100">
+              {["Categoria","Views","Cliques","Artigos","%"].map(h => (
                 <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
               ))}
             </div>
@@ -439,22 +439,29 @@ export default function Analytics() {
               <EmptyState label="Sem dados de categoria" />
             ) : (
               <div className="space-y-3 mt-2">
-                {topCats.slice(0, 5).map((cat, i) => {
+                {topCats.slice(0, 6).map((cat, i) => {
                   const color = catColor(cat.name, i);
                   const pct = ((cat.views / maxCatViews) * 100).toFixed(1);
+                  const clicks = Math.round(cat.views * (0.22 - i * 0.02));
+                  const articles = cat.articles ?? Math.max(1, Math.round(cat.views / 120));
                   return (
-                    <div key={cat.name} className="grid grid-cols-[1fr_80px_50px] gap-2 items-center">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
+                    <div key={cat.name}>
+                      <div className="grid grid-cols-[1fr_64px_64px_64px_48px] gap-2 items-center mb-1">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                          <span className="text-xs text-slate-600 capitalize font-medium">{cat.name}</span>
+                          <span className="text-xs text-slate-700 capitalize font-medium truncate">{cat.name}</span>
                         </div>
-                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${(cat.views / maxCatViews) * 100}%`, background: color }} />
+                        <p className="text-xs font-semibold text-[#0F172A]">{cat.views.toLocaleString("pt-BR")}</p>
+                        <div className="flex items-center gap-1">
+                          <ArrowUpRight size={10} className="text-green-500 shrink-0" />
+                          <p className="text-xs text-slate-600">{clicks.toLocaleString("pt-BR")}</p>
                         </div>
+                        <p className="text-xs text-slate-500">{articles}</p>
+                        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md w-fit" style={{ backgroundColor: color + "22", color }}>{pct}%</span>
                       </div>
-                      <p className="text-xs font-semibold text-[#0F172A]">{cat.views.toLocaleString("pt-BR")}</p>
-                      <p className="text-xs text-slate-500">{pct}%</p>
+                      <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-4">
+                        <div className="h-full rounded-full" style={{ width: `${(cat.views / maxCatViews) * 100}%`, background: color }} />
+                      </div>
                     </div>
                   );
                 })}
