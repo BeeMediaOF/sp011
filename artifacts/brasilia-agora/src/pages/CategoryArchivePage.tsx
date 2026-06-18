@@ -44,6 +44,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
           )
           .map((a): CategoryArticle => ({
             id:       a.id,
+            slug:     a.slug || a.id,
             title:    a.title,
             subtitle: a.subtitle,
             time:     relativeTime(a.publishedAt),

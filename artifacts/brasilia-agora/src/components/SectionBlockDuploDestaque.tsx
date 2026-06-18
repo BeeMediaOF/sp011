@@ -3,6 +3,7 @@ import { Link } from "wouter";
 
 interface Article {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -45,7 +46,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
         {/* 2 destaques grandes */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
           {featured.map((art) => (
-            <Link key={art.id} href={`/artigo/${art.id}`} className="group block">
+            <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
               <div className="relative overflow-hidden bg-gray-100 h-[380px]">
                 <img
                   src={imgSrc(art.image)}
@@ -85,7 +86,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
             {strip.map((art) => (
               <Link
                 key={art.id}
-                href={`/artigo/${art.id}`}
+                href={`/artigo/${art.slug || art.id}`}
                 className="group flex gap-3 items-start snap-start shrink-0 w-[72vw] max-w-[260px] sm:w-auto sm:max-w-none sm:shrink-0"
               >
                 <div className="w-[80px] h-[60px] shrink-0 overflow-hidden bg-gray-100">

@@ -48,7 +48,7 @@ router.get("/sitemap.xml", (req, res) => {
         ? new Date(a.updatedAt).toISOString().split("T")[0]
         : "";
       const lastmodTag = lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : "";
-      return `  <url>\n    <loc>${escapeXml(base + "/artigo/" + a.id)}</loc>${lastmodTag}\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
+      return `  <url>\n    <loc>${escapeXml(base + "/artigo/" + (a.slug || a.id))}</loc>${lastmodTag}\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
     })
     .join("\n");
 

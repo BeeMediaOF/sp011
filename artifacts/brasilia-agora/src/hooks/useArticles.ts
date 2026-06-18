@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 
 export interface Article {
   id: string;
+  slug?: string;
   title: string;
   subtitle: string;
   content: string;
@@ -10,6 +11,7 @@ export interface Article {
   imageUrl: string;
   author: string;
   publishedAt: string;
+  keywords?: string;
   origin?: "manual" | "rss";
   rssSourceId?: string;
   rssSourceName?: string;

@@ -12,6 +12,7 @@ import politicaFeatImg from "../assets/images/politica_feat.webp";
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FeaturedItem = {
   id: string;
+  slug?: string;
   img: string;
   chapeu: string;
   chapeuColor: string;
@@ -23,6 +24,7 @@ type FeaturedItem = {
 
 type SecondaryItem = {
   id: string;
+  slug?: string;
   img: string;
   chapeu: string;
   chapeuColor: string;
@@ -93,7 +95,7 @@ function FeaturedCard({
 }) {
   return (
     <Link
-      href={`/artigo/${item.id}`}
+      href={`/artigo/${item.slug || item.id}`}
       className={`group block relative overflow-hidden bg-gray-100 ${className}`}
     >
       <img
@@ -208,6 +210,7 @@ export default function HeroSection() {
   const featured: FeaturedItem[] = sorted.length >= 3
     ? sorted.slice(0, 3).map((a, i) => ({
         id:          a.id,
+        slug:        a.slug || a.id,
         img:         a.imageUrl || FALLBACK_IMGS[i % FALLBACK_IMGS.length]!,
         chapeu:      a.tag || a.category.toUpperCase(),
         chapeuColor: chapeuColor(a.category),
@@ -221,6 +224,7 @@ export default function HeroSection() {
   const secondary: SecondaryItem[] = sorted.length >= 4
     ? sorted.slice(3, 7).map((a, i) => ({
         id:          a.id,
+        slug:        a.slug || a.id,
         img:         a.imageUrl || FALLBACK_IMGS[(i + 3) % FALLBACK_IMGS.length]!,
         chapeu:      a.tag || a.category.toUpperCase(),
         chapeuColor: chapeuColor(a.category),
@@ -240,7 +244,7 @@ export default function HeroSection() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
         {secondary.map((item) => (
-          <Link key={item.id} href={`/artigo/${item.id}`} className="group flex gap-3 items-start">
+          <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
             <div className="w-[72px] h-[52px] sm:w-[100px] sm:h-[72px] shrink-0 overflow-hidden bg-gray-100">
               <img
                 src={item.img}

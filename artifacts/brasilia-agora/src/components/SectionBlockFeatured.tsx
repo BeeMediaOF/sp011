@@ -4,6 +4,7 @@ import { useSite } from "../hooks/useSite";
 
 interface Article {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -60,7 +61,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
 
           {/* Destaque principal */}
           <Link
-            href={`/artigo/${featured.id}`}
+            href={`/artigo/${featured.slug || featured.id}`}
             className="group block lg:w-[58%] shrink-0"
           >
             <div className="relative overflow-hidden aspect-[16/9] bg-gray-100">
@@ -106,7 +107,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
               return (
                 <Link
                   key={item.id}
-                  href={`/artigo/${item.id}`}
+                  href={`/artigo/${item.slug || item.id}`}
                   className="group flex gap-4 py-4 first:pt-0 last:pb-0 items-start"
                 >
                   <div className="w-[96px] h-[68px] shrink-0 overflow-hidden bg-gray-100">

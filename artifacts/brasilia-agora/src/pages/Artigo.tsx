@@ -352,7 +352,7 @@ export default function Artigo() {
   }
 
   const canonicalUrl = article
-    ? `https://brasilia-agora.com/artigo/${article.id}`
+    ? `https://brasilia-agora.com/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
     : null;
 
   const newsArticleSchema = article

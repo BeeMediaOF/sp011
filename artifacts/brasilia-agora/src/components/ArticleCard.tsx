@@ -2,6 +2,7 @@ import { Link } from "wouter";
 
 interface ArticleCardProps {
   id: string;
+  slug?: string;
   title: string;
   subtitle?: string;
   time: string;
@@ -12,6 +13,7 @@ interface ArticleCardProps {
 
 export default function ArticleCard({
   id,
+  slug,
   title,
   subtitle,
   time,
@@ -20,7 +22,7 @@ export default function ArticleCard({
   tagColor,
 }: ArticleCardProps) {
   return (
-    <Link href={`/artigo/${id}`}>
+    <Link href={`/artigo/${slug || id}`}>
       <div className="flex gap-5 group cursor-pointer py-5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
         <div className="w-[110px] h-[80px] sm:w-[180px] sm:h-[120px] shrink-0 overflow-hidden relative rounded-sm">
           <img

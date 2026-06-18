@@ -3,6 +3,7 @@ import { useSite } from "../hooks/useSite";
 
 interface NewsCardProps {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -12,13 +13,14 @@ interface NewsCardProps {
   time: string;
 }
 
-export default function NewsCard({ id, title, summary, image, chapeu, chapeuColor, author, time }: NewsCardProps) {
+export default function NewsCard({ id, slug, title, summary, image, chapeu, chapeuColor, author, time }: NewsCardProps) {
   const { settings } = useSite();
   const bylineName = settings?.bylineName || settings?.siteName || "Redação";
   const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
+  const href = `/artigo/${slug || id}`;
 
   return (
-    <Link href={`/artigo/${id}`} className="block group">
+    <Link href={href} className="block group">
       <div className="overflow-hidden bg-gray-100 mb-3">
         <img
           src={image}

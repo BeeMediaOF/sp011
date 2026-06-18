@@ -2,6 +2,7 @@ import { Link } from "wouter";
 
 interface Article {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -44,7 +45,7 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
           {items.map((item, idx) => (
             <Link
               key={item.id}
-              href={`/artigo/${item.id}`}
+              href={`/artigo/${item.slug || item.id}`}
               className="group flex items-start gap-4 py-4 md:py-3 md:border-b md:border-gray-100 hover:bg-gray-50/50 transition-colors px-2 -mx-2 rounded"
             >
               <span

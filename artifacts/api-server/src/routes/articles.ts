@@ -9,6 +9,7 @@ router.get("/", (_req, res) => {
     .filter((a) => a.status === "published")
     .map((a) => ({
       id: a.id,
+      slug: a.slug || a.id,
       title: a.title,
       subtitle: a.subtitle,
       category: a.category,
@@ -16,6 +17,7 @@ router.get("/", (_req, res) => {
       imageUrl: a.imageUrl,
       author: a.author,
       publishedAt: a.publishedAt,
+      keywords: a.keywords,
     }));
   res.json({ articles });
 });

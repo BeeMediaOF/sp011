@@ -8,6 +8,7 @@ import AdBanner from "./ads/AdBanner";
 
 export interface Article {
   id: string;
+  slug?: string;
   title: string;
   subtitle?: string;
   time: string;
@@ -51,7 +52,7 @@ export default function CategoryPage({
           {/* 2 Destaques grandes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
             {[featuredArticle, second].filter(Boolean).map((art, idx) => art && (
-              <Link key={art.id} href={`/artigo/${art.id}`} className="group block">
+              <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
                 <div className="relative overflow-hidden bg-gray-100 h-[220px] sm:h-[300px] md:h-[380px]">
                   <img
                     src={art.imageUrl}

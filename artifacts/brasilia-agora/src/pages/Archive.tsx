@@ -24,7 +24,7 @@ function imgFallback(url: string) {
 
 function FeaturedCard({ article, color }: { article: Article; color: string }) {
   return (
-    <Link href={`/artigo/${article.id}`} className="group block">
+    <Link href={`/artigo/${article.slug || article.id}`} className="group block">
       <div className="relative overflow-hidden bg-gray-100 aspect-[16/10]">
         <img
           src={imgFallback(article.imageUrl || "")}
@@ -54,7 +54,7 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
 
 function ListCard({ article, color }: { article: Article; color: string }) {
   return (
-    <Link href={`/artigo/${article.id}`} className="group flex gap-4 py-3 items-start border-b border-gray-100 last:border-0">
+    <Link href={`/artigo/${article.slug || article.id}`} className="group flex gap-4 py-3 items-start border-b border-gray-100 last:border-0">
       <div className="w-[96px] h-[64px] shrink-0 overflow-hidden bg-gray-100">
         <img
           src={imgFallback(article.imageUrl || "")}

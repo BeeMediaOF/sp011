@@ -73,7 +73,7 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 
 // ─── Article mapper ───────────────────────────────────────────────────────────
 type SectionArticle = {
-  id: string; title: string; summary: string;
+  id: string; slug?: string; title: string; summary: string;
   image: string; chapeu: string; author: string; time: string;
 };
 
@@ -85,6 +85,7 @@ function useArticlesByCategory(category: string, fallback: SectionArticle[]): Se
   if (real.length > 0) {
     return real.map((a) => ({
       id: a.id,
+      slug: a.slug || a.id,
       title: a.title,
       summary: a.subtitle,
       image: a.imageUrl || (fallback[0]?.image ?? brasilArticles[0].image),
@@ -310,6 +311,7 @@ export default function Home() {
     if (real.length > 0) {
       return real.map((a) => ({
         id: a.id,
+        slug: a.slug || a.id,
         title: a.title,
         summary: a.subtitle,
         image: a.imageUrl || (fallback[0]?.image ?? brasilArticles[0].image),

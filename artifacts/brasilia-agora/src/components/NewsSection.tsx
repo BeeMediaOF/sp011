@@ -2,6 +2,7 @@ import { Link } from "wouter";
 
 export interface NewsSectionArticle {
   id: string;
+  slug?: string;
   title: string;
   time: string;
   img: string;
@@ -13,6 +14,7 @@ export interface NewsSectionProps {
   href: string;
   featuredArticle: {
     id: string;
+    slug?: string;
     title: string;
     time: string;
     img: string;
@@ -59,7 +61,7 @@ export default function NewsSection({
             {allCards.slice(0, 4).map((item) => (
               <Link
                 key={item.id}
-                href={`/artigo/${item.id}`}
+                href={`/artigo/${item.slug || item.id}`}
                 className="group cursor-pointer flex flex-col block"
                 data-testid={`card-grid-${item.id}`}
               >
@@ -87,7 +89,7 @@ export default function NewsSection({
           /* ── Featured left + 3 smaller right layout ── */
           <div className="flex flex-col lg:flex-row gap-4">
             <Link
-              href={`/artigo/${featuredArticle.id}`}
+              href={`/artigo/${featuredArticle.slug || featuredArticle.id}`}
               className="w-full lg:w-2/5 group cursor-pointer block shrink-0"
               data-testid={`card-featured-${featuredArticle.id}`}
             >
@@ -117,7 +119,7 @@ export default function NewsSection({
               {articles.slice(0, 3).map((item) => (
                 <Link
                   key={item.id}
-                  href={`/artigo/${item.id}`}
+                  href={`/artigo/${item.slug || item.id}`}
                   className="flex gap-3 group cursor-pointer py-3 first:pt-0 last:pb-0 block"
                   data-testid={`card-news-${item.id}`}
                 >

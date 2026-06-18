@@ -2,6 +2,7 @@ import { Link } from "wouter";
 
 interface Article {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -42,7 +43,7 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
         </div>
 
         {/* Hero — full width with dark overlay */}
-        <Link href={`/artigo/${hero.id}`} className="group block relative overflow-hidden rounded-sm mb-6">
+        <Link href={`/artigo/${hero.slug || hero.id}`} className="group block relative overflow-hidden rounded-sm mb-6">
           <div className="aspect-[21/9] bg-gray-200 overflow-hidden">
             <img
               src={imgSrc(hero.image)}
@@ -75,7 +76,7 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
             {secondary.map((item) => (
               <Link
                 key={item.id}
-                href={`/artigo/${item.id}`}
+                href={`/artigo/${item.slug || item.id}`}
                 className="group flex flex-col"
               >
                 <div className="aspect-[16/9] overflow-hidden bg-gray-100 rounded-sm mb-3">

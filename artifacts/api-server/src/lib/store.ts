@@ -429,7 +429,7 @@ let _store: StoreData = loadStore();
 export const store = {
   // Articles
   getArticles: () => [..._store.articles],
-  getArticle: (id: string) => _store.articles.find((a) => a.id === id) ?? null,
+  getArticle: (id: string) => _store.articles.find((a) => a.id === id || (a.slug && a.slug === id)) ?? null,
   isDuplicateArticle: (title: string, rssSourceUrl?: string, imageUrl?: string): boolean => {
     const norm = title.trim().toLowerCase();
 

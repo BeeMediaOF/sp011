@@ -3,6 +3,7 @@ import { Link } from "wouter";
 
 interface Article {
   id: string;
+  slug?: string;
   title: string;
   summary: string;
   image: string;
@@ -49,7 +50,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
         <div className={`flex flex-col gap-8 ${reverse ? "lg:flex-row-reverse" : "lg:flex-row"}`}>
 
           {/* Destaque principal — imagem overlay */}
-          <Link href={`/artigo/${featured.id}`} className="group flex lg:w-[46%] shrink-0 self-stretch">
+          <Link href={`/artigo/${featured.slug || featured.id}`} className="group flex lg:w-[46%] shrink-0 self-stretch">
             <div className="relative overflow-hidden w-full h-full min-h-[340px] bg-gray-100">
               <img
                 src={imgSrc(featured.image)}
@@ -83,7 +84,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
             {listItems.map((item) => (
               <Link
                 key={item.id}
-                href={`/artigo/${item.id}`}
+                href={`/artigo/${item.slug || item.id}`}
                 className="group flex gap-4 py-3 first:pt-0 last:pb-0 items-start"
               >
                 <div className="w-[90px] h-[68px] sm:w-[160px] sm:h-[107px] shrink-0 overflow-hidden bg-gray-100">
