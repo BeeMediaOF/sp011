@@ -36,6 +36,9 @@ router.get("/", (_req, res) => {
  *   author      string  optional  default: "Redação Brasília Hoje"
  */
 router.post("/", authMiddleware, async (req, res) => {
+  // Log the raw body to help debug integration issues
+  req.log.info({ webhookBody: req.body, contentType: req.headers["content-type"] }, "POST /api/publish received");
+
   const {
     id, title, subtitle, content, category, tag, imageUrl, author,
   } = req.body as {
