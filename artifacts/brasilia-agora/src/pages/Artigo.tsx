@@ -569,8 +569,7 @@ export default function Artigo() {
 
                   {/* Propaganda in-content — entre a imagem e o corpo */}
                   <div className="mb-5">
-                    <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
-                    <AdBanner slot="slot_10" />
+                    <AdBanner slot="slot_10" placeholder="Publicidade" />
                   </div>
 
                   {/* Corpo */}

@@ -415,8 +415,7 @@ export default function Home() {
 
         {/* slot_09 — Rodapé da Home */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <p className="text-[9px] text-gray-300 uppercase tracking-widest text-center mb-1">Publicidade</p>
-          <AdBanner slot="slot_09" />
+          <AdBanner slot="slot_09" placeholder="Publicidade" />
         </div>
       </main>
 
