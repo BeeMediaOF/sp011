@@ -114,8 +114,8 @@ router.put("/:id/password", async (req, res) => {
   try {
     const id = parseInt(req.params.id ?? "0", 10);
     const { password } = req.body as { password?: string };
-    if (!password || password.length < 6) {
-      res.status(400).json({ error: "Senha deve ter no mínimo 6 caracteres" }); return;
+    if (!password || password.length < 8) {
+      res.status(400).json({ error: "Senha deve ter no mínimo 8 caracteres" }); return;
     }
     const passwordHash = hashPassword(password);
     const [user] = await db.update(usersTable).set({
