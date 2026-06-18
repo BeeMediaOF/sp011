@@ -108,6 +108,10 @@ export const adminApi = {
   getMyPermissions: () =>
     req<{ permissions: string[] }>("GET", "/permissions/me"),
 
+  // Webhook API Key (admin only)
+  getWebhookKey: () => req<{ apiKey: string | null }>("GET", "/webhook-key"),
+  regenerateWebhookKey: () => req<{ apiKey: string }>("POST", "/webhook-key"),
+
   // Logs (admin only)
   getAuditLogs: (params?: Record<string, string>) => {
     const qs = params ? "?" + new URLSearchParams(params).toString() : "";

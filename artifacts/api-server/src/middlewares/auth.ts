@@ -2,10 +2,19 @@ import { createHmac, scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { store } from "../lib/store.js";
 
 const SECRET = process.env["SESSION_SECRET"] ?? "dev-secret-brasilia";
 
-export const WEBHOOK_API_KEY = process.env["WEBHOOK_API_KEY"] ?? "";
+/**
+ * Returns the active webhook API key.
+ * Prefers the DB-stored key (regeneratable via admin UI) over the env var.
+ */
+function getWebhookApiKey(): string {
+  const storeKey = store.getSettings().webhookApiKey;
+  if (storeKey) return storeKey;
+  return process.env["WEBHOOK_API_KEY"] ?? "";
+}
 
 // ─── Password hashing (scrypt) ────────────────────────────────────────────────
 
@@ -106,8 +115,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   const token = authHeader.slice(7);
 
   // Webhook API key — timing-safe comparison via HMAC (avoids timing attacks)
-  if (WEBHOOK_API_KEY) {
-    const expectedHmac = createHmac("sha256", SECRET).update(WEBHOOK_API_KEY).digest();
+  const activeWebhookKey = getWebhookApiKey();
+  if (activeWebhookKey) {
+    const expectedHmac = createHmac("sha256", SECRET).update(activeWebhookKey).digest();
     const tokenHmac    = createHmac("sha256", SECRET).update(token).digest();
     if (timingSafeEqual(expectedHmac, tokenHmac)) {
       req.userId   = 0;

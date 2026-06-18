@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { authMiddleware, requireAdmin, hashPassword } from "../middlewares/auth.js";
 import { logAudit, getClientIp } from "../lib/audit.js";
+import { sendWelcomeEmail } from "../lib/mailer.js";
 import type { UserPublic } from "@workspace/db";
 
 const router = Router();
@@ -72,7 +73,17 @@ router.post("/", async (req, res) => {
       userAgent: req.headers["user-agent"],
       metadata: { targetEmail: email, role },
     });
-    res.status(201).json({ user: sanitize(user) });
+
+    const emailResult = await sendWelcomeEmail(email.toLowerCase(), name, password);
+    const response: { user: UserPublic; emailSent: boolean; emailError?: string } = {
+      user: sanitize(user),
+      emailSent: emailResult.sent,
+    };
+    if (!emailResult.sent) {
+      req.log.warn({ emailError: emailResult.error }, "Welcome email not sent");
+      response.emailError = emailResult.error;
+    }
+    res.status(201).json(response);
   } catch (err) {
     req.log.error({ err }, "Error creating user");
     res.status(500).json({ error: "Erro ao criar usuário" });

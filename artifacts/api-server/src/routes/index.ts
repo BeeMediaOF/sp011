@@ -17,6 +17,7 @@ import perplexityRouter from "./perplexity";
 import usersRouter from "./users";
 import logsRouter from "./logs";
 import permissionsRouter from "./permissions";
+import webhookKeyRouter from "./webhook-key";
 
 const router: IRouter = Router();
 
@@ -37,5 +38,6 @@ router.use("/admin/perplexity", perplexityRouter);
 router.use("/admin/users", usersRouter);
 router.use("/admin/logs", logsRouter);
 router.use("/admin/permissions", permissionsRouter);
+router.use("/admin/webhook-key", webhookKeyRouter);
 
 export default router;

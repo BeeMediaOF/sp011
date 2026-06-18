@@ -89,6 +89,7 @@ export interface SiteSettings {
   youtubeApiKey?: string;
   bylineName?: string;
   bylineLogoBase64?: string;
+  webhookApiKey?: string;
 }
 
 const DEFAULT_HOME_BLOCKS: HomeBlock[] = [

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { Copy, CheckCheck, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { Copy, CheckCheck, RefreshCw, Eye, EyeOff, Key, AlertTriangle } from "lucide-react";
 import { adminApi } from "../../lib/adminApi";
 
 function useCopy(text: string) {
@@ -43,32 +43,43 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
 }
 
 export default function Webhook() {
-  const [token, setToken] = useState<string | null>(localStorage.getItem("admin_token"));
-  const [showToken, setShowToken] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [password, setPassword] = useState("brasilia@2024");
-  const [genError, setGenError] = useState("");
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
+  const [confirmRegen, setConfirmRegen] = useState(false);
+  const [error, setError] = useState("");
 
   const baseUrl = window.location.origin;
   const publishUrl = `${baseUrl}/api/publish`;
-  const loginUrl = `${baseUrl}/api/admin/login`;
+
+  useEffect(() => {
+    adminApi.getWebhookKey()
+      .then(({ apiKey: k }) => setApiKey(k))
+      .catch(() => setError("Erro ao carregar chave de API"))
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleGenerate() {
-    setGenerating(true); setGenError("");
+    if (!confirmRegen) { setConfirmRegen(true); return; }
+    setRegenerating(true); setError(""); setConfirmRegen(false);
     try {
-      const { token: t } = await adminApi.login("admin", password);
-      localStorage.setItem("admin_token", t);
-      setToken(t);
+      const { apiKey: newKey } = await adminApi.regenerateWebhookKey();
+      setApiKey(newKey);
+      setShowKey(true);
     } catch {
-      setGenError("Senha incorreta");
+      setError("Erro ao regenerar chave de API");
     } finally {
-      setGenerating(false);
+      setRegenerating(false);
     }
   }
 
+  const maskedKey = apiKey ? `${apiKey.slice(0, 8)}${"•".repeat(24)}${apiKey.slice(-8)}` : "";
+  const displayKey = showKey ? (apiKey ?? "") : maskedKey;
+
   const curlCreate = `curl -X POST "${publishUrl}" \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer ${token ?? "<seu-token>"}" \\
+  -H "Authorization: Bearer ${apiKey ?? "<sua-api-key>"}" \\
   -d '{
     "title": "Título do artigo",
     "subtitle": "Subtítulo ou lide do artigo",
@@ -80,11 +91,7 @@ export default function Webhook() {
   }'`;
 
   const curlPublishId = `curl -X POST "${publishUrl}/<id-do-artigo>" \\
-  -H "Authorization: Bearer ${token ?? "<seu-token>"}"`;
-
-  const curlLogin = `curl -X POST "${loginUrl}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"username": "admin", "password": "brasilia@2024"}'`;
+  -H "Authorization: Bearer ${apiKey ?? "<sua-api-key>"}"`;
 
   const bodySchema = `{
   "title":    string  // OBRIGATÓRIO — Título do artigo
@@ -139,42 +146,86 @@ export default function Webhook() {
           <p className="text-xs text-gray-400 mt-1.5 ml-1">Segundo endpoint: publica um rascunho existente pelo ID</p>
         </div>
 
-        {/* Auth header */}
+        {/* Permanent API Key */}
         <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
-          <h2 className="font-bold text-gray-800 text-base">Header de Autenticação</h2>
-
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 font-mono text-sm">
-            <span className="text-gray-500">Authorization:</span>
-            <span className="text-amber-700 font-semibold">Bearer</span>
-            <span className="text-gray-700 truncate flex-1">{token ? (showToken ? token : "••••••••••••••••••••••••") : "<token>"}</span>
-            <button onClick={() => setShowToken(s => !s)} className="text-gray-400 hover:text-gray-600">
-              {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
-            </button>
-            {token && <CopyButton text={`Bearer ${token}`} label="Copiar header" />}
+          <div className="flex items-center gap-2">
+            <Key size={16} className="text-[#0B2A66]" />
+            <h2 className="font-bold text-gray-800 text-base">Chave de API Permanente</h2>
+            <span className="ml-auto bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-full">Não expira</span>
           </div>
 
-          {/* Generate token */}
-          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Gerar novo token</p>
-            <div className="flex gap-2">
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Senha do admin"
-                className="flex-1 border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
-              />
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                className="flex items-center gap-1.5 bg-[#0B2A66] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#0a2255] transition-colors disabled:opacity-60"
-              >
-                <RefreshCw size={14} className={generating ? "animate-spin" : ""} />
-                {generating ? "Gerando..." : "Gerar"}
-              </button>
+          <p className="text-sm text-gray-500">
+            Use esta chave no header <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Authorization: Bearer &lt;chave&gt;</code> para integrar com Make, Zapier, n8n e outras plataformas. Diferente do token JWT, esta chave é permanente e não expira.
+          </p>
+
+          {loading ? (
+            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <div className="w-4 h-4 border-2 border-[#0B2A66] border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-gray-400">Carregando...</span>
             </div>
-            {genError && <p className="text-xs text-red-500">{genError}</p>}
-            {token && <p className="text-xs text-green-600">Token ativo — válido por 24 horas</p>}
+          ) : apiKey ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 font-mono text-sm">
+                <span className="text-gray-500 text-xs">Bearer</span>
+                <span className="text-[#0B2A66] font-semibold truncate flex-1 text-xs">{displayKey}</span>
+                <button onClick={() => setShowKey(s => !s)} className="text-gray-400 hover:text-gray-600 flex-shrink-0">
+                  {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+                <CopyButton text={apiKey} label="Copiar chave" />
+              </div>
+              <p className="text-xs text-green-600 font-medium">✓ Chave ativa — use esta chave nas suas automações</p>
+            </div>
+          ) : (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-amber-700">Nenhuma chave gerada ainda. Clique em "Gerar Chave" abaixo para criar sua primeira API Key permanente.</p>
+            </div>
+          )}
+
+          {error && <p className="text-xs text-red-500">{error}</p>}
+
+          {/* Regenerate section */}
+          <div className="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-3">
+            {confirmRegen ? (
+              <>
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-700">
+                    <strong>Atenção:</strong> Ao regenerar, a chave atual será invalidada imediatamente. Todas as integrações existentes precisarão ser atualizadas com a nova chave.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setConfirmRegen(false)}
+                    className="flex-1 border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleGenerate}
+                    disabled={regenerating}
+                    className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-60"
+                  >
+                    <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} />
+                    {regenerating ? "Regenerando..." : "Confirmar Regeneração"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-gray-600">{apiKey ? "Regenerar chave de API" : "Gerar chave de API"}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{apiKey ? "Invalida a chave atual e cria uma nova" : "Cria uma nova chave permanente para integrações"}</p>
+                </div>
+                <button
+                  onClick={handleGenerate}
+                  disabled={regenerating}
+                  className="flex items-center gap-1.5 bg-[#0B2A66] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#0a2255] transition-colors disabled:opacity-60"
+                >
+                  <RefreshCw size={14} className={regenerating ? "animate-spin" : ""} />
+                  {apiKey ? "Regenerar Chave" : "Gerar Chave"}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -190,7 +241,6 @@ export default function Webhook() {
 
           <CodeBlock code={curlCreate} label="1. Criar e publicar artigo" />
           <CodeBlock code={curlPublishId} label="2. Publicar rascunho existente por ID" />
-          <CodeBlock code={curlLogin} label="3. Obter token via login" />
         </div>
 
         {/* Response */}
@@ -202,7 +252,7 @@ export default function Webhook() {
             {[
               { code: "201", label: "Artigo criado e publicado", color: "bg-green-100 text-green-700" },
               { code: "400", label: "Campo obrigatório ausente", color: "bg-yellow-100 text-yellow-700" },
-              { code: "401", label: "Token ausente ou inválido", color: "bg-red-100 text-red-700" },
+              { code: "401", label: "Chave ausente ou inválida", color: "bg-red-100 text-red-700" },
             ].map(({ code, label, color }) => (
               <div key={code} className={`${color} rounded-lg px-3 py-2.5 text-center`}>
                 <p className="font-bold text-lg">{code}</p>
@@ -219,9 +269,10 @@ export default function Webhook() {
           <ol className="text-sm text-white/80 space-y-1 list-decimal list-inside">
             <li>URL: <code className="bg-white/10 px-1.5 rounded font-mono">{publishUrl}</code></li>
             <li>Método: <strong className="text-white">POST</strong></li>
-            <li>Header: <code className="bg-white/10 px-1.5 rounded font-mono">Authorization: Bearer {"{"}token{"}"}</code></li>
+            <li>Header: <code className="bg-white/10 px-1.5 rounded font-mono">Authorization: Bearer {"{"}api-key{"}"}</code></li>
             <li>Body: JSON com os campos acima</li>
           </ol>
+          <p className="text-xs text-white/50 pt-1">Use a Chave de API Permanente acima — ela não expira e não precisa ser renovada.</p>
         </div>
 
       </div>
