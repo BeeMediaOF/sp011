@@ -364,13 +364,43 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // 1. Featured image + description from meta tags (always available, even on paywalled pages)
-    const imageUrl =
-      $("meta[property='og:image']").attr("content") ??
-      $("meta[name='twitter:image']").attr("content") ??
-      $("meta[property='og:image:secure_url']").attr("content") ??
-      $("meta[name='thumbnail']").attr("content") ??
+    // 1. Featured image from meta tags (og:image is the article's canonical share image)
+    const metaImage =
+      $("meta[property='og:image:secure_url']").attr("content") ||
+      $("meta[property='og:image']").attr("content") ||
+      $("meta[name='twitter:image:src']").attr("content") ||
+      $("meta[name='twitter:image']").attr("content") ||
+      $("link[rel='image_src']").attr("href") ||
+      $("meta[itemprop='image']").attr("content") ||
+      $("meta[name='thumbnail']").attr("content") ||
       "";
+
+    // 2. Extract primary article figure image as a more reliable fallback
+    //    (catches cases where og:image is missing, wrong, or JS-rendered)
+    const BODY_IMG_SELECTORS = [
+      "article figure img",
+      ".article-image img", ".article-img img", ".article__image img",
+      ".post-image img", ".entry-image img",
+      "[class*='featured-image'] img", "[class*='destaque'] img",
+      "figure.featured img", "figure.hero img",
+      ".article-body figure:first-of-type img",
+      "article .content figure:first-of-type img",
+      "[itemprop='image'] img",
+    ];
+    let bodyImage = "";
+    for (const sel of BODY_IMG_SELECTORS) {
+      const src =
+        $(sel).first().attr("src") ||
+        $(sel).first().attr("data-src") ||
+        $(sel).first().attr("data-lazy-src");
+      if (src && src.startsWith("http") && !src.includes("logo") && !src.includes("pixel") && !src.includes("icon")) {
+        bodyImage = src;
+        break;
+      }
+    }
+
+    // Prefer meta og:image; fall back to article body image
+    const imageUrl = metaImage || bodyImage;
 
     const description =
       $("meta[property='og:description']").attr("content") ??
