@@ -5,7 +5,7 @@ const router = Router();
 
 /** GET /api/site — site settings + menu items (public, sensitive keys excluded) */
 router.get("/site", (_req, res) => {
-  const { rssAiApiKey: _omit, ...settings } = store.getSettings();
+  const settings = store.getPublicSettings();
   const menuItems = store.getMenuItems().filter((m) => m.visible);
   res.json({ ...settings, menuItems });
 });

@@ -510,6 +510,27 @@ export const store = {
 
   // Settings
   getSettings: () => ({ ..._store.settings }),
+  /** Returns settings with all API key values stripped — safe to send to any client */
+  getPublicSettings: () => {
+    const s = { ..._store.settings };
+    const out: Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"openaiApiKey"|"youtubeApiKey"> & {
+      hasRssAiKey: boolean; hasDiffbotKey: boolean; hasGeminiKey: boolean;
+      hasOpenaiKey: boolean; hasYoutubeKey: boolean;
+    } = {
+      ...s,
+      hasRssAiKey:   !!s.rssAiApiKey,
+      hasDiffbotKey: !!s.diffbotApiKey,
+      hasGeminiKey:  !!s.geminiApiKey,
+      hasOpenaiKey:  !!s.openaiApiKey,
+      hasYoutubeKey: !!s.youtubeApiKey,
+    };
+    delete (out as Record<string, unknown>)["rssAiApiKey"];
+    delete (out as Record<string, unknown>)["diffbotApiKey"];
+    delete (out as Record<string, unknown>)["geminiApiKey"];
+    delete (out as Record<string, unknown>)["openaiApiKey"];
+    delete (out as Record<string, unknown>)["youtubeApiKey"];
+    return out;
+  },
   updateSettings: (data: Partial<SiteSettings>): SiteSettings => {
     _store.settings = { ..._store.settings, ...data };
     saveStore(_store);

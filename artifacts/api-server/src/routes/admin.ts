@@ -388,7 +388,7 @@ router.put("/menu", (req, res) => {
 
 /** GET /api/admin/settings */
 router.get("/settings", (_req, res) => {
-  res.json({ settings: store.getSettings() });
+  res.json({ settings: store.getPublicSettings() });
 });
 
 /** GET /api/admin/ai-quota */
@@ -398,8 +398,8 @@ router.get("/ai-quota", authMiddleware, (_req, res) => {
 
 /** PUT /api/admin/settings */
 router.put("/settings", (req, res) => {
-  const settings = store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
-  res.json({ settings });
+  store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
+  res.json({ settings: store.getPublicSettings() });
 });
 
 /** POST /api/admin/logo  — upload logo as base64 */
