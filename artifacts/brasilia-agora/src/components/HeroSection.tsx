@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useArticles } from "../hooks/useArticles";
+import { useSite } from "../hooks/useSite";
 import heroImg        from "../assets/images/hero.webp";
 import trafficImg     from "../assets/images/traffic.webp";
 import policeImg      from "../assets/images/police.webp";
@@ -93,6 +94,10 @@ function FeaturedCard({
   priority?: boolean;
   className?: string;
 }) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
+
   return (
     <Link
       href={`/artigo/${item.slug || item.id}`}
@@ -118,8 +123,8 @@ function FeaturedCard({
           dangerouslySetInnerHTML={{ __html: item.title }}
         />
         <div className="flex items-center gap-2 text-[11px] text-white/60">
-          <img src="/favicon.jpg" alt="SBC Agora" className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
-          <span className="font-medium">{item.author || "Redação"}</span>
+          <img src={bylineLogo} alt={bylineName} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
+          <span className="font-medium">{bylineName}</span>
           <span className="w-1 h-1 rounded-full bg-white/40" />
           <span>{item.time}</span>
         </div>
