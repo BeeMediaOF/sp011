@@ -48,6 +48,7 @@ import UsersManager from "@/pages/admin/UsersManager";
 import Logs from "@/pages/admin/Logs";
 import SecurityCheckup from "@/pages/admin/SecurityCheckup";
 import EditorPermissions from "@/pages/admin/EditorPermissions";
+import MaquinaArtigos from "@/pages/admin/MaquinaArtigos";
 
 const queryClient = new QueryClient();
 
@@ -125,6 +126,9 @@ function Router() {
       </Route>
       <Route path="/admin/redes-sociais">
         <RequireAdmin><SocialMedia /></RequireAdmin>
+      </Route>
+      <Route path="/admin/maquina-artigos">
+        <RequireAdmin><MaquinaArtigos /></RequireAdmin>
       </Route>
       <Route path="/admin/perplexity">
         <RequireAdmin><PerplexitySearch /></RequireAdmin>

@@ -6,7 +6,7 @@ import {
   Users, BarChart2, LayoutGrid, Rss, Share2, Zap,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, KeyRound, Eye, AlertCircle, CheckCircle, Info,
-  ShieldCheck, ClipboardList, Camera, Pencil, Moon, Sun,
+  ShieldCheck, ClipboardList, Camera, Pencil, Moon, Sun, Bot,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 import { getStoredUser, setStoredUser, clearAuth } from "../../pages/Admin";
@@ -28,6 +28,7 @@ const NAV_MAIN = [
   { label: "Propagandas",   icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
   { label: "Colunistas",    icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
   { label: "Fontes RSS",    icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
+  { label: "Máquina Artigos", icon: Bot,            path: "/admin/maquina-artigos", permKey: "articles.create" },
   { label: "Perplexity",    icon: Zap,              path: "/admin/perplexity",   permKey: null },
   { label: "Redes Sociais", icon: Share2,           path: "/admin/redes-sociais",permKey: "social.view" },
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },

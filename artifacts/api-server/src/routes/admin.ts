@@ -7,7 +7,7 @@ import {
 } from "../middlewares/auth.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
-import { rewriteWithAI } from "../lib/rssProcessor.js";
+import { rewriteWithAI, scrapeArticle } from "../lib/rssProcessor.js";
 
 const router = Router();
 
@@ -497,6 +497,140 @@ router.put("/contact", (req, res) => {
 });
 
 // ─── AI SEO ──────────────────────────────────────────────────────────────────
+
+// ─── Máquina de Artigos ───────────────────────────────────────────────────────
+
+/** Detect YouTube URL and extract video ID */
+function extractYouTubeId(url: string): string | null {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)([A-Za-z0-9_-]{11})/,
+    /youtube\.com\/shorts\/([A-Za-z0-9_-]{11})/,
+  ];
+  for (const re of patterns) {
+    const m = re.exec(url);
+    if (m?.[1]) return m[1];
+  }
+  return null;
+}
+
+/** Fetch YouTube page metadata via oEmbed + page scrape */
+async function scrapeYouTube(url: string): Promise<{ title: string; text: string; imageUrl: string }> {
+  const videoId = extractYouTubeId(url);
+
+  // oEmbed for title + thumbnail
+  let title = "";
+  let imageUrl = "";
+  try {
+    const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, {
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (oembed.ok) {
+      const d = await oembed.json() as { title?: string; thumbnail_url?: string };
+      title = d.title ?? "";
+      imageUrl = d.thumbnail_url ?? (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : "");
+    }
+  } catch { /* ignore */ }
+
+  if (!imageUrl && videoId) {
+    imageUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  }
+
+  // Try to scrape the page for description
+  let text = "";
+  try {
+    const pageRes = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (pageRes.ok) {
+      const html = await pageRes.text();
+      const descMatch = /<meta name="description" content="([^"]+)"/.exec(html);
+      if (descMatch?.[1]) text = descMatch[1];
+      const ogDescMatch = /<meta property="og:description" content="([^"]+)"/.exec(html);
+      if (ogDescMatch?.[1] && ogDescMatch[1].length > text.length) text = ogDescMatch[1];
+    }
+  } catch { /* ignore */ }
+
+  return { title, text: `Vídeo do YouTube: ${title}\n\n${text}`, imageUrl };
+}
+
+/** POST /api/admin/article-from-url — generate article from a URL */
+router.post("/article-from-url", async (req, res) => {
+  const { url, category, giveCredit } = req.body as {
+    url?: string; category?: string; giveCredit?: boolean;
+  };
+
+  if (!url || !url.startsWith("http")) {
+    res.status(400).json({ error: "URL inválida" });
+    return;
+  }
+
+  const isYouTube = /youtube\.com|youtu\.be/.test(url);
+
+  try {
+    let title = "";
+    let text  = "";
+    let imageUrl = "";
+    let sourceName = "";
+
+    if (isYouTube) {
+      const yt = await scrapeYouTube(url);
+      title      = yt.title;
+      text       = yt.text;
+      imageUrl   = yt.imageUrl;
+      sourceName = "YouTube";
+    } else {
+      // Scrape article page
+      const scraped = await scrapeArticle(url);
+      text          = scraped.text;
+      imageUrl      = scraped.imageUrl;
+
+      // Try to get og:title from the URL
+      try {
+        const pageRes = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (pageRes.ok) {
+          const html = await pageRes.text();
+          const ogTitle   = /<meta property="og:title" content="([^"]+)"/.exec(html)?.[1] ?? "";
+          const metaTitle = /<title[^>]*>([^<]+)<\/title>/.exec(html)?.[1] ?? "";
+          title = ogTitle || metaTitle;
+        }
+      } catch { /* ignore */ }
+
+      try { sourceName = new URL(url).hostname.replace(/^www\./, ""); } catch { sourceName = "Web"; }
+    }
+
+    if (!title && !text) {
+      res.status(422).json({ error: "Não foi possível extrair conteúdo desta URL. Verifique se ela é acessível publicamente." });
+      return;
+    }
+
+    // Generate article with AI
+    const result = await rewriteWithAI(
+      title || "Notícia sem título",
+      text || title,
+      sourceName,
+      giveCredit ?? false,
+    );
+
+    res.json({
+      title:    result.title    || title,
+      subtitle: result.subtitle || "",
+      content:  result.content,
+      keywords: result.keywords,
+      slug:     result.slug,
+      imageUrl,
+      category: category ?? "geral",
+      sourceUrl: url,
+      sourceName,
+    });
+  } catch (err: unknown) {
+    req.log.error({ err }, "article-from-url failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Erro ao gerar artigo" });
+  }
+});
 
 /** POST /api/admin/ai-seo — generate meta description + keywords with Perplexity */
 router.post("/ai-seo", authMiddleware, async (req, res) => {
