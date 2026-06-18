@@ -5,6 +5,22 @@ import { articleService } from "../lib/articleService.js";
 const router = Router();
 
 /**
+ * GET /api/publish  (also HEAD)
+ * Endpoint discovery probe — used by external platforms to verify the endpoint is reachable.
+ * Returns 200 with capability info. Does NOT require authentication.
+ */
+router.get("/", (_req, res) => {
+  res.json({
+    ok: true,
+    endpoint: "POST /api/publish",
+    description: "Cria e publica um artigo imediatamente",
+    required_fields: ["title"],
+    optional_fields: ["subtitle", "content", "category", "tag", "imageUrl", "author"],
+    authentication: "Bearer token (Authorization header)",
+  });
+});
+
+/**
  * POST /api/publish
  *
  * Webhook endpoint to create and immediately publish an article.
