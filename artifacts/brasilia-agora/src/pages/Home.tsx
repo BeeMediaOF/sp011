@@ -375,7 +375,7 @@ export default function Home() {
       <main className="flex-1">
         <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
 
-        {visibleBlocks.map((block, idx) => {
+        {settings && visibleBlocks.map((block, idx) => {
           const content = (
             <>
               {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" /></div>}

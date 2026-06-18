@@ -67,7 +67,9 @@ function saveToStorage(data: SiteSettings) {
   }
 }
 
-let _cache: SiteSettings | null = loadFromStorage();
+// Always start null — never pre-render with stale localStorage data.
+// localStorage is only used as a network-error fallback.
+let _cache: SiteSettings | null = null;
 let _fetch: Promise<void> | null = null;
 const _subscribers = new Set<(s: SiteSettings) => void>();
 
@@ -76,22 +78,36 @@ function notifySubscribers() {
 }
 
 async function doFetch() {
-  const r = await fetch("/api/site");
-  const data = await r.json() as SiteSettings;
-  _cache = data;
-  saveToStorage(data);
-  notifySubscribers();
+  try {
+    const r = await fetch("/api/site");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json() as SiteSettings;
+    _cache = data;
+    saveToStorage(data);
+    notifySubscribers();
+  } catch {
+    // Network / server error — fall back to localStorage so the page
+    // is not completely blank, but never show it on a successful load.
+    const stored = loadFromStorage();
+    if (stored && !_cache) {
+      _cache = stored;
+      notifySubscribers();
+    }
+    _fetch = null;
+  }
 }
 
 if (typeof window !== "undefined") {
   window.addEventListener("message", (e) => {
     if (e.data?.type === "settings:refresh") {
+      _cache = null;
       _fetch = doFetch().catch(() => { _fetch = null; });
     }
   });
 }
 
 export function invalidateSiteCache() {
+  _cache = null;
   _fetch = doFetch().catch(() => { _fetch = null; });
 }
 
