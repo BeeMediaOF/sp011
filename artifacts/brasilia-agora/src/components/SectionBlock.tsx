@@ -66,7 +66,27 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
           </div>
         </div>
 
-        <div className={`grid gap-5 min-h-[280px] grid-cols-1 sm:grid-cols-2 ${pageSize === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        {/* ── Mobile: horizontal carousel ── */}
+        <div className="flex sm:hidden overflow-x-auto snap-x snap-mandatory gap-4 -mx-4 px-4 pb-3 scrollbar-none"
+          style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}>
+          {visible.map((article) => (
+            <div key={article.id} className="snap-start shrink-0 w-[76vw]">
+              <NewsCard
+                id={article.id}
+                title={article.title}
+                summary={article.summary}
+                image={article.image}
+                chapeu={article.chapeu}
+                chapeuColor={color}
+                author={article.author}
+                time={article.time}
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* ── Desktop: grid ── */}
+        <div className={`hidden sm:grid gap-5 min-h-[280px] sm:grid-cols-2 ${pageSize === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
           {visible.map((article) => (
             <NewsCard
               key={article.id}
