@@ -91,7 +91,7 @@ Conteúdo da fonte:
 - Somente use informações presentes no conteúdo da fonte, nunca invente dados
 
 **METADADOS:**
-- slug: kebab-case sem acentos, máximo 60 caracteres
+- slug: kebab-case sem acentos, MÁXIMO 5 PALAVRAS SIGNIFICATIVAS (ignore artigos: o, a, os, as, de, da, do, dos, das, para, com, em, e, ou, um, uma). Exemplo: "prefeito-inaugura-hospital-sao-paulo" (5 palavras). NUNCA gere slug com mais de 55 caracteres.
 - keywords: 6 palavras-chave relevantes separadas por vírgula
 
 ## REGRAS ABSOLUTAS
@@ -159,6 +159,26 @@ export interface RewriteResult {
   subtitle?: string;
 }
 
+/** Trim slug to at most 5 meaningful words and 55 chars, cutting at a word boundary */
+function trimSlug(raw: string): string {
+  // Normalise: lowercase, remove accents, replace spaces with hyphens
+  const s = raw.trim().toLowerCase();
+
+  // Split on hyphens, filter out single-char stop-words
+  const STOP = new Set(["o","a","os","as","de","da","do","dos","das","para","com","em","e","ou","um","uma","no","na","nos","nas","ao","aos","pela","pelo","por","que"]);
+  const words = s.split("-").filter(w => w.length > 0);
+  const significant = words.filter(w => !STOP.has(w));
+
+  // Take up to 5 significant words; rebuild slug
+  const chosen = significant.slice(0, 5).join("-");
+
+  // Hard cap at 55 chars, always cutting at a hyphen boundary
+  if (chosen.length <= 55) return chosen;
+  const cut = chosen.slice(0, 55);
+  const lastHyphen = cut.lastIndexOf("-");
+  return lastHyphen > 10 ? cut.slice(0, lastHyphen) : cut;
+}
+
 function parseRewriteResult(raw: string): RewriteResult {
   // Strip markdown code fences if the model wraps output in ```json ... ```
   const stripped = raw
@@ -174,7 +194,7 @@ function parseRewriteResult(raw: string): RewriteResult {
     };
     const content  = (parsed.content_html ?? "").trim();
     const keywords = (parsed.keywords ?? "").trim();
-    const slug     = (parsed.slug ?? "").trim().slice(0, 80);
+    const slug     = trimSlug(parsed.slug ?? "");
     const title    = (parsed.title ?? "").trim();
     const subtitle = (parsed.subtitle ?? "").trim();
     return { content, keywords, slug, title, subtitle };
@@ -182,7 +202,7 @@ function parseRewriteResult(raw: string): RewriteResult {
     // Fallback: old plain-text format with SLUG:/KEYWORDS: markers
     const slugMatch     = raw.match(/^SLUG:\s*(.+)$/m);
     const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
-    const slug     = (slugMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "").slice(0, 80);
+    const slug     = trimSlug((slugMatch?.[1] ?? "").replace(/^\[|\]$/g, ""));
     const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
     const content  = raw
       .replace(/^SLUG:\s*.+$/m, "")
