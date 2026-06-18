@@ -117,7 +117,7 @@ function CustomBlock({ block, getArticles }: {
     case "duplo":
       return <SectionBlockDuploDestaque title={block.name} color={color} href={href} articles={articles} />;
     case "cultura":
-      return <SectionBlockCulturaLayout title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockCulturaLayout title={block.name} color={color} href={href} articles={articles} reverse={block.reverse} />;
     case "lista":
       return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} />;
     case "manchete":
@@ -167,7 +167,7 @@ function ConfigurableBlock({ block, getArticles }: {
     case "duplo":
       return <SectionBlockDuploDestaque title={title} color={color} href={href} articles={articles} />;
     case "cultura":
-      return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} reverse={block.reverse ?? defaults?.reverse} />;
     case "lista":
       return <SectionBlockLista title={title} color={color} href={href} articles={articles} />;
     case "manchete":

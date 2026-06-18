@@ -207,6 +207,7 @@ export interface HomeBlock {
   layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
   color?: string;
   custom?: boolean;
+  reverse?: boolean;
 }
 
 export interface SiteSettings {

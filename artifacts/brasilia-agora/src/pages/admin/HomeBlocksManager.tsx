@@ -168,6 +168,7 @@ interface BlockForm {
   showImage: boolean;
   showAuthorDate: boolean;
   showSummary: boolean;
+  reverse: boolean;
 }
 
 const EMPTY_FORM: BlockForm = {
@@ -176,6 +177,7 @@ const EMPTY_FORM: BlockForm = {
   source: "automatic_by_category", itemsLimit: 4,
   color: "#1d4ed8", primaryColor: "#0B2A66", accentColor: "#E71D36", textColor: "#FFFFFF",
   showTitle: true, showCategory: true, showImage: true, showAuthorDate: true, showSummary: false,
+  reverse: false,
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
@@ -198,6 +200,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     showImage:     true,
     showAuthorDate: true,
     showSummary:   false,
+    reverse:       block.reverse ?? false,
   };
 }
 
@@ -287,6 +290,19 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
                 <span className="text-[9px] font-bold uppercase tracking-wide">{l.label}</span>
               </button>
             ))}
+          </div>
+        </PanelSection>
+      )}
+
+      {/* Inverter layout (só para Foto+Lista) */}
+      {!isSpecial && form.layout === "cultura" && (
+        <PanelSection label="Layout da imagem" icon={Layers}>
+          <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
+            <div className="flex items-center gap-2">
+              <Layers size={12} className="text-slate-400" />
+              <span className="text-[12px] font-medium text-slate-700">Imagem à direita, lista à esquerda</span>
+            </div>
+            <Toggle checked={form.reverse} onChange={() => onChange("reverse", !form.reverse)} accent={form.color} />
           </div>
         </PanelSection>
       )}
@@ -618,6 +634,7 @@ export default function HomeBlocksManager() {
         category: nextForm.categories[0] ?? nextForm.category,
         layout: nextForm.layout,
         color: nextForm.color,
+        reverse: nextForm.reverse,
       } : b);
       debounceSave(updated, 800);
     }, 300);
@@ -630,6 +647,7 @@ export default function HomeBlocksManager() {
       category: editForm.categories[0] ?? editForm.category,
       layout: editForm.layout,
       color: editForm.color,
+      reverse: editForm.reverse,
     } : b);
     setBlocks(next); setEditingId(null);
     pushHistory(next);
