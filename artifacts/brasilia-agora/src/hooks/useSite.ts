@@ -30,6 +30,7 @@ export interface SiteSettings {
   seoDescription?: string;
   seoKeywords?: string;
   facebookPixelId?: string;
+  gtmId?: string;
   ga4MeasurementId?: string;
   ogImageBase64?: string;
   faviconBase64?: string;
