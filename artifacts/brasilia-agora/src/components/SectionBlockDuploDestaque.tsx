@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
+import { useSite } from "../hooks/useSite";
 
 interface Article {
   id: string;
@@ -25,6 +26,8 @@ function imgSrc(img: unknown): string {
 }
 
 export default function SectionBlockDuploDestaque({ title, color, href, articles }: Props) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
   const featured = articles.slice(0, 2);
   const strip = articles.slice(2, 6);
 
@@ -70,7 +73,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
                   </h3>
                   <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.summary}</p>
                   <div className="flex items-center gap-2 text-[11px] text-white/50">
-                    <span>{art.author}</span>
+                    <span>{bylineName}</span>
                     <span className="w-1 h-1 rounded-full bg-white/40" />
                     <span>{art.time}</span>
                   </div>

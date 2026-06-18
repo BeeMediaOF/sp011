@@ -490,7 +490,7 @@ export default function Artigo() {
                       />
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          Por {settings?.bylineName || settings?.siteName || "Redação"}
+                          {settings?.bylineName || settings?.siteName || "Redação"}
                         </div>
                         <div className="text-xs text-gray-400">
                           {new Date(article.publishedAt).toLocaleDateString("pt-BR", {

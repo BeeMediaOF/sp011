@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import ArticleCard from "./ArticleCard";
+import { useSite } from "../hooks/useSite";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
@@ -33,6 +34,8 @@ export default function CategoryPage({
   featuredArticle,
   featuredArticle2,
 }: CategoryPageProps) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
   const second = featuredArticle2 ?? articles[0];
 
   return (
@@ -81,8 +84,8 @@ export default function CategoryPage({
                       <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.subtitle}</p>
                     )}
                     <div className="flex items-center gap-2 text-[11px] text-white/50">
-                      {art.author && <span>Por {art.author}</span>}
-                      {art.author && <span className="w-1 h-1 rounded-full bg-white/40" />}
+                      <span>{bylineName}</span>
+                      <span className="w-1 h-1 rounded-full bg-white/40" />
                       <span>{art.time}</span>
                     </div>
                   </div>

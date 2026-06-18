@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "wouter";
+import { useSite } from "../hooks/useSite";
 
 interface Article {
   id: string;
@@ -26,6 +27,8 @@ function imgSrc(img: unknown): string {
 }
 
 export default function SectionBlockCulturaLayout({ title, color, href, articles, reverse = false }: Props) {
+  const { settings } = useSite();
+  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
   const [featured, ...rest] = articles;
   const listItems = rest.slice(0, 5);
 
@@ -71,7 +74,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 />
                 <p className="text-white/70 text-[13px] line-clamp-2">{featured.summary}</p>
                 <div className="flex items-center gap-2 mt-3 text-[11px] text-white/60">
-                  <span>{featured.author}</span>
+                  <span>{bylineName}</span>
                   <span className="w-1 h-1 rounded-full bg-white/40" />
                   <span>{featured.time}</span>
                 </div>
@@ -100,7 +103,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                     dangerouslySetInnerHTML={{ __html: item.title }}
                   />
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">
-                    <span>Escrito por <strong className="font-bold text-[#1a1a1a]">{item.author || "Redação"}</strong></span>
+                    <span>Escrito por <strong className="font-bold text-[#1a1a1a]">{bylineName}</strong></span>
                     <span className="text-gray-300">|</span>
                     <span>{item.time}</span>
                   </div>
