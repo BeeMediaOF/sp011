@@ -16,8 +16,13 @@ interface Stats {
   engagement?: { uniqueSessions: number; avgReadTime: number; bounceRate: number; readCompletions: number };
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
+  peakHour?: number;
+  dayOfWeekChart?: { day: string; views: number }[];
+  peakDay?: string;
   topArticles: { id: string; title: string; views: number; avgTime?: number }[];
   topCategories: { name: string; views: number; clicks: number; articles: number }[];
+  topCities?: { name: string; views: number }[];
+  topRegions?: { name: string; views: number }[];
   devices: { mobile: number; desktop: number; tablet: number };
   scrollDepthChart?: { depth: number; count: number }[];
   referrerChart?: { name: string; value: number }[];
@@ -72,13 +77,7 @@ function catColor(name?: string, idx = 0) {
   return CAT_COLORS[name?.toLowerCase() ?? ""] ?? CAT_COLORS_ARR[idx % CAT_COLORS_ARR.length];
 }
 
-const REGIONS = [
-  { name: "Sudeste",     pct: 52.8, color: "#2563EB" },
-  { name: "Sul",         pct: 17.6, color: "#22C55E" },
-  { name: "Nordeste",    pct: 15.3, color: "#F97316" },
-  { name: "Centro-Oeste",pct:  8.2, color: "#7C3AED" },
-  { name: "Norte",       pct:  6.1, color: "#94A3B8" },
-];
+const GEO_COLORS = ["#2563EB","#E71D36","#F97316","#16A34A","#7C3AED","#0891b2","#F59E0B","#64748B"];
 
 function EmptyState({ label }: { label: string }) {
   return (
@@ -93,6 +92,7 @@ export default function Analytics() {
   const [stats,   setStats]   = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
+  const [geoTab,  setGeoTab]  = useState<"cidades" | "estados">("cidades");
 
   useEffect(() => {
     const token = localStorage.getItem("admin_token");
@@ -476,66 +476,104 @@ export default function Analytics() {
             </div>
           </div>
 
-          {/* Region audience (3/10) */}
+          {/* Localização: Cidades / Estados (3/10) */}
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Audiência por região</h2>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">Localização</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden text-xs">
-                <span className="px-3 py-1 bg-[#0B2A66] text-white font-medium">Brasil</span>
-                <span className="px-3 py-1 text-slate-500 hover:bg-slate-50 cursor-pointer">Mundo</span>
+                <button
+                  onClick={() => setGeoTab("cidades")}
+                  className={`px-3 py-1 font-medium transition-colors ${geoTab === "cidades" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                >
+                  Cidades
+                </button>
+                <button
+                  onClick={() => setGeoTab("estados")}
+                  className={`px-3 py-1 font-medium transition-colors ${geoTab === "estados" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}
+                >
+                  Estados
+                </button>
               </div>
             </div>
 
-            {/* Brazil map placeholder */}
-            <div className="h-28 bg-slate-50 rounded-xl flex items-center justify-center mb-4 overflow-hidden relative border border-slate-100">
-              <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                <svg viewBox="0 0 300 250" className="w-full h-full" fill="none">
-                  <path d="M120,20 L200,15 L240,50 L270,80 L260,130 L230,160 L200,180 L170,210 L140,230 L120,220 L80,200 L60,170 L50,140 L60,100 L80,60 Z" fill="#2563EB" opacity="0.4" />
-                  <path d="M120,20 L80,60 L60,100 L50,140 L60,170 L80,200 L120,220 L100,180 L90,150 L100,120 L110,80 Z" fill="#2563EB" opacity="0.6" />
-                </svg>
-              </div>
-              <span className="text-slate-400 text-xs relative z-10">Mapa de regiões</span>
-            </div>
-
-            {/* Regions list */}
-            <div className="space-y-2.5">
-              <div className="grid grid-cols-[1fr_50px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
-                <span>Região</span>
-                <span className="text-right">%</span>
-              </div>
-              {REGIONS.map(({ name, pct, color }) => (
-                <div key={name} className="flex items-center gap-3">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                  <span className="text-xs text-slate-600 flex-1">{name}</span>
-                  <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full" style={{ width: `${(pct / 52.8) * 100}%`, background: color }} />
+            {geoTab === "cidades" ? (
+              (() => {
+                const cities = stats.topCities ?? [];
+                const maxV = cities[0]?.views || 1;
+                return cities.length === 0 ? (
+                  <EmptyState label="Aguardando dados de localização" />
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-[1fr_48px_44px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
+                      <span>Cidade</span><span className="text-right">Views</span><span className="text-right">%</span>
+                    </div>
+                    {cities.map(({ name, views }, i) => {
+                      const color = GEO_COLORS[i % GEO_COLORS.length]!;
+                      const pct = ((views / maxV) * 100).toFixed(0);
+                      return (
+                        <div key={name} className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="text-xs text-slate-600 flex-1 truncate">{name}</span>
+                          <span className="text-xs font-semibold text-[#0F172A] w-10 text-right">{views.toLocaleString("pt-BR")}</span>
+                          <span className="text-[11px] text-slate-400 w-8 text-right">{pct}%</span>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <span className="text-xs font-semibold text-[#0F172A] w-10 text-right">{pct}%</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-100">
-              <span className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer">
-                Ver relatório completo <ArrowUpRight size={11} />
-              </span>
-            </div>
+                );
+              })()
+            ) : (
+              (() => {
+                const regions = stats.topRegions ?? [];
+                const maxV = regions[0]?.views || 1;
+                return regions.length === 0 ? (
+                  <EmptyState label="Aguardando dados de localização" />
+                ) : (
+                  <div className="space-y-2.5">
+                    <div className="grid grid-cols-[1fr_48px_44px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
+                      <span>Estado</span><span className="text-right">Views</span><span className="text-right">%</span>
+                    </div>
+                    {regions.map(({ name, views }, i) => {
+                      const color = GEO_COLORS[i % GEO_COLORS.length]!;
+                      const pct = ((views / maxV) * 100).toFixed(0);
+                      return (
+                        <div key={name}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                            <span className="text-xs text-slate-600 flex-1 truncate">{name}</span>
+                            <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                            <span className="text-[11px] text-slate-400 w-8 text-right">{pct}%</span>
+                          </div>
+                          <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-4">
+                            <div className="h-full rounded-full" style={{ width: `${(views / maxV) * 100}%`, background: color }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()
+            )}
           </div>
         </div>
 
-        {/* ── Extra: hourly + scroll depth ──────────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        {/* ── Extra: hourly + day-of-week + scroll depth ────────── */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
 
           {/* Pico por hora */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico de acessos por hora</h2>
-              <span className="text-xs text-slate-400">Hoje</span>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por hora</h2>
+              {stats.peakHour !== undefined && (stats.hourlyChart ?? []).some(h => h.views > 0) && (
+                <span className="text-[11px] font-semibold bg-blue-50 text-[#2563EB] px-2 py-0.5 rounded-full">
+                  Pico: {String(stats.peakHour).padStart(2,"0")}h
+                </span>
+              )}
             </div>
-            <ResponsiveContainer width="100%" height={160}>
+            <ResponsiveContainer width="100%" height={150}>
               <BarChart data={stats.hourlyChart ?? []} margin={{ top: 0, right: 4, bottom: 0, left: -10 }}>
                 <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
                 <XAxis
@@ -552,9 +590,53 @@ export default function Analytics() {
                   formatter={(v: number) => [v, "views"]}
                   labelFormatter={(h) => `${String(h).padStart(2,"0")}:00`}
                 />
-                <Bar dataKey="views" fill="#2563EB" radius={[4, 4, 0, 0]} opacity={0.85} />
+                <Bar dataKey="views" radius={[4, 4, 0, 0]}>
+                  {(stats.hourlyChart ?? []).map((entry) => (
+                    <Cell
+                      key={entry.hour}
+                      fill={entry.hour === stats.peakHour ? "#E71D36" : "#2563EB"}
+                      opacity={entry.hour === stats.peakHour ? 1 : 0.7}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* Pico por dia da semana */}
+          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por dia da semana</h2>
+              {stats.peakDay && (stats.dayOfWeekChart ?? []).some(d => d.views > 0) && (
+                <span className="text-[11px] font-semibold bg-red-50 text-[#E71D36] px-2 py-0.5 rounded-full">
+                  Pico: {stats.peakDay}
+                </span>
+              )}
+            </div>
+            {(stats.dayOfWeekChart ?? []).every(d => d.views === 0) ? (
+              <EmptyState label="Aguardando dados" />
+            ) : (
+              <ResponsiveContainer width="100%" height={150}>
+                <BarChart data={stats.dayOfWeekChart ?? []} margin={{ top: 0, right: 4, bottom: 0, left: -10 }}>
+                  <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
+                    formatter={(v: number) => [v, "views"]}
+                  />
+                  <Bar dataKey="views" radius={[4, 4, 0, 0]}>
+                    {(stats.dayOfWeekChart ?? []).map((entry) => (
+                      <Cell
+                        key={entry.day}
+                        fill={entry.day === stats.peakDay ? "#E71D36" : "#7C3AED"}
+                        opacity={entry.day === stats.peakDay ? 1 : 0.7}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Profundidade de leitura */}

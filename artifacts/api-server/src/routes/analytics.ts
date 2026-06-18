@@ -16,10 +16,11 @@ export interface AnalyticsEvent {
   device: "mobile" | "desktop" | "tablet";
   ts: number;
   ua?: string;
-  // new fields
   referrer?: string;      // "direto" | "busca" | "social" | "outro"
   scrollDepth?: number;   // 25 | 50 | 75 | 100
   platform?: string;      // "facebook" | "twitter" | "whatsapp" | "copy"
+  city?: string;
+  region?: string;        // Estado (e.g. "São Paulo")
 }
 
 // In-memory circular buffer — max 50k events
@@ -37,6 +38,32 @@ function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
   return "desktop";
 }
 
+// ── IP Geolocation ────────────────────────────────────────────────────────────
+interface GeoInfo { city: string; region: string }
+const geoCache = new Map<string, GeoInfo>();
+const LOCAL_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
+async function geoLookup(ip: string): Promise<GeoInfo | null> {
+  if (!ip || LOCAL_IPS.has(ip)) return null;
+  if (geoCache.has(ip)) return geoCache.get(ip)!;
+  // Prevent concurrent fetches for same IP
+  const placeholder: GeoInfo = { city: "", region: "" };
+  geoCache.set(ip, placeholder);
+  try {
+    const res = await fetch(
+      `http://ip-api.com/json/${ip}?fields=city,regionName&lang=pt-BR`,
+      { signal: AbortSignal.timeout(4_000) }
+    );
+    if (res.ok) {
+      const data = await res.json() as { city?: string; regionName?: string };
+      const geo: GeoInfo = { city: data.city ?? "", region: data.regionName ?? "" };
+      geoCache.set(ip, geo);
+      return geo;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 /** POST /api/analytics/event — public, no auth */
 router.post("/event", (req, res) => {
   const {
@@ -44,7 +71,10 @@ router.post("/event", (req, res) => {
     referrer, scrollDepth, platform,
   } = req.body as Partial<AnalyticsEvent>;
   if (!type || !path || !sessionId) { res.status(400).json({ ok: false }); return; }
-  const ua = req.headers["user-agent"] ?? "";
+  const ua  = req.headers["user-agent"] ?? "";
+  const ip  = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "";
+  const geo = geoCache.get(ip); // use cached value if available, otherwise undefined
+
   pushEvent({
     type: type as AnalyticsEvent["type"],
     path, title, category, articleId, sessionId, duration,
@@ -54,7 +84,12 @@ router.post("/event", (req, res) => {
     referrer,
     scrollDepth,
     platform,
+    city:   geo?.city   || undefined,
+    region: geo?.region || undefined,
   });
+
+  // Geolocate async for future events from this IP
+  void geoLookup(ip);
 
   // Persist category views to disk so counts survive server restarts
   if (type === "category" && category) {
@@ -77,9 +112,12 @@ router.get("/stats", authMiddleware, (_req, res) => {
   }
 
   const byHour: number[]                = Array(24).fill(0);
+  const byDayOfWeek: number[]           = Array(7).fill(0); // 0=Dom … 6=Sáb
   const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
-  const catViewMap:  Record<string, number> = {}; // pageviews with category (article reads)
-  const catClickMap: Record<string, number> = {}; // explicit category-tab clicks
+  const catViewMap:  Record<string, number> = {};
+  const catClickMap: Record<string, number> = {};
+  const cityMap:     Record<string, number> = {};
+  const regionMap:   Record<string, number> = {};
   const deviceMap:  Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
   const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
   const scrollMap:  Record<number, number>  = { 25: 0, 50: 0, 75: 0, 100: 0 };
@@ -105,6 +143,7 @@ router.get("/stats", authMiddleware, (_req, res) => {
       if (age <= DAY)      today++;
 
       byHour[hour]++;
+      byDayOfWeek[new Date(ev.ts).getDay()]++;
       deviceMap[ev.device]++;
 
       // referrer
@@ -122,8 +161,12 @@ router.get("/stats", authMiddleware, (_req, res) => {
         articleMap[ev.articleId]!.views++;
       }
 
-        // category from pageview (article reads in that category)
+      // category from pageview (article reads in that category)
       if (ev.category) catViewMap[ev.category] = (catViewMap[ev.category] ?? 0) + 1;
+
+      // geo
+      if (ev.city)   cityMap[ev.city]     = (cityMap[ev.city]     ?? 0) + 1;
+      if (ev.region) regionMap[ev.region] = (regionMap[ev.region] ?? 0) + 1;
     }
 
     // ── category click (user navigated to the category page) ──────────
@@ -197,6 +240,23 @@ router.get("/stats", authMiddleware, (_req, res) => {
 
   const dailyChart  = Object.entries(byDay).map(([date, views]) => ({ date, views }));
   const hourlyChart = byHour.map((views, hour) => ({ hour, views }));
+  const peakHour    = byHour.indexOf(Math.max(...byHour));
+
+  const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const dayOfWeekChart = byDayOfWeek.map((views, day) => ({ day: DAY_NAMES[day]!, views }));
+  const peakDay = DAY_NAMES[byDayOfWeek.indexOf(Math.max(...byDayOfWeek))]!;
+
+  const topCities = Object.entries(cityMap)
+    .filter(([c]) => c)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([name, views]) => ({ name, views }));
+
+  const topRegions = Object.entries(regionMap)
+    .filter(([r]) => r)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([name, views]) => ({ name, views }));
 
   const scrollDepthChart = [25, 50, 75, 100].map((depth) => ({
     depth, count: scrollMap[depth] ?? 0,
@@ -215,8 +275,13 @@ router.get("/stats", authMiddleware, (_req, res) => {
     engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
     dailyChart,
     hourlyChart,
+    peakHour,
+    dayOfWeekChart,
+    peakDay,
     topArticles,
     topCategories,
+    topCities,
+    topRegions,
     devices: deviceMap,
     scrollDepthChart,
     referrerChart,
