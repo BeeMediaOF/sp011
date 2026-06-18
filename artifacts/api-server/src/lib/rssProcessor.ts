@@ -71,22 +71,24 @@ Conteúdo da fonte:
 
 ## INSTRUÇÕES
 
-**TÍTULO:** Elabore um título de cauda longa de cerca de 150 caracteres, altamente chamativo, otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes. NÃO repita o título dentro do content_html.
+**TÍTULO:** Elabore um título único de cauda longa com cerca de 150 caracteres, altamente chamativo e otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes. NÃO repita o título dentro do content_html.
 
-**SUBTÍTULO:** Crie um subtítulo de cerca de 150 caracteres que complemente o título e introduza o texto, ele será o primeiro <h2> dentro do content_html.
+**SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título e introduza o texto, ele será o primeiro <h2> dentro do content_html.
 
 **CONTEÚDO (content_html):**
 - Comece com o subtítulo como primeiro <h2> dentro do content_html
 - Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto e fazendo um gancho para o que o leitor irá encontrar
-- Cite a fonte ao final da lead: por exemplo, "conforme informação divulgada por {{FONTE}}"
+- Ao final da lead, cite obrigatoriamente a fonte: por exemplo, "conforme informação divulgada por {{FONTE}}"
+- Escreva como jornalista — NUNCA escreva como se você fosse um redator da própria fonte; cite as informações atribuindo corretamente a origem
 - Use até 4 subtítulos <h3> para organizar o restante do texto
 - Parágrafos curtos: 150 a 250 caracteres cada — faça muitos parágrafos curtos
+- Extraia citações diretas e dados estatísticos presentes na fonte e inclua-os no texto, garantindo que sejam 100% fiéis ao original; se a citação estiver em idioma estrangeiro, traduza-a para o Português do Brasil
+- Utilize a palavra-chave principal (extraída do título) no título, no subtítulo e distribuída ao longo do texto; use também palavras-chave correlacionadas
 - Use <b> para negritos em palavras e frases importantes, NUNCA use ** ou outras marcações markdown
 - Prefira texto corrido; use <ul><li> apenas quando necessário para a didática do conteúdo
 - NUNCA coloque <h1> dentro do content_html
 - NUNCA use travessões (—), use sempre vírgula
 - NUNCA escreva códigos de idioma como "pt-BR", "en-US" ou similares em nenhuma parte da resposta
-- Distribua a palavra-chave principal (extraída do título) ao longo do texto
 - Linguagem clara, acessível e fácil de entender pelo público brasileiro
 - Somente use informações presentes no conteúdo da fonte, nunca invente dados
 

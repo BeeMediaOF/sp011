@@ -1,0 +1,148 @@
+/* ======================================================================
+   MAA PRO — YouTube — UI
+   Escopo principal: .maa3
+   ====================================================================== */
+
+/* ---------- Vars de fallback ---------- */
+:root {
+  --text: #0f172a;
+  --line: #e5e7eb;
+  --line-2: #cbd5e1;
+}
+@media (prefers-color-scheme: dark){
+  :root {
+    --text: #e5e7eb;
+    --line: #243044;
+    --line-2: #2c3a52;
+  }
+}
+
+/* ---------- Inputs padrão ---------- */
+.maa3 .maa-yt-input{
+  width:100%;
+  background:#fff;
+  border:1px solid var(--line-2);
+  border-radius:10px;
+  padding:10px 12px;
+  color:var(--text);
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .maa-yt-input{ background:#0f172a; border-color:#243044; color:#e5e7eb; }
+}
+.maa3 .maa-yt-input:focus{
+  outline:none;
+  border-color:#93c5fd;
+  box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+.maa3 .maa-yt-actions{
+  display:flex; align-items:center; gap:10px; margin-top:12px;
+}
+
+/* ---------- Dica/alerta discreto ---------- */
+.maa3 .maa-yt-tip{
+  display:flex; align-items:center; gap:8px;
+  padding:10px; border-radius:10px;
+  background:#f8fafc; border:1px solid var(--line);
+  color:#334155; font-size:13px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .maa-yt-tip{ background:#0f172a; border-color:#243044; color:#cbd5e1; }
+}
+.maa3 .maa-yt-tip span{ font-weight:700; color:#111827; }
+@media (prefers-color-scheme: dark){
+  .maa3 .maa-yt-tip span{ color:#e2e8f0; }
+}
+
+/* ---------- Botões (reuso) ---------- */
+.maa3 .btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:9px 12px; border-radius:10px;
+  border:1px solid var(--line-2); background:#fff; color:#111827;
+  cursor:pointer; text-decoration:none; font-weight:600;
+  user-select:none; transition: filter .15s ease, transform .02s ease;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .btn{ background:#0f172a; color:#e5e7eb; border-color:#243044; }
+}
+.maa3 .btn:hover{ filter:brightness(0.98); }
+.maa3 .btn:active{ transform: translateY(1px); }
+.maa3 .btn:focus-visible{
+  outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.25);
+}
+.maa3 .btn.primary{
+  background:linear-gradient(90deg,#3b82f6 0%,#8b5cf6 100%);
+  border:0; color:#fff; font-weight:700;
+}
+.maa3 .btn.xs{
+  padding:6px 8px; border-radius:8px; font-size:12px;
+}
+.maa3 .btn.danger{ border-color:#fecaca; color:#991b1b; background:#fff7f7; }
+@media (prefers-color-scheme: dark){
+  .maa3 .btn.danger{ border-color:#6b1a1a; color:#fecaca; background:#1b0f12; }
+}
+.maa3 .btn.is-disabled,
+.maa3 .btn[disabled]{
+  pointer-events:none; opacity:.55;
+}
+
+/* ---------- Transcript block ---------- */
+.maa3 .yt-transcript-head{
+  display:flex; justify-content:space-between; align-items:flex-start;
+  gap:12px; margin-bottom:8px;
+}
+.maa3 .yt-transcript-head .mini-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+.maa3 .yt-textarea{
+  width:100%; min-height:180px; resize:vertical;
+  background:#fff; color:var(--text);
+  border:1px solid var(--line-2); border-radius:10px; padding:10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  line-height:1.5;
+  transition: box-shadow .15s ease, border-color .15s ease;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .yt-textarea{ background:#0f172a; border-color:#243044; color:#e5e7eb; }
+}
+.maa3 .yt-textarea:focus{
+  outline:none; border-color:#93c5fd; box-shadow:0 0 0 3px rgba(37,99,235,.15);
+}
+
+/* ---------- Segmentados (modo e IA) ---------- */
+.maa3 .seg{ display:inline-flex; gap:6px; flex-wrap:wrap; }
+.maa3 .seg button{
+  appearance:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:8px 10px; border-radius:10px; border:1px solid var(--line-2);
+  background:#fff; color:inherit; cursor:pointer; font-weight:600;
+  user-select:none; position:relative; z-index:0;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.maa3 .seg button:hover{ filter:brightness(0.98); }
+.maa3 .seg button:focus-visible{
+  outline:none; box-shadow:0 0 0 3px rgba(59,130,246,.25);
+}
+.maa3 .seg button[aria-pressed="true"]{
+  background:#eef2ff; border-color:#c7d2fe; color:#3730a3;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .seg button{ background:#0f172a; border-color:#243044; color:#e5e7eb; }
+  .maa3 .seg button[aria-pressed="true"]{ background:#1f2536; border-color:#384862; color:#c7d2fe; }
+}
+
+/* ---------- Cards de pautas ---------- */
+.maa3 .q-list .q-card{
+  border:1px solid var(--line); background:#fff; border-radius:10px;
+  padding:10px 12px; margin-bottom:8px;
+}
+@media (prefers-color-scheme: dark){
+  .maa3 .q-list .q-card{ background:#0f172a; border-color:#243044; }
+}
+
+/* ---------- Utilidades pequenas ---------- */
+.maa3 .row-inline{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.maa3 .grid-top{ display:grid; gap:12px; grid-template-columns:1fr 1fr; }
+@media (max-width: 860px){
+  .maa3 .grid-top{ grid-template-columns:1fr; }
+}

@@ -3033,7 +3033,7 @@
       "autoMode": "rewrite_publish",
       "id": "ef604be2-61d7-455b-9256-d0b31c0450eb",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:58:20.220Z",
+      "lastFetchedAt": "2026-06-18T15:17:52.088Z",
       "fetchLimit": 1
     },
     {
@@ -3090,7 +3090,7 @@
       "autoMode": "rewrite_publish",
       "id": "d3b820f3-ac9f-4042-8e0c-a49e7b7b5713",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:58:36.735Z",
+      "lastFetchedAt": "2026-06-18T15:18:09.104Z",
       "fetchLimit": 1
     },
     {
@@ -3103,7 +3103,7 @@
       "autoMode": "rewrite_publish",
       "id": "e952a24d-f4c5-48e9-b4c6-7b509d83b738",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:58:37.673Z",
+      "lastFetchedAt": "2026-06-18T15:18:10.772Z",
       "fetchLimit": 1
     },
     {
@@ -3116,7 +3116,7 @@
       "autoMode": "rewrite_publish",
       "id": "a75cbb8f-edcc-44a5-a83b-ac7383521388",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:58:38.311Z",
+      "lastFetchedAt": "2026-06-18T15:18:12.138Z",
       "fetchLimit": 1
     },
     {
@@ -3129,7 +3129,7 @@
       "autoMode": "rewrite_publish",
       "id": "43788d01-c651-4745-bf45-0cf326ccaa5b",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T13:58:40.515Z",
+      "lastFetchedAt": "2026-06-18T15:18:13.486Z",
       "fetchLimit": 1
     },
     {
@@ -3143,7 +3143,7 @@
       "id": "1c321751-f353-40f1-b934-5a21101d83ef",
       "createdAt": "2026-06-16T13:29:06.165Z",
       "fetchLimit": 1,
-      "lastFetchedAt": "2026-06-18T13:58:40.778Z"
+      "lastFetchedAt": "2026-06-18T15:18:13.818Z"
     },
     {
       "name": "Jornal de Brasília – DF",
@@ -3166,7 +3166,7 @@
       "autoMode": "rewrite_publish",
       "id": "0aaf6413-cb92-4234-82a3-9818045578f8",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T14:00:39.696Z",
+      "lastFetchedAt": "2026-06-18T15:18:30.856Z",
       "fetchLimit": 1
     },
     {
@@ -3212,7 +3212,7 @@
       "autoMode": "rewrite_publish",
       "id": "4344bd7f-ff60-4890-bcef-8807b4471333",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T14:00:56.109Z",
+      "lastFetchedAt": "2026-06-18T15:18:47.561Z",
       "fetchLimit": 1
     },
     {
@@ -3236,7 +3236,7 @@
       "autoMode": "rewrite_publish",
       "id": "8f9785c6-1025-4bdd-9561-b5e546d1712f",
       "createdAt": "2026-06-16T13:29:06.165Z",
-      "lastFetchedAt": "2026-06-18T14:01:13.048Z",
+      "lastFetchedAt": "2026-06-18T15:19:04.273Z",
       "fetchLimit": 1
     }
   ],
