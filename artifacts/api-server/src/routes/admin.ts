@@ -8,6 +8,7 @@ import {
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo } from "../lib/store.js";
 import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot } from "../lib/rssProcessor.js";
+import { YoutubeTranscript } from "youtube-transcript";
 
 const router = Router();
 
@@ -513,45 +514,96 @@ function extractYouTubeId(url: string): string | null {
   return null;
 }
 
-/** Fetch YouTube page metadata via oEmbed + page scrape */
+/**
+ * Fetch the full transcript from a YouTube video using the youtube-transcript
+ * library (uses YouTube's Innertube API — no API key required for public videos
+ * that have captions/auto-generated subtitles).
+ * Prefers Portuguese, falls back to any available language.
+ */
+async function fetchYouTubeTranscript(videoId: string): Promise<string> {
+  // Try Portuguese first, then fall back to any available language
+  const langs = ["pt", "pt-BR", "en", undefined] as const;
+  let lastErr: unknown;
+  for (const lang of langs) {
+    try {
+      const segments = lang
+        ? await YoutubeTranscript.fetchTranscript(videoId, { lang })
+        : await YoutubeTranscript.fetchTranscript(videoId);
+      const text = segments.map((s) => s.text.replace(/\n/g, " ").trim()).filter(Boolean).join(" ");
+      if (text.length > 50) return text;
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error("No transcript available for this video");
+}
+
+/**
+ * Best-quality YouTube thumbnail: tries maxresdefault (HD) then falls back
+ * to hqdefault (always available).
+ */
+async function getBestYouTubeThumbnail(videoId: string): Promise<string> {
+  const hd = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  const hq = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  try {
+    const res = await fetch(hd, { method: "HEAD", signal: AbortSignal.timeout(5_000) });
+    // maxresdefault returns 404 or a 120×90 "placeholder" (< 2 KB) when unavailable
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (res.ok && len > 5_000) return hd;
+  } catch { /* ignore */ }
+  return hq;
+}
+
+/** Fetch YouTube page metadata + transcript */
 async function scrapeYouTube(url: string): Promise<{ title: string; text: string; imageUrl: string }> {
   const videoId = extractYouTubeId(url);
 
-  // oEmbed for title + thumbnail
+  // oEmbed for title
   let title = "";
-  let imageUrl = "";
   try {
-    const oembed = await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`, {
-      signal: AbortSignal.timeout(8_000),
-    });
+    const oembed = await fetch(
+      `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
+      { signal: AbortSignal.timeout(8_000) }
+    );
     if (oembed.ok) {
-      const d = await oembed.json() as { title?: string; thumbnail_url?: string };
+      const d = await oembed.json() as { title?: string };
       title = d.title ?? "";
-      imageUrl = d.thumbnail_url ?? (videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : "");
     }
   } catch { /* ignore */ }
 
-  if (!imageUrl && videoId) {
-    imageUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  // Best thumbnail
+  const imageUrl = videoId ? await getBestYouTubeThumbnail(videoId) : "";
+
+  // Full transcript (primary) — fallback to page description
+  let transcriptText = "";
+  let transcriptLang = "";
+  if (videoId) {
+    try {
+      transcriptText = await fetchYouTubeTranscript(videoId);
+      transcriptLang = "transcrição completa";
+    } catch (err) {
+      // Captions not available — fall back to page description
+      try {
+        const pageRes = await fetch(url, {
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+          signal: AbortSignal.timeout(12_000),
+        });
+        if (pageRes.ok) {
+          const html = await pageRes.text();
+          const og = /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ?? "";
+          const meta = /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ?? "";
+          transcriptText = og.length >= meta.length ? og : meta;
+          transcriptLang = "descrição do vídeo";
+        }
+      } catch { /* ignore */ }
+    }
   }
 
-  // Try to scrape the page for description
-  let text = "";
-  try {
-    const pageRes = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (pageRes.ok) {
-      const html = await pageRes.text();
-      const descMatch = /<meta name="description" content="([^"]+)"/.exec(html);
-      if (descMatch?.[1]) text = descMatch[1];
-      const ogDescMatch = /<meta property="og:description" content="([^"]+)"/.exec(html);
-      if (ogDescMatch?.[1] && ogDescMatch[1].length > text.length) text = ogDescMatch[1];
-    }
-  } catch { /* ignore */ }
+  const context = transcriptLang === "transcrição completa"
+    ? `Transcrição completa do vídeo do YouTube "${title}":\n\n${transcriptText}`
+    : `Vídeo do YouTube: ${title}\n\n${transcriptText || "(sem transcrição disponível)"}`;
 
-  return { title, text: `Vídeo do YouTube: ${title}\n\n${text}`, imageUrl };
+  return { title, text: context, imageUrl };
 }
 
 /** POST /api/admin/article-from-url — generate article from a URL */
