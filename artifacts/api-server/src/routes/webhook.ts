@@ -15,10 +15,35 @@ router.get("/", (_req, res) => {
     endpoint: "POST /api/publish",
     description: "Cria e publica um artigo imediatamente",
     required_fields: ["title"],
-    optional_fields: ["subtitle", "content", "category", "tag", "imageUrl", "author"],
+    optional_fields: ["id", "subtitle", "content", "category", "tag", "imageUrl", "author"],
+    note: "Se 'title' não for enviado, será derivado de 'subtitle' ou da primeira frase de 'content'. Se 'id' for enviado sem 'title', o rascunho existente é publicado.",
     authentication: "Bearer token (Authorization header)",
   });
 });
+
+/**
+ * Derives a title from available text fields.
+ * Priority: subtitle → first sentence of content → timestamp fallback.
+ */
+function deriveTitle(subtitle?: string, content?: string): string {
+  const sub = subtitle?.trim();
+  if (sub && sub.length >= 10) {
+    return sub.length <= 120 ? sub : sub.slice(0, 120).replace(/\s+\S*$/, "…");
+  }
+
+  const body = content?.trim();
+  if (body) {
+    // Take first sentence (up to first period/exclamation/question mark)
+    const sentence = /^([^.!?]{10,120})[.!?]/.exec(body)?.[1]?.trim();
+    if (sentence) return sentence;
+    // Fallback: first 100 chars of content
+    const snippet = body.slice(0, 100).replace(/\s+\S*$/, "").trim();
+    if (snippet.length >= 10) return snippet + "…";
+  }
+
+  // Last resort: timestamp
+  return `Artigo ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+}
 
 /**
  * POST /api/publish
@@ -27,17 +52,17 @@ router.get("/", (_req, res) => {
  * Requires: Authorization: Bearer <token>
  *
  * Body:
- *   title       string  required
+ *   title       string  recommended (auto-derived from subtitle/content if absent)
  *   subtitle    string  optional
  *   content     string  optional
  *   category    string  optional  default: "geral"
  *   tag         string  optional  default: "GERAL"
  *   imageUrl    string  optional
  *   author      string  optional  default: "Redação Brasília Hoje"
+ *   id          string  optional  if provided without title, publishes an existing draft
  */
 router.post("/", authMiddleware, async (req, res) => {
-  // Log the raw body to help debug integration issues
-  req.log.info({ webhookBody: req.body, contentType: req.headers["content-type"] }, "POST /api/publish received");
+  req.log.info({ webhookBody: req.body, contentType: String(req.headers["content-type"] ?? "") }, "POST /api/publish received");
 
   const {
     id, title, subtitle, content, category, tag, imageUrl, author,
@@ -46,7 +71,7 @@ router.post("/", authMiddleware, async (req, res) => {
     tag?: string; imageUrl?: string; author?: string;
   };
 
-  // If caller sent an article ID but no title → publish existing draft (same as POST /api/publish/:id)
+  // If caller sent an article ID but no title → publish existing draft
   if (id?.trim() && !title?.trim()) {
     const article = await articleService.updateArticle(id.trim(), {
       status: "published",
@@ -60,18 +85,40 @@ router.post("/", authMiddleware, async (req, res) => {
     return;
   }
 
-  if (!title?.trim()) {
+  // If no usable content at all, return a clear error
+  const hasContent = title?.trim() || subtitle?.trim() || content?.trim();
+  if (!hasContent) {
     res.status(400).json({
       ok: false,
-      error: "O campo 'title' é obrigatório (ou envie 'id' para publicar um rascunho existente)",
+      error: "Nenhum conteúdo fornecido. Envie ao menos 'title', 'subtitle' ou 'content'.",
       required_fields: ["title"],
       optional_fields: ["id", "subtitle", "content", "category", "tag", "imageUrl", "author"],
     });
     return;
   }
 
+  // Derive title if not explicitly provided
+  const resolvedTitle = title?.trim() || deriveTitle(subtitle, content);
+
+  if (!resolvedTitle) {
+    res.status(400).json({
+      ok: false,
+      error: "Não foi possível derivar um título. Envie o campo 'title'.",
+      required_fields: ["title"],
+      optional_fields: ["id", "subtitle", "content", "category", "tag", "imageUrl", "author"],
+    });
+    return;
+  }
+
+  if (!title?.trim()) {
+    req.log.warn(
+      { derivedTitle: resolvedTitle, providedFields: Object.keys(req.body as object).filter(k => !!(req.body as Record<string, unknown>)[k]) },
+      "POST /api/publish: 'title' ausente — título derivado automaticamente"
+    );
+  }
+
   const article = await articleService.createArticle({
-    title: title.trim(),
+    title: resolvedTitle,
     subtitle: subtitle?.trim() ?? "",
     content: content?.trim() ?? "",
     category: category?.trim() ?? "geral",
@@ -82,10 +129,12 @@ router.post("/", authMiddleware, async (req, res) => {
     status: "published",
   });
 
+  const titleDerived = !title?.trim();
   res.status(201).json({
     ok: true,
     message: "Artigo criado e publicado com sucesso",
     article,
+    ...(titleDerived ? { warning: "Campo 'title' ausente — título derivado automaticamente de outros campos." } : {}),
   });
 });
 
@@ -94,7 +143,7 @@ router.post("/", authMiddleware, async (req, res) => {
  * Publish an existing draft by ID.
  */
 router.post("/:id", authMiddleware, async (req, res) => {
-  const article = await articleService.updateArticle(req.params.id ?? "", {
+  const article = await articleService.updateArticle(String(req.params["id"] ?? ""), {
     status: "published",
     publishedAt: new Date().toISOString(),
   });
