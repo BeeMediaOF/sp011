@@ -24,7 +24,7 @@ export interface RssLogEntry {
 const MAX_LOG = 300;
 const _rssEventLog: RssLogEntry[] = [];
 
-function addLog(entry: Omit<RssLogEntry, "id" | "ts">) {
+export function addLog(entry: Omit<RssLogEntry, "id" | "ts">) {
   _rssEventLog.unshift({
     id: Math.random().toString(36).slice(2),
     ts: new Date().toISOString(),
@@ -34,6 +34,24 @@ function addLog(entry: Omit<RssLogEntry, "id" | "ts">) {
 }
 
 export function getRssLog(): RssLogEntry[] { return [..._rssEventLog]; }
+
+// ─── Rewrite Queue callback (registered by rewriteQueue.ts to avoid circular imports) ────
+
+export interface RewriteJobItem {
+  articleId: string;
+  title: string;
+  text: string;
+  sourceName: string;
+  giveCredit: boolean;
+  customPrompt?: string;
+  finalStatus: "published" | "draft";
+}
+
+let _rewriteQueue: ((item: RewriteJobItem) => void) | null = null;
+
+export function registerRewriteQueue(fn: (item: RewriteJobItem) => void): void {
+  _rewriteQueue = fn;
+}
 
 // ─── RSS parser ───────────────────────────────────────────────────────────────
 
@@ -852,6 +870,41 @@ export async function autoProcessArticle(
   let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
+    if (_rewriteQueue) {
+      // Queue mode: save as draft immediately, then rewrite asynchronously
+      const finalStatus = autoMode === "rewrite_publish" ? "published" : "draft";
+      const prompts = store.getRssPrompts();
+      const chosenPrompt = resolvePrompt(src, prompts);
+      const saved = await articleService.createArticle({
+        title:         art.title,
+        subtitle:      art.excerpt.slice(0, 160),
+        content:       art.fullText,
+        category,
+        tag:           TAG_MAP[category] ?? "GERAL",
+        imageUrl:      art.imageUrl,
+        author,
+        publishedAt:   new Date().toISOString(),
+        status:        "draft",
+        origin:        "rss",
+        rssSourceId:   art.sourceId,
+        rssSourceName: art.sourceName,
+        rssSourceUrl:  art.link,
+        aiRewritten:   false,
+      });
+      _rewriteQueue({
+        articleId:   saved.id,
+        title:       art.title,
+        text:        art.fullText,
+        sourceName,
+        giveCredit,
+        customPrompt: chosenPrompt,
+        finalStatus,
+      });
+      addLog({ type: "draft", sourceName, articleTitle: art.title, message: "Salvo — aguardando reescrita na fila" });
+      logger.info({ articleId: saved.id, finalStatus }, "Article queued for AI rewrite");
+      return;
+    }
+    // Fallback (no queue registered): rewrite immediately
     try {
       const prompts = store.getRssPrompts();
       const chosenPrompt = resolvePrompt(src, prompts);
@@ -864,7 +917,6 @@ export async function autoProcessArticle(
       aiRewriteSuccess = true;
       addLog({ type: "rewrite", sourceName, articleTitle: aiTitle ?? art.title });
     } catch (err) {
-      // Feature: skip articles that fail rewrite instead of saving raw text
       addLog({ type: "error", sourceName, articleTitle: art.title, message: `Reescrita falhou: ${String(err)}` });
       logger.warn({ err, sourceId: src.id }, "AI rewrite failed — skipping article");
       return;

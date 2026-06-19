@@ -69,7 +69,7 @@ function saveHistory(entries: HistoryEntry[]) {
 // ─── AI Settings panel ────────────────────────────────────────────────────────
 
 interface AiSettings {
-  provider: "gemini_free" | "gemini_paid" | "openai";
+  provider: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai";
   model: string;
   hasKey: boolean;
   outputPrompt: string;
@@ -80,9 +80,10 @@ interface AiSettings {
 }
 
 const AI_PROVIDERS = [
-  { value: "gemini_free",  label: "Gemini (grátis via Replit)", hint: "Sem necessidade de chave" },
-  { value: "gemini_paid",  label: "Gemini (pago)",              hint: "Requer chave da Google AI" },
-  { value: "openai",       label: "ChatGPT (OpenAI)",           hint: "Requer chave da OpenAI" },
+  { value: "gemini_direct", label: "Gemini Direto (GEMINI_API_KEY)", hint: "Usa chave do ambiente — maior cota" },
+  { value: "gemini_free",   label: "Gemini (grátis via Replit)",     hint: "Sem necessidade de chave" },
+  { value: "gemini_paid",   label: "Gemini (pago)",                  hint: "Requer chave da Google AI Studio" },
+  { value: "openai",        label: "ChatGPT (OpenAI)",               hint: "Requer chave da OpenAI" },
 ] as const;
 
 const DEFAULT_OUTPUT_PROMPT = `Você é um jornalista brasileiro experiente. Reescreva o conteúdo abaixo como um artigo jornalístico completo, profissional e original em português do Brasil.
@@ -134,7 +135,7 @@ export default function MaquinaArtigos() {
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving]   = useState(false);
   const [aiSettings, setAiSettings]           = useState<AiSettings | null>(null);
-  const [cfgProvider, setCfgProvider]         = useState<AiSettings["provider"]>("gemini_free");
+  const [cfgProvider, setCfgProvider]         = useState<AiSettings["provider"]>("gemini_direct");
   const [cfgModel, setCfgModel]               = useState("");
   const [cfgApiKey, setCfgApiKey]             = useState("");
   const [cfgDiffbotKey, setCfgDiffbotKey]     = useState("");

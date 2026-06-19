@@ -9,6 +9,7 @@ import { processDueSource } from "./rssProcessor.js";
 import { searchNews } from "./perplexitySearch.js";
 import { rewriteWithAI } from "./rssProcessor.js";
 import { logger } from "./logger.js";
+import { startRewriteWorker } from "./rewriteQueue.js";
 
 const CHECK_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes
 
@@ -120,6 +121,9 @@ async function runCheck(): Promise<void> {
 }
 
 export function startScheduler(): void {
+  // Start the async rewrite queue worker (processes 1 article/5s)
+  startRewriteWorker();
+
   // Initial run after 1 minute (let the server warm up)
   setTimeout(() => {
     void runCheck();

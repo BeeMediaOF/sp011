@@ -79,7 +79,7 @@ export interface SiteSettings {
   loginLogoBase64?: string;
   adminSidebarColor?: string;
   adminAccentColor?: string;
-  rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
+  rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai";
   rssAiApiKey?: string;
   rssAiModel?: string;
   rssAiOutputPrompt?: string;

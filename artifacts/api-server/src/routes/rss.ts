@@ -226,7 +226,7 @@ router.post("/import", async (req, res) => {
 router.get("/ai-settings", (_req, res) => {
   const s = store.getSettings();
   res.json({
-    provider:       s.rssAiProvider ?? "gemini_paid",
+    provider:       s.rssAiProvider ?? "gemini_direct",
     model:          s.rssAiModel ?? "",
     hasKey:         !!s.rssAiApiKey,
     outputPrompt:   s.rssAiOutputPrompt ?? "",
