@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Settings, LogOut,
-  ChevronRight, Globe, Newspaper, Webhook, Megaphone,
+  ChevronRight, Globe, Newspaper, Megaphone,
   Users, BarChart2, LayoutGrid, Rss, Share2, Zap,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
-  UserCircle, KeyRound, Eye, AlertCircle, CheckCircle, Info,
-  ShieldCheck, ClipboardList, Camera, Pencil, Moon, Sun, Bot,
+  UserCircle, Eye, AlertCircle, CheckCircle, Info,
+  Camera, Pencil, Moon, Sun, Bot,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 import { getStoredUser, setStoredUser, clearAuth } from "../../pages/Admin";
@@ -34,12 +34,7 @@ const NAV_MAIN = [
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
 ];
 
-const NAV_CONFIG = [
-  { label: "Webhook",             icon: Webhook,      path: "/admin/configuracoes?tab=webhook",          permKey: null },
-  { label: "Segurança",           icon: ShieldCheck,  path: "/admin/configuracoes?tab=seguranca",        permKey: "security.view" },
-  { label: "Permissões do Editor",icon: KeyRound,     path: "/admin/configuracoes?tab=permissoes",       permKey: null },
-  { label: "Logs",                icon: ClipboardList,path: "/admin/configuracoes?tab=logs",             permKey: "logs.view" },
-];
+const NAV_CONFIG_PERMS = ["security.view", "logs.view"];
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -426,7 +421,6 @@ function UserMenu({ onLogout, isDark, onToggleDark }: { onLogout: () => void; is
 }
 
 export default function AdminLayout({ children, title, noPadding, topbarExtra }: AdminLayoutProps) {
-  const [configOpen, setConfigOpen] = useState(false);
   const [isDark, setIsDark] = useState(() => getAdminDarkMode());
   const [location, navigate] = useLocation();
   const { accent, logo } = usePanelTheme();
@@ -449,13 +443,8 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
     return permSet.has(permKey);
   }
 
-  const visibleMain   = NAV_MAIN.filter((i) => canSee(i.permKey));
-  const visibleConfig = NAV_CONFIG.filter((i) => canSee(i.permKey));
-  const inConfig      = visibleConfig.some((i) => location.startsWith(i.path));
-
-  useEffect(() => {
-    if (inConfig) setConfigOpen(true);
-  }, [inConfig]);
+  const visibleMain    = NAV_MAIN.filter((i) => canSee(i.permKey));
+  const canSeeConfig   = role === "admin" || NAV_CONFIG_PERMS.some((p) => permSet.has(p));
 
   function handleLogout() {
     clearAuth();
@@ -512,25 +501,10 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
         <nav className="flex-1 py-4 space-y-0.5 pr-2">
           {visibleMain.map(({ label, icon: Icon, path }) => navItem(label, Icon, path))}
 
-          {/* Configurações group */}
-          {visibleConfig.length > 0 && (
+          {/* Configurações — single direct link */}
+          {canSeeConfig && (
             <div className="pt-3">
-              <button
-                onClick={() => setConfigOpen((o) => !o)}
-                className={`w-full flex items-center gap-3 pl-5 pr-4 py-2.5 text-sm transition-colors rounded-r-xl
-                  ${inConfig
-                    ? "text-[#0B2A66] dark:text-blue-300 font-semibold bg-[#EEF2FF] dark:bg-blue-950/60"
-                    : "text-slate-500 dark:text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/50"}`}
-              >
-                <Settings size={17} className={inConfig ? "text-[#0B2A66] dark:text-blue-300" : "text-slate-400 dark:text-slate-500"} />
-                <span className="flex-1 text-left">Configurações</span>
-                <ChevronDown size={13} className={`transition-transform ${configOpen ? "rotate-180" : ""}`} />
-              </button>
-              {configOpen && (
-                <div className="mt-0.5 space-y-0.5">
-                  {visibleConfig.map(({ label, icon: Icon, path }) => navItem(label, Icon, path, true))}
-                </div>
-              )}
+              {navItem("Configurações", Settings, "/admin/configuracoes")}
             </div>
           )}
         </nav>
