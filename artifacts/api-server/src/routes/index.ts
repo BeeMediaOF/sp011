@@ -18,10 +18,12 @@ import usersRouter from "./users";
 import logsRouter from "./logs";
 import permissionsRouter from "./permissions";
 import webhookKeyRouter from "./webhook-key";
+import uploadsRouter from "./uploads";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/uploads", uploadsRouter);
 router.use("/admin", adminRouter);
 router.use("/publish", webhookRouter);
 router.use("/ads", adsRouter);

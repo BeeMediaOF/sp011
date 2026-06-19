@@ -3,6 +3,7 @@ import { useCategories } from "../../hooks/useCategories";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
+import { invalidateArticlesCache } from "../../hooks/useArticles";
 import {
   Save, Send, Eye, ChevronDown, ChevronRight,
   Image as ImageIcon, X, CheckCircle, Sparkles, Loader2,
@@ -64,6 +65,7 @@ export default function ArticleEdit() {
   const [error, setError]             = useState("");
   const [success, setSuccess]         = useState("");
   const [dragOver, setDragOver]       = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   // ── Paste / format modal ─────────────────────────────────────
   const [pasteOpen, setPasteOpen]     = useState(false);
@@ -185,10 +187,19 @@ export default function ArticleEdit() {
     setField("tag", found?.tag ?? cat.toUpperCase());
   }
 
-  function handleImageFile(file: File) {
-    const reader = new FileReader();
-    reader.onload = (e) => setField("imageUrl", e.target?.result as string);
-    reader.readAsDataURL(file);
+  async function handleImageFile(file: File) {
+    setUploadingImage(true);
+    try {
+      const { url } = await adminApi.uploadImage(file);
+      setField("imageUrl", url);
+    } catch {
+      // Fallback to Base64 if upload fails (e.g., server unreachable)
+      const reader = new FileReader();
+      reader.onload = (e) => setField("imageUrl", e.target?.result as string);
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   // ── Toolbar actions ─────────────────────────────────────────
@@ -425,6 +436,7 @@ export default function ArticleEdit() {
 
       if (isNew) {
         const { article } = await adminApi.createArticle(data);
+        invalidateArticlesCache();
         setSuccess(newStatus === "published" ? "Artigo publicado!" : "Rascunho salvo!");
         setTimeout(() => navigate(`/admin/artigos/${article.id}`), 800);
       } else {
@@ -435,6 +447,7 @@ export default function ArticleEdit() {
         } else {
           setForm(article);
         }
+        invalidateArticlesCache();
         const msg = intent === "publish" ? "Artigo publicado!" :
                     intent === "draft"   ? "Rascunho salvo"    :
                                           "Alterações salvas";
@@ -768,7 +781,12 @@ export default function ArticleEdit() {
               onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); }}
             />
 
-            {form.imageUrl ? (
+            {uploadingImage ? (
+              <div className="border-2 border-dashed border-[#0B2A66] bg-[#EEF2FF] rounded-xl p-10 text-center">
+                <Loader2 size={28} className="animate-spin text-[#0B2A66] mx-auto mb-3" />
+                <p className="text-sm text-[#0B2A66] font-medium">Enviando imagem…</p>
+              </div>
+            ) : form.imageUrl ? (
               <div
                 className="group relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer bg-slate-100"
                 onClick={() => imageRef.current?.click()}
@@ -780,7 +798,6 @@ export default function ArticleEdit() {
                   style={{ maxHeight: "220px" }}
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
-                {/* Hover overlay */}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                   <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold text-slate-700">
                     <Pencil size={14} /> Clique para trocar
@@ -795,7 +812,7 @@ export default function ArticleEdit() {
                 onDrop={(e) => {
                   e.preventDefault(); setDragOver(false);
                   const f = e.dataTransfer.files[0];
-                  if (f && f.type.startsWith("image/")) handleImageFile(f);
+                  if (f && f.type.startsWith("image/")) void handleImageFile(f);
                 }}
                 className={`border-2 border-dashed rounded-xl p-10 text-center transition-colors cursor-pointer ${
                   dragOver ? "border-[#0B2A66] bg-[#EEF2FF]" : "border-slate-200 hover:border-slate-300 bg-slate-50"
@@ -817,7 +834,7 @@ export default function ArticleEdit() {
                   <ImageIcon size={14} /> Selecionar do computador
                 </button>
                 <p className="text-[11px] text-slate-400 mt-3">
-                  JPG, PNG ou WebP · Recomendado: 1200×630px
+                  JPG, PNG, WebP · Recomendado: 1200×630px · Máx: 8 MB
                 </p>
               </div>
             )}

@@ -108,6 +108,24 @@ export const adminApi = {
   getMyPermissions: () =>
     req<{ permissions: string[] }>("GET", "/permissions/me"),
 
+  // Image upload (multipart)
+  uploadImage: (file: File): Promise<{ ok: boolean; url: string; filename: string; size: number }> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append("image", file);
+    return fetch("/api/uploads/image", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (r) => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error((err as { error?: string }).error ?? r.statusText);
+      }
+      return r.json() as Promise<{ ok: boolean; url: string; filename: string; size: number }>;
+    });
+  },
+
   // Webhook API Key (admin only)
   getWebhookKey: () => req<{ apiKey: string | null }>("GET", "/webhook-key"),
   regenerateWebhookKey: () => req<{ apiKey: string }>("POST", "/webhook-key"),
