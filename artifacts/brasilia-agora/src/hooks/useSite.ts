@@ -28,6 +28,7 @@ export interface SiteSettings {
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   showTickerBar?: boolean;
+  showHeroStrip?: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   facebookPixelId?: string;

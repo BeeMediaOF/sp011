@@ -548,6 +548,28 @@ export default function Settings() {
                   </button>
                 </div>
 
+                {/* Hero strip */}
+                <div className={`${CARD} p-6`} style={CARD_SHADOW}>
+                  <SectionHeader icon={<LayoutDashboard size={15}/>} label="Strip de Destaques"/>
+                  <p className="text-xs text-[#64748B] mb-4 mt-1">Faixa com 4 notícias secundárias exibida abaixo do bloco principal de capa. No mobile, aparece como carrossel deslizável.</p>
+                  <button
+                    onClick={() => setField("showHeroStrip", !(settings.showHeroStrip ?? true))}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                      (settings.showHeroStrip ?? true)
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                        : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    }`}>
+                    <LayoutDashboard size={18}/>
+                    <div className="flex-1 text-left">
+                      <p className="text-[13px] font-semibold">Strip de destaques</p>
+                      <p className="text-[11px] opacity-70">4 notícias · desktop grid · mobile carrossel</p>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showHeroStrip ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showHeroStrip ?? true) ? "Ativado" : "Desativado"}
+                    </span>
+                  </button>
+                </div>
+
                 <SaveBar saving={savingSettings} onSave={saveSettings}/>
               </>
             )}

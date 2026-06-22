@@ -190,9 +190,49 @@ function DesktopGrid({ items }: { items: FeaturedItem[] }) {
   );
 }
 
+// ─── Mobile horizontal carousel for secondary items ───────────────────────────
+function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
+  return (
+    <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-1 -mx-4 px-4">
+      {items.map((item) => (
+        <a
+          key={item.id}
+          href={`/artigo/${item.slug || item.id}`}
+          className="group flex gap-2.5 items-start snap-start shrink-0 w-[72vw] max-w-[280px]"
+        >
+          <div className="w-[72px] h-[52px] shrink-0 overflow-hidden bg-gray-100 rounded-sm">
+            <img
+              src={item.img}
+              alt={item.chapeu}
+              width={72}
+              height={52}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span
+              className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+              style={{ color: item.chapeuColor }}
+            >
+              {item.chapeu}
+            </span>
+            <h3
+              className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
+              dangerouslySetInnerHTML={{ __html: item.title }}
+            />
+          </div>
+        </a>
+      ))}
+    </div>
+  );
+}
+
 // ─── HeroSection principal ────────────────────────────────────────────────────
 export default function HeroSection() {
   const { articles, loading } = useArticles();
+  const { settings } = useSite();
 
   // Sort all published articles by publishedAt desc
   const sorted = [...articles].sort(
@@ -232,34 +272,44 @@ export default function HeroSection() {
         {featured.length > 0 && <DesktopGrid items={featured} />}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
-        {secondary.map((item) => (
-          <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
-            <div className="w-[72px] h-[52px] sm:w-[100px] sm:h-[72px] shrink-0 overflow-hidden bg-gray-100">
-              <img
-                src={item.img}
-                alt={item.chapeu}
-                width={100}
-                height={72}
-                loading="lazy"
-                decoding="async"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <span
-                className="text-[11px] font-bold uppercase tracking-wider block mb-1"
-                style={{ color: item.chapeuColor }}
-              >
-                {item.chapeu}
-              </span>
-              <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
-                dangerouslySetInnerHTML={{ __html: item.title }}
-              />
-            </div>
-          </Link>
-        ))}
-      </div>
+      {(settings?.showHeroStrip ?? true) && secondary.length > 0 && (
+        <>
+          {/* Mobile: horizontal snap carousel */}
+          <div className="lg:hidden border-t border-gray-200 pt-5">
+            <SecondaryCarousel items={secondary} />
+          </div>
+
+          {/* Desktop: 4-column grid */}
+          <div className="hidden lg:grid lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
+            {secondary.map((item) => (
+              <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
+                <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100">
+                  <img
+                    src={item.img}
+                    alt={item.chapeu}
+                    width={100}
+                    height={72}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+                    style={{ color: item.chapeuColor }}
+                  >
+                    {item.chapeu}
+                  </span>
+                  <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
+                  />
+                </div>
+              </Link>
+            ))}
+          </div>
+        </>
+      )}
     </section>
   );
 }

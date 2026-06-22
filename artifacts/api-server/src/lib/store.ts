@@ -345,6 +345,7 @@ const defaultStore: StoreData = {
     mobileEnabled: true,
     desktopEnabled: true,
     showTickerBar: true,
+    showHeroStrip: true,
     homeBlocks: DEFAULT_HOME_BLOCKS,
   },
   rssSources: [],
