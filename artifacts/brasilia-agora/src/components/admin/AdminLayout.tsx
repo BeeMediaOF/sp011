@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Settings, LogOut,
-  ChevronRight, Globe, Newspaper, Megaphone,
+  ChevronRight, Globe, Megaphone,
   Users, BarChart2, LayoutGrid, Rss,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, Eye, AlertCircle, CheckCircle, Info,
@@ -22,7 +22,6 @@ const NAV_MAIN = [
   { label: "Dashboard",     icon: LayoutDashboard, path: "/admin",               permKey: "dashboard.view" },
   { label: "Analytics",     icon: BarChart2,        path: "/admin/analytics",    permKey: "analytics.view" },
   { label: "Artigos",       icon: FileText,         path: "/admin/artigos",      permKey: "articles.view" },
-  { label: "Novo Artigo",   icon: Newspaper,        path: "/admin/artigos/novo", permKey: "articles.create" },
   { label: "Menu",          icon: Menu,             path: "/admin/menu",         permKey: "menu.view" },
   { label: "Blocos Home",   icon: LayoutGrid,       path: "/admin/home-blocos",  permKey: "home_blocks.view" },
   { label: "Propagandas",   icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
