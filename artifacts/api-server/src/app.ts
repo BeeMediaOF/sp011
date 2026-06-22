@@ -6,25 +6,45 @@ import router from "./routes";
 import { logger } from "./lib/logger";
 import { startScheduler } from "./lib/scheduler";
 
-// ── Startup security warnings ─────────────────────────────────────────────────
-if (!process.env["SESSION_SECRET"]) {
-  logger.warn("SESSION_SECRET not set — using insecure default. Set it in production!");
-}
+const isProd = process.env["NODE_ENV"] === "production";
+
+// ── Startup check for ADMIN_DEFAULT_PASSWORD ──────────────────────────────────
 if (!process.env["ADMIN_DEFAULT_PASSWORD"]) {
   logger.warn("ADMIN_DEFAULT_PASSWORD not set — admin seed will use weak default password.");
 }
+// SESSION_SECRET check is handled in auth.ts (throws in production if missing)
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 const rawOrigins = process.env["ALLOWED_ORIGINS"] ?? "";
 const allowedOrigins = rawOrigins.split(",").map((s) => s.trim()).filter(Boolean);
 
+let corsOrigin: cors.CorsOptions["origin"];
+
+if (allowedOrigins.length > 0) {
+  // Explicit allow-list — only these origins are accepted
+  corsOrigin = (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    else cb(new Error(`Origem não permitida: ${origin}`));
+  };
+} else if (isProd) {
+  // Production with no allow-list configured: block all cross-origin requests.
+  // Set ALLOWED_ORIGINS to your domain(s) to fix this.
+  logger.warn(
+    "ALLOWED_ORIGINS is not set in production — all cross-origin requests will be blocked. " +
+    "Set ALLOWED_ORIGINS=https://yourdomain.com to allow your frontend."
+  );
+  corsOrigin = (origin, cb) => {
+    if (!origin) cb(null, true); // same-origin / server-to-server requests
+    else cb(new Error("Cross-origin requests are not allowed. Configure ALLOWED_ORIGINS."));
+  };
+} else {
+  // Development: accept all origins with a clear warning
+  logger.warn("CORS is open to all origins (development mode). Set ALLOWED_ORIGINS in production.");
+  corsOrigin = true;
+}
+
 const corsOptions: cors.CorsOptions = {
-  origin: allowedOrigins.length > 0
-    ? (origin, cb) => {
-        if (!origin || allowedOrigins.includes(origin)) cb(null, true);
-        else cb(new Error(`Origem não permitida: ${origin}`));
-      }
-    : true,
+  origin: corsOrigin,
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
@@ -38,25 +58,34 @@ app.use(
     logger,
     serializers: {
       req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
+        return { id: req.id, method: req.method, url: req.url?.split("?")[0] };
       },
       res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
+        return { statusCode: res.statusCode };
       },
     },
   }),
 );
 
-// ── Security headers (helmet) ─────────────────────────────────────────────────
+// ── Security headers (helmet + CSP) ──────────────────────────────────────────
+// This is a JSON API — the CSP restricts what browsers can do with API responses.
+// It does NOT affect the frontend Vite app (served separately).
 app.use(
   helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc:      ["'none'"],
+        scriptSrc:       ["'none'"],
+        styleSrc:        ["'none'"],
+        imgSrc:          ["'self'", "data:"],
+        fontSrc:         ["'none'"],
+        connectSrc:      ["'self'"],
+        frameAncestors:  ["'none'"],
+        formAction:      ["'none'"],
+        baseUri:         ["'none'"],
+        objectSrc:       ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),
@@ -65,7 +94,6 @@ app.use(
 app.use(cors(corsOptions));
 
 // ── Body parsing ──────────────────────────────────────────────────────────────
-// General routes get 512kb; upload routes (logo, avatar, images) get 10mb
 app.use((req, _res, next) => {
   const isUploadRoute =
     req.path.includes("/logo") ||
@@ -73,8 +101,8 @@ app.use((req, _res, next) => {
     req.path.includes("/favicon") ||
     req.path.includes("/og-image") ||
     req.path.includes("/ads") ||
-    req.path.endsWith("/me") ||      // profile update can carry avatarBase64
-    req.path.endsWith("/settings");  // settings can carry logoBase64, ogImageBase64, etc.
+    req.path.endsWith("/me") ||
+    req.path.endsWith("/settings");
   express.json({ limit: isUploadRoute ? "10mb" : "512kb" })(req, _res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));

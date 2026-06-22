@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { gte, eq, count } from "drizzle-orm";
+import { db, analyticsEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
-
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -17,29 +19,67 @@ export interface AnalyticsEvent {
   device: "mobile" | "desktop" | "tablet";
   ts: number;
   ua?: string;
-  referrer?: string;      // "direto" | "busca" | "social" | "outro"
-  scrollDepth?: number;   // 25 | 50 | 75 | 100
-  platform?: string;      // "facebook" | "twitter" | "whatsapp" | "copy"
+  referrer?: string;
+  scrollDepth?: number;
+  platform?: string;
   city?: string;
-  region?: string;        // Estado (e.g. "São Paulo")
+  region?: string;
 }
 
-// In-memory circular buffer — max 50k events
-const MAX_EVENTS = 50_000;
-const events: AnalyticsEvent[] = [];
+// ─── In-memory buffer ─────────────────────────────────────────────────────────
+const BUFFER_MAX = 500;
+let _buffer: AnalyticsEvent[] = [];
+let _flushing = false;
 
-function pushEvent(ev: AnalyticsEvent) {
-  if (events.length >= MAX_EVENTS) events.splice(0, 1000);
-  events.push(ev);
+async function flushBuffer(): Promise<void> {
+  if (_flushing || _buffer.length === 0) return;
+  _flushing = true;
+  const batch = _buffer.splice(0, _buffer.length);
+  try {
+    await db.insert(analyticsEventsTable).values(
+      batch.map((ev) => ({
+        type:        ev.type,
+        path:        ev.path,
+        title:       ev.title ?? null,
+        category:    ev.category ?? null,
+        articleId:   ev.articleId ?? null,
+        sessionId:   ev.sessionId,
+        duration:    ev.duration ?? null,
+        device:      ev.device,
+        ts:          new Date(ev.ts),
+        ua:          ev.ua ?? null,
+        referrer:    ev.referrer ?? null,
+        scrollDepth: ev.scrollDepth ?? null,
+        platform:    ev.platform ?? null,
+        city:        ev.city ?? null,
+        region:      ev.region ?? null,
+      }))
+    );
+  } catch (err) {
+    logger.error({ err }, "analytics: flush failed — re-queuing batch");
+    // Re-queue, but cap to BUFFER_MAX to avoid unbounded growth
+    _buffer.unshift(...batch.slice(0, BUFFER_MAX - _buffer.length));
+  } finally {
+    _flushing = false;
+  }
 }
 
+// Flush every 60 seconds
+setInterval(() => { void flushBuffer(); }, 60_000);
+
+function pushEvent(ev: AnalyticsEvent): void {
+  _buffer.push(ev);
+  if (_buffer.length >= BUFFER_MAX) void flushBuffer();
+}
+
+// ─── Device detection ─────────────────────────────────────────────────────────
 function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
   if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
   if (/mobile|android|iphone|ipod|blackberry|opera mini|windows phone/i.test(ua)) return "mobile";
   return "desktop";
 }
 
-// ── IP Geolocation ────────────────────────────────────────────────────────────
+// ─── IP Geolocation ────────────────────────────────────────────────────────────
 interface GeoInfo { city: string; region: string }
 const geoCache = new Map<string, GeoInfo>();
 const LOCAL_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
@@ -47,7 +87,6 @@ const LOCAL_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 async function geoLookup(ip: string): Promise<GeoInfo | null> {
   if (!ip || LOCAL_IPS.has(ip)) return null;
   if (geoCache.has(ip)) return geoCache.get(ip)!;
-  // Prevent concurrent fetches for same IP
   const placeholder: GeoInfo = { city: "", region: "" };
   geoCache.set(ip, placeholder);
   try {
@@ -65,16 +104,17 @@ async function geoLookup(ip: string): Promise<GeoInfo | null> {
   return null;
 }
 
-/** POST /api/analytics/event — public, no auth */
+// ─── POST /api/analytics/event ────────────────────────────────────────────────
 router.post("/event", (req, res) => {
   const {
     type, path, title, category, articleId, sessionId, duration,
     referrer, scrollDepth, platform,
   } = req.body as Partial<AnalyticsEvent>;
   if (!type || !path || !sessionId) { res.status(400).json({ ok: false }); return; }
+
   const ua  = req.headers["user-agent"] ?? "";
   const ip  = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "";
-  const geo = geoCache.get(ip); // use cached value if available, otherwise undefined
+  const geo = geoCache.get(ip);
 
   pushEvent({
     type: type as AnalyticsEvent["type"],
@@ -89,57 +129,70 @@ router.post("/event", (req, res) => {
     region: geo?.region || undefined,
   });
 
-  // Geolocate async for future events from this IP
   void geoLookup(ip);
 
-  // Persist category views to disk so counts survive server restarts
-  if (type === "category" && category) {
-    store.trackCategoryView(category);
-  }
-
-  // Persist article views to disk so counts survive server restarts
-  if (type === "pageview" && articleId && title) {
-    store.trackArticleView(articleId, title);
-  }
+  if (type === "category" && category) store.trackCategoryView(category);
+  if (type === "pageview" && articleId && title) store.trackArticleView(articleId, title);
 
   res.json({ ok: true });
 });
 
-/** GET /api/analytics/stats — admin only */
+// ─── GET /api/analytics/stats ─────────────────────────────────────────────────
 router.get("/stats", authMiddleware, async (_req, res) => {
   const now = Date.now();
   const DAY = 86_400_000;
+  const thirtyDaysAgo = new Date(now - 30 * DAY);
 
-  // Last 30 days pageviews by day
+  // Query DB for last 30 days + merge unflushed buffer
+  const [dbRows, allTimeResult] = await Promise.all([
+    db.select().from(analyticsEventsTable).where(gte(analyticsEventsTable.ts, thirtyDaysAgo)),
+    db.select({ count: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.type, "pageview")),
+  ]);
+
+  // Merge DB rows + unflushed buffer (convert buffer to same shape)
+  type EventLike = {
+    type: string; path: string; title?: string | null; category?: string | null;
+    articleId?: string | null; sessionId: string; duration?: number | null;
+    device: string; ts: Date | number; referrer?: string | null;
+    scrollDepth?: number | null; platform?: string | null;
+    city?: string | null; region?: string | null;
+  };
+  const rows: EventLike[] = [
+    ...dbRows,
+    ..._buffer.map((ev) => ({ ...ev, ts: new Date(ev.ts) })),
+  ];
+
+  // ── Aggregation (same logic as before, now over DB rows) ──────────────────
   const byDay: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
     const d = new Date(now - i * DAY);
     byDay[d.toISOString().slice(0, 10)] = 0;
   }
 
-  const byHour: number[]                = Array(24).fill(0);
-  const byDayOfWeek: number[]           = Array(7).fill(0); // 0=Dom … 6=Sáb
+  const byHour: number[]       = Array(24).fill(0);
+  const byDayOfWeek: number[]  = Array(7).fill(0);
   const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
   const catViewMap:  Record<string, number> = {};
   const catClickMap: Record<string, number> = {};
   const cityMap:     Record<string, number> = {};
   const regionMap:   Record<string, number> = {};
-  const deviceMap:  Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
+  const deviceMap:   Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
   const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
-  const scrollMap:  Record<number, number>  = { 25: 0, 50: 0, 75: 0, 100: 0 };
-  const shareMap:   Record<string, number>  = {};
+  const scrollMap:   Record<number, number> = { 25: 0, 50: 0, 75: 0, 100: 0 };
+  const shareMap:    Record<string, number> = {};
   const sessionPageviews: Record<string, number> = {};
 
   let today = 0, week = 0, month = 0;
   let totalReadTime = 0, readCount = 0;
 
-  for (const ev of events) {
-    const age = now - ev.ts;
+  for (const ev of rows) {
+    const evTs  = ev.ts instanceof Date ? ev.ts.getTime() : ev.ts;
+    const age   = now - evTs;
+    const evType = ev.type;
 
-    // ── pageview ──────────────────────────────────────────────────────
-    if (ev.type === "pageview") {
-      const dayKey = new Date(ev.ts).toISOString().slice(0, 10);
-      const hour   = new Date(ev.ts).getHours();
+    if (evType === "pageview") {
+      const dayKey = new Date(evTs).toISOString().slice(0, 10);
+      const hour   = new Date(evTs).getHours();
 
       if (age <= 30 * DAY) {
         if (byDay[dayKey] !== undefined) byDay[dayKey]++;
@@ -149,39 +202,30 @@ router.get("/stats", authMiddleware, async (_req, res) => {
       if (age <= DAY)      today++;
 
       byHour[hour]++;
-      byDayOfWeek[new Date(ev.ts).getDay()]++;
-      deviceMap[ev.device]++;
+      byDayOfWeek[new Date(evTs).getDay()]++;
+      deviceMap[ev.device] = (deviceMap[ev.device] ?? 0) + 1;
 
-      // referrer
       const ref = ev.referrer ?? "direto";
       referrerMap[ref] = (referrerMap[ref] ?? 0) + 1;
 
-      // session bounce tracking
       sessionPageviews[ev.sessionId] = (sessionPageviews[ev.sessionId] ?? 0) + 1;
 
-      // article
       if (ev.articleId) {
         if (!articleMap[ev.articleId]) {
           articleMap[ev.articleId] = { title: ev.title ?? ev.articleId, views: 0, totalReadTime: 0, readSessions: 0 };
         }
         articleMap[ev.articleId]!.views++;
       }
-
-      // category from pageview (article reads in that category)
       if (ev.category) catViewMap[ev.category] = (catViewMap[ev.category] ?? 0) + 1;
-
-      // geo
       if (ev.city)   cityMap[ev.city]     = (cityMap[ev.city]     ?? 0) + 1;
       if (ev.region) regionMap[ev.region] = (regionMap[ev.region] ?? 0) + 1;
     }
 
-    // ── category click (user navigated to the category page) ──────────
-    if (ev.type === "category" && ev.category) {
+    if (evType === "category" && ev.category) {
       catClickMap[ev.category] = (catClickMap[ev.category] ?? 0) + 1;
     }
 
-    // ── read ──────────────────────────────────────────────────────────
-    if (ev.type === "read" && ev.duration) {
+    if (evType === "read" && ev.duration) {
       totalReadTime += ev.duration;
       readCount++;
       if (ev.articleId && articleMap[ev.articleId]) {
@@ -190,48 +234,40 @@ router.get("/stats", authMiddleware, async (_req, res) => {
       }
     }
 
-    // ── scroll ────────────────────────────────────────────────────────
-    if (ev.type === "scroll" && ev.scrollDepth) {
+    if (evType === "scroll" && ev.scrollDepth) {
       scrollMap[ev.scrollDepth] = (scrollMap[ev.scrollDepth] ?? 0) + 1;
     }
 
-    // ── share ─────────────────────────────────────────────────────────
-    if (ev.type === "share" && ev.platform) {
+    if (evType === "share" && ev.platform) {
       shareMap[ev.platform] = (shareMap[ev.platform] ?? 0) + 1;
     }
   }
 
-  // Derived stats
-  const uniqueSessions  = Object.keys(sessionPageviews).length;
-  const avgReadTime     = readCount > 0 ? Math.round(totalReadTime / readCount) : 0;
-  const bounceSessions  = Object.values(sessionPageviews).filter((v) => v === 1).length;
-  const bounceRate      = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
+  const uniqueSessions = Object.keys(sessionPageviews).length;
+  const avgReadTime    = readCount > 0 ? Math.round(totalReadTime / readCount) : 0;
+  const bounceSessions = Object.values(sessionPageviews).filter((v) => v === 1).length;
+  const bounceRate     = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
   const readCompletions = scrollMap[100] ?? 0;
+  const allTime = (allTimeResult[0]?.count ?? 0) + _buffer.filter((e) => e.type === "pageview").length;
 
-  // Merge in-memory article stats with persisted views (survive restarts)
+  // Merge with persisted article/category views
   const persistedArticleViews = store.getArticleViews();
   const allArticleIds = new Set([...Object.keys(articleMap), ...Object.keys(persistedArticleViews)]);
-  const mergedArticles = Array.from(allArticleIds).map(id => {
+  const topArticles = Array.from(allArticleIds).map((id) => {
     const mem  = articleMap[id];
     const disk = persistedArticleViews[id];
-    // Use disk views as source of truth (all-time); in-mem only for engagement metrics
     return {
       id,
       title:   disk?.title   ?? mem?.title ?? id,
       views:   disk?.views   ?? mem?.views ?? 0,
       avgTime: mem && mem.readSessions > 0 ? Math.round(mem.totalReadTime / mem.readSessions) : undefined,
     };
-  });
-  const topArticles = mergedArticles
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 10);
+  }).sort((a, b) => b.views - a.views).slice(0, 10);
 
-  // Top categories: merge in-memory counts + persistent store counts (survive restarts)
-  // persistedClicks holds explicit category-page navigation events saved to disk
   const persistedClicks = store.getCategoryViews();
   const mergedClickMap: Record<string, number> = { ...persistedClicks };
-  for (const [cat, count] of Object.entries(catClickMap)) {
-    mergedClickMap[cat] = (mergedClickMap[cat] ?? 0) + count;
+  for (const [cat, cnt] of Object.entries(catClickMap)) {
+    mergedClickMap[cat] = (mergedClickMap[cat] ?? 0) + cnt;
   }
 
   const publishedArticles = (await articleService.getArticles()).filter((a) => a.status === "published");
@@ -244,64 +280,31 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     ...Object.keys(mergedClickMap),
     ...Object.keys(articleCountByCategory),
   ]);
-  const topCategories = Array.from(allCatNames)
-    .map((name) => ({
-      name,
-      views:   catViewMap[name]    ?? 0,
-      clicks:  mergedClickMap[name] ?? 0,
-      articles: articleCountByCategory[name] ?? 0,
-    }))
-    .sort((a, b) => (b.clicks + b.views || b.articles) - (a.clicks + a.views || a.articles))
-    .slice(0, 10);
-
-  const dailyChart  = Object.entries(byDay).map(([date, views]) => ({ date, views }));
-  const hourlyChart = byHour.map((views, hour) => ({ hour, views }));
-  const peakHour    = byHour.indexOf(Math.max(...byHour));
+  const topCategories = Array.from(allCatNames).map((name) => ({
+    name,
+    views:    catViewMap[name]     ?? 0,
+    clicks:   mergedClickMap[name] ?? 0,
+    articles: articleCountByCategory[name] ?? 0,
+  })).sort((a, b) => (b.clicks + b.views || b.articles) - (a.clicks + a.views || a.articles)).slice(0, 10);
 
   const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  const dayOfWeekChart = byDayOfWeek.map((views, day) => ({ day: DAY_NAMES[day]!, views }));
-  const peakDay = DAY_NAMES[byDayOfWeek.indexOf(Math.max(...byDayOfWeek))]!;
-
-  const topCities = Object.entries(cityMap)
-    .filter(([c]) => c)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([name, views]) => ({ name, views }));
-
-  const topRegions = Object.entries(regionMap)
-    .filter(([r]) => r)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([name, views]) => ({ name, views }));
-
-  const scrollDepthChart = [25, 50, 75, 100].map((depth) => ({
-    depth, count: scrollMap[depth] ?? 0,
-  }));
-
-  const referrerChart = Object.entries(referrerMap)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-
-  const shareChart = Object.entries(shareMap)
-    .map(([platform, count]) => ({ platform, count }))
-    .sort((a, b) => b.count - a.count);
 
   res.json({
-    totals: { today, week, month, allTime: events.filter(e => e.type === "pageview").length },
+    totals: { today, week, month, allTime },
     engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
-    dailyChart,
-    hourlyChart,
-    peakHour,
-    dayOfWeekChart,
-    peakDay,
+    dailyChart:      Object.entries(byDay).map(([date, views]) => ({ date, views })),
+    hourlyChart:     byHour.map((views, hour) => ({ hour, views })),
+    peakHour:        byHour.indexOf(Math.max(...byHour)),
+    dayOfWeekChart:  byDayOfWeek.map((views, day) => ({ day: DAY_NAMES[day]!, views })),
+    peakDay:         DAY_NAMES[byDayOfWeek.indexOf(Math.max(...byDayOfWeek))]!,
     topArticles,
     topCategories,
-    topCities,
-    topRegions,
-    devices: deviceMap,
-    scrollDepthChart,
-    referrerChart,
-    shareChart,
+    topCities:       Object.entries(cityMap).filter(([c]) => c).sort((a,b) => b[1]-a[1]).slice(0,8).map(([name,views])=>({name,views})),
+    topRegions:      Object.entries(regionMap).filter(([r]) => r).sort((a,b) => b[1]-a[1]).slice(0,6).map(([name,views])=>({name,views})),
+    devices:         deviceMap,
+    scrollDepthChart: [25,50,75,100].map((depth) => ({ depth, count: scrollMap[depth] ?? 0 })),
+    referrerChart:   Object.entries(referrerMap).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),
+    shareChart:      Object.entries(shareMap).map(([platform,count])=>({platform,count})).sort((a,b)=>b.count-a.count),
   });
 });
 

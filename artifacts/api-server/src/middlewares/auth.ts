@@ -1,14 +1,34 @@
 import { createHmac, scryptSync, randomBytes, timingSafeEqual } from "crypto";
 import type { Request, Response, NextFunction } from "express";
-import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, usersTable, loginAttemptsTable } from "@workspace/db";
+import { eq, sql } from "drizzle-orm";
 import { store } from "../lib/store.js";
 
-const SECRET = process.env["SESSION_SECRET"] ?? "dev-secret-brasilia";
+// ─── SESSION_SECRET ───────────────────────────────────────────────────────────
+// In production, the secret MUST be set explicitly — a predictable default
+// would allow any attacker who knows this source code to forge tokens.
+const isProd = process.env["NODE_ENV"] === "production";
+
+if (isProd && !process.env["SESSION_SECRET"]) {
+  // Crash immediately — a misconfigured production server is dangerous.
+  throw new Error(
+    "[FATAL] SESSION_SECRET environment variable is not set. " +
+    "Set a random 64-byte hex string before starting the server in production."
+  );
+}
+
+const SECRET = process.env["SESSION_SECRET"] ?? "dev-secret-brasilia-2024";
+
+if (!isProd && !process.env["SESSION_SECRET"]) {
+  // Non-fatal warning in development — loud but doesn't crash the dev workflow.
+  console.warn(
+    "[WARN] SESSION_SECRET not set — using insecure dev fallback. " +
+    "Tokens generated here MUST NOT be used in production."
+  );
+}
 
 /**
  * Returns the active webhook API key.
- * Prefers the DB-stored key (regeneratable via admin UI) over the env var.
  */
 function getWebhookApiKey(): string {
   const storeKey = store.getSettings().webhookApiKey;
@@ -37,7 +57,6 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 // ─── Token generation / verification ─────────────────────────────────────────
-// Payload format: `userId:role:timestamp`
 
 export function generateToken(userId: number, role: string): string {
   const ts = Date.now().toString();
@@ -59,7 +78,6 @@ export function verifyToken(token: string): TokenPayload | null {
     const sig = parts[parts.length - 1] as string;
     const payload = parts.slice(0, -1).join(":");
     const expected = createHmac("sha256", SECRET).update(payload).digest("hex");
-    // Timing-safe comparison to prevent timing attacks on HMAC
     if (sig.length !== expected.length) return null;
     if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
     const ts = parts[parts.length - 2];
@@ -87,8 +105,7 @@ declare global {
   }
 }
 
-// ─── User status cache (avoids DB lookup on every request) ────────────────────
-// TTL: 60s — a blocked user will lose access within 1 minute of being blocked.
+// ─── User status cache ────────────────────────────────────────────────────────
 
 interface UserCache { status: string; role: string; cachedAt: number }
 const _userCache = new Map<number, UserCache>();
@@ -114,7 +131,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
   const token = authHeader.slice(7);
 
-  // Webhook API key — timing-safe comparison via HMAC (avoids timing attacks)
   const activeWebhookKey = getWebhookApiKey();
   if (activeWebhookKey) {
     const expectedHmac = createHmac("sha256", SECRET).update(activeWebhookKey).digest();
@@ -133,7 +149,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  // Check cache first — avoids DB round-trip on every request
   const cached = getCachedUser(payload.userId);
   if (cached) {
     if (cached.status !== "active") {
@@ -146,7 +161,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     return;
   }
 
-  // Not in cache — fetch from DB to verify user is still active
   try {
     const [user] = await db
       .select({ status: usersTable.status, role: usersTable.role, email: usersTable.email })
@@ -164,7 +178,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     req.userEmail = user.email;
     next();
   } catch {
-    // DB failure — fall back to token claims so valid users aren't locked out
     req.userId   = payload.userId;
     req.userRole = payload.role;
     next();
@@ -179,23 +192,47 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
-// ─── Rate limiting (in-memory, per IP) ────────────────────────────────────────
-// 10 attempts per minute per IP — resets on server restart (acceptable for MVP)
+// ─── Rate limiting (DB-backed, persistent across restarts) ────────────────────
+// 10 attempts per minute per IP. Uses PostgreSQL so it survives restarts and
+// works correctly across multiple server instances.
 
-const loginAttempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_MAX     = 10;
+const RATE_LIMIT_WINDOW  = 60_000; // 1 minute
 
-export function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const record = loginAttempts.get(ip);
-  if (!record || record.resetAt < now) {
-    loginAttempts.set(ip, { count: 1, resetAt: now + 60_000 });
+export async function checkRateLimit(ip: string): Promise<boolean> {
+  const now = new Date();
+  try {
+    // Upsert: insert new record or increment counter if window still active
+    await db
+      .insert(loginAttemptsTable)
+      .values({ ip, count: 1, resetAt: new Date(Date.now() + RATE_LIMIT_WINDOW), updatedAt: now })
+      .onConflictDoUpdate({
+        target: loginAttemptsTable.ip,
+        set: {
+          // If window has expired, reset the counter; otherwise increment
+          count: sql`CASE WHEN ${loginAttemptsTable.resetAt} < NOW() THEN 1 ELSE ${loginAttemptsTable.count} + 1 END`,
+          resetAt: sql`CASE WHEN ${loginAttemptsTable.resetAt} < NOW() THEN NOW() + INTERVAL '1 minute' ELSE ${loginAttemptsTable.resetAt} END`,
+          updatedAt: now,
+        },
+      });
+
+    const [row] = await db
+      .select({ count: loginAttemptsTable.count })
+      .from(loginAttemptsTable)
+      .where(eq(loginAttemptsTable.ip, ip))
+      .limit(1);
+
+    return (row?.count ?? 0) <= RATE_LIMIT_MAX;
+  } catch {
+    // On DB failure, allow the request (fail open) to avoid locking out users
     return true;
   }
-  if (record.count >= 10) return false;
-  record.count++;
-  return true;
 }
 
-export function resetRateLimit(ip: string): void {
-  loginAttempts.delete(ip);
+export async function resetRateLimit(ip: string): Promise<void> {
+  try {
+    await db.delete(loginAttemptsTable).where(eq(loginAttemptsTable.ip, ip));
+  } catch {
+    // Non-critical — ignore
+  }
 }

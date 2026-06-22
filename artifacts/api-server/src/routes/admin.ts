@@ -21,7 +21,7 @@ router.post("/login", async (req, res) => {
   const ua = req.headers["user-agent"] ?? "";
 
   // Rate limit by IP
-  if (!checkRateLimit(ip)) {
+  if (!await checkRateLimit(ip)) {
     await logSecurity({
       eventType: "rate_limit_exceeded",
       severity: "high",
@@ -91,7 +91,7 @@ router.post("/login", async (req, res) => {
         lockedUntil: null,
         updatedAt: new Date(),
       }).where(eq(usersTable.id, user.id));
-      resetRateLimit(ip);
+      await resetRateLimit(ip);
       await logAudit({
         userId: user.id, userEmail: user.email,
         action: "login", module: "auth",
