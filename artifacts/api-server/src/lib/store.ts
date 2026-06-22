@@ -54,7 +54,7 @@ export interface HomeBlock {
   visible: boolean;
   order: number;
   category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
+  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
   color?: string;
   custom?: boolean;
   reverse?: boolean;

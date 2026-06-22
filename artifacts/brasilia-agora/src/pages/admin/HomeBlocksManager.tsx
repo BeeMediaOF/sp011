@@ -17,7 +17,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed";
-type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
+type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
@@ -114,6 +114,10 @@ const LAYOUTS: { id: LayoutId; label: string; desc: string; mini: React.ReactNod
   { id: "lista",    label: "Lista",     desc: "Numerada", mini: <div className="flex flex-col gap-0.5 w-full">{[0,1,2,3].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-1.5 h-1.5 bg-current rounded-full opacity-50 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
   { id: "manchete", label: "Manchete",  desc: "Hero + 3", mini: <div className="flex flex-col gap-0.5 w-full"><div className="w-full h-3 bg-current rounded-sm opacity-40"/><div className="flex gap-0.5">{[0,1,2].map(i=><div key={i} className="flex-1 h-2 bg-current rounded-sm opacity-25"/>)}</div></div> },
   { id: "mosaico",  label: "Mosaico",   desc: "1 grande + 4", mini: <div className="flex gap-0.5 w-full"><div className="flex-[2] h-4 bg-current rounded-sm opacity-40"/><div className="flex-[2] grid grid-cols-2 gap-0.5">{[0,1,2,3].map(i=><div key={i} className="h-2 bg-current rounded-sm opacity-25"/>)}</div></div> },
+  { id: "trio",     label: "Trio",      desc: "3 cards iguais", mini: <div className="flex gap-0.5 w-full">{[0,1,2].map(i=><div key={i} className="flex-1 h-4 bg-current rounded-sm opacity-40"/>)}</div> },
+  { id: "compact",  label: "Compacto",  desc: "6 mini itens",   mini: <div className="grid grid-cols-2 gap-0.5 w-full">{[0,1,2,3,4,5].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-2 h-2 bg-current rounded-sm opacity-40 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
+  { id: "bigstory", label: "Big Story", desc: "1 hero + lateral", mini: <div className="flex gap-0.5 w-full"><div className="flex-[3] h-4 bg-current rounded-sm opacity-40"/><div className="flex-1 flex flex-col gap-0.5">{[0,1,2].map(i=><div key={i} className="h-1 bg-current rounded opacity-25"/>)}</div></div> },
+  { id: "timeline", label: "Timeline",  desc: "Lista com linha", mini: <div className="flex flex-col gap-0.5 w-full pl-1 border-l border-current opacity-60">{[0,1,2,3].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
 ];
 
 // ─── Block defaults ───────────────────────────────────────────────────────────
@@ -988,6 +992,23 @@ export default function HomeBlocksManager() {
   function handleFormChange<K extends keyof BlockForm>(key: K, val: BlockForm[K]) {
     const nextForm = { ...editFormRef.current, [key]: val };
     setEditForm(nextForm);
+    // ── Instant preview: push block state to iframe immediately (no debounce) ──
+    const previewId = editingIdRef.current;
+    if (previewId) {
+      iframeRef.current?.contentWindow?.postMessage({
+        type: "block:preview",
+        block: {
+          id: previewId,
+          name: nextForm.name,
+          category: nextForm.categories[0] ?? nextForm.category,
+          layout: nextForm.layout,
+          color: nextForm.color,
+          reverse: nextForm.reverse,
+          visible: true,
+          order: 0,
+        },
+      }, "*");
+    }
     // Optimistic update name in block list immediately
     if (key === "name") {
       const id = editingIdRef.current;
@@ -1001,10 +1022,10 @@ export default function HomeBlocksManager() {
         ...b,
         name: nextForm.name,
         category: nextForm.categories[0] ?? nextForm.category,
-        layout: nextForm.layout,
+        layout: nextForm.layout as HomeBlock["layout"],
         color: nextForm.color,
         reverse: nextForm.reverse,
-      } : b);
+      } : b) as HomeBlock[];
       // Update state so the list reflects latest changes immediately
       setBlocks(updated);
       debounceSave(updated);
@@ -1020,10 +1041,10 @@ export default function HomeBlocksManager() {
       ...b,
       name: cur.name,
       category: cur.categories[0] ?? cur.category,
-      layout: cur.layout,
+      layout: cur.layout as HomeBlock["layout"],
       color: cur.color,
       reverse: cur.reverse,
-    } : b);
+    } : b) as HomeBlock[];
     setBlocks(next);
     pushHistory(next);
     setEditingId(null);

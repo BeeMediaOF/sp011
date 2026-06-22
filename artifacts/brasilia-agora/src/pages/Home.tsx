@@ -14,6 +14,7 @@ import Footer from "../components/Footer";
 import AdBanner from "../components/ads/AdBanner";
 import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
+import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 
 // ─── Colors per section ───────────────────────────────────────────────────────
@@ -73,6 +74,140 @@ function useArticlesByCategory(category: string): SectionArticle[] {
     }));
 }
 
+// ─── Extra layout components ──────────────────────────────────────────────────
+function SectionBlockTrio({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const items = articles.slice(0, 3);
+  if (items.length === 0) return null;
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5" style={{ backgroundColor: color }} />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+          </div>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {items.map((a) => (
+            <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="group flex flex-col">
+              {a.image && <img src={a.image} alt={a.title} className="w-full aspect-[4/3] object-cover rounded-lg mb-3 group-hover:brightness-95 transition-all" />}
+              <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>{a.chapeu}</span>
+              <p className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:underline">{a.title}</p>
+              <p className="text-[12px] text-gray-400 mt-1">{a.time}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionBlockCompact({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const items = articles.slice(0, 6);
+  if (items.length === 0) return null;
+  return (
+    <section className="border-t border-gray-200 py-6">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5" style={{ backgroundColor: color }} />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+          </div>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
+          {items.map((a) => (
+            <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="flex gap-3 items-start group border-b border-gray-100 pb-3 last:border-0">
+              {a.image && <img src={a.image} alt={a.title} className="w-16 h-12 object-cover rounded shrink-0" />}
+              <div className="min-w-0">
+                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu}</span>
+                <p className="text-[13px] font-semibold text-[#1a1a1a] leading-tight group-hover:underline line-clamp-2 mt-0.5">{a.title}</p>
+                <p className="text-[11px] text-gray-400 mt-0.5">{a.time}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionBlockBigStory({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const [main, ...rest] = articles;
+  if (!main) return null;
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5" style={{ backgroundColor: color }} />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+          </div>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+        </div>
+        <div className="flex flex-col lg:flex-row gap-6">
+          <Link href={`/artigo/${main.slug ?? main.id}`} className="flex-[3] relative group overflow-hidden rounded-xl">
+            <div className="relative w-full aspect-[16/7] overflow-hidden rounded-xl">
+              {main.image && <img src={main.image} alt={main.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent rounded-xl" />
+              <div className="absolute bottom-0 left-0 right-0 p-6">
+                <span className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded mb-2 text-white" style={{ backgroundColor: color }}>{main.chapeu}</span>
+                <h3 className="text-2xl font-black text-white leading-tight">{main.title}</h3>
+                {main.summary && <p className="text-[13px] text-white/80 mt-2 line-clamp-2">{main.summary}</p>}
+              </div>
+            </div>
+          </Link>
+          {rest.length > 0 && (
+            <div className="flex-1 flex flex-col gap-3 justify-center">
+              {rest.slice(0, 4).map((a) => (
+                <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="flex gap-3 items-start group border-b border-gray-100 pb-3 last:border-0">
+                  {a.image && <img src={a.image} alt={a.title} className="w-20 h-14 object-cover rounded shrink-0" />}
+                  <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu}</span>
+                    <p className="text-[13px] font-semibold text-[#1a1a1a] leading-tight group-hover:underline line-clamp-2 mt-0.5">{a.title}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">{a.time}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionBlockTimeline({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const items = articles.slice(0, 6);
+  if (items.length === 0) return null;
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-5" style={{ backgroundColor: color }} />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+          </div>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+        </div>
+        <div className="relative pl-6 border-l-2" style={{ borderColor: color + "40" }}>
+          {items.map((a, i) => (
+            <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className={`flex gap-4 items-start group relative ${i < items.length - 1 ? "mb-5" : ""}`}>
+              <div className="absolute -left-[25px] w-3.5 h-3.5 rounded-full border-2 bg-white shrink-0 mt-1" style={{ borderColor: color }} />
+              <div className="flex-1 min-w-0">
+                <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu} · {a.time}</span>
+                <p className="text-[14px] font-semibold text-[#1a1a1a] leading-snug group-hover:underline mt-0.5">{a.title}</p>
+              </div>
+              {a.image && <img src={a.image} alt={a.title} className="w-20 h-14 object-cover rounded shrink-0" />}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Custom block renderer ────────────────────────────────────────────────────
 function CustomBlock({ block, getArticles }: {
   block: HomeBlock;
@@ -96,6 +231,14 @@ function CustomBlock({ block, getArticles }: {
       return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} />;
     case "manchete":
       return <SectionBlockManchete title={block.name} color={color} href={href} articles={articles} />;
+    case "trio":
+      return <SectionBlockTrio title={block.name} color={color} href={href} articles={articles} />;
+    case "compact":
+      return <SectionBlockCompact title={block.name} color={color} href={href} articles={articles} />;
+    case "bigstory":
+      return <SectionBlockBigStory title={block.name} color={color} href={href} articles={articles} />;
+    case "timeline":
+      return <SectionBlockTimeline title={block.name} color={color} href={href} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={block.name} color={color} href={href} articles={articles} pageSize={4} />;
@@ -146,6 +289,14 @@ function ConfigurableBlock({ block, getArticles }: {
       return <SectionBlockLista title={title} color={color} href={href} articles={articles} />;
     case "manchete":
       return <SectionBlockManchete title={title} color={color} href={href} articles={articles} />;
+    case "trio":
+      return <SectionBlockTrio title={title} color={color} href={href} articles={articles} />;
+    case "compact":
+      return <SectionBlockCompact title={title} color={color} href={href} articles={articles} />;
+    case "bigstory":
+      return <SectionBlockBigStory title={title} color={color} href={href} articles={articles} />;
+    case "timeline":
+      return <SectionBlockTimeline title={title} color={color} href={href} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} />;
@@ -260,7 +411,7 @@ export default function Home() {
     setPreviewBlocks(baseBlocks.filter((b) => b.visible));
   }, [settings]);
 
-  // Listen for block selection from admin panel
+  // Listen for block selection and live preview updates from admin panel
   React.useEffect(() => {
     if (!isAdminPreview) return;
     function onMessage(e: MessageEvent) {
@@ -269,6 +420,13 @@ export default function Home() {
         setSelectedBlockId(e.data.blockId);
         const el = document.getElementById(`block-${e.data.blockId}`);
         if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      // Instant preview: update a single block immediately without re-fetching settings
+      if (e.data.type === "block:preview" && e.data.block) {
+        const updated = e.data.block as HomeBlock;
+        setPreviewBlocks((prev) =>
+          prev.map((b) => b.id === updated.id ? { ...b, ...updated } : b)
+        );
       }
     }
     window.addEventListener("message", onMessage);
