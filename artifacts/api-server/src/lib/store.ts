@@ -67,6 +67,7 @@ export interface SiteSettings {
   logoSize?: number;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
+  showTickerBar?: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   facebookPixelId?: string;
@@ -343,6 +344,7 @@ const defaultStore: StoreData = {
     logoSize: 101,
     mobileEnabled: true,
     desktopEnabled: true,
+    showTickerBar: true,
     homeBlocks: DEFAULT_HOME_BLOCKS,
   },
   rssSources: [],

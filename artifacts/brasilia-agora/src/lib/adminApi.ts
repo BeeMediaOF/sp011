@@ -241,6 +241,7 @@ export interface SiteSettings {
   logoSize?: number;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
+  showTickerBar?: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   facebookPixelId?: string;

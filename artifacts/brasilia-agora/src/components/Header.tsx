@@ -258,7 +258,7 @@ export default function Header() {
             </div>
           )}
         </header>
-        <TickerBar />
+        {settings?.showTickerBar !== false && <TickerBar />}
       </div>
     );
   }
@@ -351,7 +351,7 @@ export default function Header() {
           </div>
         )}
       </header>
-      <TickerBar />
+      {settings?.showTickerBar !== false && <TickerBar />}
     </div>
   );
 }

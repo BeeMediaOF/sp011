@@ -11,7 +11,7 @@ import {
   Mail, Phone, MapPin, Building2, FileText, Youtube,
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
-  Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight,
+  Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs";
@@ -524,6 +524,28 @@ export default function Settings() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                {/* Ticker bar */}
+                <div className={`${CARD} p-6`} style={CARD_SHADOW}>
+                  <SectionHeader icon={<TrendingUp size={15}/>} label="Barra de Cotações"/>
+                  <p className="text-xs text-[#64748B] mb-4 mt-1">Faixa rolante com cotações de moedas e criptomoedas exibida abaixo do cabeçalho.</p>
+                  <button
+                    onClick={() => setField("showTickerBar", !(settings.showTickerBar ?? true))}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                      (settings.showTickerBar ?? true)
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                        : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    }`}>
+                    <TrendingUp size={18}/>
+                    <div className="flex-1 text-left">
+                      <p className="text-[13px] font-semibold">Barra de cotações</p>
+                      <p className="text-[11px] opacity-70">ETH · USD · EUR · GBP · BTC</p>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showTickerBar ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showTickerBar ?? true) ? "Ativada" : "Desativada"}
+                    </span>
+                  </button>
                 </div>
 
                 <SaveBar saving={savingSettings} onSave={saveSettings}/>
