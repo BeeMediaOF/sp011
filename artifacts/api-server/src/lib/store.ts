@@ -68,6 +68,7 @@ export interface SiteSettings {
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   showTickerBar?: boolean;
+  showHeroStrip?: boolean;
   seoDescription?: string;
   seoKeywords?: string;
   facebookPixelId?: string;
@@ -215,7 +216,6 @@ interface StoreData {
   articles: Article[];
   menuItems: MenuItem[];
   settings: SiteSettings;
-  ads: Ad[];
   columnists: Columnist[];
   contactInfo: ContactInfo;
   rssSources: RssSource[];
@@ -349,7 +349,6 @@ const defaultStore: StoreData = {
     homeBlocks: DEFAULT_HOME_BLOCKS,
   },
   rssSources: [],
-  ads: [],
   columnists: [
     {
       id: "c1", name: "Ana Paula Mendes", specialty: "Política" as const,
@@ -541,51 +540,6 @@ export const store = {
     _store.settings = { ..._store.settings, ...data };
     saveStore(_store);
     return { ..._store.settings };
-  },
-
-  // Ads
-  getAds: () => [..._store.ads],
-  getAd: (id: string) => _store.ads.find((a) => a.id === id) ?? null,
-  createAd: (data: Omit<Ad, "id" | "createdAt" | "updatedAt" | "clicks" | "impressions">): Ad => {
-    const ad: Ad = {
-      ...data,
-      id: randomUUID(),
-      clicks: 0,
-      impressions: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    _store.ads.push(ad);
-    saveStore(_store);
-    return ad;
-  },
-  updateAd: (id: string, data: Partial<Omit<Ad, "id" | "createdAt">>): Ad | null => {
-    const idx = _store.ads.findIndex((a) => a.id === id);
-    if (idx === -1) return null;
-    _store.ads[idx] = { ..._store.ads[idx]!, ...data, updatedAt: new Date().toISOString() };
-    saveStore(_store);
-    return _store.ads[idx]!;
-  },
-  deleteAd: (id: string): boolean => {
-    const before = _store.ads.length;
-    _store.ads = _store.ads.filter((a) => a.id !== id);
-    const deleted = _store.ads.length < before;
-    if (deleted) saveStore(_store);
-    return deleted;
-  },
-  trackAdClick: (id: string): boolean => {
-    const idx = _store.ads.findIndex((a) => a.id === id);
-    if (idx === -1 || !_store.ads[idx]!.active) return false;
-    _store.ads[idx]!.clicks += 1;
-    saveStore(_store);
-    return true;
-  },
-  trackAdImpression: (id: string): boolean => {
-    const idx = _store.ads.findIndex((a) => a.id === id);
-    if (idx === -1) return false;
-    _store.ads[idx]!.impressions = (_store.ads[idx]!.impressions ?? 0) + 1;
-    saveStore(_store);
-    return true;
   },
 
   // Columnists

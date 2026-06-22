@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, sql } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { db, usersTable, adsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
   authMiddleware, generateToken, verifyPassword,
   checkRateLimit, resetRateLimit,
@@ -412,20 +412,37 @@ router.post("/logo", (req, res) => {
 
 // ─── Ads ───────────────────────────────────────────────────────────────
 
+function adRowToPublic(r: typeof adsTable.$inferSelect) {
+  return {
+    id: r.id,
+    name: r.name,
+    imageBase64: r.imageBase64,
+    link: r.link,
+    position: r.position,
+    active: r.active,
+    clicks: r.clicks,
+    impressions: r.impressions,
+    targetDevices: parseTargetDevices(r.targetDevices),
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
 /** GET /api/admin/ads */
-router.get("/ads", (_req, res) => {
-  res.json({ ads: store.getAds() });
+router.get("/ads", async (_req, res) => {
+  const rows = await db.select().from(adsTable).orderBy(adsTable.createdAt);
+  res.json({ ads: rows.map(adRowToPublic) });
 });
 
 /** GET /api/admin/ads/:id */
-router.get("/ads/:id", (req, res) => {
-  const ad = store.getAd(req.params.id ?? "");
-  if (!ad) { res.status(404).json({ error: "Ad not found" }); return; }
-  res.json({ ad });
+router.get("/ads/:id", async (req, res) => {
+  const [row] = await db.select().from(adsTable).where(eq(adsTable.id, req.params.id ?? "")).limit(1);
+  if (!row) { res.status(404).json({ error: "Ad not found" }); return; }
+  res.json({ ad: adRowToPublic(row) });
 });
 
 /** POST /api/admin/ads — create ad */
-router.post("/ads", (req, res) => {
+router.post("/ads", async (req, res) => {
   const { name, imageBase64, link, position, active, targetDevices } = req.body as {
     name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
     targetDevices?: ("desktop" | "mobile" | "tablet")[];
@@ -433,31 +450,51 @@ router.post("/ads", (req, res) => {
   if (!name || !imageBase64 || !link) {
     res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
   }
-  const VALID_POSITIONS = [
-    "slot_01","slot_02","slot_03","slot_04","slot_05","slot_06","slot_07",
-    "banner","sidebar","central","topo","centro","lateral","rodape",
-    "slidebar_250","slidebar_500",
-  ];
-  const ad = store.createAd({
+  const safePosition: AdPosition = (VALID_AD_POSITIONS as string[]).includes(position ?? "")
+    ? (position as AdPosition)
+    : "slot_01";
+  const { randomUUID } = await import("crypto");
+  const now = new Date();
+  const [row] = await db.insert(adsTable).values({
+    id: randomUUID(),
     name, imageBase64, link,
-    position: (VALID_POSITIONS.includes(position ?? "") ? position! : "slot_01") as Parameters<typeof store.createAd>[0]["position"],
-    active: !!active,
-    targetDevices: targetDevices ?? ["desktop", "mobile", "tablet"],
-  });
-  res.status(201).json({ ad });
+    position: safePosition,
+    active: active !== false,
+    clicks: 0,
+    impressions: 0,
+    targetDevices: serializeTargetDevices(targetDevices ?? ["desktop", "mobile", "tablet"]),
+    createdAt: now,
+    updatedAt: now,
+  }).returning();
+  res.status(201).json({ ad: adRowToPublic(row!) });
 });
 
 /** PUT /api/admin/ads/:id */
-router.put("/ads/:id", (req, res) => {
-  const ad = store.updateAd(req.params.id ?? "", req.body as Parameters<typeof store.updateAd>[1]);
-  if (!ad) { res.status(404).json({ error: "Ad not found" }); return; }
-  res.json({ ad });
+router.put("/ads/:id", async (req, res) => {
+  const id = req.params.id ?? "";
+  const { name, imageBase64, link, position, active, targetDevices } = req.body as {
+    name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
+    targetDevices?: ("desktop" | "mobile" | "tablet")[];
+  };
+  const safePosition: AdPosition | undefined = position
+    ? ((VALID_AD_POSITIONS as string[]).includes(position) ? (position as AdPosition) : undefined)
+    : undefined;
+  const updateData: Partial<typeof adsTable.$inferInsert> = { updatedAt: new Date() };
+  if (name !== undefined) updateData.name = name;
+  if (imageBase64 !== undefined) updateData.imageBase64 = imageBase64;
+  if (link !== undefined) updateData.link = link;
+  if (safePosition !== undefined) updateData.position = safePosition;
+  if (active !== undefined) updateData.active = active;
+  if (targetDevices !== undefined) updateData.targetDevices = serializeTargetDevices(targetDevices);
+  const [row] = await db.update(adsTable).set(updateData).where(eq(adsTable.id, id)).returning();
+  if (!row) { res.status(404).json({ error: "Ad not found" }); return; }
+  res.json({ ad: adRowToPublic(row) });
 });
 
 /** DELETE /api/admin/ads/:id */
-router.delete("/ads/:id", (req, res) => {
-  const deleted = store.deleteAd(req.params.id ?? "");
-  if (!deleted) { res.status(404).json({ error: "Ad not found" }); return; }
+router.delete("/ads/:id", async (req, res) => {
+  const result = await db.delete(adsTable).where(eq(adsTable.id, req.params.id ?? "")).returning({ id: adsTable.id });
+  if (result.length === 0) { res.status(404).json({ error: "Ad not found" }); return; }
   res.json({ success: true });
 });
 
