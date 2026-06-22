@@ -5,7 +5,7 @@ import {
   Plus, Pencil, Trash2, Send, Search, Rss, Wand2,
   FileText, FileArchive, Calendar, Archive,
   Eye, ChevronLeft, ChevronRight, ArrowUpRight,
-  Loader2, Zap, RefreshCw, CheckCircle2, Clock, Play, StopCircle,
+  Loader2, Zap, RefreshCw, CheckCircle2, Clock, Play, StopCircle, Wrench,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -73,8 +73,10 @@ export default function Articles() {
   const [publishing, setPublishing] = useState<string | null>(null);
   const [rewriting, setRewriting]   = useState<string | null>(null);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkDone, setBulkDone]       = useState(false);
+  const [bulkLoading, setBulkLoading]   = useState(false);
+  const [bulkDone, setBulkDone]         = useState(false);
+  const [repairLoading, setRepairLoading] = useState(false);
+  const [repairResult, setRepairResult]   = useState<{ fixed: number; total: number } | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -143,6 +145,18 @@ export default function Articles() {
       setTimeout(() => setBulkDone(false), 3000);
       if (d.added === 0) alert("Todos os rascunhos já estão na fila ou foram reescritos.");
     } catch { } finally { setBulkLoading(false); }
+  }
+
+  async function handleRepairContent() {
+    if (!confirm("Isso vai corrigir artigos com conteúdo em formato JSON bruto. Continuar?")) return;
+    setRepairLoading(true);
+    setRepairResult(null);
+    try {
+      const r = await adminApi.repairContent();
+      setRepairResult({ fixed: r.fixed, total: r.total });
+      if (r.fixed > 0) load();
+      setTimeout(() => setRepairResult(null), 8000);
+    } catch { alert("Erro ao reparar conteúdo."); } finally { setRepairLoading(false); }
   }
 
   async function handleTogglePause() {
@@ -279,6 +293,22 @@ export default function Articles() {
                   : <Zap size={14} />}
                 {bulkDone ? "Enfileirado!" : "Reescrever tudo com IA"}
               </button>
+              <button
+                onClick={() => void handleRepairContent()}
+                disabled={repairLoading}
+                title="Corrige artigos cujo conteúdo foi salvo como JSON bruto em vez de HTML"
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-colors disabled:opacity-40"
+              >
+                {repairLoading ? <Loader2 size={14} className="animate-spin" /> : <Wrench size={14} />}
+                {repairLoading ? "Reparando…" : "Reparar conteúdo"}
+              </button>
+              {repairResult && (
+                <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${repairResult.fixed > 0 ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-100 text-slate-500"}`}>
+                  {repairResult.fixed > 0
+                    ? `✓ ${repairResult.fixed} artigo(s) corrigido(s)`
+                    : "Nenhum artigo com conteúdo quebrado"}
+                </span>
+              )}
             </div>
           </div>
         </div>

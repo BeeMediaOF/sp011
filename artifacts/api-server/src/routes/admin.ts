@@ -480,6 +480,65 @@ router.post("/publish/:id", async (req, res) => {
   res.json({ article, message: "Article published successfully" });
 });
 
+/** POST /api/admin/articles/repair-content
+ *  Scans all articles for JSON-wrapped content and extracts clean HTML.
+ *  Safe to run multiple times — only touches broken articles.
+ */
+router.post("/articles/repair-content", async (_req, res) => {
+  function extractHtmlFromJson(raw: string): string | null {
+    // Strip markdown fences
+    const stripped = raw
+      .trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
+
+    if (!stripped.startsWith("{")) return null;
+
+    // 1. Try clean JSON parse
+    try {
+      const parsed = JSON.parse(stripped) as Record<string, unknown>;
+      const html = (parsed["content_html"] ?? parsed["contentHtml"] ?? parsed["content"] ?? "") as string;
+      return html.trim() || null;
+    } catch { /* try regex fallback */ }
+
+    // 2. Regex fallback for truncated / malformed JSON
+    const m = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
+    if (m?.[1]) {
+      return m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+    }
+    return null;
+  }
+
+  function looksLikeBrokenContent(content: string): boolean {
+    const t = content.trim();
+    return (
+      t.startsWith("```json") ||
+      t.startsWith("```") ||
+      (t.startsWith("{") && (t.includes('"content_html"') || t.includes('"contentHtml"'))) ||
+      // stored JSON that was treated as plain text
+      /^\s*\{[\s\S]{50,}"title"\s*:/.test(t)
+    );
+  }
+
+  const articles = await articleService.getArticles();
+  let fixed = 0;
+  let skipped = 0;
+
+  for (const article of articles) {
+    const raw = article.content ?? "";
+    if (!looksLikeBrokenContent(raw)) { skipped++; continue; }
+
+    const html = extractHtmlFromJson(raw);
+    if (!html) { skipped++; continue; }
+
+    await articleService.updateArticle(article.id, { content: html });
+    fixed++;
+  }
+
+  res.json({ fixed, skipped, total: articles.length });
+});
+
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
 router.post("/bulk-publish", async (_req, res) => {
   const articles = await articleService.getArticles();

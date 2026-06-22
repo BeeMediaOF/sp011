@@ -282,13 +282,27 @@ export default function Artigo() {
 
   function renderContent(raw: string): React.ReactNode[] {
     // Handle JSON-wrapped content (AI rewrite saved full JSON response instead of just HTML)
-    const stripped = raw.trim().replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
-    if (stripped.startsWith("{")) {
+    const stripped = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/, "").trim();
+    const looksLikeJson = stripped.startsWith("{") || stripped.startsWith("[");
+    if (looksLikeJson) {
+      // 1. Try clean JSON parse
       try {
         const parsed = JSON.parse(stripped) as Record<string, unknown>;
-        const html = (parsed.content_html ?? parsed.contentHtml ?? parsed.content ?? "") as string;
+        const html = (parsed["content_html"] ?? parsed["contentHtml"] ?? parsed["content"] ?? "") as string;
+        if (html) return renderContent(html.trim());
+      } catch { /* try regex */ }
+      // 2. Regex fallback for truncated / malformed JSON — extract content_html value
+      const m = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
+      if (m?.[1]) {
+        const html = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
         if (html) return renderContent(html);
-      } catch {}
+      }
+      // 3. If it looks like JSON but we couldn't extract content — show error placeholder
+      return [
+        <p key="json-err" className="text-sm text-red-500 italic p-4 border border-red-200 rounded-xl bg-red-50">
+          Conteúdo com formatação inválida. Use "Reparar conteúdo" no painel administrativo.
+        </p>,
+      ];
     }
 
     // HTML content (from AI JSON rewrite) — render directly with styles

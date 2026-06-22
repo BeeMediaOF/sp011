@@ -223,30 +223,49 @@ function parseRewriteResult(raw: string): RewriteResult {
     .trim();
 
   // Try to parse as JSON (new format)
-  try {
-    const parsed = JSON.parse(stripped) as {
-      title?: string; subtitle?: string;
-      content_html?: string; slug?: string; keywords?: string;
-    };
-    const content  = (parsed.content_html ?? "").trim();
-    const keywords = (parsed.keywords ?? "").trim();
-    const slug     = trimSlug(parsed.slug ?? "");
-    const title    = (parsed.title ?? "").trim();
-    const subtitle = (parsed.subtitle ?? "").trim();
-    return { content, keywords, slug, title, subtitle };
-  } catch {
-    // Fallback: old plain-text format with SLUG:/KEYWORDS: markers
-    const slugMatch     = raw.match(/^SLUG:\s*(.+)$/m);
-    const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
-    const slug     = trimSlug((slugMatch?.[1] ?? "").replace(/^\[|\]$/g, ""));
-    const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
-    const content  = raw
-      .replace(/^SLUG:\s*.+$/m, "")
-      .replace(/^KEYWORDS:\s*.+$/m, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    return { content, keywords, slug };
+  if (stripped.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(stripped) as {
+        title?: string; subtitle?: string;
+        content_html?: string; slug?: string; keywords?: string;
+      };
+      const content  = (parsed.content_html ?? "").trim();
+      const keywords = (parsed.keywords ?? "").trim();
+      const slug     = trimSlug(parsed.slug ?? "");
+      const title    = (parsed.title ?? "").trim();
+      const subtitle = (parsed.subtitle ?? "").trim();
+      if (content) return { content, keywords, slug, title, subtitle };
+    } catch { /* try regex fallback below */ }
+
+    // Regex fallback for truncated / malformed JSON
+    const mHtml = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
+    if (mHtml?.[1]) {
+      const content  = mHtml[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+      const mTitle   = stripped.match(/"title"\s*:\s*"([^"]+)"/);
+      const mSub     = stripped.match(/"subtitle"\s*:\s*"([^"]+)"/);
+      const mSlug    = stripped.match(/"slug"\s*:\s*"([^"]+)"/);
+      const mKw      = stripped.match(/"keywords"\s*:\s*"([^"]+)"/);
+      return {
+        content,
+        title:    mTitle?.[1]?.trim() ?? "",
+        subtitle: mSub?.[1]?.trim() ?? "",
+        slug:     trimSlug(mSlug?.[1] ?? ""),
+        keywords: mKw?.[1]?.trim() ?? "",
+      };
+    }
   }
+
+  // Fallback: old plain-text format with SLUG:/KEYWORDS: markers
+  const slugMatch     = raw.match(/^SLUG:\s*(.+)$/m);
+  const keywordsMatch = raw.match(/^KEYWORDS:\s*(.+)$/m);
+  const slug     = trimSlug((slugMatch?.[1] ?? "").replace(/^\[|\]$/g, ""));
+  const keywords = (keywordsMatch?.[1] ?? "").trim().replace(/^\[|\]$/g, "");
+  const content  = raw
+    .replace(/^SLUG:\s*.+$/m, "")
+    .replace(/^KEYWORDS:\s*.+$/m, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { content, keywords, slug };
 }
 
 // ─── AI Quota Manager ─────────────────────────────────────────────────────────

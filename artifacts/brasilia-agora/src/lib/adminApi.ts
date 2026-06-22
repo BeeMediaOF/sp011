@@ -45,6 +45,7 @@ export const adminApi = {
   deleteArticle: (id: string) => req<{ success: boolean }>("DELETE", `/articles/${id}`),
   publishArticle: (id: string) => req<{ article: Article }>("POST", `/publish/${id}`, {}),
   rewriteArticle: (id: string) => req<{ article: Article }>("POST", `/articles/${id}/rewrite`, {}),
+  repairContent: () => req<{ fixed: number; skipped: number; total: number }>("POST", "/articles/repair-content", {}),
   autofillArticle: (title: string, content: string) =>
     req<{ subtitle: string; summary: string; tags: string[]; seoTitle: string; metaDesc: string; slug: string }>(
       "POST", "/articles/autofill", { title, content }
