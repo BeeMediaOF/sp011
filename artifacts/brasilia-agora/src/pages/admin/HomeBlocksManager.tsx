@@ -87,18 +87,22 @@ const SOURCES: { value: SourceType; label: string }[] = [
 
 // ─── Categories ───────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { value: "politica",   label: "Política",    color: "#1d4ed8" },
-  { value: "cidade",     label: "Cidade / DF", color: "#0b3d91" },
-  { value: "seguranca",  label: "Segurança",   color: "#7c3aed" },
-  { value: "saude",      label: "Saúde",       color: "#16a34a" },
-  { value: "educacao",   label: "Educação",    color: "#0284c7" },
-  { value: "cultura",    label: "Cultura",     color: "#0d9488" },
-  { value: "esportes",   label: "Esportes",    color: "#dc2626" },
-  { value: "tecnologia", label: "Tecnologia",  color: "#0284c7" },
-  { value: "economia",   label: "Economia",    color: "#b45309" },
-  { value: "brasil",     label: "Brasil",      color: "#16a34a" },
-  { value: "mundo",      label: "Mundo",       color: "#6b21a8" },
-  { value: "colunas",    label: "Colunas",     color: "#7c3aed" },
+  { value: "politica",    label: "Política",     color: "#1d4ed8" },
+  { value: "cidade",      label: "Cidade / DF",  color: "#0b3d91" },
+  { value: "seguranca",   label: "Segurança",    color: "#7c3aed" },
+  { value: "saude",       label: "Saúde",        color: "#16a34a" },
+  { value: "educacao",    label: "Educação",     color: "#0284c7" },
+  { value: "cultura",     label: "Cultura",      color: "#0d9488" },
+  { value: "esportes",    label: "Esportes",     color: "#dc2626" },
+  { value: "tecnologia",  label: "Tecnologia",   color: "#0284c7" },
+  { value: "economia",    label: "Economia",     color: "#b45309" },
+  { value: "brasil",      label: "Brasil",       color: "#16a34a" },
+  { value: "mundo",       label: "Mundo",        color: "#6b21a8" },
+  { value: "colunas",     label: "Colunas",      color: "#7c3aed" },
+  { value: "turismo",     label: "Turismo",      color: "#0369a1" },
+  { value: "transporte",  label: "Transporte",   color: "#ca8a04" },
+  { value: "meio-ambiente", label: "Meio Ambiente", color: "#15803d" },
+  { value: "geral",       label: "Geral",        color: "#64748b" },
 ];
 
 // ─── Layout visual presets ────────────────────────────────────────────────────
@@ -412,6 +416,33 @@ function blockToForm(block: HomeBlock): BlockForm {
   };
 }
 
+// ─── Custom category input ────────────────────────────────────────────────────
+function CustomCategoryInput({ onAdd }: { onAdd: (val: string) => void }) {
+  const [val, setVal] = useState("");
+  function commit() {
+    const v = val.trim().toLowerCase().replace(/\s+/g, "-");
+    if (!v) return;
+    onAdd(v);
+    setVal("");
+  }
+  return (
+    <div className="flex gap-1 mt-1.5">
+      <input
+        type="text"
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } }}
+        placeholder="Outra categoria…"
+        className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:outline-none focus:border-[#0B2A66] bg-white placeholder:text-slate-400"
+      />
+      <button type="button" onClick={commit}
+        className="px-2.5 py-1 rounded-lg bg-[#0B2A66] text-white text-[11px] font-semibold hover:bg-[#0a2255] transition-colors">
+        +
+      </button>
+    </div>
+  );
+}
+
 // ─── Toggle switch ────────────────────────────────────────────────────────────
 function Toggle({ checked, onChange, accent }: { checked: boolean; onChange: () => void; accent?: string }) {
   return (
@@ -532,7 +563,22 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
                 </button>
               );
             })}
+            {/* Chips for custom categories not in the list */}
+            {form.categories.filter(v => !CATEGORIES.find(c => c.value === v)).map((v) => (
+              <button key={v} type="button" onClick={() => toggleCategory(v)}
+                className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all"
+                style={{ borderColor: "#0369a1", backgroundColor: "#0369a120", color: "#0369a1" }}>
+                <CheckCircle size={8} />
+                {v}
+              </button>
+            ))}
           </div>
+          {/* Custom category input */}
+          <CustomCategoryInput
+            onAdd={(val) => {
+              if (!form.categories.includes(val)) toggleCategory(val);
+            }}
+          />
         </PanelSection>
       )}
 
@@ -641,6 +687,7 @@ export default function HomeBlocksManager() {
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
   const [saved, setSaved]               = useState(false);
+  const [saveError, setSaveError]       = useState(false);
   const [dragIdx, setDragIdx]           = useState<number | null>(null);
   const [editingId, setEditingId]       = useState<string | null>(null);
   const [editForm, setEditForm]         = useState<BlockForm>(EMPTY_FORM);
@@ -755,10 +802,14 @@ export default function HomeBlocksManager() {
         await adminApi.updateSettings({ homeBlocks: newBlocks.map((b, i) => ({ ...b, order: i })) });
         invalidateSiteCache();
         setSaved(true);
+        setSaveError(false);
         // Refresh iframe via postMessage — no full remount
         iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
         setTimeout(() => setSaved(false), 2000);
-      } catch { } finally { setSaving(false); }
+      } catch {
+        setSaveError(true);
+        setTimeout(() => setSaveError(false), 4000);
+      } finally { setSaving(false); }
     }, delay);
   }, []);
 
@@ -851,9 +902,13 @@ export default function HomeBlocksManager() {
       await adminApi.updateSettings({ homeBlocks: ordered });
       invalidateSiteCache();
       setSaved(true);
+      setSaveError(false);
       setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2000);
-    } catch { } finally { setSaving(false); }
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 4000);
+    } finally { setSaving(false); }
   }
 
   async function saveHeaderFooter(hs: HeaderStyle, fs: FooterStyle, hBg?: string, fBg?: string) {
@@ -1010,6 +1065,11 @@ export default function HomeBlocksManager() {
             {saved && (
               <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold bg-green-50 px-3 py-1.5 rounded-lg border border-green-200">
                 <CheckCircle size={13} /> Salvo
+              </span>
+            )}
+            {saveError && (
+              <span className="flex items-center gap-1.5 text-xs text-red-600 font-semibold bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
+                Erro ao salvar — tente novamente
               </span>
             )}
             <button onClick={undo} disabled={!canUndo}
