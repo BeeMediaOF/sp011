@@ -65,13 +65,23 @@ function rowToArticle(row: ArticleRow): Article {
   };
 }
 
+// ─── In-memory article cache (30s TTL) ────────────────────────────────────────
+let _cache: Article[] | null = null;
+let _cacheAt = 0;
+const CACHE_TTL = 30_000;
+
+function bustCache() { _cache = null; _cacheAt = 0; }
+
 export const articleService = {
   async getArticles(): Promise<Article[]> {
+    if (_cache && Date.now() - _cacheAt < CACHE_TTL) return [..._cache];
     const rows = await db
       .select()
       .from(articlesTable)
       .orderBy(desc(articlesTable.createdAt));
-    return rows.map(rowToArticle);
+    _cache = rows.map(rowToArticle);
+    _cacheAt = Date.now();
+    return [..._cache];
   },
 
   /** Returns drafts that haven't been AI-rewritten yet (up to `limit`). */
@@ -153,6 +163,7 @@ export const articleService = {
   async createArticle(
     data: Omit<Article, "id" | "createdAt" | "updatedAt">,
   ): Promise<Article> {
+    bustCache();
     const now = new Date();
     const id  = randomUUID();
     const slug = data.slug ?? slugify(data.title);
@@ -191,6 +202,7 @@ export const articleService = {
     id: string,
     data: Partial<Omit<Article, "id" | "createdAt">>,
   ): Promise<Article | null> {
+    bustCache();
     const rows = await db
       .update(articlesTable)
       .set({
@@ -221,6 +233,7 @@ export const articleService = {
   },
 
   async deleteArticle(id: string): Promise<boolean> {
+    bustCache();
     const rows = await db
       .delete(articlesTable)
       .where(eq(articlesTable.id, id))
