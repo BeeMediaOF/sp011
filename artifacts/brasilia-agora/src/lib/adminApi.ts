@@ -264,6 +264,7 @@ export interface SiteSettings {
   footerStyle?: "dark" | "light" | "minimal";
   headerBgColor?: string;
   footerBgColor?: string;
+  siteUrl?: string;
 }
 
 export interface AnalyticsStats {

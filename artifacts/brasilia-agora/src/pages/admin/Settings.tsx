@@ -12,6 +12,7 @@ import {
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
   Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
+  Share2,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs";
@@ -472,6 +473,76 @@ export default function Settings() {
                     <input value={settings.seoKeywords ?? ""} onChange={e => setField("seoKeywords", e.target.value)}
                       className={INPUT} placeholder="brasília, notícias, df, política"/>
                   </Field>
+                </div>
+
+                {/* Compartilhamento */}
+                <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
+                  <SectionHeader icon={<Share2 size={15}/>} label="Compartilhamento (Open Graph)"/>
+                  <p className="text-xs text-[#94A3B8]">
+                    Aparece ao compartilhar o link no WhatsApp, Telegram, Facebook etc.
+                    Ao salvar, o título e a descrição também atualizam automaticamente o HTML do site para que crawlers de redes sociais vejam os dados corretos.
+                  </p>
+
+                  {/* Preview card */}
+                  <div className="border border-[#E2E8F0] rounded-xl overflow-hidden bg-white shadow-sm select-none">
+                    <div className="h-28 bg-[#0B2A66] flex items-center justify-center overflow-hidden relative">
+                      {settings.ogImageBase64
+                        ? <img src={settings.ogImageBase64} alt="OG preview" className="w-full h-full object-cover"/>
+                        : (
+                          <div className="flex flex-col items-center gap-1.5 text-white/40">
+                            <Image size={22}/>
+                            <span className="text-[10px] tracking-wide">Imagem de compartilhamento</span>
+                          </div>
+                        )}
+                      <div className="absolute inset-0 pointer-events-none" style={{boxShadow:"inset 0 -2px 8px rgba(0,0,0,0.1)"}}/>
+                    </div>
+                    <div className="p-3 border-t border-[#E2E8F0]">
+                      <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide truncate">
+                        {(() => { try { return settings.siteUrl ? new URL(settings.siteUrl).hostname : "seusite.com.br"; } catch { return settings.siteUrl || "seusite.com.br"; } })()}
+                      </p>
+                      <p className="text-[13px] font-semibold text-[#0F172A] truncate mt-0.5">
+                        {settings.siteName || "Nome do portal"}{settings.tagline ? ` — ${settings.tagline}` : ""}
+                      </p>
+                      <p className="text-[11px] text-[#64748B] line-clamp-2 mt-0.5">
+                        {settings.seoDescription || settings.tagline || "Descrição do portal…"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* URL */}
+                  <Field label="URL do site" hint="og:url">
+                    <input
+                      value={settings.siteUrl ?? ""}
+                      onChange={e => setField("siteUrl", e.target.value)}
+                      className={INPUT}
+                      placeholder="https://brasilia-agora.com.br"
+                    />
+                  </Field>
+
+                  {/* OG image upload */}
+                  <div>
+                    <label className="block text-xs font-medium text-[#64748B] mb-1">Imagem de compartilhamento</label>
+                    <p className="text-[11px] text-[#94A3B8] mb-2">Recomendado: 1200 × 630 px. PNG ou JPEG.</p>
+                    <input ref={ogRef} type="file" accept="image/*" className="hidden"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("ogImageBase64", f); }}/>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        onClick={() => ogRef.current?.click()}
+                        className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
+                      >
+                        Selecionar imagem
+                      </button>
+                      {settings.ogImageBase64 ? (
+                        <div className="relative">
+                          <img src={settings.ogImageBase64} alt="OG" className="h-10 w-16 object-cover rounded-xl border border-[#E2E8F0]"/>
+                          <button
+                            onClick={() => setField("ogImageBase64", undefined)}
+                            className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
+                          >&times;</button>
+                        </div>
+                      ) : <span className="text-xs text-[#94A3B8] italic">Nenhuma imagem selecionada</span>}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Byline */}

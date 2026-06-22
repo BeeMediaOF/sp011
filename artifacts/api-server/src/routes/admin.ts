@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { eq, sql } from "drizzle-orm";
+import { writeFileSync } from "fs";
+import { resolve } from "path";
 import { db, usersTable, adsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
   authMiddleware, generateToken, verifyPassword,
   checkRateLimit, resetRateLimit,
 } from "../middlewares/auth.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
-import { store, type ContactInfo } from "../lib/store.js";
+import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
+import { logger } from "../lib/logger.js";
 import { articleService } from "../lib/articleService.js";
 import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot, getAIQuotaStatus } from "../lib/rssProcessor.js";
 import { YoutubeTranscript } from "youtube-transcript";
@@ -386,6 +389,94 @@ router.put("/menu", (req, res) => {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
+/** Escape HTML special chars for safe interpolation into index.html */
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/**
+ * Write the Vite index.html and public/opengraph.jpg whenever settings change
+ * so social-media crawlers always see up-to-date Open Graph meta tags without
+ * requiring server-side rendering.
+ *
+ * Non-critical — errors are logged but never surfaced to the caller.
+ */
+function updateIndexHtml(settings: SiteSettings): void {
+  try {
+    const base      = resolve(process.cwd(), "..", "brasilia-agora");
+    const indexPath = resolve(base, "index.html");
+    const ogPath    = resolve(base, "public", "opengraph.jpg");
+    const favPath   = resolve(base, "public", "favicon.jpg");
+
+    const siteName = escHtml(settings.siteName  || "Brasília Agora");
+    const tagline  = escHtml(settings.tagline   || "Notícias do DF e do Brasil");
+    const desc     = escHtml(settings.seoDescription || settings.tagline || "Informação com credibilidade sobre o Distrito Federal e o Brasil.");
+    const siteUrl  = escHtml(settings.siteUrl   || "");
+    const title    = `${siteName} — ${tagline}`;
+
+    // Persist OG image so /opengraph.jpg returns the admin-uploaded version
+    if (settings.ogImageBase64) {
+      try {
+        const b64 = settings.ogImageBase64.replace(/^data:image\/\w+;base64,/, "");
+        writeFileSync(ogPath, Buffer.from(b64, "base64"));
+      } catch (imgErr) {
+        logger.warn({ err: imgErr }, "updateIndexHtml: could not write opengraph.jpg");
+      }
+    }
+
+    // Persist favicon so /favicon.jpg returns the admin-uploaded version
+    if (settings.faviconBase64) {
+      try {
+        const b64 = settings.faviconBase64.replace(/^data:image\/\w+;base64,/, "");
+        writeFileSync(favPath, Buffer.from(b64, "base64"));
+      } catch (favErr) {
+        logger.warn({ err: favErr }, "updateIndexHtml: could not write favicon.jpg");
+      }
+    }
+
+    const ogUrlTag = siteUrl
+      ? `\n    <meta property="og:url" content="${siteUrl}" />`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>${title}</title>
+    <meta name="description" content="${desc}" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="${siteName}" />${ogUrlTag}
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${desc}" />
+    <meta property="og:image" content="/opengraph.jpg" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${desc}" />
+    <meta name="twitter:image" content="/opengraph.jpg" />
+
+    <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>`;
+
+    writeFileSync(indexPath, html, "utf-8");
+  } catch (err) {
+    logger.warn({ err }, "updateIndexHtml: failed");
+  }
+}
+
 /** GET /api/admin/settings */
 router.get("/settings", (_req, res) => {
   res.json({ settings: store.getPublicSettings() });
@@ -398,7 +489,8 @@ router.get("/ai-quota", authMiddleware, (_req, res) => {
 
 /** PUT /api/admin/settings */
 router.put("/settings", (req, res) => {
-  store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
+  const updated = store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
+  updateIndexHtml(updated);
   res.json({ settings: store.getPublicSettings() });
 });
 

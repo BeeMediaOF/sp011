@@ -58,7 +58,7 @@ export interface SiteSettings {
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;
   diffbotApiKey?: string; geminiApiKey?: string; openaiApiKey?: string;
   youtubeApiKey?: string; bylineName?: string; bylineLogoBase64?: string;
-  webhookApiKey?: string;
+  webhookApiKey?: string; siteUrl?: string;
 }
 
 export type ColumnistSpecialty =
