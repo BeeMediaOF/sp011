@@ -396,8 +396,8 @@ export default function RSSManager() {
   }
 
   async function toggleQueuePause() {
-    if (!queueStats) return;
-    const path = queueStats.paused ? "resume" : "pause";
+    if (!rwQueue) return;
+    const path = rwQueue.paused ? "resume" : "pause";
     await fetch(`${BASE}api/admin/queue/${path}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token()}` },

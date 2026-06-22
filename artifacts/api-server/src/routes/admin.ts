@@ -295,7 +295,15 @@ router.use(authMiddleware);
 
 /** GET /api/admin/articles */
 router.get("/articles", async (_req, res) => {
-  res.json({ articles: await articleService.getArticles() });
+  const [articles, viewsMap] = await Promise.all([
+    articleService.getArticles(),
+    Promise.resolve(store.getArticleViews()),
+  ]);
+  const withViews = articles.map((a) => ({
+    ...a,
+    views: viewsMap[a.id]?.views ?? 0,
+  }));
+  res.json({ articles: withViews });
 });
 
 /** GET /api/admin/articles/:id */

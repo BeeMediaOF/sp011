@@ -43,6 +43,7 @@ export function getQueueStats() {
     paused:         _paused,
     processedTotal: _processedTotal,
     failedTotal:    _failedTotal,
+    queuedIds:      _queue.map((i) => i.articleId),
     quota: {
       usedToday:    quota.usedToday,
       dailyLimit:   quota.dailyLimit,
