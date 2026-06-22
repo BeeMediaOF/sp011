@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type MenuItem } from "../../lib/adminApi";
+import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   Plus, PlusCircle, Trash2, GripVertical, Save, Eye, EyeOff,
   Search, ChevronDown, ChevronRight, Pencil, Monitor, Tablet,
@@ -102,7 +103,6 @@ export default function MenuManager() {
 
   async function applyEditToSelected() {
     if (!selected) return;
-    // Apply all fields to local state first
     const patch: Partial<MenuItem> = {
       label: editLabel.trim() || "Item sem nome",
       path: editPath.trim() || "/",
@@ -113,12 +113,12 @@ export default function MenuManager() {
     const nextItems = items.map((it) => it.id === selected ? { ...it, ...patch } : it);
     setItems(nextItems);
 
-    // Save immediately to the database
     setApplying(true); setApplied(false);
     try {
       const ordered = nextItems.map((it, i) => ({ ...it, order: i }));
       const { menuItems } = await adminApi.updateMenu(ordered);
       setItems(menuItems);
+      invalidateSiteCache();
       setApplied(true);
       setTimeout(() => setApplied(false), 2500);
     } catch { } finally { setApplying(false); }
@@ -166,6 +166,7 @@ export default function MenuManager() {
     try {
       const { menuItems } = await adminApi.updateMenu(ordered);
       setItems(menuItems);
+      invalidateSiteCache();
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch { } finally { setSaving(false); }

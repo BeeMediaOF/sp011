@@ -70,11 +70,17 @@ function saveToStorage(data: SiteSettings) {
   }
 }
 
-// Always start null — never pre-render with stale localStorage data.
-// localStorage is only used as a network-error fallback.
+// Cache TTL: 60 seconds. After this, the next useSite() mount triggers a fresh fetch.
+const CACHE_TTL_MS = 60_000;
+
 let _cache: SiteSettings | null = null;
+let _cacheAt = 0;
 let _fetch: Promise<void> | null = null;
 const _subscribers = new Set<(s: SiteSettings) => void>();
+
+function isCacheStale() {
+  return !_cache || Date.now() - _cacheAt > CACHE_TTL_MS;
+}
 
 function notifySubscribers() {
   if (_cache) _subscribers.forEach((cb) => cb(_cache!));
@@ -86,6 +92,7 @@ async function doFetch() {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const data = await r.json() as SiteSettings;
     _cache = data;
+    _cacheAt = Date.now();
     saveToStorage(data);
     notifySubscribers();
   } catch {
@@ -94,8 +101,11 @@ async function doFetch() {
     const stored = loadFromStorage();
     if (stored && !_cache) {
       _cache = stored;
+      _cacheAt = Date.now();
       notifySubscribers();
     }
+  } finally {
+    // Always reset _fetch so the next mount can re-check staleness
     _fetch = null;
   }
 }
@@ -104,6 +114,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("message", (e) => {
     if (e.data?.type === "settings:refresh") {
       _cache = null;
+      _cacheAt = 0;
       _fetch = doFetch().catch(() => { _fetch = null; });
     }
   });
@@ -111,6 +122,7 @@ if (typeof window !== "undefined") {
 
 export function invalidateSiteCache() {
   _cache = null;
+  _cacheAt = 0;
   _fetch = doFetch().catch(() => { _fetch = null; });
 }
 
@@ -130,14 +142,17 @@ export function useSite() {
       setLoading(false);
     }
 
-    if (!_fetch) {
+    // Fetch if: no in-flight request AND (no cache or cache is stale)
+    if (!_fetch && isCacheStale()) {
       _fetch = doFetch().catch(() => { _fetch = null; });
     }
 
-    _fetch.then(() => {
-      if (_cache) setSettings(_cache);
-      setLoading(false);
-    });
+    if (_fetch) {
+      _fetch.then(() => {
+        if (_cache) setSettings(_cache);
+        setLoading(false);
+      });
+    }
 
     return () => { _subscribers.delete(subscriber); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
