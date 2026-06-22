@@ -12,7 +12,7 @@ import {
   Newspaper, Users, Hash, AlignJustify, Globe, Flame,
   Trophy, Tv2, Building2, Heart, Cpu, Star, Zap, BarChart3,
   Type, Palette, Eye as EyeIcon, Calendar, User, FileImage,
-  ChevronRight, Layers,
+  ChevronRight, ChevronUp, Layers,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -519,6 +519,23 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
         </PanelSection>
       </div>
 
+      {/* Propaganda: link rápido para gerenciar anúncios */}
+      {form.blockType === "advertising" && (
+        <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 flex items-start gap-2.5">
+          <Megaphone size={14} className="text-[#D97706] mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] font-bold text-[#92400E] mb-1">Espaço de anúncio</p>
+            <p className="text-[10px] text-[#92400E]/80 leading-relaxed mb-2">
+              Clique abaixo para subir ou gerenciar propagandas para este espaço.
+            </p>
+            <a href="/admin/propagandas" target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-[#D97706] hover:bg-[#B45309] rounded-lg transition-colors">
+              <Upload size={11} /> Gerenciar propagandas
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Layout visual (content only) */}
       {!isSpecial && form.blockType === "content" && (
         <PanelSection label="Layout visual" icon={Layers}>
@@ -696,6 +713,7 @@ export default function HomeBlocksManager() {
   const [editingId, setEditingId]       = useState<string | null>(null);
   const [editForm, setEditForm]         = useState<BlockForm>(EMPTY_FORM);
   const [showAdd, setShowAdd]           = useState(false);
+  const [insertAtIdx, setInsertAtIdx]   = useState<number | null>(null);
   const [previewKey, setPreviewKey]     = useState(0);
   const [tab, setTab]                   = useState<Tab>("blocks");
   const [filterTab, setFilterTab]       = useState<FilterTab>("all");
@@ -959,9 +977,24 @@ export default function HomeBlocksManager() {
     const idx = blocks.findIndex((b) => b.id === id);
     const next = [...blocks.slice(0, idx + 1), clone, ...blocks.slice(idx + 1)].map((b, i) => ({ ...b, order: i }));
     pushHistory(next); setBlocks(next); debounceSave(next);
-    // Open editor on clone
     setEditingId(clone.id);
     setEditForm(blockToForm(clone));
+  }
+
+  function moveBlockUp(idx: number) {
+    if (idx <= 0) return;
+    const next = [...blocks];
+    [next[idx - 1], next[idx]] = [next[idx]!, next[idx - 1]!];
+    const ordered = next.map((b, i) => ({ ...b, order: i }));
+    pushHistory(ordered); setBlocks(ordered); debounceSave(ordered);
+  }
+
+  function moveBlockDown(idx: number) {
+    if (idx >= blocks.length - 1) return;
+    const next = [...blocks];
+    [next[idx], next[idx + 1]] = [next[idx + 1]!, next[idx]!];
+    const ordered = next.map((b, i) => ({ ...b, order: i }));
+    pushHistory(ordered); setBlocks(ordered); debounceSave(ordered);
   }
 
   // ── Drag & drop ─────────────────────────────────────────────────────────────
@@ -1054,8 +1087,13 @@ export default function HomeBlocksManager() {
   // ── Add block ───────────────────────────────────────────────────────────────
   function addBlockFromType(type: string, name: string) {
     const newBlock: HomeBlock = { id: `${type}-${Date.now()}`, name, visible: true, order: blocks.length, custom: true };
-    const next = [...blocks, newBlock];
-    setBlocks(next); pushHistory(next); setShowAdd(false); debounceSave(next);
+    let next: HomeBlock[];
+    if (insertAtIdx !== null) {
+      next = [...blocks.slice(0, insertAtIdx + 1), newBlock, ...blocks.slice(insertAtIdx + 1)].map((b, i) => ({ ...b, order: i }));
+    } else {
+      next = [...blocks, newBlock];
+    }
+    setBlocks(next); pushHistory(next); setShowAdd(false); setInsertAtIdx(null); debounceSave(next);
     setEditingId(newBlock.id);
     setEditForm({ ...EMPTY_FORM, name, blockType: type as BlockType });
   }
@@ -1290,64 +1328,105 @@ export default function HomeBlocksManager() {
                   </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+                <div className="flex-1 overflow-y-auto px-3 py-3">
                   {loading ? (
                     <div className="text-center py-16 text-[#64748B] text-sm">Carregando…</div>
                   ) : filteredBlocks.length === 0 ? (
                     <div className="text-center py-16 text-[#64748B] text-sm">Nenhum bloco {filterTab === "visible" ? "visível" : "oculto"}</div>
-                  ) : filteredBlocks.map((block) => {
+                  ) : filteredBlocks.map((block, bIdx) => {
                     const realIdx  = blocks.findIndex((b) => b.id === block.id);
                     const isEditing  = editingId === block.id;
                     const isDragging = dragIdx === realIdx;
                     const meta = BLOCK_META[block.id] ?? DEFAULT_META;
 
                     return (
-                      <div key={block.id}
-                        ref={(el) => { blockRefs.current[block.id] = el; }}
-                        draggable={!isEditing}
-                        onDragStart={() => handleDragStart(realIdx)}
-                        onDragOver={(e) => handleDragOver(e, realIdx)}
-                        onDragEnd={handleDragEnd}
-                        className={`rounded-2xl border bg-white transition-all select-none
-                          ${isDragging ? "border-[#F59E0B] shadow-lg scale-[1.02] opacity-90" : "border-[#E2E8F0]"}
-                          ${!block.visible ? "opacity-50" : ""}
-                          ${isEditing ? "ring-2 ring-[#0B2A66]/20 border-[#0B2A66]/40 shadow-sm" : "hover:border-[#CBD5E1]"}
-                        `}
-                        style={{ boxShadow: isDragging ? "0 8px 24px rgba(15,23,42,0.10)" : isEditing ? "0 0 0 2px rgba(11,42,102,0.12)" : undefined }}
-                      >
-                        <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer" onClick={() => openEdit(block)}>
-                          <span className="text-[#CBD5E1] hover:text-[#94A3B8] cursor-grab shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <GripVertical size={15} />
-                          </span>
-                          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: meta.iconBg }}>
-                            <meta.Icon size={14} style={{ color: meta.iconColor }} />
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13px] font-semibold text-[#0F172A] truncate leading-tight">{block.name}</p>
-                            <span className="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
-                              style={{ backgroundColor: meta.tagBg, color: meta.tagColor }}>
-                              {meta.tag}
+                      <React.Fragment key={block.id}>
+                        {/* ── Insert-here separator (between blocks) ── */}
+                        {bIdx > 0 && (
+                          <div className="group/ins flex items-center gap-1 my-0.5 px-1 h-5">
+                            <div className="flex-1 h-px bg-[#E2E8F0] group-hover/ins:bg-[#0B2A66]/20 transition-colors" />
+                            <button
+                              title="Inserir bloco aqui"
+                              onClick={(e) => { e.stopPropagation(); setInsertAtIdx(realIdx - 1); setShowAdd(true); }}
+                              className="opacity-0 group-hover/ins:opacity-100 transition-opacity flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold text-[#0B2A66] bg-[#EFF6FF] border border-[#0B2A66]/20 hover:bg-[#0B2A66] hover:text-white hover:border-[#0B2A66] whitespace-nowrap">
+                              <Plus size={9} /> Inserir
+                            </button>
+                            <div className="flex-1 h-px bg-[#E2E8F0] group-hover/ins:bg-[#0B2A66]/20 transition-colors" />
+                          </div>
+                        )}
+
+                        <div
+                          ref={(el) => { blockRefs.current[block.id] = el; }}
+                          draggable={!isEditing}
+                          onDragStart={() => handleDragStart(realIdx)}
+                          onDragOver={(e) => handleDragOver(e, realIdx)}
+                          onDragEnd={handleDragEnd}
+                          className={`group/block rounded-2xl border bg-white transition-all select-none mb-1.5
+                            ${isDragging ? "border-[#F59E0B] shadow-lg scale-[1.02] opacity-90" : "border-[#E2E8F0]"}
+                            ${!block.visible ? "opacity-50" : ""}
+                            ${isEditing ? "ring-2 ring-[#0B2A66]/20 border-[#0B2A66]/40 shadow-sm" : "hover:border-[#CBD5E1]"}
+                          `}
+                          style={{ boxShadow: isDragging ? "0 8px 24px rgba(15,23,42,0.10)" : isEditing ? "0 0 0 2px rgba(11,42,102,0.12)" : undefined }}
+                        >
+                          <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer" onClick={() => openEdit(block)}>
+                            <span className="text-[#CBD5E1] hover:text-[#94A3B8] cursor-grab shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <GripVertical size={15} />
+                            </span>
+                            <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: meta.iconBg }}>
+                              <meta.Icon size={14} style={{ color: meta.iconColor }} />
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[13px] font-semibold text-[#0F172A] truncate leading-tight">{block.name}</p>
+                              <span className="inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider"
+                                style={{ backgroundColor: meta.tagBg, color: meta.tagColor }}>
+                                {meta.tag}
+                              </span>
+                            </div>
+
+                            {/* ── Inline quick-actions (visible on hover) ── */}
+                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                title="Mover para cima"
+                                disabled={realIdx === 0}
+                                onClick={() => moveBlockUp(realIdx)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <ChevronUp size={13} />
+                              </button>
+                              <button
+                                title="Mover para baixo"
+                                disabled={realIdx === blocks.length - 1}
+                                onClick={() => moveBlockDown(realIdx)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                <ChevronDown size={13} />
+                              </button>
+                              <button
+                                title="Duplicar bloco"
+                                onClick={() => duplicateBlock(block.id)}
+                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition-colors">
+                                <Copy size={12} />
+                              </button>
+                            </div>
+
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Toggle checked={block.visible} onChange={() => toggleVisible(realIdx)} />
+                            </div>
+                            <span className={`text-[#CBD5E1] transition-transform ${isEditing ? "rotate-180" : ""}`}>
+                              <ChevronDown size={14} />
                             </span>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                            <Toggle checked={block.visible} onChange={() => toggleVisible(realIdx)} />
-                          </div>
-                          <span className={`text-[#CBD5E1] transition-transform ${isEditing ? "rotate-180" : ""}`}>
-                            <ChevronDown size={14} />
-                          </span>
-                        </div>
 
-                        {isEditing && (
-                          <SettingsPanel
-                            block={block} form={editForm} saving={saving}
-                            onChange={handleFormChange}
-                            onApply={() => applyAndSave(block.id)}
-                            onDuplicate={() => duplicateBlock(block.id)}
-                            onDelete={() => deleteBlock(block.id)}
-                            onCancel={() => setEditingId(null)}
-                          />
-                        )}
-                      </div>
+                          {isEditing && (
+                            <SettingsPanel
+                              block={block} form={editForm} saving={saving}
+                              onChange={handleFormChange}
+                              onApply={() => applyAndSave(block.id)}
+                              onDuplicate={() => duplicateBlock(block.id)}
+                              onDelete={() => deleteBlock(block.id)}
+                              onCancel={() => setEditingId(null)}
+                            />
+                          )}
+                        </div>
+                      </React.Fragment>
                     );
                   })}
                 </div>
