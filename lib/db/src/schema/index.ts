@@ -14,3 +14,4 @@ export * from "./endpoint_rate_limits";
 export * from "./article_views";
 export * from "./category_views";
 export * from "./push_subscriptions";
+export * from "./geo_stats";

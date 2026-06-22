@@ -1,9 +1,11 @@
 import { Router } from "express";
-import { gte, eq, count } from "drizzle-orm";
-import { db, analyticsEventsTable } from "@workspace/db";
+import { gte, eq, count, sql } from "drizzle-orm";
+import { db, analyticsEventsTable, geoStatsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
+import { logger } from "../lib/logger.js";
+
 const router = Router();
 
 export interface AnalyticsEvent {
@@ -54,7 +56,6 @@ async function flushBuffer(): Promise<void> {
       }))
     );
   } catch (err) {
-    // Re-queue on failure, capped to avoid unbounded growth
     _buffer.unshift(...batch.slice(0, BUFFER_MAX - _buffer.length));
     void err;
   } finally {
@@ -62,7 +63,6 @@ async function flushBuffer(): Promise<void> {
   }
 }
 
-// Flush every 60 seconds
 setInterval(() => { void flushBuffer(); }, 60_000);
 
 function pushEvent(ev: AnalyticsEvent): void {
@@ -77,10 +77,58 @@ function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
   return "desktop";
 }
 
-// ─── IP Geolocation (best-effort, no external calls) ─────────────────────────
-// geoip-lite v2 requires separate data file download; returns empty for now.
-function getGeoFromIp(_ip: string): { city?: string; region?: string } {
-  return {};
+// ─── IP Geolocation via ip-api.com (async, cached, non-blocking) ──────────────
+interface GeoResult { city: string; region: string; country: string }
+const _geoCache = new Map<string, GeoResult | null>();
+const _geoPending = new Set<string>();
+
+// Skip loopback / private IPs
+function isPrivateIp(ip: string): boolean {
+  return (
+    ip === "127.0.0.1" ||
+    ip === "::1" ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip) ||
+    ip === "" ||
+    ip === "::ffff:127.0.0.1"
+  );
+}
+
+function lookupGeoAsync(ip: string): void {
+  if (isPrivateIp(ip)) return;
+  if (_geoCache.has(ip) || _geoPending.has(ip)) return;
+
+  _geoPending.add(ip);
+  fetch(`http://ip-api.com/json/${ip}?fields=status,city,regionName,countryCode&lang=pt-BR`, {
+    signal: AbortSignal.timeout(3000),
+  })
+    .then(async (r) => {
+      if (!r.ok) return;
+      const d = await r.json() as { status: string; city?: string; regionName?: string; countryCode?: string };
+      if (d.status !== "success" || !d.city) return;
+      const geo: GeoResult = {
+        city:    d.city,
+        region:  d.regionName ?? "",
+        country: d.countryCode ?? "BR",
+      };
+      _geoCache.set(ip, geo);
+      // Persist to DB — upsert by city+region key
+      const id = `${geo.city}::${geo.region}`;
+      void db
+        .insert(geoStatsTable)
+        .values({ id, city: geo.city, region: geo.region, country: geo.country, views: 1, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: geoStatsTable.id,
+          set: {
+            views:     sql`${geoStatsTable.views} + 1`,
+            updatedAt: new Date(),
+          },
+        })
+        .catch(() => { /* ignore */ });
+    })
+    .catch(() => { _geoCache.set(ip, null); })
+    .finally(() => { _geoPending.delete(ip); });
 }
 
 // ─── POST /api/analytics/event ────────────────────────────────────────────────
@@ -93,7 +141,11 @@ router.post("/event", (req, res) => {
 
   const ua  = req.headers["user-agent"] ?? "";
   const ip  = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "";
-  const geo = getGeoFromIp(ip);
+
+  // Fire-and-forget geo lookup (only on pageviews to reduce API calls)
+  if (type === "pageview") lookupGeoAsync(ip);
+
+  const cachedGeo = _geoCache.get(ip);
 
   pushEvent({
     type: type as AnalyticsEvent["type"],
@@ -104,8 +156,8 @@ router.post("/event", (req, res) => {
     referrer,
     scrollDepth,
     platform,
-    city:   geo.city,
-    region: geo.region,
+    city:   cachedGeo?.city,
+    region: cachedGeo?.region,
   });
 
   if (type === "category" && category) store.trackCategoryView(category);
@@ -120,9 +172,10 @@ router.get("/stats", authMiddleware, async (_req, res) => {
   const DAY = 86_400_000;
   const thirtyDaysAgo = new Date(now - 30 * DAY);
 
-  const [dbRows, allTimeResult] = await Promise.all([
+  const [dbRows, allTimeResult, geoRows] = await Promise.all([
     db.select().from(analyticsEventsTable).where(gte(analyticsEventsTable.ts, thirtyDaysAgo)),
     db.select({ count: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.type, "pageview")),
+    db.select().from(geoStatsTable),
   ]);
 
   type EventLike = {
@@ -148,8 +201,6 @@ router.get("/stats", authMiddleware, async (_req, res) => {
   const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
   const catViewMap:  Record<string, number> = {};
   const catClickMap: Record<string, number> = {};
-  const cityMap:     Record<string, number> = {};
-  const regionMap:   Record<string, number> = {};
   const deviceMap:   Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
   const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
   const scrollMap:   Record<number, number> = { 25: 0, 50: 0, 75: 0, 100: 0 };
@@ -190,8 +241,6 @@ router.get("/stats", authMiddleware, async (_req, res) => {
         articleMap[ev.articleId]!.views++;
       }
       if (ev.category) catViewMap[ev.category] = (catViewMap[ev.category] ?? 0) + 1;
-      if (ev.city)   cityMap[ev.city]     = (cityMap[ev.city]     ?? 0) + 1;
-      if (ev.region) regionMap[ev.region] = (regionMap[ev.region] ?? 0) + 1;
     }
 
     if (evType === "category" && ev.category) {
@@ -261,6 +310,14 @@ router.get("/stats", authMiddleware, async (_req, res) => {
 
   const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+  // Build top cities and regions from persistent geo_stats table (all-time)
+  const cityTotals:   Record<string, number> = {};
+  const regionTotals: Record<string, number> = {};
+  for (const row of geoRows) {
+    if (row.city)   cityTotals[row.city]     = (cityTotals[row.city]     ?? 0) + row.views;
+    if (row.region) regionTotals[row.region] = (regionTotals[row.region] ?? 0) + row.views;
+  }
+
   res.json({
     totals: { today, week, month, allTime },
     engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
@@ -271,8 +328,8 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     peakDay:         DAY_NAMES[byDayOfWeek.indexOf(Math.max(...byDayOfWeek))]!,
     topArticles,
     topCategories,
-    topCities:       Object.entries(cityMap).filter(([c]) => c).sort((a,b) => b[1]-a[1]).slice(0,8).map(([name,views])=>({name,views})),
-    topRegions:      Object.entries(regionMap).filter(([r]) => r).sort((a,b) => b[1]-a[1]).slice(0,6).map(([name,views])=>({name,views})),
+    topCities:  Object.entries(cityTotals).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
+    topRegions: Object.entries(regionTotals).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
     devices:         deviceMap,
     scrollDepthChart: [25,50,75,100].map((depth) => ({ depth, count: scrollMap[depth] ?? 0 })),
     referrerChart:   Object.entries(referrerMap).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),
