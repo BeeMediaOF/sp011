@@ -16,7 +16,16 @@ if (!process.env["ADMIN_DEFAULT_PASSWORD"]) {
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 const rawOrigins = process.env["ALLOWED_ORIGINS"] ?? "";
-const allowedOrigins = rawOrigins.split(",").map((s) => s.trim()).filter(Boolean);
+const explicitOrigins = rawOrigins.split(",").map((s) => s.trim()).filter(Boolean);
+
+// Automatically include Replit-assigned domains (comma-separated in REPLIT_DOMAINS)
+const replitDomains = (process.env["REPLIT_DOMAINS"] ?? "")
+  .split(",")
+  .map((d) => d.trim())
+  .filter(Boolean)
+  .flatMap((d) => [`https://${d}`, `http://${d}`]);
+
+const allowedOrigins = [...new Set([...explicitOrigins, ...replitDomains])];
 
 let corsOrigin: cors.CorsOptions["origin"];
 
@@ -26,9 +35,9 @@ if (allowedOrigins.length > 0) {
     if (!origin || allowedOrigins.includes(origin)) cb(null, true);
     else cb(new Error(`Origem não permitida: ${origin}`));
   };
+  if (isProd) logger.info({ allowedOrigins }, "CORS allow-list configured.");
 } else if (isProd) {
   // Production with no allow-list configured: block all cross-origin requests.
-  // Set ALLOWED_ORIGINS to your domain(s) to fix this.
   logger.warn(
     "ALLOWED_ORIGINS is not set in production — all cross-origin requests will be blocked. " +
     "Set ALLOWED_ORIGINS=https://yourdomain.com to allow your frontend."
