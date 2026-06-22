@@ -95,6 +95,7 @@ function emptyForm() {
   return {
     name: "", position: "" as AdPosition | "", link: "", preview: "", active: true,
     targetDevices: ["desktop", "mobile", "tablet"] as ("desktop" | "mobile" | "tablet")[],
+    expiresAt: "",
   };
 }
 
@@ -292,6 +293,23 @@ function AdFormModal({
             <p className="text-[10px] text-gray-400">Selecione os dispositivos onde este anúncio deve aparecer.</p>
           </div>
 
+          {/* Expiry date */}
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-[#0F172A]">
+              Data de expiração <span className="text-xs text-gray-400 font-normal">(opcional)</span>
+            </label>
+            <input
+              type="date"
+              value={form.expiresAt}
+              min={new Date().toISOString().split("T")[0]}
+              onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
+            />
+            {form.expiresAt && (
+              <p className="text-xs text-amber-600">O anúncio expirará em {new Date(form.expiresAt + "T12:00:00").toLocaleDateString("pt-BR")}</p>
+            )}
+          </div>
+
           {/* Status toggle */}
           <div className="flex items-center justify-between py-3 border-t border-gray-100">
             <div>
@@ -419,6 +437,7 @@ export default function AdsManager() {
     setForm({
       name: ad.name, position: ad.position, link: ad.link, preview: ad.imageBase64, active: ad.active,
       targetDevices: ad.targetDevices && ad.targetDevices.length > 0 ? ad.targetDevices : ["desktop", "mobile", "tablet"],
+      expiresAt: ad.expiresAt ? new Date(ad.expiresAt).toISOString().split("T")[0] : "",
     });
     setModalOpen(true);
   }
@@ -440,12 +459,14 @@ export default function AdsManager() {
           name: form.name, link: form.link,
           imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
           targetDevices: form.targetDevices,
+          expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
         });
       } else {
         await adminApi.createAd({
           name: form.name, link: form.link,
           imageBase64: form.preview, position: form.position as AdPosition, active: form.active,
           targetDevices: form.targetDevices,
+          expiresAt: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
         });
       }
       closeModal();

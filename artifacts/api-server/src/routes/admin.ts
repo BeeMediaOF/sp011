@@ -4,9 +4,11 @@ import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { db, usersTable, adsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
-  authMiddleware, generateToken, verifyPassword,
-  checkRateLimit, resetRateLimit,
+  authMiddleware, generateToken, generateTempToken, verifyTempToken,
+  verifyPassword, checkRateLimit, resetRateLimit,
 } from "../middlewares/auth.js";
+import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, generateURI as otpGenerateURI } from "otplib";
+import QRCode from "qrcode";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
@@ -83,7 +85,17 @@ router.post("/login", async (req, res) => {
           description: `Tentativa de login inválida (${newFailed}/5): ${user.email}`,
           ipAddress: ip, userAgent: ua, route: "/api/admin/login",
         });
-        res.status(401).json({ error: "E-mail ou senha inválidos." });
+        res.status(401).json({
+          error: "E-mail ou senha inválidos.",
+          requiresCaptcha: newFailed >= 3,
+        });
+        return;
+      }
+
+      // Two-factor auth check — return a temp token for the TOTP step
+      if (user.twoFactorEnabled) {
+        const tempToken = generateTempToken(user.id);
+        res.json({ requiresTwoFactor: true, tempToken });
         return;
       }
 
@@ -116,6 +128,109 @@ router.post("/login", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Login error");
     res.status(500).json({ error: "Erro interno no login." });
+  }
+});
+
+// ─── 2FA Routes ──────────────────────────────────────────────────────────────
+
+/** POST /api/admin/2fa/setup — generate TOTP secret + QR code */
+router.post("/2fa/setup", authMiddleware, async (req, res) => {
+  if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+  try {
+    const [user] = await db.select({ email: usersTable.email })
+      .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
+    const secret = otpGenerateSecret();
+    const otpauth = otpGenerateURI({ label: user.email, issuer: "Brasília Agora Admin", secret });
+    const qrDataUrl = await QRCode.toDataURL(otpauth);
+    // Store secret temporarily (user must verify before it's persisted)
+    await db.update(usersTable).set({ twoFactorSecret: secret }).where(eq(usersTable.id, req.userId));
+    res.json({ secret, qrDataUrl });
+  } catch (err) {
+    req.log.error({ err }, "2FA setup error");
+    res.status(500).json({ error: "Erro ao configurar 2FA" });
+  }
+});
+
+/** POST /api/admin/2fa/verify — verify TOTP code and enable 2FA */
+router.post("/2fa/verify", authMiddleware, async (req, res) => {
+  if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+  const { code } = req.body as { code?: string };
+  if (!code) { res.status(400).json({ error: "Código obrigatório" }); return; }
+  try {
+    const [user] = await db.select({ twoFactorSecret: usersTable.twoFactorSecret })
+      .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
+    if (!user?.twoFactorSecret) { res.status(400).json({ error: "Execute /2fa/setup primeiro" }); return; }
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret, strategy: "totp" });
+    if (!valid) { res.status(400).json({ error: "Código inválido" }); return; }
+    await db.update(usersTable).set({ twoFactorEnabled: true }).where(eq(usersTable.id, req.userId));
+    res.json({ ok: true, message: "2FA ativado com sucesso" });
+  } catch (err) {
+    req.log.error({ err }, "2FA verify error");
+    res.status(500).json({ error: "Erro ao verificar 2FA" });
+  }
+});
+
+/** POST /api/admin/2fa/disable — disable 2FA (requires valid code) */
+router.post("/2fa/disable", authMiddleware, async (req, res) => {
+  if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+  const { code } = req.body as { code?: string };
+  if (!code) { res.status(400).json({ error: "Código obrigatório" }); return; }
+  try {
+    const [user] = await db.select({ twoFactorSecret: usersTable.twoFactorSecret, twoFactorEnabled: usersTable.twoFactorEnabled })
+      .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
+    if (!user?.twoFactorEnabled) { res.json({ ok: true, message: "2FA já estava desativado" }); return; }
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret!, strategy: "totp" });
+    if (!valid) { res.status(400).json({ error: "Código inválido" }); return; }
+    await db.update(usersTable).set({ twoFactorEnabled: false, twoFactorSecret: null }).where(eq(usersTable.id, req.userId));
+    res.json({ ok: true, message: "2FA desativado" });
+  } catch (err) {
+    req.log.error({ err }, "2FA disable error");
+    res.status(500).json({ error: "Erro ao desativar 2FA" });
+  }
+});
+
+/** POST /api/admin/2fa/status — check 2FA status for current user */
+router.get("/2fa/status", authMiddleware, async (req, res) => {
+  if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
+  const [user] = await db.select({ twoFactorEnabled: usersTable.twoFactorEnabled })
+    .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
+  res.json({ twoFactorEnabled: user?.twoFactorEnabled ?? false });
+});
+
+/** POST /api/admin/2fa/login — complete 2FA login with tempToken + TOTP code */
+router.post("/2fa/login", async (req, res) => {
+  const ip = getClientIp(req);
+  const { tempToken, code } = req.body as { tempToken?: string; code?: string };
+  if (!tempToken || !code) { res.status(400).json({ error: "tempToken e code são obrigatórios" }); return; }
+  const userId = verifyTempToken(tempToken);
+  if (!userId) { res.status(401).json({ error: "Token inválido ou expirado" }); return; }
+  try {
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+    if (!user || user.status !== "active") { res.status(401).json({ error: "Conta inativa" }); return; }
+    if (!user.twoFactorSecret) { res.status(400).json({ error: "2FA não configurado" }); return; }
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret, strategy: "totp" });
+    if (!valid) {
+      await logSecurity({
+        userId: user.id, userEmail: user.email,
+        eventType: "failed_login", severity: "medium",
+        description: `Código 2FA inválido: ${user.email}`,
+        ipAddress: ip, userAgent: req.headers["user-agent"] ?? "", route: "/api/admin/2fa/login",
+      });
+      res.status(401).json({ error: "Código inválido" });
+      return;
+    }
+    await db.update(usersTable).set({ lastLogin: new Date(), failedLoginAttempts: 0, lockedUntil: null, updatedAt: new Date() })
+      .where(eq(usersTable.id, user.id));
+    await logAudit({
+      userId: user.id, userEmail: user.email, action: "login", module: "auth",
+      description: `Login com 2FA: ${user.email}`, ipAddress: ip, userAgent: req.headers["user-agent"] ?? "",
+    });
+    const token = generateToken(user.id, user.role);
+    res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null });
+  } catch (err) {
+    req.log.error({ err }, "2FA login error");
+    res.status(500).json({ error: "Erro interno" });
   }
 });
 
@@ -516,6 +631,7 @@ function adRowToPublic(r: typeof adsTable.$inferSelect) {
     clicks: r.clicks,
     impressions: r.impressions,
     targetDevices: parseTargetDevices(r.targetDevices),
+    expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   };
@@ -537,9 +653,9 @@ router.get("/ads/:id", async (req, res) => {
 
 /** POST /api/admin/ads — create ad */
 router.post("/ads", async (req, res) => {
-  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices } = req.body as {
+  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices, expiresAt } = req.body as {
     name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
-    targetDevices?: ("desktop" | "mobile" | "tablet")[];
+    targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null;
   };
   if (!name || (!imageBase64 && !imageUrlIn) || !link) {
     res.status(400).json({ error: "name, link e imageBase64 ou imageUrl são obrigatórios" }); return;
@@ -557,6 +673,7 @@ router.post("/ads", async (req, res) => {
     clicks: 0,
     impressions: 0,
     targetDevices: serializeTargetDevices(targetDevices ?? ["desktop", "mobile", "tablet"]),
+    expiresAt: expiresAt ? new Date(expiresAt) : null,
     createdAt: now,
     updatedAt: now,
   }).returning();
@@ -566,9 +683,9 @@ router.post("/ads", async (req, res) => {
 /** PUT /api/admin/ads/:id */
 router.put("/ads/:id", async (req, res) => {
   const id = req.params.id ?? "";
-  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices } = req.body as {
+  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices, expiresAt } = req.body as {
     name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
-    targetDevices?: ("desktop" | "mobile" | "tablet")[];
+    targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null;
   };
   const safePosition: AdPosition | undefined = position
     ? ((VALID_AD_POSITIONS as string[]).includes(position) ? (position as AdPosition) : undefined)
@@ -581,6 +698,7 @@ router.put("/ads/:id", async (req, res) => {
   if (safePosition !== undefined) updateData.position = safePosition;
   if (active !== undefined) updateData.active = active;
   if (targetDevices !== undefined) updateData.targetDevices = serializeTargetDevices(targetDevices);
+  if (expiresAt !== undefined) updateData.expiresAt = expiresAt ? new Date(expiresAt) : null;
   const [row] = await db.update(adsTable).set(updateData).where(eq(adsTable.id, id)).returning();
   if (!row) { res.status(404).json({ error: "Ad not found" }); return; }
   res.json({ ad: adRowToPublic(row) });

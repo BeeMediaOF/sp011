@@ -82,7 +82,7 @@ export function verifyToken(token: string): TokenPayload | null {
     if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
     const ts = parts[parts.length - 2];
     const age = Date.now() - Number(ts);
-    if (age > 604_800_000) return null; // 7 days
+    if (age > 28_800_000) return null; // 8 hours
     const userId = parseInt(parts[0] as string, 10);
     const role = parts[1] as string;
     if (isNaN(userId)) return null;
@@ -176,6 +176,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     req.userId    = payload.userId;
     req.userRole  = user.role;
     req.userEmail = user.email;
+    // Update lastSeenAt in the background (non-blocking)
+    db.update(usersTable).set({ lastSeenAt: new Date() }).where(eq(usersTable.id, payload.userId)).catch(() => {});
     next();
   } catch {
     req.userId   = payload.userId;
@@ -198,6 +200,43 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
 const RATE_LIMIT_MAX     = 10;
 const RATE_LIMIT_WINDOW  = 60_000; // 1 minute
+
+// ─── 2FA Temp Token (10-minute, single-use for TOTP verification) ─────────────
+
+const TEMP_TOKEN_EXPIRY_MS = 10 * 60 * 1000;
+
+export function generateTempToken(userId: number): string {
+  const ts = Date.now().toString();
+  const payload = `${userId}:2fa-pending:${ts}`;
+  const sig = createHmac("sha256", SECRET).update(payload).digest("hex");
+  return Buffer.from(`${payload}:${sig}`).toString("base64url");
+}
+
+export function verifyTempToken(token: string): number | null {
+  try {
+    const decoded = Buffer.from(token, "base64url").toString("utf-8");
+    const lastColon = decoded.lastIndexOf(":");
+    if (lastColon === -1) return null;
+    const sig     = decoded.slice(lastColon + 1);
+    const payload = decoded.slice(0, lastColon);
+    const expected = createHmac("sha256", SECRET).update(payload).digest("hex");
+    if (sig.length !== expected.length) return null;
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    const parts = payload.split(":");
+    if (parts.length !== 3 || parts[1] !== "2fa-pending") return null;
+    const age = Date.now() - Number(parts[2]);
+    if (age > TEMP_TOKEN_EXPIRY_MS) return null;
+    const userId = parseInt(parts[0]!, 10);
+    if (isNaN(userId)) return null;
+    return userId;
+  } catch {
+    return null;
+  }
+}
+
+// ─── Rate limiting (DB-backed, persistent across restarts) ────────────────────
+// 10 attempts per minute per IP. Uses PostgreSQL so it survives restarts and
+// works correctly across multiple server instances.
 
 export async function checkRateLimit(ip: string): Promise<boolean> {
   const now = new Date();

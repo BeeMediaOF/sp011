@@ -36,6 +36,7 @@ import Articles from "@/pages/admin/Articles";
 import ArticleEdit from "@/pages/admin/ArticleEdit";
 import MenuManager from "@/pages/admin/MenuManager";
 import Settings from "@/pages/admin/Settings";
+import TwoFactorSetup from "@/pages/admin/TwoFactorSetup";
 import Webhook from "@/pages/admin/Webhook";
 import AdsManager from "@/pages/admin/AdsManager";
 import ColumnistsManager from "@/pages/admin/ColumnistsManager";
@@ -138,6 +139,9 @@ function Router() {
       </Route>
       <Route path="/admin/configuracoes">
         <RequireAdmin><Settings /></RequireAdmin>
+      </Route>
+      <Route path="/admin/2fa-setup">
+        <RequireAdmin><TwoFactorSetup /></RequireAdmin>
       </Route>
       <Route path="/admin/logo">
         <RequireAdmin><Settings /></RequireAdmin>

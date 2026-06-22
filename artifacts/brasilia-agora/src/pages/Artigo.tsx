@@ -101,6 +101,60 @@ export default function Artigo() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id]);
 
+  /* Dynamic OG meta tags + AMP link */
+  useEffect(() => {
+    if (!article) return;
+    const articleSlug = article.slug || article.id;
+    const canonical = `${window.location.origin}/artigo/${articleSlug}`;
+    const ampUrl    = `${window.location.origin}/api/amp/artigos/${articleSlug}`;
+    const title = article.title.replace(/<[^>]*>/g, "");
+    const desc  = (article.subtitle || article.title).replace(/<[^>]*>/g, "").slice(0, 160);
+    const image = article.imageUrl || "/opengraph.jpg";
+    const prevTitle = document.title;
+    document.title = `${title} — Brasília Agora`;
+
+    function setMeta(prop: string, content: string, isOg = false): HTMLMetaElement {
+      const attr = isOg ? "property" : "name";
+      let el = document.head.querySelector<HTMLMetaElement>(`meta[${attr}="${prop}"]`);
+      if (!el) {
+        el = document.createElement("meta");
+        el.setAttribute(attr, prop);
+        el.dataset.articleDynamic = "1";
+        document.head.appendChild(el);
+      }
+      el.setAttribute("content", content);
+      return el;
+    }
+
+    setMeta("og:type", "article", true);
+    setMeta("og:title", title, true);
+    setMeta("og:description", desc, true);
+    setMeta("og:url", canonical, true);
+    setMeta("og:image", image, true);
+    setMeta("twitter:title", title);
+    setMeta("twitter:description", desc);
+    setMeta("twitter:image", image);
+    if (article.publishedAt) setMeta("article:published_time", new Date(article.publishedAt).toISOString(), true);
+    if (article.category)    setMeta("article:section", article.category, true);
+
+    // AMP alternate link
+    let ampLink = document.head.querySelector<HTMLLinkElement>('link[rel="amphtml"]');
+    const createdAmpLink = !ampLink;
+    if (!ampLink) {
+      ampLink = document.createElement("link");
+      ampLink.rel = "amphtml";
+      document.head.appendChild(ampLink);
+    }
+    ampLink.href = ampUrl;
+
+    return () => {
+      document.title = prevTitle;
+      document.head.querySelectorAll<HTMLMetaElement>("meta[data-article-dynamic]").forEach((el) => el.remove());
+      if (createdAmpLink && ampLink?.parentNode) ampLink.parentNode.removeChild(ampLink);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [article?.id]);
+
   const showSkeleton = loading;
 
   const chapeuColor =

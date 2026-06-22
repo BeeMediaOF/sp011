@@ -120,6 +120,31 @@ async function runCheck(): Promise<void> {
   await runPerplexityCheck();
 }
 
+// ─── Log retention (daily cleanup) ───────────────────────────────────────────
+
+async function runLogRetention(): Promise<void> {
+  try {
+    const { db, auditLogsTable, securityLogsTable, rssEventLogsTable } = await import("@workspace/db");
+    const { lt } = await import("drizzle-orm");
+
+    const auditCutoff    = new Date(Date.now() - 90  * 24 * 3600 * 1000); // 90 days
+    const securityCutoff = new Date(Date.now() - 180 * 24 * 3600 * 1000); // 180 days
+    const rssCutoff      = new Date(Date.now() - 30  * 24 * 3600 * 1000); // 30 days
+
+    const [a, s, r] = await Promise.all([
+      db.delete(auditLogsTable).where(lt(auditLogsTable.createdAt, auditCutoff)),
+      db.delete(securityLogsTable).where(lt(securityLogsTable.createdAt, securityCutoff)),
+      db.delete(rssEventLogsTable).where(lt(rssEventLogsTable.ts, rssCutoff)),
+    ]);
+
+    logger.info({ auditDeleted: a.rowCount, securityDeleted: s.rowCount, rssDeleted: r.rowCount }, "Log retention: cleanup complete");
+  } catch (err) {
+    logger.warn({ err }, "Log retention: cleanup failed");
+  }
+}
+
+const LOG_RETENTION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
 export function startScheduler(): void {
   // Start the async rewrite queue worker (processes 1 article/5s)
   startRewriteWorker();
@@ -129,5 +154,12 @@ export function startScheduler(): void {
     void runCheck();
     setInterval(() => { void runCheck(); }, CHECK_INTERVAL_MS);
   }, 60_000);
+
+  // Log retention: run once per day (first run after 2 minutes)
+  setTimeout(() => {
+    void runLogRetention();
+    setInterval(() => { void runLogRetention(); }, LOG_RETENTION_INTERVAL_MS);
+  }, 2 * 60_000);
+
   logger.info("RSS scheduler started (checking every 20 min)");
 }

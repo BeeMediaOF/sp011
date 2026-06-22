@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, pgEnum, index } from "drizzle-orm/pg-core";
 
 export const articleStatusEnum  = pgEnum("article_status",  ["draft", "published"]);
 export const articleOriginEnum  = pgEnum("article_origin",  ["manual", "rss", "perplexity"]);
@@ -24,7 +24,12 @@ export const articlesTable = pgTable("articles", {
   draftReason:   text("draft_reason"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => ({
+  slugIdx:        index("articles_slug_idx").on(table.slug),
+  statusIdx:      index("articles_status_idx").on(table.status),
+  categoryIdx:    index("articles_category_idx").on(table.category),
+  publishedAtIdx: index("articles_published_at_idx").on(table.publishedAt),
+}));
 
 export type ArticleRow    = typeof articlesTable.$inferSelect;
 export type ArticleInsert = typeof articlesTable.$inferInsert;

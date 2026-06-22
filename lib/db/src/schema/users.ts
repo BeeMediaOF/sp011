@@ -1,4 +1,4 @@
-import { pgTable, serial, text, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, timestamp, integer, boolean, pgEnum } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -20,6 +20,9 @@ export const usersTable = pgTable("users", {
   passwordChangedAt: timestamp("password_changed_at"),
   mustChangePassword: integer("must_change_password").notNull().default(0),
   avatarBase64: text("avatar_base64"),
+  twoFactorSecret: text("two_factor_secret"),
+  twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({

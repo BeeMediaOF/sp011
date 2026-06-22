@@ -68,24 +68,26 @@ app.use(
 );
 
 // ── Security headers (helmet + CSP) ──────────────────────────────────────────
-// This is a JSON API — the CSP restricts what browsers can do with API responses.
-// It does NOT affect the frontend Vite app (served separately).
+// Applied to all responses including AMP pages and the sitemap.
+// The frontend Vite app is served separately and has its own headers.
 app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc:      ["'none'"],
-        scriptSrc:       ["'none'"],
-        styleSrc:        ["'none'"],
-        imgSrc:          ["'self'", "data:"],
-        fontSrc:         ["'none'"],
+        defaultSrc:      ["'self'"],
+        scriptSrc:       ["'self'", "'unsafe-inline'", "https://cdn.ampproject.org"],
+        styleSrc:        ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc:          ["'self'", "data:", "https:"],
+        fontSrc:         ["'self'", "https://fonts.gstatic.com"],
         connectSrc:      ["'self'"],
         frameAncestors:  ["'none'"],
-        formAction:      ["'none'"],
-        baseUri:         ["'none'"],
+        formAction:      ["'self'"],
+        baseUri:         ["'self'"],
         objectSrc:       ["'none'"],
       },
     },
+    referrerPolicy:            { policy: "strict-origin-when-cross-origin" },
+    permittedCrossDomainPolicies: false,
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
   }),

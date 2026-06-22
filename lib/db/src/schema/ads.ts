@@ -21,6 +21,7 @@ export const adsTable = pgTable("ads", {
   impressions:   integer("impressions").notNull().default(0),
   targetDevices: text("target_devices").notNull().default("desktop,mobile,tablet"),
   imageUrl:      text("image_url"),
+  expiresAt:     timestamp("expires_at", { withTimezone: true }),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
@@ -60,6 +61,7 @@ export type AdPublic = {
   clicks: number;
   impressions: number;
   targetDevices: ("desktop"|"mobile"|"tablet")[];
+  expiresAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -64,11 +64,19 @@ export const adminApi = {
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
   getAd: (id: string) => req<{ ad: Ad }>("GET", `/ads/${id}`),
-  createAd: (data: { name: string; imageBase64: string; link: string; position: Ad["position"]; active: boolean; targetDevices?: ("desktop" | "mobile" | "tablet")[] }) =>
+  createAd: (data: { name: string; imageBase64: string; link: string; position: Ad["position"]; active: boolean; targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null }) =>
     req<{ ad: Ad }>("POST", "/ads", data),
   updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
   deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),
   trackAdClick: (id: string) => fetch(`/api/ads/${id}/click`, { method: "POST" }).then((r) => r.json()),
+
+  // 2FA
+  twoFaStatus: () => req<{ twoFactorEnabled: boolean }>("GET", "/2fa/status"),
+  twoFaSetup: () => req<{ secret: string; qrDataUrl: string }>("POST", "/2fa/setup", {}),
+  twoFaVerify: (code: string) => req<{ ok: boolean; message: string }>("POST", "/2fa/verify", { code }),
+  twoFaDisable: (code: string) => req<{ ok: boolean; message: string }>("POST", "/2fa/disable", { code }),
+  twoFaLogin: (tempToken: string, code: string) =>
+    req<{ token: string; email: string; role: string; name: string; avatarBase64: string | null }>("POST", "/2fa/login", { tempToken, code }),
 
   // Columnists
   getColumnists: () => req<{ columnists: Columnist[] }>("GET", "/columnists"),
@@ -288,6 +296,7 @@ export interface Ad {
   createdAt: string;
   updatedAt: string;
   targetDevices?: ("desktop" | "mobile" | "tablet")[];
+  expiresAt?: string | null;
 }
 
 export type ColumnistSpecialty =

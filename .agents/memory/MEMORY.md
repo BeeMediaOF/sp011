@@ -6,3 +6,5 @@
 - [Admin design system completo](admin-design-system.md) — Todas as páginas admin redesenhadas; tokens: bg #F7F9FC, primary #0B2A66, accent #E71D36, card shadow 0 8px 24px rgba(15,23,42,0.06), rounded-2xl
 - [Sistema de autenticação admin](auth-system.md) — DB-backed auth com scrypt, RBAC admin/editor, seed automático, lockout, audit/security logs
 - [Dependências problemáticas do api-server](problematic-deps.md) — @replit/object-storage e geoip-lite v2 causam crash; como evitar
+- [otplib v13 API funcional](otplib-v13.md) — Não exporta `authenticator`; usar generateSecret/verifySync/generateURI importados de "otplib"
+- [Features de segurança implementadas](security-features.md) — TOTP 2FA completo, math CAPTCHA pós-3-falhas, token 8h, lastSeenAt, log retention cron, AMP route, OG dinâmico

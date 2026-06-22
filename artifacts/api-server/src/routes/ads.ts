@@ -1,20 +1,28 @@
 import { Router } from "express";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { db, adsTable, parseTargetDevices } from "@workspace/db";
 
 const router = Router();
 
-/** GET /api/ads — list active ads (public) */
+/** GET /api/ads — list active non-expired ads (public) */
 router.get("/", async (_req, res) => {
+  const now = new Date();
+
   const rows = await db
     .select()
     .from(adsTable)
-    .where(eq(adsTable.active, true));
+    .where(
+      and(
+        eq(adsTable.active, true),
+        // Include ads with no expiry, or expiry in the future
+        or(isNull(adsTable.expiresAt), gte(adsTable.expiresAt, now))
+      )
+    );
 
   const ads = rows.map((r) => ({
     id: r.id,
-    imageUrl: r.imageUrl || undefined,
-    imageBase64: r.imageUrl ? "" : r.imageBase64,
+    // Omit imageBase64 when imageUrl is present (ghost field fix)
+    ...(r.imageUrl ? { imageUrl: r.imageUrl } : { imageBase64: r.imageBase64 }),
     link: r.link,
     position: r.position,
     targetDevices: parseTargetDevices(r.targetDevices),
