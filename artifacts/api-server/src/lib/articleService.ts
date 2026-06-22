@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { eq, or, desc, sql } from "drizzle-orm";
+import { eq, or, and, isNull, desc, sql } from "drizzle-orm";
 import { db, articlesTable, type ArticleRow } from "@workspace/db";
 
 function slugify(text: string): string {
@@ -71,6 +71,25 @@ export const articleService = {
       .select()
       .from(articlesTable)
       .orderBy(desc(articlesTable.createdAt));
+    return rows.map(rowToArticle);
+  },
+
+  /** Returns drafts that haven't been AI-rewritten yet (up to `limit`). */
+  async getPendingRewrites(limit = 50): Promise<Article[]> {
+    const rows = await db
+      .select()
+      .from(articlesTable)
+      .where(
+        and(
+          eq(articlesTable.status, "draft"),
+          or(
+            isNull(articlesTable.aiRewritten),
+            eq(articlesTable.aiRewritten, false),
+          ),
+        ),
+      )
+      .orderBy(articlesTable.createdAt)
+      .limit(limit);
     return rows.map(rowToArticle);
   },
 

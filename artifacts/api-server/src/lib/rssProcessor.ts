@@ -251,7 +251,7 @@ function parseRewriteResult(raw: string): RewriteResult {
 
 // ─── AI Quota Manager ─────────────────────────────────────────────────────────
 
-const DEFAULT_DAILY_LIMIT = 18; // safety margin under the 20 free-tier req/day
+const DEFAULT_DAILY_LIMIT = 200; // Gemini free tier: 1500 RPD; 200 = safe daily budget
 const MIN_CALL_INTERVAL_MS = 3_000; // 3 s between successive AI calls
 
 interface QuotaState {

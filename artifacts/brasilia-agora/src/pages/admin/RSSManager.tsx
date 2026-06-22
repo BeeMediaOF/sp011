@@ -292,6 +292,13 @@ export default function RSSManager() {
   const [defsApplied,   setDefsApplied]   = useState(false);
   const [runningAll,    setRunningAll]    = useState(false);
 
+  // ── Rewrite Queue (server-side) ──
+  const [rwQueue, setRwQueue] = useState<{
+    pending: number; paused: boolean; processedTotal: number; failedTotal: number;
+    quota: { usedToday: number; dailyLimit: number; remaining: number; isOnCooldown: boolean; isExhausted: boolean; cooldownSecs: number };
+  } | null>(null);
+  const [queueLoading, setQueueLoading] = useState(false);
+
   // ── Table UI ──
   const [currentPage,  setCurrentPage]  = useState(1);
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -364,6 +371,40 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadQueueStats = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}api/admin/queue/status`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      if (res.ok) setRwQueue(await res.json() as typeof rwQueue);
+    } catch { /* ignore */ }
+  }, []);
+
+  async function processDrafts() {
+    setQueueLoading(true);
+    try {
+      const res = await fetch(`${BASE}api/admin/queue/process-drafts`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const d = await res.json() as { added: number; pending: number };
+      await loadQueueStats();
+      alert(`${d.added} rascunho(s) adicionado(s) à fila. Total na fila: ${d.pending}`);
+    } catch { /* ignore */ } finally {
+      setQueueLoading(false);
+    }
+  }
+
+  async function toggleQueuePause() {
+    if (!queueStats) return;
+    const path = queueStats.paused ? "resume" : "pause";
+    await fetch(`${BASE}api/admin/queue/${path}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    await loadQueueStats();
+  }
+
   const loadMenuCategories = useCallback(async () => {
     try {
       const res = await fetch(`${BASE}api/admin/menu`, {
@@ -388,9 +429,11 @@ export default function RSSManager() {
     void loadRssStats();
     void loadPrompts();
     void loadLogs();
+    void loadQueueStats();
     const quotaInterval = setInterval(() => void loadAiQuota(), 15_000);
-    return () => clearInterval(quotaInterval);
-  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs]);
+    const queueInterval = setInterval(() => void loadQueueStats(), 10_000);
+    return () => { clearInterval(quotaInterval); clearInterval(queueInterval); };
+  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -1256,6 +1299,95 @@ export default function RSSManager() {
 
           {/* ── RIGHT: add form + advanced ────────────────────────────────── */}
           <div className="space-y-4">
+
+            {/* ── Rewrite Queue Status card ─────────────────────────────────── */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-purple-50">
+                    <Cpu size={16} className="text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0B2A66]">Fila de Reescrita IA</h3>
+                    <p className="text-[11px] text-slate-400">Gemini processa 1 artigo / 6s</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => void loadQueueStats()}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                  title="Atualizar"
+                >
+                  <RefreshCw size={13} />
+                </button>
+              </div>
+
+              {rwQueue ? (
+                <div className="space-y-3">
+                  {/* Quota bar */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] text-slate-500">Cota diária Gemini</span>
+                      <span className={`text-[11px] font-semibold ${rwQueue.quota.isExhausted || rwQueue.quota.isOnCooldown ? "text-red-600" : rwQueue.quota.remaining <= 20 ? "text-amber-600" : "text-green-600"}`}>
+                        {rwQueue.quota.usedToday} / {rwQueue.quota.dailyLimit}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${rwQueue.quota.isExhausted || rwQueue.quota.isOnCooldown ? "bg-red-500" : rwQueue.quota.remaining <= 20 ? "bg-amber-400" : "bg-green-500"}`}
+                        style={{ width: `${Math.min(100, (rwQueue.quota.usedToday / rwQueue.quota.dailyLimit) * 100)}%` }}
+                      />
+                    </div>
+                    {rwQueue.quota.isOnCooldown && (
+                      <p className="text-[10px] text-amber-600 mt-1">⏳ Aguardando {rwQueue.quota.cooldownSecs}s — limite temporário da API</p>
+                    )}
+                    {rwQueue.quota.isExhausted && (
+                      <p className="text-[10px] text-red-600 mt-1">🚫 Cota diária esgotada — reseta à meia-noite</p>
+                    )}
+                  </div>
+
+                  {/* Stats row */}
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Na fila", value: rwQueue.pending, color: "text-blue-600 bg-blue-50" },
+                      { label: "Publicados", value: rwQueue.processedTotal, color: "text-green-600 bg-green-50" },
+                      { label: "Falhas", value: rwQueue.failedTotal, color: "text-red-600 bg-red-50" },
+                    ].map(({ label, value, color }) => (
+                      <div key={label} className={`rounded-xl p-2 text-center ${color}`}>
+                        <p className="text-base font-bold">{value}</p>
+                        <p className="text-[10px] font-medium">{label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => void processDrafts()}
+                      disabled={queueLoading || rwQueue.quota.isExhausted}
+                      className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
+                    >
+                      {queueLoading ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} />}
+                      Processar rascunhos
+                    </button>
+                    <button
+                      onClick={() => void toggleQueuePause()}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${rwQueue.paused ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}
+                      title={rwQueue.paused ? "Retomar fila" : "Pausar fila"}
+                    >
+                      {rwQueue.paused ? <Play size={12} /> : <StopCircle size={12} />}
+                    </button>
+                  </div>
+                  {rwQueue.paused && (
+                    <p className="text-[10px] text-amber-600 text-center">⏸ Fila pausada manualmente</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Carregando status da fila…
+                </div>
+              )}
+            </div>
 
             {/* Add source form */}
             <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>

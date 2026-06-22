@@ -24,6 +24,7 @@ import realtimeStatsRouter from "./realtime-stats";
 import rssLogsRouter from "./rss-logs";
 import pushRouter from "./push";
 import sitemapNewsRouter from "./sitemap-news";
+import queueRouter from "./queue";
 
 const router: IRouter = Router();
 
@@ -51,5 +52,6 @@ router.use("/admin/realtime-stats", realtimeStatsRouter);
 router.use("/admin/rss-logs", rssLogsRouter);
 router.use("/push", pushRouter);
 router.use(sitemapNewsRouter);
+router.use("/admin/queue", queueRouter);
 
 export default router;
