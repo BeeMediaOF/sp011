@@ -35,6 +35,7 @@ export interface Article {
   aiRewritten?: boolean;
   slug?: string;
   keywords?: string;
+  draftReason?: string;
 }
 
 function rowToArticle(row: ArticleRow): Article {
@@ -58,6 +59,7 @@ function rowToArticle(row: ArticleRow): Article {
     aiRewritten:   row.aiRewritten ?? undefined,
     slug:          row.slug ?? undefined,
     keywords:      row.keywords ?? undefined,
+    draftReason:   row.draftReason ?? undefined,
   };
 }
 
@@ -154,6 +156,7 @@ export const articleService = {
         aiRewritten:   data.aiRewritten ?? false,
         slug,
         keywords:      data.keywords,
+        draftReason:   data.draftReason ?? null,
         createdAt:     now,
         updatedAt:     now,
       })
@@ -185,6 +188,7 @@ export const articleService = {
         ...(data.aiRewritten   !== undefined && { aiRewritten:   data.aiRewritten }),
         ...(data.slug          !== undefined && { slug:          data.slug }),
         ...(data.keywords      !== undefined && { keywords:      data.keywords }),
+        ...(data.draftReason   !== undefined && { draftReason:   data.draftReason }),
         updatedAt: new Date(),
       })
       .where(eq(articlesTable.id, id))

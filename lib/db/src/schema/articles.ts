@@ -21,6 +21,7 @@ export const articlesTable = pgTable("articles", {
   aiRewritten:   boolean("ai_rewritten").default(false),
   slug:          text("slug"),
   keywords:      text("keywords"),
+  draftReason:   text("draft_reason"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

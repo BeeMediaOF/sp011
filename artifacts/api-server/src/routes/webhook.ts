@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { articleService } from "../lib/articleService.js";
+import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
+
+const publishRateLimit = endpointRateLimit("/api/publish");
 
 const router = Router();
 
@@ -61,7 +64,7 @@ function deriveTitle(subtitle?: string, content?: string): string {
  *   author      string  optional  default: "Redação Brasília Hoje"
  *   id          string  optional  if provided without title, publishes an existing draft
  */
-router.post("/", authMiddleware, async (req, res) => {
+router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
   req.log.info({ webhookBody: req.body, contentType: String(req.headers["content-type"] ?? "") }, "POST /api/publish received");
 
   const {

@@ -13,7 +13,8 @@ router.get("/", async (_req, res) => {
 
   const ads = rows.map((r) => ({
     id: r.id,
-    imageBase64: r.imageBase64,
+    imageUrl: r.imageUrl || undefined,
+    imageBase64: r.imageUrl ? "" : r.imageBase64,
     link: r.link,
     position: r.position,
     targetDevices: parseTargetDevices(r.targetDevices),

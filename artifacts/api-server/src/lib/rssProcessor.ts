@@ -9,6 +9,7 @@ import { GoogleGenAI } from "@google/genai";
 import { store, type RssSource, type RssAutoMode } from "./store.js";
 import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
+import { db, rssEventLogsTable } from "@workspace/db";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
 
@@ -25,12 +26,20 @@ const MAX_LOG = 300;
 const _rssEventLog: RssLogEntry[] = [];
 
 export function addLog(entry: Omit<RssLogEntry, "id" | "ts">) {
-  _rssEventLog.unshift({
-    id: Math.random().toString(36).slice(2),
-    ts: new Date().toISOString(),
-    ...entry,
-  });
+  const id = Math.random().toString(36).slice(2);
+  const ts = new Date().toISOString();
+  _rssEventLog.unshift({ id, ts, ...entry });
   if (_rssEventLog.length > MAX_LOG) _rssEventLog.pop();
+
+  // Persist to DB asynchronously (fire and forget)
+  db.insert(rssEventLogsTable).values({
+    id,
+    ts:           new Date(),
+    type:         entry.type,
+    sourceName:   entry.sourceName,
+    articleTitle: entry.articleTitle,
+    message:      entry.message ?? null,
+  }).catch(() => { /* swallow — memory log already captured */ });
 }
 
 export function getRssLog(): RssLogEntry[] { return [..._rssEventLog]; }
@@ -869,12 +878,23 @@ export async function autoProcessArticle(
   let aiSubtitle: string | undefined;
   let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
+  // ── Ghost-publication guard ────────────────────────────────────────────────
+  // Articles without an image should never be auto-published; downgrade to draft.
+  const hasImage = !!art.imageUrl?.trim();
+  const hasText  = !!art.fullText?.trim();
+
   if (autoMode === "rewrite_draft" || autoMode === "rewrite_publish") {
     if (_rewriteQueue) {
-      // Queue mode: save as draft immediately, then rewrite asynchronously
+      // Queue mode: save as draft immediately, then rewrite asynchronously.
+      // Skip if there's nothing to rewrite.
+      if (!hasText) {
+        addLog({ type: "skip", sourceName, articleTitle: art.title, message: "Ignorado: sem conteúdo para reescrever" });
+        return;
+      }
       const finalStatus = autoMode === "rewrite_publish" ? "published" : "draft";
       const prompts = store.getRssPrompts();
       const chosenPrompt = resolvePrompt(src, prompts);
+      const draftReason = !hasImage ? "no_image" : undefined;
       const saved = await articleService.createArticle({
         title:         art.title,
         subtitle:      art.excerpt.slice(0, 160),
@@ -890,6 +910,7 @@ export async function autoProcessArticle(
         rssSourceName: art.sourceName,
         rssSourceUrl:  art.link,
         aiRewritten:   false,
+        draftReason,
       });
       _rewriteQueue({
         articleId:   saved.id,
@@ -909,7 +930,7 @@ export async function autoProcessArticle(
       const prompts = store.getRssPrompts();
       const chosenPrompt = resolvePrompt(src, prompts);
       const result = await rewriteWithAI(art.title, art.fullText, sourceName, giveCredit, chosenPrompt);
-      content          = result.content;
+      content          = result.content || art.fullText; // fallback to original if AI returns empty
       keywords         = result.keywords;
       slug             = result.slug;
       aiTitle          = result.title    || undefined;
@@ -923,13 +944,29 @@ export async function autoProcessArticle(
     }
   }
 
-  const status = (autoMode === "publish" || autoMode === "rewrite_publish")
+  // Validate final content — use fullText as fallback if AI produced nothing
+  const finalContent = content?.trim() || art.fullText?.trim() || "";
+  const draftReason = !hasImage ? "no_image" : (!finalContent ? "no_content" : undefined);
+
+  // Force draft if ghost-publication guard triggers
+  const intendedStatus = (autoMode === "publish" || autoMode === "rewrite_publish")
     ? "published" : "draft";
+  const status: "draft" | "published" = draftReason ? "draft" : intendedStatus;
+
+  if (draftReason) {
+    addLog({ type: "draft", sourceName, articleTitle: aiTitle ?? art.title, message: `Salvo como rascunho: ${draftReason}` });
+  }
+
+  if (!finalContent && !hasImage) {
+    // Completely empty article — skip entirely rather than save garbage
+    addLog({ type: "skip", sourceName, articleTitle: art.title, message: "Ignorado: sem imagem nem conteúdo" });
+    return;
+  }
 
   await articleService.createArticle({
     title:         aiTitle    ?? art.title,
     subtitle:      aiSubtitle ?? art.excerpt.slice(0, 160),
-    content,
+    content:       finalContent,
     category,
     tag:           TAG_MAP[category] ?? "GERAL",
     imageUrl:      art.imageUrl,
@@ -943,14 +980,17 @@ export async function autoProcessArticle(
     aiRewritten:   aiRewriteSuccess,
     keywords:      keywords || undefined,
     slug:          slug || undefined,
+    draftReason,
   });
 
-  addLog({
-    type:          status === "published" ? "publish" : "draft",
-    sourceName,
-    articleTitle:  aiTitle ?? art.title,
-    message:       status === "published" ? "Publicado" : "Salvo como rascunho",
-  });
+  if (!draftReason) {
+    addLog({
+      type:          status === "published" ? "publish" : "draft",
+      sourceName,
+      articleTitle:  aiTitle ?? art.title,
+      message:       status === "published" ? "Publicado" : "Salvo como rascunho",
+    });
+  }
 }
 
 /** Full pipeline: fetch source, process each article */

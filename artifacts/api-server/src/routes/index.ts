@@ -19,6 +19,8 @@ import logsRouter from "./logs";
 import permissionsRouter from "./permissions";
 import webhookKeyRouter from "./webhook-key";
 import uploadsRouter from "./uploads";
+import realtimeStatsRouter from "./realtime-stats";
+import rssLogsRouter from "./rss-logs";
 
 const router: IRouter = Router();
 
@@ -41,5 +43,7 @@ router.use("/admin/users", usersRouter);
 router.use("/admin/logs", logsRouter);
 router.use("/admin/permissions", permissionsRouter);
 router.use("/admin/webhook-key", webhookKeyRouter);
+router.use("/admin/realtime-stats", realtimeStatsRouter);
+router.use("/admin/rss-logs", rssLogsRouter);
 
 export default router;

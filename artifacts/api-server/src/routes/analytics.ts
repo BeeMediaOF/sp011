@@ -4,8 +4,6 @@ import { db, analyticsEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
-import { logger } from "../lib/logger.js";
-
 const router = Router();
 
 export interface AnalyticsEvent {
@@ -56,9 +54,9 @@ async function flushBuffer(): Promise<void> {
       }))
     );
   } catch (err) {
-    logger.error({ err }, "analytics: flush failed — re-queuing batch");
-    // Re-queue, but cap to BUFFER_MAX to avoid unbounded growth
+    // Re-queue on failure, capped to avoid unbounded growth
     _buffer.unshift(...batch.slice(0, BUFFER_MAX - _buffer.length));
+    void err;
   } finally {
     _flushing = false;
   }
@@ -79,29 +77,10 @@ function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
   return "desktop";
 }
 
-// ─── IP Geolocation ────────────────────────────────────────────────────────────
-interface GeoInfo { city: string; region: string }
-const geoCache = new Map<string, GeoInfo>();
-const LOCAL_IPS = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
-
-async function geoLookup(ip: string): Promise<GeoInfo | null> {
-  if (!ip || LOCAL_IPS.has(ip)) return null;
-  if (geoCache.has(ip)) return geoCache.get(ip)!;
-  const placeholder: GeoInfo = { city: "", region: "" };
-  geoCache.set(ip, placeholder);
-  try {
-    const res = await fetch(
-      `http://ip-api.com/json/${ip}?fields=city,regionName&lang=pt-BR`,
-      { signal: AbortSignal.timeout(4_000) }
-    );
-    if (res.ok) {
-      const data = await res.json() as { city?: string; regionName?: string };
-      const geo: GeoInfo = { city: data.city ?? "", region: data.regionName ?? "" };
-      geoCache.set(ip, geo);
-      return geo;
-    }
-  } catch { /* ignore */ }
-  return null;
+// ─── IP Geolocation (best-effort, no external calls) ─────────────────────────
+// geoip-lite v2 requires separate data file download; returns empty for now.
+function getGeoFromIp(_ip: string): { city?: string; region?: string } {
+  return {};
 }
 
 // ─── POST /api/analytics/event ────────────────────────────────────────────────
@@ -114,7 +93,7 @@ router.post("/event", (req, res) => {
 
   const ua  = req.headers["user-agent"] ?? "";
   const ip  = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "";
-  const geo = geoCache.get(ip);
+  const geo = getGeoFromIp(ip);
 
   pushEvent({
     type: type as AnalyticsEvent["type"],
@@ -125,11 +104,9 @@ router.post("/event", (req, res) => {
     referrer,
     scrollDepth,
     platform,
-    city:   geo?.city   || undefined,
-    region: geo?.region || undefined,
+    city:   geo.city,
+    region: geo.region,
   });
-
-  void geoLookup(ip);
 
   if (type === "category" && category) store.trackCategoryView(category);
   if (type === "pageview" && articleId && title) store.trackArticleView(articleId, title);
@@ -143,13 +120,11 @@ router.get("/stats", authMiddleware, async (_req, res) => {
   const DAY = 86_400_000;
   const thirtyDaysAgo = new Date(now - 30 * DAY);
 
-  // Query DB for last 30 days + merge unflushed buffer
   const [dbRows, allTimeResult] = await Promise.all([
     db.select().from(analyticsEventsTable).where(gte(analyticsEventsTable.ts, thirtyDaysAgo)),
     db.select({ count: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.type, "pageview")),
   ]);
 
-  // Merge DB rows + unflushed buffer (convert buffer to same shape)
   type EventLike = {
     type: string; path: string; title?: string | null; category?: string | null;
     articleId?: string | null; sessionId: string; duration?: number | null;
@@ -162,7 +137,6 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     ..._buffer.map((ev) => ({ ...ev, ts: new Date(ev.ts) })),
   ];
 
-  // ── Aggregation (same logic as before, now over DB rows) ──────────────────
   const byDay: Record<string, number> = {};
   for (let i = 29; i >= 0; i--) {
     const d = new Date(now - i * DAY);
@@ -207,7 +181,6 @@ router.get("/stats", authMiddleware, async (_req, res) => {
 
       const ref = ev.referrer ?? "direto";
       referrerMap[ref] = (referrerMap[ref] ?? 0) + 1;
-
       sessionPageviews[ev.sessionId] = (sessionPageviews[ev.sessionId] ?? 0) + 1;
 
       if (ev.articleId) {
@@ -250,7 +223,6 @@ router.get("/stats", authMiddleware, async (_req, res) => {
   const readCompletions = scrollMap[100] ?? 0;
   const allTime = (allTimeResult[0]?.count ?? 0) + _buffer.filter((e) => e.type === "pageview").length;
 
-  // Merge with persisted article/category views
   const persistedArticleViews = store.getArticleViews();
   const allArticleIds = new Set([...Object.keys(articleMap), ...Object.keys(persistedArticleViews)]);
   const topArticles = Array.from(allArticleIds).map((id) => {

@@ -110,10 +110,10 @@ router.post("/fetch", async (req, res) => {
       const articles = await fetchSourceArticles(src);
       store.updateRssSource(src.id, { lastFetchedAt: new Date().toISOString() });
       // Mark duplicates so the UI can flag them without blocking preview
-      const tagged = articles.map((a) => ({
+      const tagged = await Promise.all(articles.map(async (a) => ({
         ...a,
-        isDuplicate: store.isDuplicateArticle(a.title, a.link),
-      }));
+        isDuplicate: await articleService.isDuplicateArticle(a.title, a.link, a.imageUrl),
+      })));
       allArticles.push(...tagged);
     } catch (err) {
       allArticles.push({

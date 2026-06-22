@@ -5,3 +5,4 @@
 - [Footer com newsletter](footer-newsletter.md) — Newsletter inline com input + botão OK; 4 colunas de links
 - [Admin design system completo](admin-design-system.md) — Todas as páginas admin redesenhadas; tokens: bg #F7F9FC, primary #0B2A66, accent #E71D36, card shadow 0 8px 24px rgba(15,23,42,0.06), rounded-2xl
 - [Sistema de autenticação admin](auth-system.md) — DB-backed auth com scrypt, RBAC admin/editor, seed automático, lockout, audit/security logs
+- [Dependências problemáticas do api-server](problematic-deps.md) — @replit/object-storage e geoip-lite v2 causam crash; como evitar

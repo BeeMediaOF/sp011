@@ -20,6 +20,7 @@ export const adsTable = pgTable("ads", {
   clicks:        integer("clicks").notNull().default(0),
   impressions:   integer("impressions").notNull().default(0),
   targetDevices: text("target_devices").notNull().default("desktop,mobile,tablet"),
+  imageUrl:      text("image_url"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

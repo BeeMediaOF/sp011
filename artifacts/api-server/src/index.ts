@@ -1,15 +1,13 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
-import { store } from "./lib/store.js";
+import { initStore, seedDefaultRssSources } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
+  throw new Error("PORT environment variable is required but was not provided.");
 }
 
 const port = Number(rawPort);
@@ -24,12 +22,15 @@ app.listen(port, async (err) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+
+  // Initialize store from PostgreSQL (migrates store.json data if needed)
+  await initStore();
+  await seedDefaultRssSources();
   await seedAdminUser();
 
   // Migrate articles from store.json to DB (runs only when DB table is empty)
   try {
-    const storeArticles = store.getArticles();
-    const migrated = await articleService.migrateFromStore(storeArticles);
+    const migrated = await articleService.migrateFromStore([]);
     if (migrated > 0) {
       logger.info({ migrated }, "Migrated articles from store.json to PostgreSQL");
     }

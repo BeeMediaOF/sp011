@@ -417,6 +417,7 @@ function adRowToPublic(r: typeof adsTable.$inferSelect) {
     id: r.id,
     name: r.name,
     imageBase64: r.imageBase64,
+    imageUrl: r.imageUrl ?? undefined,
     link: r.link,
     position: r.position,
     active: r.active,
@@ -441,14 +442,15 @@ router.get("/ads/:id", async (req, res) => {
   res.json({ ad: adRowToPublic(row) });
 });
 
+
 /** POST /api/admin/ads — create ad */
 router.post("/ads", async (req, res) => {
-  const { name, imageBase64, link, position, active, targetDevices } = req.body as {
-    name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
+  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices } = req.body as {
+    name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
     targetDevices?: ("desktop" | "mobile" | "tablet")[];
   };
-  if (!name || !imageBase64 || !link) {
-    res.status(400).json({ error: "name, imageBase64 and link are required" }); return;
+  if (!name || (!imageBase64 && !imageUrlIn) || !link) {
+    res.status(400).json({ error: "name, link e imageBase64 ou imageUrl são obrigatórios" }); return;
   }
   const safePosition: AdPosition = (VALID_AD_POSITIONS as string[]).includes(position ?? "")
     ? (position as AdPosition)
@@ -457,7 +459,7 @@ router.post("/ads", async (req, res) => {
   const now = new Date();
   const [row] = await db.insert(adsTable).values({
     id: randomUUID(),
-    name, imageBase64, link,
+    name, imageBase64: imageBase64 ?? "", imageUrl: imageUrlIn ?? null, link,
     position: safePosition,
     active: active !== false,
     clicks: 0,
@@ -472,8 +474,8 @@ router.post("/ads", async (req, res) => {
 /** PUT /api/admin/ads/:id */
 router.put("/ads/:id", async (req, res) => {
   const id = req.params.id ?? "";
-  const { name, imageBase64, link, position, active, targetDevices } = req.body as {
-    name?: string; imageBase64?: string; link?: string; position?: string; active?: boolean;
+  const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices } = req.body as {
+    name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
     targetDevices?: ("desktop" | "mobile" | "tablet")[];
   };
   const safePosition: AdPosition | undefined = position
@@ -482,6 +484,7 @@ router.put("/ads/:id", async (req, res) => {
   const updateData: Partial<typeof adsTable.$inferInsert> = { updatedAt: new Date() };
   if (name !== undefined) updateData.name = name;
   if (imageBase64 !== undefined) updateData.imageBase64 = imageBase64;
+  if (imageUrlIn !== undefined) updateData.imageUrl = imageUrlIn;
   if (link !== undefined) updateData.link = link;
   if (safePosition !== undefined) updateData.position = safePosition;
   if (active !== undefined) updateData.active = active;
@@ -513,7 +516,7 @@ router.get("/columnists/:id", (req, res) => {
 router.post("/columnists", (req, res) => {
   const { name, bio, avatarBase64, active } = req.body as { name?: string; bio?: string; avatarBase64?: string; active?: boolean };
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
-  const c = store.createColumnist({ name, bio: bio ?? "", avatarBase64: avatarBase64 ?? "", active: !!active });
+  const c = store.createColumnist({ name, bio: bio ?? "", specialty: "Outro", avatarBase64: avatarBase64 ?? "", active: !!active });
   res.status(201).json({ columnist: c });
 });
 
