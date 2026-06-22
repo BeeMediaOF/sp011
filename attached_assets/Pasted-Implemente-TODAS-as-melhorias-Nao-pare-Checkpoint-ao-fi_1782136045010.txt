@@ -1,0 +1,25 @@
+Implemente TODAS as melhorias. Nao pare. Checkpoint ao final.
+
+BLOCO 1 — MULTI-TENANT: Adicionar portalId text(portal_id).notNull().default(sbcagora) nas tabelas articlesTable, adsTable, rss_sources, perplexity_topics, site_settings, article_views, category_views, rss_event_logs. Criar lib/db/src/schema/portals.ts com portalsTable(id primaryKey, name, domain, logoUrl, primaryColor default #e11d48, active boolean, createdAt). Exportar em schema/index.ts. Middleware no servidor: req.portalId = headers[x-portal-id] || env.PORTAL_ID || sbcagora. Seed portal sbcagora no startup.
+
+BLOCO 2 — SEO: Adicionar colunas na articlesTable: metaTitle, metaDescription, canonicalUrl, ogImage, schemaMarkup. Criar lib/seoGenerator.ts com generateSeoFields(article): metaTitle=title.slice(0,60), metaDescription=stripHTML(content).slice(0,155)+..., slug=slugify(title) se vazio, canonicalUrl=https://sbcagora.com.br/SLUG, schemaMarkup=JSON.stringify schema.org NewsArticle. Chamar em rssProcessor e em POST/PATCH articles. GET /api/sitemap.xml com artigos published, Content-Type application/xml, Cache-Control public max-age=3600. GET /api/robots.txt: User-agent: * Allow: / Disallow: /admin/ Sitemap: https://sbcagora.com.br/sitemap.xml
+
+BLOCO 3A — DEDUPLICACAO: Adicionar contentHash text(content_hash) na articlesTable. hashTitle(title)=normalizar(lowercase+remover acentos+remover pontuacao).slice(0,64). No rssProcessor verificar contentHash ultimos 7 dias antes de salvar — se existir pular com log duplicata.
+
+BLOCO 3B — SCORE: Adicionar qualityScore integer default 0. calculateQualityScore: +20 imageUrl, +20 content>300, +20 content>800, +15 titulo 30-70, +15 metaDescription, +10 slug. Score<40=draftReason qualidade insuficiente (score: X). Rodar em rssProcessor e POST /api/articles.
+
+BLOCO 3C — AGENDA: Adicionar scheduledAt timestamp(scheduled_at, withTimezone) na articlesTable. scheduler.ts: setInterval 5min buscar status=draft scheduledAt<=NOW() e publicar. Inicializar no startup. Aceitar scheduledAt em POST/PUT /api/articles.
+
+BLOCO 4A — PUSH: pnpm add web-push. Criar push_subscriptions schema (id, portalId, endpoint unique, p256dh, auth, userAgent, subscribedAt, active). webPush.ts: gerar VAPID keys se VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY nao em env (logar no console), sendPushToAll(portalId, title, body, url), remover 410 Gone. Endpoints: POST /api/push/subscribe, DELETE /api/push/unsubscribe, GET /api/push/vapid-public-key. Chamar sendPushToAll ao publicar artigo.
+
+BLOCO 4B — NEWSLETTER: Criar newsletter schema com newsletterSubscribersTable (id, portalId, email unique, name, active, confirmedAt, unsubscribedAt, createdAt) e emailQueueTable (id, portalId, to, subject, htmlBody, status pending/sent/failed, attempts, lastError, scheduledFor, sentAt, createdAt). Endpoints: POST /api/newsletter/subscribe, DELETE /api/newsletter/unsubscribe, GET /api/admin/newsletter/subscribers, POST /api/admin/newsletter/send. emailSender.ts: checar RESEND_API_KEY ou SENDGRID_API_KEY; sem chave=dry-run (logar). Job 2min: processar emailQueue max 10 por ciclo.
+
+BLOCO 5 — ANUNCIOS: Criar ad_impressions schema com adImpressionsTable e adClicksTable (id, adId, portalId, articleId, position, device, ipHash, createdAt). Endpoints: POST /api/ads/impression (rate limited), POST /api/ads/click (rate limited), GET /api/ads/rotation/:position (ad com menos impressoes ultimas 24h), GET /api/admin/ads/report (CTR 7 e 30 dias). Job 1h: atualizar clicks e impressions na tabela ads.
+
+BLOCO 6A — CACHE: Criar lib/cache.ts com SimpleCache: set(key,data,ttlSecs), get(key):null se expirado, invalidate(pattern), size(). Aplicar: /api/articles (120s), /api/articles/:id (300s), /api/sitemap.xml (3600s), /api/ads/rotation/:position (30s). Invalidar ao publicar/atualizar. Adicionar cacheSize ao realtime-stats.
+
+BLOCO 6B — PROXY IMAGENS: pnpm add sharp. GET /api/image-proxy?url=ENCODED&w=W&h=H: fetch externo, sharp resize (max 1200px), WebP se Accept inclui image/webp, Cache-Control public max-age=86400. Rejeitar IPs privados (192.168., 10., 127., localhost).
+
+BLOCO 6C — ALERTAS: Criar system_alerts schema (id, portalId, type, message, severity info/warning/critical, resolved boolean default false, resolvedAt, createdAt). alerting.ts: createAlert(type,message,severity), sendTelegramAlert(msg) via TELEGRAM_BOT_TOKEN+TELEGRAM_CHAT_ID env (senao logar), checkRssHealth() alerta se RSS nao coletou >2h, checkErrorRate() alerta se >50 erros/hora. Job 30min. Endpoints: GET /api/admin/alerts, PATCH /api/admin/alerts/:id/resolve.
+
+FINAL: exportar todos schemas em index.ts, pnpm run db:push, pnpm tsc --noEmit, corrigir erros, reiniciar servidor, confirmar rodando, checkpoint: Feature complete: multi-tenant SEO dedup scheduler push newsletter ads-rotation cache image-proxy alerts
