@@ -6,6 +6,7 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useArticle, useArticles } from "../hooks/useArticles";
+import ArtigosRelacionados from "../components/ArtigosRelacionados";
 import { useSite } from "../hooks/useSite";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
@@ -147,10 +148,40 @@ export default function Artigo() {
     }
     ampLink.href = ampUrl;
 
+    // Canonical + hreflang
+    const canonHref = article.canonicalUrl || canonical;
+    let canonLink = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    const createdCanon = !canonLink;
+    if (!canonLink) {
+      canonLink = document.createElement("link");
+      canonLink.rel = "canonical";
+      document.head.appendChild(canonLink);
+    }
+    canonLink.href = canonHref;
+
+    const hreflangLinks: HTMLLinkElement[] = [];
+    [
+      { hreflang: "pt-BR", href: canonical },
+      { hreflang: "x-default", href: canonical },
+    ].forEach(({ hreflang, href }) => {
+      let el = document.head.querySelector<HTMLLinkElement>(`link[rel="alternate"][hreflang="${hreflang}"]`);
+      const created = !el;
+      if (!el) {
+        el = document.createElement("link");
+        el.rel = "alternate";
+        el.setAttribute("hreflang", hreflang);
+        document.head.appendChild(el);
+      }
+      el.href = href;
+      if (created) hreflangLinks.push(el);
+    });
+
     return () => {
       document.title = prevTitle;
       document.head.querySelectorAll<HTMLMetaElement>("meta[data-article-dynamic]").forEach((el) => el.remove());
       if (createdAmpLink && ampLink?.parentNode) ampLink.parentNode.removeChild(ampLink);
+      if (createdCanon && canonLink?.parentNode) canonLink.parentNode.removeChild(canonLink);
+      hreflangLinks.forEach((el) => el.parentNode?.removeChild(el));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id]);
@@ -600,6 +631,8 @@ export default function Artigo() {
                       </p>
                     </div>
                   )}
+
+                  <ArtigosRelacionados currentSlug={article.slug || article.id} />
 
                   {/* Tags + compartilhamento inferior */}
                   <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">

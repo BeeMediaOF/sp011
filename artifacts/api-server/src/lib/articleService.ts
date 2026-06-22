@@ -36,6 +36,7 @@ export interface Article {
   slug?: string;
   keywords?: string;
   draftReason?: string;
+  canonicalUrl?: string;
 }
 
 function rowToArticle(row: ArticleRow): Article {
@@ -60,6 +61,7 @@ function rowToArticle(row: ArticleRow): Article {
     slug:          row.slug ?? undefined,
     keywords:      row.keywords ?? undefined,
     draftReason:   row.draftReason ?? undefined,
+    canonicalUrl:  row.canonicalUrl ?? undefined,
   };
 }
 
@@ -157,6 +159,7 @@ export const articleService = {
         slug,
         keywords:      data.keywords,
         draftReason:   data.draftReason ?? null,
+        canonicalUrl:  data.canonicalUrl ?? null,
         createdAt:     now,
         updatedAt:     now,
       })
@@ -189,6 +192,7 @@ export const articleService = {
         ...(data.slug          !== undefined && { slug:          data.slug }),
         ...(data.keywords      !== undefined && { keywords:      data.keywords }),
         ...(data.draftReason   !== undefined && { draftReason:   data.draftReason }),
+        ...(data.canonicalUrl  !== undefined && { canonicalUrl:  data.canonicalUrl }),
         updatedAt: new Date(),
       })
       .where(eq(articlesTable.id, id))

@@ -22,6 +22,8 @@ import webhookKeyRouter from "./webhook-key";
 import uploadsRouter from "./uploads";
 import realtimeStatsRouter from "./realtime-stats";
 import rssLogsRouter from "./rss-logs";
+import pushRouter from "./push";
+import sitemapNewsRouter from "./sitemap-news";
 
 const router: IRouter = Router();
 
@@ -47,5 +49,7 @@ router.use("/admin/permissions", permissionsRouter);
 router.use("/admin/webhook-key", webhookKeyRouter);
 router.use("/admin/realtime-stats", realtimeStatsRouter);
 router.use("/admin/rss-logs", rssLogsRouter);
+router.use("/push", pushRouter);
+router.use(sitemapNewsRouter);
 
 export default router;

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
+import RichTextEditor from "../../components/admin/RichTextEditor";
 import { useCategories } from "../../hooks/useCategories";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
@@ -634,115 +635,12 @@ export default function ArticleEdit() {
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Conteúdo <span className="text-[#E71D36]">*</span>
               </label>
-              <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#0B2A66] transition-colors">
-                {/* Toolbar */}
-                <div className="flex items-center gap-0.5 px-3 py-2 bg-slate-50 border-b border-slate-100 flex-wrap">
-                  {/* Format select */}
-                  <div className="relative mr-1">
-                    <select className="text-xs font-medium text-slate-600 bg-transparent border border-slate-200 rounded-lg px-2 py-1 outline-none appearance-none cursor-pointer pr-5">
-                      <option>Parágrafo</option>
-                      <option>Título H2</option>
-                      <option>Título H3</option>
-                      <option>Citação</option>
-                    </select>
-                    <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
-                  </div>
-
-                  <div className="w-px h-4 bg-slate-200 mx-1" />
-
-                  {/* Format buttons */}
-                  {[
-                    { id: "bold",     Icon: Bold,          title: "Negrito" },
-                    { id: "italic",   Icon: Italic,        title: "Itálico" },
-                    { id: "underline",Icon: Underline,     title: "Sublinhado" },
-                    { id: "strikethrough", Icon: Strikethrough, title: "Tachado", noAction: true },
-                  ].map(({ id, Icon, title, noAction }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      title={title}
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        if (!noAction) insertFormat(id as Parameters<typeof insertFormat>[0]);
-                      }}
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-[#0B2A66] transition-colors"
-                    >
-                      <Icon size={13} />
-                    </button>
-                  ))}
-
-                  <div className="w-px h-4 bg-slate-200 mx-1" />
-
-                  {[
-                    { id: "list",    Icon: List,         title: "Lista"       },
-                    { id: "ordered", Icon: ListOrdered,  title: "Lista numerada" },
-                    { id: "h2",      Icon: Heading2,     title: "Título H2"   },
-                    { id: "h3",      Icon: Heading3,     title: "Título H3"   },
-                    { id: "quote",   Icon: Quote,        title: "Citação"     },
-                  ].map(({ id, Icon, title }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      title={title}
-                      onMouseDown={(e) => { e.preventDefault(); insertFormat(id as Parameters<typeof insertFormat>[0]); }}
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-[#0B2A66] transition-colors"
-                    >
-                      <Icon size={13} />
-                    </button>
-                  ))}
-
-                  <div className="w-px h-4 bg-slate-200 mx-1" />
-
-                  {[
-                    { id: "link",  Icon: LinkIcon,  title: "Link" },
-                  ].map(({ id, Icon, title }) => (
-                    <button
-                      key={id}
-                      type="button"
-                      title={title}
-                      onMouseDown={(e) => { e.preventDefault(); insertFormat(id as Parameters<typeof insertFormat>[0]); }}
-                      className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-[#0B2A66] transition-colors"
-                    >
-                      <Icon size={13} />
-                    </button>
-                  ))}
-
-                  <div className="w-px h-4 bg-slate-200 mx-1" />
-
-                  {/* Colar texto formatado */}
-                  <button
-                    type="button"
-                    title="Colar texto formatado"
-                    onMouseDown={(e) => { e.preventDefault(); setPasteRaw(""); setPasteOpen(true); }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 transition-colors"
-                  >
-                    <ClipboardPaste size={12} /> Colar texto
-                  </button>
-
-                  {/* Formatar parágrafos */}
-                  <button
-                    type="button"
-                    title="Formatar parágrafos automaticamente"
-                    onMouseDown={(e) => { e.preventDefault(); handleFormatContent(); }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
-                  >
-                    <AlignLeft size={12} /> Formatar
-                  </button>
-                </div>
-
-                <textarea
-                  ref={contentRef}
-                  value={content}
-                  onChange={(e) => setField("content", e.target.value)}
-                  rows={14}
-                  placeholder="Escreva o conteúdo da matéria aqui..."
-                  className="w-full px-4 py-3 text-sm outline-none resize-y leading-relaxed placeholder:text-slate-300 bg-white"
-                />
-                <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50">
-                  <span className="text-[11px] text-slate-400 font-mono">p</span>
-                  <span className="text-[11px] text-slate-400">{words} palavras</span>
-                </div>
-              </div>
+              <RichTextEditor
+                value={form.content ?? ""}
+                onChange={(html) => setField("content", html)}
+                onPasteClick={() => { setPasteRaw(""); setPasteOpen(true); }}
+                onFormatClick={handleFormatContent}
+              />
             </div>
           </div>
 
@@ -1449,6 +1347,17 @@ export default function ArticleEdit() {
                 }`}
               />
               <p className="text-[10px] text-slate-400 mt-0.5">Separe por vírgula · a IA preenche automaticamente</p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">URL Canônica</label>
+              <input
+                value={form.canonicalUrl ?? ""}
+                onChange={(e) => setField("canonicalUrl", e.target.value)}
+                placeholder="https://exemplo.com/artigo-original (opcional)"
+                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
+              />
+              <p className="text-[10px] text-slate-400 mt-0.5">Deixe em branco se este artigo é o original</p>
             </div>
           </div>
         </div>

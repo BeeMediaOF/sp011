@@ -218,6 +218,7 @@ export interface Article {
   aiRewritten?: boolean;
   keywords?: string;
   slug?: string;
+  canonicalUrl?: string;
 }
 
 export interface MenuItem {

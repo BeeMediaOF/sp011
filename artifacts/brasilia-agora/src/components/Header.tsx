@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
+import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_brasilia_agora.png";
 
 const FALLBACK_NAV = [
@@ -148,6 +149,7 @@ export default function Header() {
             <div className="flex-1 lg:hidden" />
 
             <div className="flex items-center gap-1 ml-auto">
+              <PushSubscribeButton />
               {searchOpen ? (
                 <>
                   <input autoFocus type="text" placeholder="Pesquisar..."
@@ -301,6 +303,7 @@ export default function Header() {
           <div className="flex-1 lg:hidden" />
 
           <div className="flex items-center gap-1 ml-auto">
+            <PushSubscribeButton />
             {searchOpen ? (
               <>
                 <input

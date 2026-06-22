@@ -13,3 +13,4 @@ export * from "./rss_event_logs";
 export * from "./endpoint_rate_limits";
 export * from "./article_views";
 export * from "./category_views";
+export * from "./push_subscriptions";

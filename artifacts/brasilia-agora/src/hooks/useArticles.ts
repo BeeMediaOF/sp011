@@ -17,6 +17,7 @@ export interface Article {
   rssSourceName?: string;
   rssSourceUrl?: string;
   aiRewritten?: boolean;
+  canonicalUrl?: string;
 }
 
 // ─── Singleton module-level cache ─────────────────────────────────────────────

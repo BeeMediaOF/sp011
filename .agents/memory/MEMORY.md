@@ -8,3 +8,4 @@
 - [Dependências problemáticas do api-server](problematic-deps.md) — @replit/object-storage e geoip-lite v2 causam crash; como evitar
 - [otplib v13 API funcional](otplib-v13.md) — Não exporta `authenticator`; usar generateSecret/verifySync/generateURI importados de "otplib"
 - [Features de segurança implementadas](security-features.md) — TOTP 2FA completo, math CAPTCHA pós-3-falhas, token 8h, lastSeenAt, log retention cron, AMP route, OG dinâmico
+- [Sprint 2 — features implementadas](sprint2-features.md) — Web Push VAPID, Tiptap editor, ArtigosRelacionados, LazyImage, Google News Sitemap, canonical+hreflang

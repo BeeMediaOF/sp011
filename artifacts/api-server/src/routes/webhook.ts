@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
 import { articleService } from "../lib/articleService.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
+import { sendPushToAll } from "./push.js";
 
 const publishRateLimit = endpointRateLimit("/api/publish");
 
@@ -84,6 +85,11 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
       res.status(404).json({ ok: false, error: "Artigo não encontrado", id: id.trim() });
       return;
     }
+    void sendPushToAll({
+      title: article.title.replace(/<[^>]*>/g, ""),
+      body: (article.subtitle || "").replace(/<[^>]*>/g, "").slice(0, 100),
+      url: `/artigo/${article.slug || article.id}`,
+    });
     res.json({ ok: true, message: "Artigo publicado com sucesso", article });
     return;
   }
@@ -132,6 +138,11 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
     status: "published",
   });
 
+  void sendPushToAll({
+    title: article.title.replace(/<[^>]*>/g, ""),
+    body: (article.subtitle || "").replace(/<[^>]*>/g, "").slice(0, 100),
+    url: `/artigo/${article.slug || article.id}`,
+  });
   const titleDerived = !title?.trim();
   res.status(201).json({
     ok: true,
@@ -154,6 +165,11 @@ router.post("/:id", authMiddleware, async (req, res) => {
     res.status(404).json({ ok: false, error: "Artigo não encontrado" });
     return;
   }
+  void sendPushToAll({
+    title: article.title.replace(/<[^>]*>/g, ""),
+    body: (article.subtitle || "").replace(/<[^>]*>/g, "").slice(0, 100),
+    url: `/artigo/${article.slug || article.id}`,
+  });
   res.json({ ok: true, message: "Artigo publicado com sucesso", article });
 });
 

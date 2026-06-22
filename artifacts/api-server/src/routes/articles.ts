@@ -61,4 +61,50 @@ router.get("/:id", async (req, res) => {
   res.json({ article });
 });
 
+/** GET /api/articles/:id/relacionados — 4 related published articles */
+router.get("/:id/relacionados", async (req, res) => {
+  const slug = req.params.id ?? "";
+  const current = await articleService.getArticle(slug);
+  if (!current || current.status !== "published") {
+    res.json({ articles: [] }); return;
+  }
+
+  const allArticles = await articleService.getArticles();
+  const all = allArticles
+    .filter((a) => a.status === "published" && a.id !== current.id && (a.slug || a.id) !== slug);
+
+  const currentKeywords = new Set(
+    (current.keywords ?? "").toLowerCase().split(/[,\s]+/).filter(Boolean)
+  );
+
+  const scored = all.map((a) => {
+    let score = 0;
+    if (a.category === current.category) score += 10;
+    if (currentKeywords.size > 0) {
+      const aKw = new Set((a.keywords ?? "").toLowerCase().split(/[,\s]+/).filter(Boolean));
+      score += [...currentKeywords].filter((k) => aKw.has(k)).length * 2;
+    }
+    return { a, score };
+  });
+
+  const related = scored
+    .sort((x, y) =>
+      y.score - x.score ||
+      new Date(y.a.publishedAt).getTime() - new Date(x.a.publishedAt).getTime()
+    )
+    .slice(0, 4)
+    .map(({ a }) => ({
+      id: a.id,
+      slug: a.slug || a.id,
+      title: a.title,
+      subtitle: a.subtitle,
+      imageUrl: a.imageUrl,
+      category: a.category,
+      tag: a.tag,
+      publishedAt: a.publishedAt,
+    }));
+
+  res.json({ articles: related });
+});
+
 export default router;

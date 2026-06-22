@@ -22,6 +22,7 @@ export const articlesTable = pgTable("articles", {
   slug:          text("slug"),
   keywords:      text("keywords"),
   draftReason:   text("draft_reason"),
+  canonicalUrl:  text("canonical_url"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
