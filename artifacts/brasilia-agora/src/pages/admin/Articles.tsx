@@ -32,9 +32,19 @@ function fmtDate(d?: string) {
 type ArticleWithViews = Article & { views?: number };
 type StatusFilter = "all" | "draft" | "published" | "scheduled" | "archived";
 
+interface HistoryEntry {
+  articleId: string;
+  title:     string;
+  status:    "ok" | "failed";
+  at:        number;
+  error?:    string;
+}
+
 interface QueueStatus {
   pending: number; paused: boolean; processedTotal: number; failedTotal: number;
   queuedIds: string[];
+  currentItem: { articleId: string; title: string; startedAt: number } | null;
+  recentHistory: HistoryEntry[];
   quota: { usedToday: number; dailyLimit: number; remaining: number; isOnCooldown: boolean; isExhausted: boolean; cooldownSecs: number };
 }
 
@@ -225,8 +235,9 @@ export default function Articles() {
           ))}
         </div>
 
-        {/* ── IA Progress bar + bulk action ─────────────────── */}
-        <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+        {/* ── IA Progress + queue monitor ────────────────────── */}
+        <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
+          {/* Row 1: progress bar + cota + controls */}
           <div className="flex flex-wrap items-center gap-4">
             {/* Progress */}
             <div className="flex-1 min-w-[200px]">
@@ -240,16 +251,6 @@ export default function Articles() {
                   style={{ width: `${rewrittenPct}%` }}
                 />
               </div>
-              {queueStatus && queueStatus.pending > 0 && (
-                <p className="text-[11px] text-amber-600 mt-1">
-                  ⏳ {queueStatus.pending} artigo(s) na fila — processando 1 a cada 6s
-                </p>
-              )}
-              {queueStatus?.quota.isOnCooldown && (
-                <p className="text-[11px] text-red-500 mt-1">
-                  ⏸ Aguardando cooldown Gemini: {queueStatus.quota.cooldownSecs}s
-                </p>
-              )}
             </div>
 
             {/* Cota */}
@@ -263,7 +264,7 @@ export default function Articles() {
             )}
 
             {/* Controls */}
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 shrink-0">
               {queueStatus && (
                 <button
                   onClick={() => void handleTogglePause()}
@@ -286,11 +287,7 @@ export default function Articles() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors disabled:opacity-40"
                 style={{ background: bulkDone ? "#16A34A" : "#7C3AED" }}
               >
-                {bulkLoading
-                  ? <Loader2 size={14} className="animate-spin" />
-                  : bulkDone
-                  ? <CheckCircle2 size={14} />
-                  : <Zap size={14} />}
+                {bulkLoading ? <Loader2 size={14} className="animate-spin" /> : bulkDone ? <CheckCircle2 size={14} /> : <Zap size={14} />}
                 {bulkDone ? "Enfileirado!" : "Reescrever tudo com IA"}
               </button>
               <button
@@ -304,13 +301,75 @@ export default function Articles() {
               </button>
               {repairResult && (
                 <span className={`text-xs font-semibold px-3 py-1.5 rounded-lg ${repairResult.fixed > 0 ? "bg-green-50 text-green-700 border border-green-200" : "bg-slate-100 text-slate-500"}`}>
-                  {repairResult.fixed > 0
-                    ? `✓ ${repairResult.fixed} artigo(s) corrigido(s)`
-                    : "Nenhum artigo com conteúdo quebrado"}
+                  {repairResult.fixed > 0 ? `✓ ${repairResult.fixed} corrigido(s)` : "Nenhum artigo quebrado"}
                 </span>
               )}
             </div>
           </div>
+
+          {/* Row 2: queue monitor — only when queue has activity */}
+          {queueStatus && (queueStatus.pending > 0 || queueStatus.currentItem || queueStatus.quota.isOnCooldown || queueStatus.recentHistory.length > 0) && (
+            <div className="border-t border-slate-100 pt-3 space-y-2">
+
+              {/* Currently processing */}
+              {queueStatus.currentItem && (
+                <div className="flex items-center gap-2 bg-purple-50 rounded-xl px-3 py-2">
+                  <Loader2 size={13} className="animate-spin text-purple-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-purple-700 font-semibold truncate">
+                      Processando: {queueStatus.currentItem.title}
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-purple-400 shrink-0">
+                    {Math.round((Date.now() - queueStatus.currentItem.startedAt) / 1000)}s
+                  </span>
+                </div>
+              )}
+
+              {/* Cooldown warning */}
+              {queueStatus.quota.isOnCooldown && !queueStatus.currentItem && (
+                <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3 py-2">
+                  <Clock size={13} className="text-red-400 shrink-0" />
+                  <p className="text-[11px] text-red-600 font-semibold">
+                    Cooldown Gemini — aguardando {queueStatus.quota.cooldownSecs}s para retomar
+                  </p>
+                </div>
+              )}
+
+              {/* Queue size + timing */}
+              {queueStatus.pending > 0 && !queueStatus.quota.isOnCooldown && !queueStatus.currentItem && (
+                <div className="flex items-center gap-2 text-[11px] text-amber-700">
+                  <Clock size={12} className="shrink-0" />
+                  <span>
+                    {queueStatus.pending} na fila · próximo em ~8s · ~{Math.ceil(queueStatus.pending * 8 / 60)} min no total
+                  </span>
+                </div>
+              )}
+
+              {/* Recent history */}
+              {queueStatus.recentHistory.length > 0 && (
+                <div className="space-y-1">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Últimos processados</p>
+                  <div className="space-y-0.5 max-h-32 overflow-y-auto">
+                    {queueStatus.recentHistory.slice(0, 8).map((h, i) => (
+                      <div key={i} className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-slate-50">
+                        {h.status === "ok"
+                          ? <CheckCircle2 size={11} className="text-green-500 shrink-0" />
+                          : <span className="w-[11px] h-[11px] rounded-full bg-red-400 shrink-0 text-[8px] flex items-center justify-center text-white font-bold">!</span>
+                        }
+                        <p className={`text-[11px] truncate flex-1 ${h.status === "ok" ? "text-slate-600" : "text-red-600"}`}>
+                          {h.title}
+                        </p>
+                        <span className="text-[10px] text-slate-300 shrink-0">
+                          {new Date(h.at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Table panel ───────────────────────────────────── */}

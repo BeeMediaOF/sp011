@@ -18,16 +18,28 @@ import {
 import { logger } from "./logger.js";
 
 // ── Timing constants ─────────────────────────────────────────────────────────
-// 1 article every 6 s = 10/min — safely below Gemini free-tier 15 RPM
-const PROCESS_INTERVAL_MS = 6_000;
+// 1 article every 8 s = 7.5/min — comfortable margin below Gemini free-tier 15 RPM
+const PROCESS_INTERVAL_MS = 8_000;
 // Sweep for new unprocessed drafts every 5 minutes
 const SWEEP_INTERVAL_MS = 5 * 60_000;
+
+// ── History entry ─────────────────────────────────────────────────────────────
+export interface HistoryEntry {
+  articleId: string;
+  title:     string;
+  status:    "ok" | "failed";
+  at:        number; // unix ms
+  error?:    string;
+}
 
 // ── In-memory queue ───────────────────────────────────────────────────────────
 const _queue: RewriteJobItem[] = [];
 let _paused = false;
 let _processedTotal = 0;
 let _failedTotal = 0;
+let _currentItem: (RewriteJobItem & { startedAt: number }) | null = null;
+const _recentHistory: HistoryEntry[] = [];
+const HISTORY_MAX = 20;
 
 export function enqueueRewrite(item: RewriteJobItem): void {
   // Avoid duplicates already in queue
@@ -44,6 +56,10 @@ export function getQueueStats() {
     processedTotal: _processedTotal,
     failedTotal:    _failedTotal,
     queuedIds:      _queue.map((i) => i.articleId),
+    currentItem:    _currentItem
+      ? { articleId: _currentItem.articleId, title: _currentItem.title, startedAt: _currentItem.startedAt }
+      : null,
+    recentHistory:  [..._recentHistory],
     quota: {
       usedToday:    quota.usedToday,
       dailyLimit:   quota.dailyLimit,
@@ -57,6 +73,11 @@ export function getQueueStats() {
 
 export function pauseQueue(): void  { _paused = true;  logger.info("Rewrite queue paused by admin"); }
 export function resumeQueue(): void { _paused = false; logger.info("Rewrite queue resumed by admin"); }
+
+function pushHistory(entry: HistoryEntry) {
+  _recentHistory.unshift(entry);
+  if (_recentHistory.length > HISTORY_MAX) _recentHistory.length = HISTORY_MAX;
+}
 
 // ── Sweep: pick up drafts that haven't been rewritten yet ─────────────────────
 async function sweepPendingDrafts(): Promise<void> {
@@ -101,6 +122,7 @@ async function processNext(): Promise<void> {
   }
 
   const item = _queue.shift()!;
+  _currentItem = { ...item, startedAt: Date.now() };
 
   try {
     logger.info({ articleId: item.articleId, queueLeft: _queue.length }, "Rewriting queued article");
@@ -129,6 +151,7 @@ async function processNext(): Promise<void> {
     if (item.finalStatus === "published") {
       addLog({ type: "publish", sourceName: item.sourceName, articleTitle: result.title || item.title, message: "Publicado após reescrita" });
     }
+    pushHistory({ articleId: item.articleId, title: result.title || item.title, status: "ok", at: Date.now() });
     logger.info({ articleId: item.articleId }, "Rewrite queue: article updated successfully");
 
   } catch (err) {
@@ -136,6 +159,7 @@ async function processNext(): Promise<void> {
     const msg = String(err);
     logger.warn({ err, articleId: item.articleId }, "Rewrite queue: item failed");
     addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Reescrita falhou: ${msg}` });
+    pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: msg });
 
     // On quota errors, return item to front to retry after cooldown lifts
     if (msg.includes("QUOTA_COOLDOWN") || msg.includes("QUOTA_EXHAUSTED")) {
@@ -143,6 +167,8 @@ async function processNext(): Promise<void> {
       logger.info({ articleId: item.articleId, queueLength: _queue.length }, "Article returned to queue front — quota limit");
     }
     // Other errors: drop the item (content issues, network, etc.)
+  } finally {
+    _currentItem = null;
   }
 }
 
@@ -156,5 +182,5 @@ export function startRewriteWorker(): void {
   // Initial sweep after 30 s to catch drafts that already exist at boot
   setTimeout(() => { void sweepPendingDrafts(); }, 30_000);
 
-  logger.info("Rewrite queue worker started (1 article / 6s, sweep every 5 min)");
+  logger.info("Rewrite queue worker started (1 article / 8s, sweep every 5 min)");
 }
