@@ -11,23 +11,28 @@ const UPLOADS_DIR = join(__dirname, "../../data/uploads");
 
 if (!existsSync(UPLOADS_DIR)) mkdirSync(UPLOADS_DIR, { recursive: true });
 
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
-const MAX_SIZE = 8 * 1024 * 1024; // 8 MB
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
+const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/ogg", "video/quicktime", "video/x-msvideo", "video/x-matroska"]);
+const ALLOWED_TYPES = new Set([...IMAGE_TYPES, ...VIDEO_TYPES]);
+
+const IMAGE_MAX = 8 * 1024 * 1024;   // 8 MB
+const VIDEO_MAX = 100 * 1024 * 1024; // 100 MB
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
   filename: (_req, file, cb) => {
-    const ext = extname(file.originalname).toLowerCase() || ".jpg";
+    const ext = extname(file.originalname).toLowerCase() || ".bin";
     cb(null, `${randomUUID()}${ext}`);
   },
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: MAX_SIZE },
+  limits: { fileSize: VIDEO_MAX },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_TYPES.has(file.mimetype)) cb(null, true);
-    else cb(new Error(`Tipo de arquivo não permitido: ${file.mimetype}. Use JPEG, PNG, WebP ou GIF.`));
+    if (IMAGE_TYPES.has(file.mimetype)) cb(null, true);
+    else if (VIDEO_TYPES.has(file.mimetype)) cb(null, true);
+    else cb(new Error(`Tipo não permitido: ${file.mimetype}. Use JPEG, PNG, WebP, GIF, MP4, WebM ou MOV.`));
   },
 });
 
@@ -46,6 +51,28 @@ router.post("/image", authMiddleware, upload.single("image"), (req, res) => {
   const url = `/api/uploads/${req.file.filename}`;
   req.log.info({ filename: req.file.filename, size: req.file.size }, "Image uploaded");
   res.status(201).json({ ok: true, url, filename: req.file.filename, size: req.file.size });
+});
+
+/**
+ * POST /api/uploads/media
+ * Multipart upload — field name: "media"
+ * Accepts images (JPEG, PNG, WebP, GIF, AVIF) and videos (MP4, WebM, MOV, AVI, MKV).
+ * Returns: { url, filename, size, mediaType: "image" | "video" }
+ */
+router.post("/media", authMiddleware, upload.single("media"), (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: "Nenhum arquivo enviado. Campo esperado: 'media'." });
+    return;
+  }
+  const mime = req.file.mimetype;
+  const mediaType: "image" | "video" = VIDEO_TYPES.has(mime) ? "video" : "image";
+  if (mediaType === "image" && req.file.size > IMAGE_MAX) {
+    res.status(413).json({ error: `Imagem muito grande. Máximo: ${IMAGE_MAX / 1024 / 1024} MB.` });
+    return;
+  }
+  const url = `/api/uploads/${req.file.filename}`;
+  req.log.info({ filename: req.file.filename, size: req.file.size, mediaType }, "Media uploaded");
+  res.status(201).json({ ok: true, url, filename: req.file.filename, size: req.file.size, mediaType });
 });
 
 /**

@@ -640,6 +640,10 @@ export default function ArticleEdit() {
                 onChange={(html) => setField("content", html)}
                 onPasteClick={() => { setPasteRaw(""); setPasteOpen(true); }}
                 onFormatClick={handleFormatContent}
+                onUploadFile={async (file) => {
+                  const res = await adminApi.uploadMedia(file);
+                  return { url: res.url, mediaType: res.mediaType };
+                }}
               />
             </div>
           </div>

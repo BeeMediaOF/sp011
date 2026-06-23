@@ -1,4 +1,4 @@
-import React, { useEffect, useImperativeHandle, forwardRef } from "react";
+import React, { useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Image from "@tiptap/extension-image";
@@ -9,7 +9,7 @@ import {
   Bold, Italic, Heading1, Heading2, Heading3,
   List, ListOrdered, Quote, Code, Link as LinkIcon,
   Image as ImageIcon, Youtube as YoutubeIcon,
-  Undo, Redo, ClipboardPaste, AlignLeft,
+  Undo, Redo, ClipboardPaste, AlignLeft, Upload, Loader2,
 } from "lucide-react";
 
 export interface RichTextEditorHandle {
@@ -22,11 +22,12 @@ interface Props {
   onChange: (html: string) => void;
   onPasteClick?: () => void;
   onFormatClick?: () => void;
+  onUploadFile?: (file: File) => Promise<{ url: string; mediaType: "image" | "video" }>;
   placeholder?: string;
 }
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
-  ({ value, onChange, onPasteClick, onFormatClick, placeholder = "Escreva o conteúdo da matéria aqui..." }, ref) => {
+  ({ value, onChange, onPasteClick, onFormatClick, onUploadFile, placeholder = "Escreva o conteúdo da matéria aqui..." }, ref) => {
     const editor = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: { languageClassPrefix: "language-" } }),
@@ -40,6 +41,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
         onChange(editor.getHTML());
       },
     });
+
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
 
     useImperativeHandle(ref, () => ({
       setContent: (html: string) => {
@@ -91,6 +95,27 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
       editor?.commands.setYoutubeVideo({ src: url });
     }
 
+    async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+      const file = e.target.files?.[0];
+      if (!file || !onUploadFile || !editor) return;
+      e.target.value = "";
+      setUploading(true);
+      try {
+        const { url, mediaType } = await onUploadFile(file);
+        if (mediaType === "video") {
+          editor.chain().focus().insertContent(
+            `<p><video src="${url}" controls style="width:100%;max-width:100%;border-radius:10px;margin:12px 0;display:block;"></video></p>`
+          ).run();
+        } else {
+          editor.chain().focus().setImage({ src: url }).run();
+        }
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro no upload");
+      } finally {
+        setUploading(false);
+      }
+    }
+
     const wordCount = (() => {
       const text = editor?.getText() ?? "";
       return text.trim() ? text.trim().split(/\s+/).length : 0;
@@ -123,6 +148,31 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
           {btn(addLink, LinkIcon, "Link", editor.isActive("link"))}
           {btn(addImage, ImageIcon, "Imagem por URL")}
           {btn(addYoutube, YoutubeIcon, "YouTube")}
+
+          {onUploadFile && (
+            <>
+              <div className="w-px h-4 bg-slate-200 mx-1" />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/ogg,video/quicktime,.mov,.mp4,.webm,.gif"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <button
+                type="button"
+                title="Upload de imagem, GIF ou vídeo"
+                disabled={uploading}
+                onMouseDown={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors disabled:opacity-60"
+              >
+                {uploading
+                  ? <><Loader2 size={12} className="animate-spin" /> Enviando…</>
+                  : <><Upload size={12} /> Upload</>
+                }
+              </button>
+            </>
+          )}
 
           <div className="w-px h-4 bg-slate-200 mx-1" />
 

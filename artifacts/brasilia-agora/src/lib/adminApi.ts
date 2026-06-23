@@ -135,6 +135,24 @@ export const adminApi = {
     });
   },
 
+  // Media upload — images + videos (multipart)
+  uploadMedia: (file: File): Promise<{ ok: boolean; url: string; filename: string; size: number; mediaType: "image" | "video" }> => {
+    const token = getToken();
+    const form = new FormData();
+    form.append("media", file);
+    return fetch("/api/uploads/media", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (r) => {
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error((err as { error?: string }).error ?? r.statusText);
+      }
+      return r.json() as Promise<{ ok: boolean; url: string; filename: string; size: number; mediaType: "image" | "video" }>;
+    });
+  },
+
   // Webhook API Key (admin only)
   getWebhookKey: () => req<{ apiKey: string | null }>("GET", "/webhook-key"),
   regenerateWebhookKey: () => req<{ apiKey: string }>("POST", "/webhook-key"),
