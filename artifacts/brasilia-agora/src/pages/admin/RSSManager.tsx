@@ -279,6 +279,7 @@ export default function RSSManager() {
 
   // ── Source list UI ──
   const [sourceSearch,    setSourceSearch]    = useState("");
+  const [categoryFilter,  setCategoryFilter]  = useState("Todas");
   const [expandedGroups,  setExpandedGroups]  = useState<Set<string>>(new Set());
 
   // ── Prompts panel ──
@@ -307,7 +308,6 @@ export default function RSSManager() {
   const [queueLoading, setQueueLoading] = useState(false);
 
   // ── Table UI ──
-  const [currentPage,  setCurrentPage]  = useState(1);
   const [statusFilter, setStatusFilter] = useState("Todos");
 
   // ── Fetch & Preview ──
@@ -459,15 +459,8 @@ export default function RSSManager() {
   }
 
   const groupedSources = useMemo(() => {
-    const q = sourceSearch.toLowerCase();
-    const filtered = q
-      ? sources.filter((s) =>
-          s.name.toLowerCase().includes(q) ||
-          (TAG_MAP[s.category] ?? s.category).toLowerCase().includes(q)
-        )
-      : sources;
     const map = new Map<string, RssSource[]>();
-    for (const src of filtered) {
+    for (const src of filteredSources) {
       const pub = extractPublisher(src.name);
       if (!map.has(pub)) map.set(pub, []);
       map.get(pub)!.push(src);
@@ -475,7 +468,7 @@ export default function RSSManager() {
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
       .map(([publisher, srcs]) => ({ publisher, sources: srcs }));
-  }, [sources, sourceSearch]);
+  }, [filteredSources]);
 
   // Prompt tab derived vars — used in render, computed here to avoid IIFE in JSX
   const promptIsGlobal   = promptTab === "__global__";
@@ -894,7 +887,6 @@ export default function RSSManager() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
-  const ITEMS_PER_PAGE = 7;
   const needsKey = aiSettings.provider !== "gemini_free";
 
   // ── Queue derived stats ──
@@ -920,7 +912,7 @@ export default function RSSManager() {
     ));
   }
 
-  // ── Filtered / paginated sources ─────────────────────────────────────────────
+  // ── Filtered / grouped sources ───────────────────────────────────────────────
   const filteredSources = useMemo(() => {
     const q = sourceSearch.toLowerCase();
     let list = q
@@ -932,14 +924,15 @@ export default function RSSManager() {
       : [...sources];
     if (statusFilter === "Ativo")   list = list.filter((s) => s.active);
     if (statusFilter === "Pausado") list = list.filter((s) => !s.active);
+    if (categoryFilter !== "Todas") {
+      const target = categoryFilter.toLowerCase();
+      list = list.filter((s) =>
+        (TAG_MAP[s.category] ?? s.category).toLowerCase() === target ||
+        s.category.toLowerCase() === target,
+      );
+    }
     return list;
-  }, [sources, sourceSearch, statusFilter]);
-
-  const totalPages   = Math.max(1, Math.ceil(filteredSources.length / ITEMS_PER_PAGE));
-  const pagedSources = filteredSources.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE,
-  );
+  }, [sources, sourceSearch, statusFilter, categoryFilter]);
 
   function srcInitials(name: string): string {
     const words = name.replace(/[^a-zA-ZÀ-ÿ\s]/g, "").trim().split(/\s+/);
@@ -1025,8 +1018,8 @@ export default function RSSManager() {
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   value={sourceSearch}
-                  onChange={(e) => { setSourceSearch(e.target.value); setCurrentPage(1); }}
-                  placeholder="Buscar fontes..."
+                  onChange={(e) => setSourceSearch(e.target.value)}
+                  placeholder="Buscar por nome, URL ou categoria…"
                   className="w-full pl-9 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400 transition-colors"
                 />
                 {sourceSearch && (
@@ -1038,10 +1031,23 @@ export default function RSSManager() {
               <div className="relative">
                 <select
                   value={statusFilter}
-                  onChange={(e) => { setStatusFilter(e.target.value); setCurrentPage(1); }}
-                  className="pl-4 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700 min-w-[130px]"
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="pl-4 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700 min-w-[110px]"
                 >
                   {["Todos", "Ativo", "Pausado"].map((s) => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+              <div className="relative">
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="pl-4 pr-8 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700 min-w-[130px]"
+                >
+                  <option value="Todas">Categoria: Todas</option>
+                  {allCategories.map(({ slug, label }) => (
+                    <option key={slug} value={label}>{label}</option>
+                  ))}
                 </select>
                 <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
@@ -1072,7 +1078,7 @@ export default function RSSManager() {
               </div>
             )}
 
-            {/* Table */}
+            {/* Grouped sources list */}
             {sources.length === 0 ? (
               <div className="text-center py-16">
                 <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -1081,253 +1087,266 @@ export default function RSSManager() {
                 <p className="text-sm text-slate-500 font-medium">Nenhuma fonte cadastrada</p>
                 <p className="text-xs text-slate-400 mt-1">Use o painel à direita para adicionar a primeira fonte RSS</p>
               </div>
+            ) : groupedSources.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-sm text-slate-400">Nenhuma fonte encontrada para os filtros selecionados</p>
+                <button
+                  onClick={() => { setSourceSearch(""); setCategoryFilter("Todas"); setStatusFilter("Todos"); }}
+                  className="mt-3 text-xs text-[#0B2A66] hover:underline font-medium"
+                >
+                  Limpar filtros
+                </button>
+              </div>
             ) : (
               <>
-                <div className="overflow-x-auto -mx-6 px-6">
-                  <table className="w-full min-w-[640px]">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        {["Fonte", "Categoria", "Última coleta", "Status", "Modo", "Ações"].map((h) => (
-                          <th key={h} className="pb-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wide pr-4 last:pr-0">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {pagedSources.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-10 text-center text-sm text-slate-400">
-                            Nenhuma fonte encontrada
-                          </td>
-                        </tr>
-                      ) : pagedSources.map((src) => {
-                        if (editingSource?.id === src.id) {
-                          return (
-                            <tr key={src.id}>
-                              <td colSpan={6} className="py-4">
-                                <div className="bg-[#EEF2FF] rounded-xl p-4 border border-[#C7D2FE] space-y-3">
-                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Nome</label>
-                                      <input value={editingSource.name}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Categoria</label>
-                                      <select value={editingSource.category}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
-                                        {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">URL do Feed</label>
-                                      <input value={editingSource.url}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Agendamento</label>
-                                      <select value={editingSource.scheduleHours}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
-                                        {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Modo</label>
-                                      <select value={editingSource.autoMode}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
-                                        {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                      </select>
-                                    </div>
-                                    <div>
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Notícias/coleta</label>
-                                      <select value={editingSource.fetchLimit ?? 3}
-                                        onChange={(e) => setEditingSource((s) => s && ({ ...s, fetchLimit: Number(e.target.value) }))}
-                                        className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
-                                        {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                                      </select>
-                                    </div>
-                                    <div className="flex flex-col justify-end">
-                                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Crédito</label>
-                                      <label className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 text-xs cursor-pointer bg-white">
-                                        <input type="checkbox" checked={editingSource.giveCredit}
-                                          onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
-                                        Dar crédito
-                                      </label>
-                                    </div>
-                                  </div>
-                                  <details className="group">
-                                    <summary className="cursor-pointer flex items-center gap-2 text-xs font-semibold text-purple-600 py-1 select-none list-none">
-                                      <Wand2 size={12}/>Prompt personalizado
-                                      {editingSource.customPrompt && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>}
-                                      <ChevronDown size={12} className="ml-auto group-open:hidden"/>
-                                      <ChevronUp size={12} className="ml-auto hidden group-open:block"/>
-                                    </summary>
-                                    <div className="pt-2">
-                                      <PromptEditor
-                                        value={editingSource.customPrompt}
-                                        onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
-                                        apiFetch={apiFetch}
-                                      />
-                                    </div>
-                                  </details>
-                                  <div className="flex gap-2">
-                                    <button onClick={() => { void saveEdit(); }}
-                                      className="bg-[#0B2A66] text-white px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-[#0B2A66]/90 transition-colors">
-                                      Salvar
-                                    </button>
-                                    <button onClick={() => setEditingSource(null)}
-                                      className="bg-slate-100 text-slate-700 px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors">
-                                      Cancelar
-                                    </button>
-                                  </div>
-                                </div>
-                              </td>
-                            </tr>
-                          );
-                        }
+                {/* Summary bar */}
+                <p className="text-xs text-slate-400 mb-3">
+                  {groupedSources.length} marca{groupedSources.length !== 1 ? "s" : ""} · {filteredSources.length} fonte{filteredSources.length !== 1 ? "s" : ""}
+                  {(sourceSearch || categoryFilter !== "Todas" || statusFilter !== "Todos") && (
+                    <button
+                      onClick={() => { setSourceSearch(""); setCategoryFilter("Todas"); setStatusFilter("Todos"); }}
+                      className="ml-2 text-[#E71D36] hover:underline"
+                    >
+                      Limpar filtros
+                    </button>
+                  )}
+                </p>
 
-                        const color    = srcColor(src.id);
-                        const initials = srcInitials(src.name);
-                        const catLabel = (TAG_MAP[src.category] ?? src.category);
+                {/* Brand groups accordion */}
+                <div className="space-y-2">
+                  {groupedSources.map(({ publisher, sources: grpSrcs }) => {
+                    const isOpen    = expandedGroups.has(publisher);
+                    const brandColor = srcColor(grpSrcs[0]!.id);
+                    const brandInit  = srcInitials(publisher);
+                    const activeCount = grpSrcs.filter((s) => s.active).length;
 
-                        return (
-                          <tr key={src.id} className="hover:bg-slate-50/60 transition-colors group">
-                            {/* Fonte */}
-                            <td className="py-3.5 pr-4">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: color }}>
-                                  {initials}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-slate-800 truncate max-w-[160px]">{src.name}</p>
-                                  <a href={src.url} target="_blank" rel="noreferrer"
-                                    className="text-[11px] text-[#2563EB] hover:underline truncate block max-w-[160px]"
-                                    title={src.url}>
-                                    {src.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 26)}{src.url.length > 33 ? "…" : ""}
-                                  </a>
-                                </div>
-                              </div>
-                            </td>
-                            {/* Categoria */}
-                            <td className="py-3.5 pr-4">
-                              <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">{catLabel}</span>
-                            </td>
-                            {/* Última coleta */}
-                            <td className="py-3.5 pr-4">
-                              <span className="text-xs text-slate-500 whitespace-nowrap">{fmtFetch(src.lastFetchedAt)}</span>
-                            </td>
-                            {/* Status */}
-                            <td className="py-3.5 pr-4">
-                              <button
-                                onClick={() => { void toggleSource(src); }}
-                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer transition-colors ${
-                                  src.active
-                                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                    : "bg-amber-50 text-amber-600 hover:bg-amber-100"
-                                }`}
-                              >
-                                {src.active ? "● Ativo" : "○ Pausado"}
-                              </button>
-                            </td>
-                            {/* Modo */}
-                            <td className="py-3.5 pr-4">
-                              <AutoModeBadge mode={src.autoMode} />
-                            </td>
-                            {/* Ações */}
-                            <td className="py-3.5">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => { void runSource(src.id); }}
-                                  disabled={runningId === src.id}
-                                  title="Coletar agora"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40"
+                    return (
+                      <div key={publisher} className="border border-slate-100 rounded-xl overflow-hidden">
+
+                        {/* ── Group header ─────────────────────────────── */}
+                        <button
+                          onClick={() => toggleGroup(publisher)}
+                          className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50/70 transition-colors text-left"
+                        >
+                          <div
+                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                            style={{ background: brandColor }}
+                          >
+                            {brandInit}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800">{publisher}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {grpSrcs.map((s) => (
+                                <span
+                                  key={s.id}
+                                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                    s.active
+                                      ? "bg-green-100 text-green-700"
+                                      : "bg-slate-100 text-slate-400 line-through"
+                                  }`}
                                 >
-                                  {runningId === src.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-                                </button>
-                                <button
-                                  onClick={() => setEditingSource({ ...src })}
-                                  title="Editar"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors"
-                                >
-                                  <Pencil size={13} />
-                                </button>
-                                <button
-                                  onClick={() => { void deleteSource(src.id); }}
-                                  title="Remover"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                                  {TAG_MAP[s.category] ?? s.category}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mr-1">
+                            {activeCount}/{grpSrcs.length} ativa{grpSrcs.length !== 1 ? "s" : ""}
+                          </span>
+                          {isOpen
+                            ? <ChevronUp size={14} className="text-slate-400 shrink-0" />
+                            : <ChevronDown size={14} className="text-slate-400 shrink-0" />}
+                        </button>
+
+                        {/* ── Expanded rows ─────────────────────────────── */}
+                        {isOpen && (
+                          <div className="border-t border-slate-100">
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[580px]">
+                                <thead>
+                                  <tr className="bg-slate-50/60">
+                                    {["Feed", "Categoria", "Última coleta", "Status", "Modo", "Ações"].map((h) => (
+                                      <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                  {grpSrcs.map((src) => {
+                                    if (editingSource?.id === src.id) {
+                                      return (
+                                        <tr key={src.id}>
+                                          <td colSpan={6} className="px-4 py-4">
+                                            <div className="bg-[#EEF2FF] rounded-xl p-4 border border-[#C7D2FE] space-y-3">
+                                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Nome</label>
+                                                  <input value={editingSource.name}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, name: e.target.value }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Categoria</label>
+                                                  <select value={editingSource.category}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, category: e.target.value }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
+                                                    {allCategories.map(({ slug, label }) => <option key={slug} value={slug}>{label}</option>)}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">URL do Feed</label>
+                                                  <input value={editingSource.url}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, url: e.target.value }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white"/>
+                                                </div>
+                                              </div>
+                                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Agendamento</label>
+                                                  <select value={editingSource.scheduleHours}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, scheduleHours: Number(e.target.value) }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
+                                                    {SCHEDULE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Modo</label>
+                                                  <select value={editingSource.autoMode}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, autoMode: e.target.value as AutoMode }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
+                                                    {AUTO_MODE_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                  </select>
+                                                </div>
+                                                <div>
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Notícias/coleta</label>
+                                                  <select value={editingSource.fetchLimit ?? 3}
+                                                    onChange={(e) => setEditingSource((s) => s && ({ ...s, fetchLimit: Number(e.target.value) }))}
+                                                    className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-sm outline-none focus:border-[#0B2A66] bg-white appearance-none">
+                                                    {FETCH_LIMIT_OPTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                                  </select>
+                                                </div>
+                                                <div className="flex flex-col justify-end">
+                                                  <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Crédito</label>
+                                                  <label className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 text-xs cursor-pointer bg-white">
+                                                    <input type="checkbox" checked={editingSource.giveCredit}
+                                                      onChange={(e) => setEditingSource((s) => s && ({ ...s, giveCredit: e.target.checked }))}/>
+                                                    Dar crédito
+                                                  </label>
+                                                </div>
+                                              </div>
+                                              <details className="group">
+                                                <summary className="cursor-pointer flex items-center gap-2 text-xs font-semibold text-purple-600 py-1 select-none list-none">
+                                                  <Wand2 size={12}/>Prompt personalizado
+                                                  {editingSource.customPrompt && <span className="w-1.5 h-1.5 rounded-full bg-purple-500 inline-block"/>}
+                                                  <ChevronDown size={12} className="ml-auto group-open:hidden"/>
+                                                  <ChevronUp size={12} className="ml-auto hidden group-open:block"/>
+                                                </summary>
+                                                <div className="pt-2">
+                                                  <PromptEditor
+                                                    value={editingSource.customPrompt}
+                                                    onChange={(v) => setEditingSource((s) => s && ({ ...s, customPrompt: v }))}
+                                                    apiFetch={apiFetch}
+                                                  />
+                                                </div>
+                                              </details>
+                                              <div className="flex gap-2">
+                                                <button onClick={() => { void saveEdit(); }}
+                                                  className="bg-[#0B2A66] text-white px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-[#0B2A66]/90 transition-colors">
+                                                  Salvar
+                                                </button>
+                                                <button onClick={() => setEditingSource(null)}
+                                                  className="bg-slate-100 text-slate-700 px-4 py-1.5 rounded-xl text-xs font-semibold hover:bg-slate-200 transition-colors">
+                                                  Cancelar
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    }
+
+                                    const catLabel = TAG_MAP[src.category] ?? src.category;
+                                    const category = src.name.includes("–") || src.name.includes("-")
+                                      ? src.name.replace(/^[^–\-]+([\s–\-]+)/u, "").trim()
+                                      : src.name;
+
+                                    return (
+                                      <tr key={src.id} className="hover:bg-slate-50/60 transition-colors group">
+                                        {/* Feed name (category part only inside a group) */}
+                                        <td className="px-4 py-3">
+                                          <div className="min-w-0">
+                                            <p className="text-sm font-medium text-slate-700 truncate max-w-[200px]">{category}</p>
+                                            <a href={src.url} target="_blank" rel="noreferrer"
+                                              className="text-[11px] text-[#2563EB] hover:underline truncate block max-w-[200px]"
+                                              title={src.url}>
+                                              {src.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 30)}{src.url.length > 37 ? "…" : ""}
+                                            </a>
+                                          </div>
+                                        </td>
+                                        {/* Categoria */}
+                                        <td className="px-4 py-3">
+                                          <span className="text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">{catLabel}</span>
+                                        </td>
+                                        {/* Última coleta */}
+                                        <td className="px-4 py-3">
+                                          <span className="text-xs text-slate-500 whitespace-nowrap">{fmtFetch(src.lastFetchedAt)}</span>
+                                        </td>
+                                        {/* Status */}
+                                        <td className="px-4 py-3">
+                                          <button
+                                            onClick={() => { void toggleSource(src); }}
+                                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full cursor-pointer transition-colors ${
+                                              src.active
+                                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                                : "bg-amber-50 text-amber-600 hover:bg-amber-100"
+                                            }`}
+                                          >
+                                            {src.active ? "● Ativo" : "○ Pausado"}
+                                          </button>
+                                        </td>
+                                        {/* Modo */}
+                                        <td className="px-4 py-3">
+                                          <AutoModeBadge mode={src.autoMode} />
+                                        </td>
+                                        {/* Ações */}
+                                        <td className="px-4 py-3">
+                                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button
+                                              onClick={() => { void runSource(src.id); }}
+                                              disabled={runningId === src.id}
+                                              title="Coletar agora"
+                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40"
+                                            >
+                                              {runningId === src.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                                            </button>
+                                            <button
+                                              onClick={() => setEditingSource({ ...src })}
+                                              title="Editar"
+                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors"
+                                            >
+                                              <Pencil size={13} />
+                                            </button>
+                                            <button
+                                              onClick={() => { void deleteSource(src.id); }}
+                                              title="Remover"
+                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                            >
+                                              <Trash2 size={13} />
+                                            </button>
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between mt-5 pt-4 border-t border-slate-100">
-                    <p className="text-xs text-slate-500">
-                      {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredSources.length)} de {filteredSources.length}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                        className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors"
-                      >
-                        <ChevronDown size={13} className="-rotate-90" />
-                      </button>
-                      {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-colors ${
-                            currentPage === page
-                              ? "bg-[#0B2A66] text-white"
-                              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                      {totalPages > 5 && <span className="text-slate-400 text-xs px-1">…</span>}
-                      {totalPages > 5 && (
-                        <button
-                          onClick={() => setCurrentPage(totalPages)}
-                          className={`w-8 h-8 flex items-center justify-center rounded-xl text-xs font-semibold transition-colors ${
-                            currentPage === totalPages
-                              ? "bg-[#0B2A66] text-white"
-                              : "border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          {totalPages}
-                        </button>
-                      )}
-                      <button
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={currentPage === totalPages}
-                        className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 transition-colors"
-                      >
-                        <ChevronDown size={13} className="rotate-90" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {totalPages <= 1 && filteredSources.length > 0 && (
-                  <p className="text-xs text-slate-400 mt-4 pt-4 border-t border-slate-100">
-                    {filteredSources.length} fonte{filteredSources.length !== 1 ? "s" : ""}
-                  </p>
-                )}
               </>
             )}
           </div>
