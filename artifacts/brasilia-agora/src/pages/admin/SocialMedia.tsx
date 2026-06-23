@@ -1,1437 +1,1051 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import AdminLayout from "@/components/admin/AdminLayout";
-import { useSite } from "@/hooks/useSite";
-import { useToast } from "@/hooks/use-toast";
 import {
-  Share2, Instagram, Facebook, Eye, Send, CheckCircle,
-  XCircle, RefreshCw, ChevronDown, ChevronUp, ExternalLink,
-  Copy, AlertTriangle, Image as ImageIcon, Layers,
-  Hash, Info, Save, AlignLeft, Building2, Folder,
-  Type, Layout, Smile, FileText, Megaphone, ToggleLeft, ToggleRight,
-  Plus, MoreVertical, Pencil, Copy as CopyIcon, Upload,
+  Share2, Plus, Trash2, Pencil, CheckCircle, AlertCircle, Loader2, X,
+  Play, RefreshCw, ChevronDown, ChevronUp, Image as ImageIcon, Type,
+  AlignLeft, AlignCenter, AlignRight, Layers, Save,
+  Instagram, Facebook, Clock, Send, Link2, TestTube2, ToggleLeft, ToggleRight,
 } from "lucide-react";
+import AdminLayout from "@/components/admin/AdminLayout";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-interface SocialConfig {
-  instagramUserId?: string;
-  facebookPageId?: string;
-  pageAccessToken?: string;
-  feedCaption?: string;
-  storyCaption?: string;
-  autoPublishFeed?: boolean;
-  autoPublishStory?: boolean;
-  autoPublishFacebook?: boolean;
-  autoPublishIntervalHours?: number;
-  templateShowLogo?: boolean;
-  templateShowCategory?: boolean;
-  templateCustomLogoBase64?: string;
-  templateGradientFrom?: string;
-  templateGradientTo?: string;
-  lastPublishedAt?: string;
-  templateTitleSizeScale?: number;
-  templateTitleOffsetX?: number;
-  templateTitleOffsetY?: number;
-  templateTitleFont?: string;
-  templateLogoScale?: number;
-  templateLogoPosition?: "top-right" | "top-left" | "bottom-left" | "bottom-right";
-  templateCategoryOffsetX?: number;
-  templateCategoryOffsetY?: number;
-  templatePhotoRatio?: number;
-  templatePhotoCropY?: "top" | "center" | "bottom";
-  templatePhotoVignette?: number;
-  templatePanelColor?: string;
-  templateAccentColor?: string;
-  templateTitleColor?: string;
-  templateTitleMaxLines?: number;
-  templateShowSubtitle?: boolean;
-  templateSiteUrl?: string;
-  captionUseTitulo?: boolean;
-  captionUseResumo?: boolean;
-  captionIncludePortal?: boolean;
-  captionIncludeCategoria?: boolean;
-  captionIncludeHashtags?: boolean;
-  captionIncludeCTA?: boolean;
-  captionLimitChars?: boolean;
-  captionCharLimit?: "feed" | "story" | "facebook";
-  captionUseEmojis?: boolean;
-  captionSeparateBlocks?: boolean;
-  captionPrefixo?: string;
-  captionCTA?: string;
-  captionHashtagsFixed?: string;
-  captionAssinatura?: string;
-  captionTom?: string;
-  templateLayout?: string;
-  templateOverlayOpacity?: number;
-  templateCategoryStyle?: string;
-  templateShowAuthor?: boolean;
-  templateShowDate?: boolean;
-  templateShowCTA?: boolean;
-}
 
-interface Article {
+interface SocialAccount {
   id: string;
-  title: string;
-  subtitle?: string;
-  category: string;
-  tag?: string;
-  imageUrl?: string;
-  keywords?: string;
-  publishedAt?: string;
+  name: string;
+  metaAppId?: string | null;
+  metaAppSecret?: string | null;
+  pageId?: string | null;
+  pageName?: string | null;
+  instagramId?: string | null;
+  instagramName?: string | null;
+  accessToken?: string | null;
+  isActive: boolean;
+  createdAt: string;
 }
 
-type ActiveTab = "credenciais" | "template" | "legenda" | "publicar";
-type TemplateType = "feed" | "story" | "facebook";
+export interface TemplateElement {
+  id: string;
+  type: "title" | "category" | "image" | "logo" | "cta" | "text";
+  x: number; y: number;
+  width: number; height: number;
+  fontSize: number;
+  fontFamily: string;
+  fontWeight: string;
+  color: string;
+  backgroundColor: string;
+  textAlign: "left" | "center" | "right";
+  padding: number;
+  borderRadius: number;
+  opacity: number;
+  zIndex: number;
+  content: string;
+  objectFit?: "cover" | "contain" | "fill";
+}
 
-const FB_W = 1200, FB_H = 630;
+interface SocialTemplate {
+  id: string;
+  name: string;
+  type: "feed" | "story";
+  width: number;
+  height: number;
+  backgroundColor: string;
+  elements: TemplateElement[];
+}
+
+interface QueueItem {
+  id: string;
+  articleId: string;
+  articleTitle?: string | null;
+  socialAccountId: string;
+  accountName?: string | null;
+  templateId?: string | null;
+  type: string;
+  status: string;
+  caption?: string | null;
+  scheduledAt: string;
+  publishedAt?: string | null;
+  metaPostId?: string | null;
+  errorMessage?: string | null;
+  retryCount: number;
+  createdAt: string;
+}
+
+interface ArticleOption { id: string; title: string; category: string; imageUrl?: string; }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const FEED_W = 1080, FEED_H = 1350;
-const STORY_W = 1080, STORY_H = 1920;
 
-const CATEGORY_COLORS: Record<string, string> = {
-  politica: "#c8102e", cidade: "#0b3d91",  seguranca: "#7c3aed",
-  transporte: "#ea580c", saude: "#16a34a", educacao: "#0891b2",
-  cultura: "#db2777", esportes: "#ca8a04", colunas: "#6b7280",
-  brasil: "#c8102e", mundo: "#0b3d91",    economia: "#059669",
-  tecnologia: "#7c3aed", geral: "#374151",
+const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
+const PRIMARY = "#0B2A66";
+const ACCENT  = "#E71D36";
+
+const PREVIEW_W = 360;
+const ACTUAL_W  = 1080;
+const SCALE = PREVIEW_W / ACTUAL_W;
+
+const FONT_FAMILIES = ["Inter", "Georgia", "Arial", "Merriweather", "Roboto", "Oswald"];
+const ELEMENT_TYPE_LABELS: Record<string, string> = {
+  title: "Título", category: "Categoria", image: "Imagem de fundo",
+  logo: "Logo", cta: "Call to action", text: "Texto livre",
 };
 
-const DEFAULT_FEED_CAPTION =
-  "{{titulo}}\n\n{{resumo}}\n\n{{tags}}\n\nLeia mais na íntegra no link da bio! 🚀\nAcesse:";
-const DEFAULT_STORY_CAPTION =
-  "{{titulo}}\n\n{{tags}}\n\nLeia mais no link da bio! 🚀";
-
-// ─── Canvas rendering ─────────────────────────────────────────────────────────
-function hexToRgb(hex: string) {
-  const c = (hex ?? "#1a2448").replace("#", "");
+function makeElement(type: TemplateElement["type"]): TemplateElement {
+  const overrides: Record<string, Partial<TemplateElement>> = {
+    title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}" },
+    category: { x: 40, y: 540, width: 300,  height: 60,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: ACCENT, content: "{{category}}" },
+    image:    { x: 0,  y: 0,   width: 1080, height: 800, fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "#333333", content: "", objectFit: "cover" },
+    logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain" },
+    cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →" },
+    text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: "sbcagora.com.br" },
+  };
   return {
-    r: parseInt(c.slice(0, 2), 16) || 26,
-    g: parseInt(c.slice(2, 4), 16) || 36,
-    b: parseInt(c.slice(4, 6), 16) || 72,
+    id: crypto.randomUUID(),
+    type,
+    x: 40, y: 400, width: 600, height: 100,
+    fontSize: 32, fontFamily: "Inter", fontWeight: "normal",
+    color: "#ffffff", backgroundColor: "transparent",
+    textAlign: "left", padding: 16, borderRadius: 0, opacity: 1, zIndex: 1,
+    content: "",
+    ...(overrides[type] ?? {}),
   };
 }
 
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const test = cur ? `${cur} ${w}` : w;
-    if (ctx.measureText(test).width > maxW && cur) { lines.push(cur); cur = w; }
-    else cur = test;
-  }
-  if (cur) lines.push(cur);
-  return lines;
+function fmtDate(iso?: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
-function renderCanvas(
-  canvas: HTMLCanvasElement,
-  type: TemplateType,
-  article: Article | null,
-  cfg: SocialConfig,
-  logoBase64?: string,
-  siteName?: string,
-) {
-  const W = type === "feed" ? FEED_W : type === "story" ? STORY_W : FB_W;
-  const H = type === "feed" ? FEED_H : type === "story" ? STORY_H : FB_H;
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext("2d")!;
+// ─── API helpers ──────────────────────────────────────────────────────────────
 
-  const doDraw = (bgImg?: HTMLImageElement, logoImg?: HTMLImageElement) => {
-    ctx.clearRect(0, 0, W, H);
-    ctx.shadowBlur = 0;
-
-    const PAD         = Math.round(W * 0.058);
-    const photoRatio  = cfg.templatePhotoRatio   ?? 0.54;
-    const PHOTO_H     = Math.round(H * photoRatio);
-    const panelColor  = cfg.templatePanelColor   ?? "#1a2448";
-    const accentColor = cfg.templateAccentColor  ?? "#f59e0b";
-    const titleColor  = cfg.templateTitleColor   ?? "#ffffff";
-    const fontFamily  = cfg.templateTitleFont    ?? "Inter, Arial, sans-serif";
-    const cropY       = cfg.templatePhotoCropY   ?? "center";
-    const vigStrength = cfg.templatePhotoVignette ?? 0.40;
-    const maxLines    = cfg.templateTitleMaxLines ?? 4;
-    const showSub     = cfg.templateShowSubtitle  ?? false;
-    const { r: pr, g: pg, b: pb } = hexToRgb(panelColor);
-
-    // 1. Photo area — cover crop with vertical alignment
-    if (bgImg) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, W, PHOTO_H);
-      ctx.clip();
-      const ar  = bgImg.width / bgImg.height;
-      const car = W / PHOTO_H;
-      let sx = 0, sy = 0, sw = bgImg.width, sh = bgImg.height;
-      if (ar > car) {
-        sw = bgImg.height * car;
-        sx = (bgImg.width - sw) / 2;
-      } else {
-        sh = bgImg.width / car;
-        const extra = bgImg.height - sh;
-        sy = cropY === "top" ? 0 : cropY === "bottom" ? extra : extra / 2;
-      }
-      ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, PHOTO_H);
-      ctx.restore();
-
-      // Vignette — bottom of photo bleeds into panel
-      if (vigStrength > 0) {
-        const vigH = Math.round(PHOTO_H * 0.55);
-        const vg   = ctx.createLinearGradient(0, PHOTO_H - vigH, 0, PHOTO_H);
-        vg.addColorStop(0, `rgba(${pr},${pg},${pb},0)`);
-        vg.addColorStop(1, `rgba(${pr},${pg},${pb},${vigStrength})`);
-        ctx.fillStyle = vg;
-        ctx.fillRect(0, PHOTO_H - vigH, W, vigH);
-      }
-    } else {
-      const g = ctx.createLinearGradient(0, 0, W, PHOTO_H);
-      g.addColorStop(0, "#2a3a5e"); g.addColorStop(1, panelColor);
-      ctx.fillStyle = g; ctx.fillRect(0, 0, W, PHOTO_H);
-    }
-
-    // 2. Dark panel (bottom portion)
-    ctx.fillStyle = panelColor;
-    ctx.fillRect(0, PHOTO_H, W, H - PHOTO_H);
-
-    // 3. Logo (overlaid on photo)
-    if (cfg.templateShowLogo && logoImg) {
-      const logoScale = cfg.templateLogoScale ?? 1.0;
-      const lW = Math.round(W * 0.20 * logoScale);
-      const lH = Math.round(lW * (logoImg.height / logoImg.width));
-      const logoPos = cfg.templateLogoPosition ?? "top-right";
-      let lx: number, ly: number;
-      if      (logoPos === "top-left")     { lx = PAD;          ly = PAD; }
-      else if (logoPos === "bottom-left")  { lx = PAD;          ly = PHOTO_H - lH - Math.round(PAD * 0.6); }
-      else if (logoPos === "bottom-right") { lx = W - PAD - lW; ly = PHOTO_H - lH - Math.round(PAD * 0.6); }
-      else                                 { lx = W - PAD - lW; ly = PAD; }
-      ctx.drawImage(logoImg, lx, ly, lW, lH);
-    }
-
-    // 4. Category badge — top of dark panel
-    const panelPad = Math.round(H * 0.030);
-    let curY = PHOTO_H + panelPad;
-
-    if (cfg.templateShowCategory !== false && article?.category) {
-      const catOffX   = cfg.templateCategoryOffsetX ?? 0;
-      const catOffY   = cfg.templateCategoryOffsetY ?? 0;
-      const badgeText = (article.tag ?? article.category).toUpperCase();
-      const fs  = Math.round(W * 0.030);
-      ctx.font  = `700 ${fs}px Inter, Arial, sans-serif`;
-      const tm  = ctx.measureText(badgeText);
-      const bh  = Math.round(W * 0.052);
-      const bw  = tm.width + Math.round(W * 0.042);
-      const bx  = PAD + Math.round(W * catOffX);
-      const by  = curY + Math.round(H * catOffY);
-      ctx.fillStyle    = accentColor;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bw, bh, 8);
-      ctx.fill();
-      ctx.fillStyle    = "#1a2448";
-      ctx.textAlign    = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillText(badgeText, bx + Math.round(W * 0.018), by + bh / 2);
-      curY = by + bh + Math.round(H * 0.022);
-    }
-
-    // 5. Title — configurable color + max lines
-    const cleanTitle = (article?.title ?? "").replace(/<[^>]*>/g, "");
-    if (cleanTitle) {
-      const sizeScale  = cfg.templateTitleSizeScale ?? 1.0;
-      const baseFs     = type === "feed" ? Math.round(W * 0.074) : Math.round(W * 0.070);
-      const fs         = Math.round(baseFs * sizeScale);
-      ctx.font         = `800 ${fs}px ${fontFamily}`;
-      ctx.fillStyle    = titleColor;
-      ctx.textAlign    = "left";
-      ctx.textBaseline = "top";
-      const offX   = Math.round(W * (cfg.templateTitleOffsetX ?? 0));
-      const offY   = Math.round(H * (cfg.templateTitleOffsetY ?? 0));
-      const titleX = PAD + offX;
-      const maxW   = W - PAD - offX - PAD;
-      const lines  = wrapText(ctx, cleanTitle, Math.max(maxW, W * 0.5)).slice(0, maxLines);
-      const lh     = fs * 1.16;
-      lines.forEach((ln, i) => ctx.fillText(ln, titleX, curY + offY + i * lh));
-      curY += lines.length * lh + Math.round(H * 0.014) + offY;
-    }
-
-    // 6. Subtitle — accent italic, toggleable
-    if (showSub) {
-      const cleanSub = (article?.subtitle ?? "").replace(/<[^>]*>/g, "");
-      if (cleanSub) {
-        const sizeScale  = cfg.templateTitleSizeScale ?? 1.0;
-        const baseFs     = type === "feed" ? Math.round(W * 0.063) : Math.round(W * 0.059);
-        const fs         = Math.round(baseFs * sizeScale);
-        ctx.font         = `700 italic ${fs}px ${fontFamily}`;
-        ctx.fillStyle    = accentColor;
-        ctx.textAlign    = "left";
-        ctx.textBaseline = "top";
-        const maxW = W - PAD * 2;
-        const lines = wrapText(ctx, cleanSub, maxW).slice(0, 3);
-        const lh    = fs * 1.18;
-        lines.forEach((ln, i) => ctx.fillText(ln, PAD, curY + i * lh));
-      }
-    }
-
-    // 7. URL — custom or auto-generated, bottom of panel
-    const hostname = typeof window !== "undefined"
-      ? window.location.hostname.replace("www.", "")
-      : "portal.com.br";
-    const autoUrl  = siteName
-      ? `www.${siteName.toLowerCase().replace(/\s+/g, "")}.com.br`
-      : `www.${hostname}`;
-    const urlLabel = cfg.templateSiteUrl?.trim() || autoUrl;
-    const urlFs    = Math.round(W * 0.026);
-    ctx.font         = `400 ${urlFs}px Inter, Arial, sans-serif`;
-    ctx.fillStyle    = "rgba(255,255,255,0.38)";
-    ctx.textAlign    = "left";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(urlLabel, PAD, H - Math.round(H * 0.022));
-  };
-
-  // Load images
-  let bgLoaded   = false;
-  let logoLoaded = false;
-  let _bgImg:   HTMLImageElement | null = null;
-  let _logoImg: HTMLImageElement | null = null;
-  const maybeRender = () => {
-    if (bgLoaded && logoLoaded) doDraw(_bgImg ?? undefined, _logoImg ?? undefined);
-  };
-
-  if (article?.imageUrl && article.imageUrl.startsWith("http")) {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload  = () => { _bgImg = img; bgLoaded = true; maybeRender(); };
-    img.onerror = () => {                bgLoaded = true; maybeRender(); };
-    img.src = article.imageUrl;
-  } else {
-    bgLoaded = true;
-  }
-
-  if (cfg.templateShowLogo && logoBase64) {
-    const img = new Image();
-    img.onload  = () => { _logoImg = img; logoLoaded = true; maybeRender(); };
-    img.onerror = () => {                  logoLoaded = true; maybeRender(); };
-    img.src = logoBase64;
-  } else {
-    logoLoaded = true;
-  }
-
-  if (bgLoaded && logoLoaded) doDraw(undefined, undefined);
+async function apiFetch(path: string, opts?: RequestInit) {
+  const res = await fetch(`/api/admin/social${path}`, {
+    ...opts,
+    headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
+    credentials: "include",
+  });
+  return res.json() as Promise<unknown>;
 }
 
-// ─── Caption builder ──────────────────────────────────────────────────────────
-function buildCaption(template: string, article: Article | null): string {
-  if (!article) return template;
-  const tags = (article.keywords ?? article.category ?? "")
-    .split(/[,\s]+/).filter(Boolean)
-    .map(t => `#${t.replace(/[^a-zA-ZÀ-ú0-9]/g, "")}`)
-    .join(" ");
-  return template
-    .replace(/{{titulo}}/g,    article.title)
-    .replace(/{{resumo}}/g,    article.subtitle ?? "")
-    .replace(/{{tags}}/g,      tags)
-    .replace(/{{categoria}}/g, article.tag ?? article.category);
-}
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Small helpers ────────────────────────────────────────────────────────────
-function Chip({ ok, label }: { ok: boolean; label: string }) {
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium
-      ${ok ? "bg-green-100 text-green-800" : "bg-red-100 text-red-700"}`}>
-      {ok ? <CheckCircle size={11} /> : <XCircle size={11} />} {label}
-    </span>
-  );
-}
-
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function SocialMedia() {
-  const { settings } = useSite();
-  const { toast } = useToast();
+  const [tab, setTab] = useState<"accounts" | "templates" | "queue">("accounts");
 
-  const [tab, setTab] = useState<ActiveTab>("credenciais");
-  const [cfg, setCfg] = useState<SocialConfig>({});
-  const [saving, setSaving] = useState(false);
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [selArt, setSelArt] = useState<Article | null>(null);
-  const [previewType, setPreviewType] = useState<TemplateType>("feed");
-  const [showToken, setShowToken] = useState(false);
-  const [publishFeed, setPublishFeed] = useState(true);
-  const [publishStory, setPublishStory] = useState(false);
-  const [publishFacebook, setPublishFacebook] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-  const [publishResults, setPublishResults] = useState<Record<string, { ok: boolean; error?: string; id?: string }> | null>(null);
+  // ── Accounts ──────────────────────────────────────────────────────────────
+  const [accounts,         setAccounts]         = useState<SocialAccount[]>([]);
+  const [accountsLoading,  setAccountsLoading]  = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [editingAccount,   setEditingAccount]   = useState<Partial<SocialAccount & { accessToken: string }> | null>(null);
+  const [accountSaving,    setAccountSaving]    = useState(false);
+  const [testStatus,       setTestStatus]       = useState<Record<string, { ok: boolean; msg: string } | null>>({});
+  const [testingId,        setTestingId]        = useState<string | null>(null);
 
-  const [captionPlatform, setCaptionPlatform] = useState<"feed" | "story" | "facebook">("feed");
-  const [templateDestTab, setTemplateDestTab] = useState<TemplateType>("feed");
+  // ── Templates ─────────────────────────────────────────────────────────────
+  const [templates,       setTemplates]       = useState<SocialTemplate[]>([]);
+  const [currentTemplate, setCurrentTemplate] = useState<SocialTemplate | null>(null);
+  const [selectedElId,    setSelectedElId]    = useState<string | null>(null);
+  const [templateSaving,  setTemplateSaving]  = useState(false);
+  const [templateSaved,   setTemplateSaved]   = useState(false);
+  const [dragging, setDragging] = useState<{
+    id: string; startX: number; startY: number; origX: number; origY: number;
+  } | null>(null);
 
-  const feedCanvasRef      = useRef<HTMLCanvasElement>(null);
-  const storyCanvasRef     = useRef<HTMLCanvasElement>(null);
-  const facebookCanvasRef  = useRef<HTMLCanvasElement>(null);
+  // ── Queue ─────────────────────────────────────────────────────────────────
+  const [queue,          setQueue]          = useState<QueueItem[]>([]);
+  const [queueLoading,   setQueueLoading]   = useState(false);
+  const [queueFilter,    setQueueFilter]    = useState("all");
+  const [showQueueModal, setShowQueueModal] = useState(false);
+  const [articles,       setArticles]       = useState<ArticleOption[]>([]);
+  const [processing,     setProcessing]     = useState(false);
+  const [queueForm, setQueueForm] = useState({
+    articleId: "",
+    accountIds: [] as string[],
+    templateFeedId: "",
+    templateStoryId: "",
+    caption: "",
+    types: ["feed"] as string[],
+    scheduledAt: "",
+  });
 
-  // Load config
-  useEffect(() => {
-    fetch("/api/admin/social/config")
-      .then(r => r.json())
-      .then((d: SocialConfig) => setCfg({
-        feedCaption:  d.feedCaption  || DEFAULT_FEED_CAPTION,
-        storyCaption: d.storyCaption || DEFAULT_STORY_CAPTION,
-        templateShowLogo:     d.templateShowLogo     ?? false,
-        templateShowCategory: d.templateShowCategory ?? true,
-        templateGradientFrom: d.templateGradientFrom ?? "rgba(0,0,0,0)",
-        templateGradientTo:   d.templateGradientTo   ?? "rgba(0,0,0,0.88)",
-        autoPublishFeed:     d.autoPublishFeed     ?? false,
-        autoPublishStory:    d.autoPublishStory    ?? false,
-        autoPublishFacebook: d.autoPublishFacebook ?? false,
-        lastPublishedAt:     d.lastPublishedAt,
-        ...d,
-      }))
-      .catch(() => {});
+  // ── Fetch ──────────────────────────────────────────────────────────────────
+
+  const fetchAccounts = useCallback(async () => {
+    setAccountsLoading(true);
+    try { setAccounts((await apiFetch("/accounts")) as SocialAccount[]); } finally { setAccountsLoading(false); }
   }, []);
 
-  // Load articles
-  useEffect(() => {
-    if (tab !== "publicar" && tab !== "template") return;
-    fetch("/api/articles?status=published&limit=50")
-      .then(r => r.json())
-      .then((data: Article[] | { articles?: Article[] }) => {
-        const arr = Array.isArray(data) ? data : (data.articles ?? []);
-        setArticles(arr);
-        if (arr.length > 0 && !selArt) setSelArt(arr[0] ?? null);
-      })
-      .catch(() => {});
-  }, [tab]);
+  const fetchTemplates = useCallback(async () => {
+    setTemplates((await apiFetch("/templates")) as SocialTemplate[]);
+  }, []);
 
-  // Re-render canvas when relevant state changes
-  const logoBase64 = settings?.logoBase64;
-  const siteName   = settings?.siteName;
+  const fetchQueue = useCallback(async () => {
+    setQueueLoading(true);
+    try {
+      const qs = queueFilter !== "all" ? `?status=${queueFilter}` : "";
+      setQueue((await apiFetch(`/queue${qs}`)) as QueueItem[]);
+    } finally { setQueueLoading(false); }
+  }, [queueFilter]);
 
-  const effectiveLogo = cfg.templateCustomLogoBase64 ?? logoBase64;
+  useEffect(() => { void fetchAccounts(); void fetchTemplates(); }, [fetchAccounts, fetchTemplates]);
+  useEffect(() => { if (tab === "queue") void fetchQueue(); }, [tab, fetchQueue]);
+  useEffect(() => { if (tab === "queue") void fetchQueue(); }, [queueFilter]);
 
-  const redrawCanvas = useCallback(() => {
-    if (feedCanvasRef.current) {
-      renderCanvas(feedCanvasRef.current, "feed", selArt, cfg, effectiveLogo, siteName);
-    }
-    if (storyCanvasRef.current) {
-      renderCanvas(storyCanvasRef.current, "story", selArt, cfg, effectiveLogo, siteName);
-    }
-    if (facebookCanvasRef.current) {
-      renderCanvas(facebookCanvasRef.current, "facebook", selArt, cfg, effectiveLogo, siteName);
-    }
-  }, [selArt, cfg, effectiveLogo, siteName]);
+  // ── Drag ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (tab === "publicar" || tab === "template") redrawCanvas();
-  }, [tab, redrawCanvas]);
+    if (!dragging) return;
+    const onMove = (e: MouseEvent) => {
+      const dx = (e.clientX - dragging.startX) / SCALE;
+      const dy = (e.clientY - dragging.startY) / SCALE;
+      setCurrentTemplate((prev) => prev ? {
+        ...prev,
+        elements: prev.elements.map((el) =>
+          el.id === dragging.id
+            ? { ...el, x: Math.round(dragging.origX + dx), y: Math.round(dragging.origY + dy) }
+            : el,
+        ),
+      } : prev);
+    };
+    const onUp = () => setDragging(null);
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, [dragging]);
 
-  // Save config
-  const saveConfig = async () => {
-    setSaving(true);
+  // ── Account ops ───────────────────────────────────────────────────────────
+
+  async function saveAccount() {
+    if (!editingAccount?.name) return;
+    setAccountSaving(true);
     try {
-      const r = await fetch("/api/admin/social/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(cfg),
-      });
-      if (!r.ok) throw new Error("Erro ao salvar");
-      const d = await r.json() as { config: SocialConfig };
-      setCfg(prev => ({ ...prev, ...d.config }));
-      toast({ title: "Configuração salva!", description: "Credenciais e templates atualizados." });
-    } catch {
-      toast({ title: "Erro ao salvar", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Publish
-  const doPublish = async () => {
-    if (!selArt) { toast({ title: "Selecione um artigo", variant: "destructive" }); return; }
-    if (!publishFeed && !publishStory && !publishFacebook) {
-      toast({ title: "Selecione ao menos um destino", variant: "destructive" }); return;
-    }
-
-    const feedCanvas  = feedCanvasRef.current!;
-    const storyCanvas = storyCanvasRef.current!;
-
-    // Ensure canvas is rendered
-    renderCanvas(feedCanvas,  "feed",  selArt, cfg, effectiveLogo, siteName);
-    renderCanvas(storyCanvas, "story", selArt, cfg, effectiveLogo, siteName);
-
-    // Give it a brief moment for async image loads to complete
-    await new Promise(r => setTimeout(r, 600));
-
-    const imageBase64 = feedCanvas.toDataURL("image/jpeg", 0.92);
-    const caption     = buildCaption(cfg.feedCaption  ?? DEFAULT_FEED_CAPTION,  selArt);
-    const stCaption   = buildCaption(cfg.storyCaption ?? DEFAULT_STORY_CAPTION, selArt);
-
-    setPublishing(true);
-    setPublishResults(null);
-    try {
-      const r = await fetch(`/api/admin/social/publish/${selArt.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageBase64, caption, storyCaption: stCaption, publishFeed, publishStory, publishFacebook }),
-      });
-      const data = await r.json() as { ok: boolean; results?: Record<string, { ok: boolean; error?: string; id?: string }>; error?: string };
-      if (!r.ok || data.error) throw new Error(data.error ?? "Erro desconhecido");
-      setPublishResults(data.results ?? {});
-      const allOk = Object.values(data.results ?? {}).every(v => v.ok);
-      toast({ title: allOk ? "Publicado com sucesso! 🎉" : "Publicado com avisos", variant: allOk ? "default" : "destructive" });
-    } catch (e: unknown) {
-      toast({ title: "Erro na publicação", description: (e as Error).message, variant: "destructive" });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const TABS: { id: ActiveTab; label: string }[] = [
-    { id: "credenciais", label: "Credenciais Meta" },
-    { id: "template",    label: "Templates" },
-    { id: "legenda",     label: "Legenda automática" },
-    { id: "publicar",    label: "Publicar" },
-  ];
-
-  const CHAR_LIMITS: Record<string, number> = { feed: 2200, story: 150, facebook: 63206 };
-
-  function buildRuleCaption(article: Article | null, platform: "feed" | "story" | "facebook"): string {
-    if (!article) return "";
-    const title   = article.title.replace(/<[^>]*>/g, "");
-    const summary = (article.subtitle ?? "").replace(/<[^>]*>/g, "");
-    const cat     = (article.tag ?? article.category ?? "geral").toUpperCase();
-    const sep     = cfg.captionSeparateBlocks !== false ? "\n\n" : "\n";
-    const parts: string[] = [];
-
-    const prefixo = cfg.captionPrefixo ?? "{categoria} | {titulo}";
-    if (prefixo) {
-      parts.push(prefixo.replace("{categoria}", cat).replace("{titulo}", title));
-    } else if (cfg.captionUseTitulo !== false) {
-      parts.push(title);
-    }
-
-    if (cfg.captionUseResumo !== false && summary) parts.push(summary);
-    if (cfg.captionIncludePortal && siteName) parts.push(siteName);
-    if (cfg.captionIncludeCTA !== false) {
-      parts.push(cfg.captionCTA ?? "Leia a matéria completa no link da bio.");
-    }
-    if (cfg.captionAssinatura) parts.push(cfg.captionAssinatura);
-
-    let caption = parts.join(sep);
-
-    if (cfg.captionIncludeHashtags !== false) {
-      const autoTags = (article.keywords ?? article.category ?? "")
-        .split(/[,\s]+/).filter(Boolean)
-        .map(t => `#${t.replace(/[^a-zA-ZÀ-ú0-9]/g, "")}`)
-        .filter(t => t.length > 1).slice(0, 5).join(" ");
-      const fixed = cfg.captionHashtagsFixed ?? "#SBCAgora #NotíciasDeVerdade";
-      if (autoTags || fixed) caption += "\n\n" + [autoTags, fixed].filter(Boolean).join(" ");
-    }
-
-    const limit = CHAR_LIMITS[platform];
-    if (cfg.captionLimitChars && caption.length > limit) caption = caption.slice(0, limit - 3) + "…";
-    return caption;
+      if (editingAccount.id) {
+        await apiFetch(`/accounts/${editingAccount.id}`, { method: "PUT", body: JSON.stringify(editingAccount) });
+      } else {
+        await apiFetch("/accounts", { method: "POST", body: JSON.stringify(editingAccount) });
+      }
+      setShowAccountModal(false); setEditingAccount(null);
+      await fetchAccounts();
+    } finally { setAccountSaving(false); }
   }
+
+  async function deleteAccount(id: string) {
+    if (!window.confirm("Remover esta conta?")) return;
+    await apiFetch(`/accounts/${id}`, { method: "DELETE" });
+    await fetchAccounts();
+  }
+
+  async function testAccount(id: string) {
+    setTestingId(id); setTestStatus((prev) => ({ ...prev, [id]: null }));
+    try {
+      const r = (await apiFetch(`/accounts/${id}/test`, { method: "POST" })) as { ok: boolean; name?: string; error?: string };
+      setTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? `✓ ${r.name ?? "Conectado"}` : r.error ?? "Erro" } }));
+    } catch (e) {
+      setTestStatus((prev) => ({ ...prev, [id]: { ok: false, msg: (e as Error).message } }));
+    } finally { setTestingId(null); }
+  }
+
+  async function toggleAccountActive(account: SocialAccount) {
+    await apiFetch(`/accounts/${account.id}`, { method: "PUT", body: JSON.stringify({ isActive: !account.isActive }) });
+    await fetchAccounts();
+  }
+
+  // ── Template ops ──────────────────────────────────────────────────────────
+
+  function newTemplate(type: "feed" | "story") {
+    setCurrentTemplate({
+      id: "", name: `Novo ${type === "feed" ? "Feed" : "Story"}`,
+      type, width: 1080, height: type === "feed" ? 1350 : 1920,
+      backgroundColor: "#1a1a1a", elements: [],
+    });
+    setSelectedElId(null);
+  }
+
+  async function loadTemplate(id: string) {
+    const t = (await apiFetch(`/templates/${id}`)) as SocialTemplate;
+    setCurrentTemplate({ ...t, elements: (t.elements ?? []) as TemplateElement[] });
+    setSelectedElId(null);
+  }
+
+  async function saveTemplate() {
+    if (!currentTemplate) return;
+    setTemplateSaving(true);
+    try {
+      let saved: SocialTemplate;
+      if (currentTemplate.id) {
+        saved = (await apiFetch(`/templates/${currentTemplate.id}`, { method: "PUT", body: JSON.stringify(currentTemplate) })) as SocialTemplate;
+      } else {
+        saved = (await apiFetch("/templates", { method: "POST", body: JSON.stringify(currentTemplate) })) as SocialTemplate;
+      }
+      setCurrentTemplate((prev) => prev ? { ...prev, id: saved.id } : prev);
+      setTemplateSaved(true); setTimeout(() => setTemplateSaved(false), 2000);
+      await fetchTemplates();
+    } finally { setTemplateSaving(false); }
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!window.confirm("Remover este template?")) return;
+    await apiFetch(`/templates/${id}`, { method: "DELETE" });
+    if (currentTemplate?.id === id) setCurrentTemplate(null);
+    await fetchTemplates();
+  }
+
+  function addElement(type: TemplateElement["type"]) {
+    const el = makeElement(type);
+    setCurrentTemplate((prev) => prev ? { ...prev, elements: [...prev.elements, el] } : prev);
+    setSelectedElId(el.id);
+  }
+
+  function updateElement(id: string, patch: Partial<TemplateElement>) {
+    setCurrentTemplate((prev) => prev ? {
+      ...prev, elements: prev.elements.map((el) => el.id === id ? { ...el, ...patch } : el),
+    } : prev);
+  }
+
+  function removeElement(id: string) {
+    setCurrentTemplate((prev) => prev ? { ...prev, elements: prev.elements.filter((el) => el.id !== id) } : prev);
+    if (selectedElId === id) setSelectedElId(null);
+  }
+
+  function moveElementZ(id: string, dir: "up" | "down") {
+    setCurrentTemplate((prev) => {
+      if (!prev) return prev;
+      const sorted = [...prev.elements].sort((a, b) => a.zIndex - b.zIndex);
+      const idx = sorted.findIndex((e) => e.id === id);
+      if (dir === "up" && idx < sorted.length - 1) {
+        const a = sorted[idx]!, b = sorted[idx + 1]!;
+        sorted[idx] = { ...b, zIndex: a.zIndex }; sorted[idx + 1] = { ...a, zIndex: b.zIndex };
+      } else if (dir === "down" && idx > 0) {
+        const a = sorted[idx]!, b = sorted[idx - 1]!;
+        sorted[idx] = { ...b, zIndex: a.zIndex }; sorted[idx - 1] = { ...a, zIndex: b.zIndex };
+      }
+      return { ...prev, elements: sorted };
+    });
+  }
+
+  // ── Queue ops ─────────────────────────────────────────────────────────────
+
+  async function openQueueModal() {
+    try {
+      const data = (await fetch("/api/articles?limit=100").then((r) => r.json())) as { articles?: ArticleOption[] } | ArticleOption[];
+      const list = Array.isArray(data) ? data : (data.articles ?? []);
+      setArticles(list as ArticleOption[]);
+    } catch { setArticles([]); }
+    setQueueForm({ articleId: "", accountIds: [], templateFeedId: templates[0]?.id ?? "", templateStoryId: "", caption: "", types: ["feed"], scheduledAt: "" });
+    setShowQueueModal(true);
+  }
+
+  async function submitQueueForm() {
+    if (!queueForm.articleId || !queueForm.accountIds.length) return;
+    await apiFetch("/queue", { method: "POST", body: JSON.stringify(queueForm) });
+    setShowQueueModal(false); await fetchQueue();
+  }
+
+  async function removeFromQueue(id: string) {
+    await apiFetch(`/queue/${id}`, { method: "DELETE" });
+    setQueue((q) => q.filter((i) => i.id !== id));
+  }
+
+  async function retryQueueItem(id: string) {
+    await apiFetch(`/queue/${id}/retry`, { method: "POST" });
+    await fetchQueue();
+  }
+
+  async function processQueue() {
+    setProcessing(true);
+    try { await apiFetch("/process", { method: "POST" }); await fetchQueue(); }
+    finally { setProcessing(false); }
+  }
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+
+  const selectedEl = currentTemplate?.elements.find((e) => e.id === selectedElId) ?? null;
+  const previewH   = currentTemplate ? Math.round(currentTemplate.height * SCALE) : 450;
+
+  const tabBtn = (t: typeof tab, label: string, icon: React.ReactNode) => (
+    <button
+      onClick={() => setTab(t)}
+      className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors ${
+        tab === t ? "bg-white text-[#0B2A66]" : "text-white/70 hover:text-white"
+      }`}
+      style={tab === t ? { boxShadow: CARD_SHADOW } : {}}
+    >
+      {icon} {label}
+    </button>
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <AdminLayout title="Redes Sociais">
-      <div className="space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg" style={{ background: "linear-gradient(135deg,#405de6,#5851db,#833ab4,#c13584,#e1306c,#fd1d1d)" }}>
-            <Share2 size={20} className="text-white" />
+      {/* Tab bar */}
+      <div className="flex items-center gap-2 mb-6 bg-[#0B2A66] rounded-2xl p-1.5 w-fit">
+        {tabBtn("accounts",  "Contas",    <Facebook size={15} />)}
+        {tabBtn("templates", "Templates", <Layers size={15} />)}
+        {tabBtn("queue",     "Fila",      <Clock size={15} />)}
+      </div>
+
+      {/* ══════════ CONTAS ══════════════════════════════════════════════════ */}
+      {tab === "accounts" && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-slate-800">Contas Meta conectadas</h2>
+              <p className="text-sm text-slate-500 mt-0.5">Páginas do Facebook e perfis Instagram Business</p>
+            </div>
+            <button
+              onClick={() => { setEditingAccount({ name: "", isActive: true }); setShowAccountModal(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ background: PRIMARY }}
+            >
+              <Plus size={15} /> Adicionar Conta
+            </button>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Redes Sociais</h1>
-            <p className="text-sm text-gray-500">Conexão Meta · publicação automática no Feed e Story</p>
-          </div>
-          {cfg.lastPublishedAt && (
-            <span className="ml-auto text-xs text-gray-400">
-              Última publicação: {new Date(cfg.lastPublishedAt).toLocaleString("pt-BR")}
-            </span>
+
+          {accountsLoading ? (
+            <div className="flex items-center gap-2 text-slate-400 py-8"><Loader2 size={18} className="animate-spin" /> Carregando…</div>
+          ) : accounts.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Share2 size={24} className="text-slate-300" />
+              </div>
+              <p className="text-sm text-slate-500 font-medium">Nenhuma conta conectada</p>
+              <p className="text-xs text-slate-400 mt-1">Adicione uma conta Meta (Facebook/Instagram) para começar</p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {accounts.map((acc) => (
+                <div key={acc.id} className="bg-white rounded-2xl p-5 flex items-center gap-4" style={{ boxShadow: CARD_SHADOW }}>
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: acc.instagramId ? "#E1306C" : "#1877F2" }}>
+                    {acc.instagramId ? <Instagram size={20} className="text-white" /> : <Facebook size={20} className="text-white" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs text-slate-500">
+                      {acc.pageId      && <span>Page: {acc.pageId}</span>}
+                      {acc.instagramId && <span>IG: {acc.instagramId}</span>}
+                    </div>
+                    {testStatus[acc.id] && (
+                      <p className={`text-xs mt-1 font-medium ${testStatus[acc.id]?.ok ? "text-green-600" : "text-red-500"}`}>
+                        {testStatus[acc.id]?.msg}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${acc.isActive ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
+                      {acc.isActive ? "Ativo" : "Pausado"}
+                    </span>
+                    <button onClick={() => { void testAccount(acc.id); }} disabled={testingId === acc.id} title="Testar"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50">
+                      {testingId === acc.id ? <Loader2 size={13} className="animate-spin" /> : <TestTube2 size={13} />}
+                    </button>
+                    <button onClick={() => { void toggleAccountActive(acc); }} title="Ativar/Pausar"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors">
+                      {acc.isActive ? <ToggleRight size={15} className="text-green-500" /> : <ToggleLeft size={15} />}
+                    </button>
+                    <button onClick={() => { setEditingAccount({ ...acc, accessToken: "" }); setShowAccountModal(true); }} title="Editar"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors">
+                      <Pencil size={13} />
+                    </button>
+                    <button onClick={() => { void deleteAccount(acc.id); }} title="Remover"
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
+      )}
 
-        {/* Tabs */}
-        <div className="border-b border-gray-200">
-          <nav className="flex gap-6">
-            {TABS.map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                  tab === t.id
-                    ? "border-[#E71D36] text-[#E71D36]"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* ── CREDENCIAIS ──────────────────────────────────────────────────────── */}
-        {tab === "credenciais" && (
-          <div className="space-y-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3">
-              <AlertTriangle size={18} className="text-blue-600 shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-700">
-                <p className="font-medium">Pré-requisitos Meta</p>
-                <ul className="mt-1 list-disc pl-4 space-y-0.5 text-blue-600">
-                  <li>Conta comercial ou criador no Instagram vinculada a uma Página no Facebook</li>
-                  <li>App criado no <a href="https://developers.facebook.com" target="_blank" rel="noopener" className="underline inline-flex items-center gap-0.5">Meta for Developers <ExternalLink size={11}/></a></li>
-                  <li>Token de acesso de longa duração com permissões <code className="bg-blue-100 px-1 rounded">instagram_basic</code>, <code className="bg-blue-100 px-1 rounded">instagram_content_publish</code>, <code className="bg-blue-100 px-1 rounded">pages_manage_posts</code></li>
-                </ul>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
-              <h2 className="font-semibold text-gray-800 flex items-center gap-2">
-                <Instagram size={16} /> Credenciais Instagram
-              </h2>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Instagram Business Account ID *
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="123456789012345"
-                    value={cfg.instagramUserId ?? ""}
-                    onChange={e => setCfg(p => ({ ...p, instagramUserId: e.target.value }))}
-                  />
-                  <p className="mt-1 text-xs text-gray-400">Settings → About → See All Info → Instagram ID</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Facebook Page ID
-                  </label>
-                  <input
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="987654321098765"
-                    value={cfg.facebookPageId ?? ""}
-                    onChange={e => setCfg(p => ({ ...p, facebookPageId: e.target.value }))}
-                  />
-                  <p className="mt-1 text-xs text-gray-400">Necessário para publicar no feed do Facebook</p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Page Access Token *
-                </label>
-                <div className="relative">
-                  <input
-                    type={showToken ? "text" : "password"}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 pr-24"
-                    placeholder="EAABwzLixnjYBAJ..."
-                    value={cfg.pageAccessToken ?? ""}
-                    onChange={e => setCfg(p => ({ ...p, pageAccessToken: e.target.value }))}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowToken(v => !v)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-600 hover:text-blue-800 px-2 py-1">
-                    {showToken ? "Ocultar" : "Mostrar"}
-                  </button>
-                </div>
-                <p className="mt-1 text-xs text-gray-400">
-                  Token de longa duração (60 dias). <a href="https://developers.facebook.com/tools/explorer/" target="_blank" rel="noopener" className="text-blue-500 underline inline-flex items-center gap-0.5">Graph API Explorer <ExternalLink size={10}/></a>
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
-              <h2 className="font-semibold text-gray-800">Publicação automática</h2>
-              <p className="text-sm text-gray-500">Quando um artigo é publicado, postar automaticamente nas redes selecionadas.</p>
-              {([
-                { key: "autoPublishFeed",     icon: <Instagram size={15}/>, label: "Instagram Feed", sub: "1080×1350" },
-                { key: "autoPublishStory",    icon: <Layers size={15}/>,    label: "Instagram Story", sub: "1080×1920" },
-                { key: "autoPublishFacebook", icon: <Facebook size={15}/>,  label: "Facebook Page", sub: "Foto na Página" },
-              ] as const).map(({ key, icon, label, sub }) => (
-                <label key={key} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer">
-                  <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    {icon} {label} <span className="text-xs text-gray-400">{sub}</span>
-                  </span>
-                  <input type="checkbox" className="w-4 h-4 accent-[#E71D36]"
-                    checked={!!(cfg as Record<string, unknown>)[key]}
-                    onChange={e => setCfg(p => ({ ...p, [key]: e.target.checked }))} />
-                </label>
-              ))}
-
-              {/* Interval scheduler */}
-              <div className="pt-3 border-t border-gray-100 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">Publicar a cada X horas</p>
-                    <p className="text-xs text-gray-500 mt-0.5">O site publica automaticamente um artigo nas redes a cada intervalo configurado.</p>
-                  </div>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox"
-                      className="w-4 h-4 accent-[#E71D36]"
-                      checked={!!(cfg.autoPublishIntervalHours && cfg.autoPublishIntervalHours > 0)}
-                      onChange={e => setCfg(p => ({ ...p, autoPublishIntervalHours: e.target.checked ? 4 : 0 }))} />
-                    <span className="text-xs font-medium text-gray-600">Ativar</span>
-                  </label>
-                </div>
-
-                {cfg.autoPublishIntervalHours && cfg.autoPublishIntervalHours > 0 ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {[1, 2, 4, 6, 8, 12, 24].map(h => (
-                        <button
-                          key={h}
-                          type="button"
-                          onClick={() => setCfg(p => ({ ...p, autoPublishIntervalHours: h }))}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-semibold border transition-colors ${cfg.autoPublishIntervalHours === h ? "bg-[#E71D36] text-white border-[#E71D36]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"}`}
-                        >
-                          {h}h
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                      <Info size={13} className="text-amber-600 shrink-0" />
-                      <p className="text-xs text-amber-700">
-                        A cada <strong>{cfg.autoPublishIntervalHours} hora{cfg.autoPublishIntervalHours > 1 ? "s" : ""}</strong>, o artigo mais recente não publicado será postado automaticamente.
-                      </p>
-                    </div>
-                    {cfg.lastPublishedAt && (
-                      <p className="text-xs text-gray-500">
-                        Última publicação: {new Date(cfg.lastPublishedAt).toLocaleString("pt-BR")}
-                      </p>
-                    )}
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex justify-end">
-              <button onClick={saveConfig} disabled={saving}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-lg text-sm font-medium hover:bg-[#c9182e] disabled:opacity-50">
-                {saving ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                {saving ? "Salvando…" : "Salvar credenciais"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── TEMPLATE ─────────────────────────────────────────────────────────── */}
-        {tab === "template" && (
-          <div className="grid gap-6" style={{ gridTemplateColumns: "0.85fr 1.6fr" }}>
-
-            {/* ── LEFT: Settings ── */}
-            <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-              {/* Card header */}
-              <div className="px-6 pt-6 pb-4 border-b border-[#F1F5F9]">
-                <h2 className="font-semibold text-[#0F172A] text-[15px]">Configurar máscara de publicações</h2>
-                <p className="text-xs text-[#64748B] mt-0.5">Personalize como seus artigos serão exibidos nas redes sociais.</p>
-              </div>
-
-              <div className="px-6 py-5 space-y-5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)" }}>
-
-                {/* Destination sub-tabs */}
-                <div>
-                  <p className="text-xs font-medium text-[#64748B] mb-2">Destino (Template)</p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {([
-                      { id: "feed",     icon: <Instagram size={13}/>, label: "Instagram Feed",  size: "1080×1350" },
-                      { id: "story",    icon: <Layers    size={13}/>, label: "Instagram Story", size: "1080×1920" },
-                      { id: "facebook", icon: <Facebook  size={13}/>, label: "Facebook Page",   size: "1200×630" },
-                    ] as const).map(d => (
-                      <button key={d.id}
-                        onClick={() => setTemplateDestTab(d.id)}
-                        className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border text-center transition-all ${
-                          templateDestTab === d.id
-                            ? "border-[#0B2A66] bg-[#EFF6FF] text-[#0B2A66]"
-                            : "border-[#E2E8F0] bg-white text-[#64748B] hover:bg-[#F8FAFC]"
-                        }`}>
-                        {d.icon}
-                        <span className="text-[11px] font-medium leading-tight">{d.label}</span>
-                        <span className="text-[10px] opacity-70">{d.size}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Modelo de layout */}
-                <div>
-                  <label className="block text-xs font-medium text-[#64748B] mb-1.5">Modelo de layout</label>
-                  <select
-                    className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
-                    value={cfg.templateLayout ?? "Padrão com badge e logo"}
-                    onChange={e => { setCfg(p => ({ ...p, templateLayout: e.target.value })); }}>
-                    {["Padrão com badge e logo", "Editorial com imagem cheia", "Urgente com faixa vermelha", "Minimalista com título central", "Imagem escura com overlay"].map(o => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Cor primária + Cor de destaque */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Cor primária (overlay)</label>
-                    <div className="flex items-center gap-2 border border-[#E2E8F0] rounded-xl px-3 py-2">
-                      <input type="color"
-                        value={cfg.templatePanelColor ?? "#1a2448"}
-                        onChange={e => { setCfg(p => ({ ...p, templatePanelColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
-                        className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                      <span className="text-xs font-mono text-[#0F172A]">{cfg.templatePanelColor ?? "#1a2448"}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Cor de destaque (badge/CTA)</label>
-                    <div className="flex items-center gap-2 border border-[#E2E8F0] rounded-xl px-3 py-2">
-                      <input type="color"
-                        value={cfg.templateAccentColor ?? "#f59e0b"}
-                        onChange={e => { setCfg(p => ({ ...p, templateAccentColor: e.target.value })); setTimeout(redrawCanvas, 50); }}
-                        className="w-6 h-6 rounded cursor-pointer border-0 p-0 bg-transparent" />
-                      <span className="text-xs font-mono text-[#0F172A]">{cfg.templateAccentColor ?? "#f59e0b"}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tamanho do título + Subtítulo toggle */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-[#64748B]">Tamanho do título</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[#64748B]">Exibir subtítulo</span>
-                      <button
-                        onClick={() => { setCfg(p => ({ ...p, templateShowSubtitle: !(cfg.templateShowSubtitle ?? false) })); setTimeout(redrawCanvas, 50); }}
-                        className={`relative w-9 h-5 rounded-full transition-colors ${cfg.templateShowSubtitle ? "bg-[#0B2A66]" : "bg-gray-200"}`}>
-                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${cfg.templateShowSubtitle ? "translate-x-4" : "translate-x-0.5"}`} />
-                      </button>
-                    </div>
-                  </div>
-                  <input type="range" min="0.5" max="1.8" step="0.05"
-                    value={cfg.templateTitleSizeScale ?? 1.0}
-                    onChange={e => { setCfg(p => ({ ...p, templateTitleSizeScale: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                    className="w-full accent-[#0B2A66]" />
-                  <div className="flex justify-between text-[10px] text-[#94A3B8] mt-0.5"><span>Pequeno</span><span>Extra grande</span></div>
-                </div>
-
-                {/* Posição do logo + Opacidade do overlay */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-[#64748B] mb-1.5">Posição do logo</label>
-                    <select
-                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
-                      value={cfg.templateLogoPosition ?? "top-left"}
-                      onChange={e => { setCfg(p => ({ ...p, templateLogoPosition: e.target.value as typeof cfg.templateLogoPosition, templateShowLogo: true })); setTimeout(redrawCanvas, 50); }}>
-                      <option value="top-left">Superior esquerda</option>
-                      <option value="top-right">Superior direita</option>
-                      <option value="bottom-left">Inferior esquerda</option>
-                      <option value="bottom-right">Inferior direita</option>
-                    </select>
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs font-medium text-[#64748B]">Opacidade do overlay</label>
-                      <span className="text-xs font-mono text-[#0B2A66]">{Math.round((cfg.templatePhotoVignette ?? 0.40) * 100)}%</span>
-                    </div>
-                    <input type="range" min="0" max="1" step="0.05"
-                      value={cfg.templatePhotoVignette ?? 0.40}
-                      onChange={e => { setCfg(p => ({ ...p, templatePhotoVignette: parseFloat(e.target.value) })); setTimeout(redrawCanvas, 50); }}
-                      className="w-full accent-[#0B2A66] mt-1" />
-                    <div className="flex justify-between text-[10px] text-[#94A3B8] mt-0.5"><span>0%</span><span>100%</span></div>
-                  </div>
-                </div>
-
-                {/* Logo customizado para a máscara */}
-                <div className="space-y-2 p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-[#64748B]">Logo da máscara</label>
-                    {cfg.templateCustomLogoBase64 && (
-                      <button
-                        type="button"
-                        onClick={() => { setCfg(p => ({ ...p, templateCustomLogoBase64: undefined })); setTimeout(redrawCanvas, 80); }}
-                        className="text-[10px] text-red-500 hover:text-red-700 font-medium">
-                        Remover
-                      </button>
-                    )}
-                  </div>
-                  {cfg.templateCustomLogoBase64 ? (
-                    <div className="flex items-center gap-3">
-                      <img src={cfg.templateCustomLogoBase64} alt="Logo customizado" className="h-10 w-auto object-contain bg-white rounded border border-[#E2E8F0] p-1" />
-                      <span className="text-xs text-green-600 font-medium">Logo personalizado ativo</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-xs text-[#64748B]">
-                      <span className="w-8 h-8 rounded bg-white border border-[#E2E8F0] flex items-center justify-center shrink-0">
-                        <ImageIcon size={14} className="text-[#94A3B8]" />
-                      </span>
-                      <span className="italic">Usando logo do portal</span>
-                    </div>
-                  )}
-                  <label className="block">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={e => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-                        const reader = new FileReader();
-                        reader.onload = ev => {
-                          const b64 = ev.target?.result as string;
-                          setCfg(p => ({ ...p, templateCustomLogoBase64: b64, templateShowLogo: true }));
-                          setTimeout(redrawCanvas, 80);
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#0F172A] hover:bg-[#F1F5F9] cursor-pointer transition-colors">
-                      <Upload size={12} /> Subir logo diferente
-                    </span>
-                  </label>
-                  <p className="text-[10px] text-[#94A3B8]">Use um logo adaptado para fundos escuros (versão branca/clara funciona melhor).</p>
-                </div>
-
-                {/* Estilo da tag de categoria */}
-                <div>
-                  <label className="block text-xs font-medium text-[#64748B] mb-1.5">Estilo da tag de categoria</label>
-                  <select
-                    className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
-                    value={cfg.templateCategoryStyle ?? "Retangular preenchida"}
-                    onChange={e => { setCfg(p => ({ ...p, templateCategoryStyle: e.target.value })); }}>
-                    {["Retangular preenchida", "Pílula preenchida", "Contorno fino", "Sem tag"].map(o => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Exibir elementos toggles */}
-                <div>
-                  <p className="text-xs font-medium text-[#64748B] mb-2">Exibir elementos</p>
-                  <div className="flex flex-wrap gap-4">
-                    {([
-                      { key: "templateShowAuthor",   label: "Autor",      def: true },
-                      { key: "templateShowDate",     label: "Data",       def: true },
-                      { key: "templateShowCategory", label: "Categoria",  def: true },
-                      { key: "templateShowCTA",      label: "CTA (Ver mais)", def: true },
-                    ] as const).map(({ key, label, def }) => {
-                      const on = (cfg as Record<string, unknown>)[key] !== undefined
-                        ? !!(cfg as Record<string, unknown>)[key]
-                        : def;
-                      return (
-                        <label key={key} className="flex items-center gap-2 cursor-pointer">
-                          <button
-                            onClick={() => { setCfg(p => ({ ...p, [key]: !on })); setTimeout(redrawCanvas, 50); }}
-                            className={`relative w-9 h-5 rounded-full transition-colors ${on ? "bg-[#0B2A66]" : "bg-gray-200"}`}>
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${on ? "translate-x-4" : "translate-x-0.5"}`} />
-                          </button>
-                          <span className="text-sm text-[#0F172A]">{label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Templates salvos */}
-                <div className="pt-2 border-t border-[#F1F5F9]">
-                  <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">Templates salvos</p>
-                  <div className="space-y-1.5">
-                    {["Plantão", "Notícia padrão", "Esportes", "Urgente"].map(name => (
-                      <div key={name} className="flex items-center justify-between py-2 px-3 rounded-xl hover:bg-[#F8FAFC] transition-colors group">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-1 h-4 rounded-full bg-[#E2E8F0]" />
-                          <span className="text-sm text-[#0F172A]">{name}</span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-[#F1F5F9] text-[#64748B] rounded-md font-medium">Padrão</span>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#64748B] hover:text-[#0B2A66] transition-colors">
-                            <Pencil size={13}/>
-                          </button>
-                          <button className="p-1.5 rounded-lg hover:bg-[#EFF6FF] text-[#64748B] hover:text-[#0B2A66] transition-colors">
-                            <MoreVertical size={13}/>
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <button className="mt-3 w-full flex items-center justify-center gap-2 py-2 border border-dashed border-[#CBD5E1] rounded-xl text-sm text-[#64748B] hover:border-[#0B2A66] hover:text-[#0B2A66] hover:bg-[#F8FAFC] transition-all">
-                    <Plus size={14}/> Novo template
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* ── RIGHT: Preview ── */}
-            <div className="bg-white rounded-2xl overflow-hidden flex flex-col" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-              {/* Card header */}
-              <div className="px-6 pt-6 pb-4 border-b border-[#F1F5F9] flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Prévia do template</h2>
-                  <p className="text-xs text-[#64748B] mt-0.5">Visualize como suas publicações serão exibidas em cada destino.</p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {articles.length > 0 && (
-                    <select
-                      className="border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white max-w-[220px]"
-                      value={selArt?.id ?? ""}
-                      onChange={e => { const found = articles.find(a => a.id === e.target.value) ?? null; setSelArt(found); setTimeout(redrawCanvas, 100); }}>
-                      <option value="">— sem artigo —</option>
-                      {articles.map(a => (
-                        <option key={a.id} value={a.id}>
-                          {a.title.replace(/<[^>]*>/g, "").slice(0, 40)}{a.title.length > 40 ? "…" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  <button
-                    onClick={() => { setCfg(p => ({ ...p, templatePanelColor: "#1a2448", templateAccentColor: "#f59e0b", templateTitleSizeScale: 1.0, templatePhotoVignette: 0.40, templateShowSubtitle: false })); setTimeout(redrawCanvas, 80); }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors flex-shrink-0">
-                    <RefreshCw size={12}/> Redefinir padrão
-                  </button>
-                </div>
-              </div>
-
-              {/* 3 canvas previews */}
-              <div className="flex-1 px-6 py-6">
-                <div className="flex gap-6 items-start justify-center h-full">
-
-                  {/* Feed 4:5 */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
-                      <Instagram size={12}/> <span className="font-medium">Instagram Feed</span>
-                      <span className="text-[#94A3B8]">1080×1350</span>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900"
-                      style={{ width: 200, height: 250 }}>
-                      <canvas ref={feedCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                    <button onClick={() => { if (!feedCanvasRef.current) return; const a = document.createElement("a"); a.download = "feed.jpg"; a.href = feedCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
-                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
-                      <Eye size={10}/> Baixar
-                    </button>
-                  </div>
-
-                  {/* Story 9:16 */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
-                      <Layers size={12}/> <span className="font-medium">Instagram Story</span>
-                      <span className="text-[#94A3B8]">1080×1920</span>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900"
-                      style={{ width: 141, height: 250 }}>
-                      <canvas ref={storyCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                    <button onClick={() => { if (!storyCanvasRef.current) return; const a = document.createElement("a"); a.download = "story.jpg"; a.href = storyCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
-                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
-                      <Eye size={10}/> Baixar
-                    </button>
-                  </div>
-
-                  {/* Facebook 1.91:1 */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
-                      <Facebook size={12}/> <span className="font-medium">Facebook Page</span>
-                      <span className="text-[#94A3B8]">1200×630</span>
-                    </div>
-                    <div className="overflow-hidden rounded-xl border border-[#E2E8F0] bg-gray-900 flex items-center justify-center"
-                      style={{ width: 320, height: 168 }}>
-                      <canvas ref={facebookCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                    <button onClick={() => { if (!facebookCanvasRef.current) return; const a = document.createElement("a"); a.download = "facebook.jpg"; a.href = facebookCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click(); }}
-                      className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
-                      <Eye size={10}/> Baixar
-                    </button>
-                  </div>
-
-                </div>
-              </div>
-
-              {/* Footer actions */}
-              <div className="px-6 py-4 border-t border-[#F1F5F9] flex items-center justify-end gap-3">
-                <button
-                  onClick={() => toast({ title: "Template duplicado!", description: "Uma cópia foi criada nos templates salvos.", duration: 2500 })}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 border border-[#E2E8F0] rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC] transition-colors">
-                  <CopyIcon size={14}/> Duplicar template
-                </button>
-                <button onClick={saveConfig} disabled={saving}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-xl text-sm font-semibold hover:bg-[#c9182e] disabled:opacity-50 transition-colors">
-                  {saving ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>}
-                  {saving ? "Salvando…" : "Salvar template"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── LEGENDA AUTOMÁTICA ────────────────────────────────────────────────── */}
-        {tab === "legenda" && (() => {
-          const previewCaption = buildRuleCaption(selArt, captionPlatform);
-          const charCount = previewCaption.length;
-          const charLimit = CHAR_LIMITS[captionPlatform];
-          const charPct   = Math.min(100, Math.round((charCount / charLimit) * 100));
-          const withinLimit = charCount <= charLimit;
-
-          const hashtagList = previewCaption.match(/#\S+/g) ?? [];
-          const bodyWithoutTags = previewCaption.replace(/#\S+/g, "").trim();
-
-          type ToggleRule = {
-            key: keyof SocialConfig;
-            icon: React.ReactNode;
-            label: string;
-            defaultVal?: boolean;
-            extra?: React.ReactNode;
-          };
-
-          const toggleRules: ToggleRule[] = [
-            { key: "captionUseTitulo",       icon: <FileText  size={14}/>, label: "Usar título da notícia",       defaultVal: true },
-            { key: "captionUseResumo",        icon: <AlignLeft size={14}/>, label: "Usar resumo da matéria",       defaultVal: true },
-            { key: "captionIncludePortal",    icon: <Building2 size={14}/>, label: "Incluir nome do portal",       defaultVal: false },
-            { key: "captionIncludeCategoria", icon: <Folder    size={14}/>, label: "Incluir categoria",            defaultVal: true },
-            { key: "captionIncludeHashtags",  icon: <Hash      size={14}/>, label: "Incluir hashtags automáticas", defaultVal: true },
-            { key: "captionIncludeCTA",       icon: <Megaphone size={14}/>, label: "Incluir CTA",                  defaultVal: true },
-            { key: "captionLimitChars",       icon: <Type      size={14}/>, label: "Limitar caracteres por rede",  defaultVal: true,
-              extra: cfg.captionLimitChars !== false ? (
-                <select
-                  className="ml-2 border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
-                  value={cfg.captionCharLimit ?? "feed"}
-                  onChange={e => setCfg(p => ({ ...p, captionCharLimit: e.target.value as "feed"|"story"|"facebook" }))}>
-                  <option value="feed">Instagram Feed (2.200)</option>
-                  <option value="story">Instagram Story (150)</option>
-                  <option value="facebook">Facebook Page (63.206)</option>
+      {/* ══════════ TEMPLATES ═══════════════════════════════════════════════ */}
+      {tab === "templates" && (
+        <div className="flex flex-col gap-4">
+          {/* Toolbar */}
+          <div className="flex items-center gap-3 flex-wrap bg-white rounded-2xl p-3" style={{ boxShadow: CARD_SHADOW }}>
+            <select
+              className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-slate-50"
+              value={currentTemplate?.id ?? ""}
+              onChange={(e) => { if (e.target.value) void loadTemplate(e.target.value); }}
+            >
+              <option value="">— Selecionar template —</option>
+              {templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.type === "feed" ? "Feed" : "Story"})</option>)}
+            </select>
+            <button onClick={() => newTemplate("feed")}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: PRIMARY }}>
+              <Plus size={13} /> Feed
+            </button>
+            <button onClick={() => newTemplate("story")}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: "#9333EA" }}>
+              <Plus size={13} /> Story
+            </button>
+            {currentTemplate && (
+              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                <input value={currentTemplate.name}
+                  onChange={(e) => setCurrentTemplate((p) => p ? { ...p, name: e.target.value } : p)}
+                  className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] min-w-[160px]"
+                  placeholder="Nome do template" />
+                <select value={currentTemplate.type}
+                  onChange={(e) => {
+                    const t = e.target.value as "feed" | "story";
+                    setCurrentTemplate((p) => p ? { ...p, type: t, height: t === "feed" ? 1350 : 1920 } : p);
+                  }}
+                  className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-slate-50">
+                  <option value="feed">Feed (1080×1350)</option>
+                  <option value="story">Story (1080×1920)</option>
                 </select>
-              ) : null
-            },
-            { key: "captionUseEmojis",        icon: <Smile     size={14}/>, label: "Usar emojis",                  defaultVal: false },
-            { key: "captionSeparateBlocks",   icon: <Layout    size={14}/>, label: "Separar legenda por blocos",   defaultVal: true },
-          ];
+                {currentTemplate.id && (
+                  <button onClick={() => { void deleteTemplate(currentTemplate.id); }}
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                <button onClick={() => { void saveTemplate(); }} disabled={templateSaving}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-60 ${templateSaved ? "!bg-green-500" : ""}`}
+                  style={!templateSaved ? { background: ACCENT } : {}}>
+                  {templateSaving ? <Loader2 size={13} className="animate-spin" /> : templateSaved ? <CheckCircle size={13} /> : <Save size={13} />}
+                  {templateSaving ? "Salvando…" : templateSaved ? "Salvo!" : "Salvar"}
+                </button>
+              </div>
+            )}
+          </div>
 
-          return (
-            <div className="space-y-5">
-              {/* ── 2-column main grid ── */}
-              <div className="grid gap-6" style={{ gridTemplateColumns: "0.95fr 1.35fr" }}>
+          {!currentTemplate ? (
+            <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
+              <Layers size={32} className="text-slate-200 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Selecione um template ou crie um novo para começar</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_300px] gap-4">
 
-                {/* ── LEFT: Regras de geração ── */}
-                <div className="bg-white rounded-2xl p-6 space-y-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Regras de geração</h2>
-
-                  {/* Toggles */}
-                  <div className="space-y-1">
-                    {toggleRules.map(rule => {
-                      const val = (cfg as Record<string, unknown>)[rule.key] as boolean | undefined;
-                      const on  = val !== undefined ? val : (rule.defaultVal ?? true);
-                      return (
-                        <div key={rule.key as string}
-                          className="flex items-center justify-between py-2.5 px-3 rounded-xl hover:bg-gray-50 transition-colors">
-                          <span className="flex items-center gap-2.5 text-sm text-[#0F172A]">
-                            <span className="text-[#64748B]">{rule.icon}</span>
-                            {rule.label}
-                            {rule.extra}
-                          </span>
-                          <button
-                            onClick={() => setCfg(p => ({ ...p, [rule.key as string]: !on }))}
-                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${on ? "bg-[#0B2A66]" : "bg-gray-200"}`}
-                            style={{ minWidth: 40 }}>
-                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${on ? "translate-x-5" : "translate-x-0.5"}`} />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {/* Fields */}
-                  <div className="space-y-3 pt-1 border-t border-gray-100">
-                    {([
-                      { key: "captionPrefixo",      label: "Prefixo da legenda",  placeholder: "{categoria} | {titulo}", type: "text" },
-                      { key: "captionCTA",           label: "CTA padrão",          placeholder: "Leia a matéria completa no link da bio.", type: "text" },
-                      { key: "captionHashtagsFixed", label: "Hashtags fixas",      placeholder: "#SBCAgora #NotíciasDeVerdade", type: "text" },
-                      { key: "captionAssinatura",    label: "Assinatura",          placeholder: "SBC Agora – Notícias de Verdade.", type: "text" },
-                    ] as const).map(f => (
-                      <div key={f.key}>
-                        <label className="block text-xs font-medium text-[#64748B] mb-1">{f.label}</label>
-                        <input
-                          type="text"
-                          placeholder={f.placeholder}
-                          value={(cfg as Record<string, unknown>)[f.key] as string ?? ""}
-                          onChange={e => setCfg(p => ({ ...p, [f.key]: e.target.value }))}
-                          className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]"
-                        />
-                      </div>
-                    ))}
-
-                    <div>
-                      <label className="block text-xs font-medium text-[#64748B] mb-1">Tom de voz</label>
-                      <select
-                        value={cfg.captionTom ?? "Jornalístico"}
-                        onChange={e => setCfg(p => ({ ...p, captionTom: e.target.value }))}
-                        className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white">
-                        {["Jornalístico", "Institucional", "Popular", "Urgente", "Neutro"].map(t => (
-                          <option key={t}>{t}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
+              {/* LEFT — Layers */}
+              <div className="bg-white rounded-2xl p-4 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Camadas</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {(["image","title","category","logo","cta","text"] as const).map((type) => (
+                    <button key={type} onClick={() => addElement(type)}
+                      className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors">
+                      <Plus size={11} /> {ELEMENT_TYPE_LABELS[type]}
+                    </button>
+                  ))}
                 </div>
-
-                {/* ── RIGHT: Prévia da legenda ── */}
-                <div className="bg-white rounded-2xl p-6 space-y-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-                  <h2 className="font-semibold text-[#0F172A] text-[15px]">Prévia da legenda</h2>
-
-                  {/* Platform tabs */}
-                  <div className="flex gap-1 bg-[#F7F9FC] rounded-xl p-1">
-                    {([
-                      { id: "feed",     icon: <Instagram size={13}/>, label: "Instagram Feed" },
-                      { id: "story",    icon: <Layers    size={13}/>, label: "Instagram Story" },
-                      { id: "facebook", icon: <Facebook  size={13}/>, label: "Facebook Page" },
-                    ] as const).map(p => (
-                      <button key={p.id}
-                        onClick={() => setCaptionPlatform(p.id)}
-                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
-                          captionPlatform === p.id
-                            ? "bg-white text-[#0B2A66] shadow-sm"
-                            : "text-[#64748B] hover:text-[#0F172A]"
-                        }`}>
-                        {p.icon} {p.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Article selector for preview */}
-                  {articles.length > 0 && (
-                    <select
-                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs text-[#64748B] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] bg-white"
-                      value={selArt?.id ?? ""}
-                      onChange={e => {
-                        const found = articles.find(a => a.id === e.target.value) ?? null;
-                        setSelArt(found);
-                      }}>
-                      <option value="">— selecione um artigo para prévia —</option>
-                      {articles.map(a => (
-                        <option key={a.id} value={a.id}>
-                          [{a.tag ?? a.category}] {a.title.replace(/<[^>]*>/g, "").slice(0, 55)}{a.title.length > 55 ? "…" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-
-                  {/* Preview text */}
-                  <div className="min-h-[180px] bg-[#F8FAFC] rounded-xl p-4 text-sm text-[#0F172A] leading-relaxed whitespace-pre-wrap border border-[#E2E8F0]">
-                    {previewCaption || (
-                      <span className="text-[#94A3B8] italic text-sm">
-                        Selecione um artigo acima para visualizar a legenda gerada automaticamente.
+                <div className="flex items-center gap-2 pt-1">
+                  <label className="text-xs text-slate-500 w-12 shrink-0">Fundo</label>
+                  <input type="color" value={currentTemplate.backgroundColor}
+                    onChange={(e) => setCurrentTemplate((p) => p ? { ...p, backgroundColor: e.target.value } : p)}
+                    className="w-8 h-8 rounded cursor-pointer border border-slate-200" />
+                  <input type="text" value={currentTemplate.backgroundColor}
+                    onChange={(e) => setCurrentTemplate((p) => p ? { ...p, backgroundColor: e.target.value } : p)}
+                    className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                </div>
+                <div className="border-t border-slate-100 pt-2 space-y-1">
+                  {[...currentTemplate.elements].sort((a, b) => b.zIndex - a.zIndex).map((el) => (
+                    <div key={el.id} onClick={() => setSelectedElId(el.id)}
+                      className={`flex items-center gap-2 px-2.5 py-2 rounded-xl cursor-pointer transition-colors ${
+                        selectedElId === el.id ? "bg-[#EEF2FF] border border-[#C7D2FE]" : "hover:bg-slate-50 border border-transparent"
+                      }`}>
+                      <span className="text-xs font-medium text-slate-700 flex-1 truncate">
+                        {ELEMENT_TYPE_LABELS[el.type] ?? el.type}
+                        {el.content ? ` — ${el.content.slice(0, 14)}` : ""}
                       </span>
-                    )}
-                  </div>
-
-                  {/* Character counter */}
-                  {previewCaption && (
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[#64748B]">Caracteres usados</span>
-                        <span className={`font-medium ${withinLimit ? "text-[#16A34A]" : "text-[#E71D36]"}`}>
-                          {charCount.toLocaleString("pt-BR")} / {charLimit.toLocaleString("pt-BR")} — {withinLimit ? "Dentro do limite" : "Acima do limite"}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${withinLimit ? "bg-[#16A34A]" : "bg-[#E71D36]"}`}
-                          style={{ width: `${charPct}%` }}
-                        />
+                      <div className="flex items-center gap-0.5 shrink-0">
+                        <button onClick={(e) => { e.stopPropagation(); moveElementZ(el.id, "up"); }}
+                          className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-700">
+                          <ChevronUp size={11} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); moveElementZ(el.id, "down"); }}
+                          className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-slate-700">
+                          <ChevronDown size={11} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); removeElement(el.id); }}
+                          className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:text-red-500">
+                          <X size={11} />
+                        </button>
                       </div>
                     </div>
+                  ))}
+                  {currentTemplate.elements.length === 0 && (
+                    <p className="text-xs text-slate-400 text-center py-4">Adicione elementos acima</p>
                   )}
+                </div>
+              </div>
 
-                  {/* Hashtag chips */}
-                  {hashtagList.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {hashtagList.map((tag, i) => (
-                        <span key={i}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#EFF6FF] text-[#2563EB] rounded-lg text-xs font-medium">
-                          {tag}
-                        </span>
+              {/* CENTER — Canvas preview */}
+              <div className="bg-white rounded-2xl p-4 flex flex-col items-center" style={{ boxShadow: CARD_SHADOW }}>
+                <p className="text-xs text-slate-400 mb-3 self-start">
+                  Preview {currentTemplate.width}×{currentTemplate.height}px · escala 1:{Math.round(1/SCALE)}
+                </p>
+                <div
+                  className="relative shrink-0 overflow-hidden select-none"
+                  style={{
+                    width: PREVIEW_W, height: previewH,
+                    background: currentTemplate.backgroundColor,
+                    cursor: dragging ? "grabbing" : "default",
+                  }}
+                  onClick={() => setSelectedElId(null)}
+                >
+                  {[...currentTemplate.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => {
+                    const isImg = el.type === "image" || el.type === "logo";
+                    return (
+                      <div key={el.id}
+                        onMouseDown={(e) => {
+                          e.preventDefault(); e.stopPropagation();
+                          setSelectedElId(el.id);
+                          setDragging({ id: el.id, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y });
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: Math.round(el.x * SCALE), top: Math.round(el.y * SCALE),
+                          width: Math.round(el.width * SCALE), height: Math.round(el.height * SCALE),
+                          backgroundColor: el.backgroundColor || (isImg ? "#444" : "transparent"),
+                          borderRadius: el.borderRadius * SCALE,
+                          opacity: el.opacity, cursor: "grab",
+                          outline: selectedElId === el.id ? "2px solid #2563EB" : "none",
+                          outlineOffset: 1, overflow: "hidden", boxSizing: "border-box",
+                        }}
+                      >
+                        {isImg ? (
+                          <div className="w-full h-full flex items-center justify-center text-white/50 text-[10px] gap-1">
+                            <ImageIcon size={12} />
+                            {el.type === "image" ? "Imagem do artigo" : "Logo"}
+                          </div>
+                        ) : (
+                          <div style={{
+                            padding: el.padding * SCALE,
+                            fontSize: Math.max(8, el.fontSize * SCALE),
+                            fontFamily: el.fontFamily, fontWeight: el.fontWeight,
+                            color: el.color || "#fff", textAlign: el.textAlign,
+                            lineHeight: 1.3, wordBreak: "break-word", overflow: "hidden",
+                          }}>
+                            {el.content || <span style={{ opacity: 0.4 }}>{ELEMENT_TYPE_LABELS[el.type]}</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* RIGHT — Properties */}
+              <div className="bg-white rounded-2xl p-4 space-y-3 overflow-y-auto max-h-[700px]" style={{ boxShadow: CARD_SHADOW }}>
+                {!selectedEl ? (
+                  <div className="flex items-center justify-center h-40 text-slate-300 text-sm text-center">
+                    Clique num elemento no canvas para editar suas propriedades
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{ELEMENT_TYPE_LABELS[selectedEl.type]}</p>
+
+                    {/* Position & Size */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["x","y","width","height"] as const).map((prop) => (
+                        <div key={prop}>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                            {prop === "x" ? "X" : prop === "y" ? "Y" : prop === "width" ? "Largura" : "Altura"}
+                          </label>
+                          <input type="number" value={selectedEl[prop]}
+                            onChange={(e) => updateElement(selectedEl.id, { [prop]: Number(e.target.value) })}
+                            className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                        </div>
                       ))}
                     </div>
-                  )}
-                </div>
-              </div>
 
-              {/* ── Variables panel ── */}
-              <div className="bg-white rounded-2xl px-5 py-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-xs font-semibold text-[#64748B] uppercase tracking-wide">Variáveis disponíveis</span>
-                  <span className="text-xs text-[#64748B]">Clique para copiar</span>
-                  <div className="flex flex-wrap gap-2">
-                    {["{titulo}", "{resumo}", "{categoria}", "{cidade}", "{autor}", "{link}"].map(v => (
-                      <button key={v}
-                        onClick={() => { navigator.clipboard.writeText(v); toast({ title: `${v} copiado!`, duration: 1500 }); }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg text-xs font-mono text-[#0F172A] hover:bg-[#EFF6FF] hover:border-[#0B2A66]/30 hover:text-[#0B2A66] transition-colors">
-                        <Copy size={10}/> {v}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
+                    {/* Content */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                        {selectedEl.type === "image" || selectedEl.type === "logo" ? "URL da imagem" : "Conteúdo"}
+                      </label>
+                      <textarea rows={2} value={selectedEl.content}
+                        onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
+                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] resize-none"
+                        placeholder={
+                          selectedEl.type === "title"    ? "{{title}}" :
+                          selectedEl.type === "category" ? "{{category}}" :
+                          selectedEl.type === "image"    ? "URL de fallback" :
+                          selectedEl.type === "logo"     ? "https://…/logo.png" : "Texto…"
+                        } />
+                      {(selectedEl.type === "title" || selectedEl.type === "category") && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">Use {"{{title}}"} e {"{{category}}"} para dados do artigo</p>
+                      )}
+                    </div>
 
-              {/* ── Action bar ── */}
-              <div className="bg-white rounded-2xl px-5 py-4" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
-                <div className="flex items-center gap-4">
-                  <div className="flex-1 flex items-start gap-2.5 bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl px-4 py-3">
-                    <Info size={15} className="text-[#2563EB] flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-[#1E40AF] leading-relaxed">
-                      Ao publicar um novo artigo, a legenda será gerada automaticamente com base nas regras acima e na prévia correspondente à rede selecionada.
-                    </p>
-                  </div>
-                  <div className="flex gap-3 flex-shrink-0">
-                    <button
-                      onClick={() => {
-                        if (!articles[0]) return;
-                        if (!selArt) setSelArt(articles[0]);
-                        toast({ title: "Exemplo gerado!", description: "Selecione um artigo para ver a prévia.", duration: 2000 });
-                      }}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-[#E2E8F0] rounded-xl text-sm font-medium text-[#0F172A] hover:bg-[#F8FAFC] transition-colors">
-                      <RefreshCw size={14}/> Gerar exemplo
-                    </button>
-                    <button onClick={saveConfig} disabled={saving}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E71D36] text-white rounded-xl text-sm font-semibold hover:bg-[#c9182e] disabled:opacity-50 transition-colors">
-                      {saving ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>}
-                      {saving ? "Salvando…" : "Salvar regras"}
-                    </button>
-                  </div>
-                </div>
+                    {/* Text props */}
+                    {selectedEl.type !== "image" && selectedEl.type !== "logo" && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Fonte</label>
+                            <select value={selectedEl.fontFamily}
+                              onChange={(e) => updateElement(selectedEl.id, { fontFamily: e.target.value })}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
+                              {FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Tamanho</label>
+                            <input type="number" value={selectedEl.fontSize}
+                              onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Peso</label>
+                            <select value={selectedEl.fontWeight}
+                              onChange={(e) => updateElement(selectedEl.id, { fontWeight: e.target.value })}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
+                              {["normal","bold","light"].map((w) => <option key={w} value={w}>{w}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Alinhamento</label>
+                            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                              {(["left","center","right"] as const).map((a) => (
+                                <button key={a} onClick={() => updateElement(selectedEl.id, { textAlign: a })}
+                                  className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${
+                                    selectedEl.textAlign === a ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
+                                  }`}>
+                                  {a === "left" ? <AlignLeft size={11} /> : a === "center" ? <AlignCenter size={11} /> : <AlignRight size={11} />}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
+                            <div className="flex items-center gap-1.5">
+                              <input type="color" value={selectedEl.color}
+                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                              <input type="text" value={selectedEl.color}
+                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor de fundo</label>
+                            <div className="flex items-center gap-1.5">
+                              <input type="color" value={selectedEl.backgroundColor || "#000000"}
+                                onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
+                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                              <input type="text" value={selectedEl.backgroundColor}
+                                onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
+                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* objectFit */}
+                    {(selectedEl.type === "image" || selectedEl.type === "logo") && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Ajuste de imagem</label>
+                        <select value={selectedEl.objectFit ?? "cover"}
+                          onChange={(e) => updateElement(selectedEl.id, { objectFit: e.target.value as "cover" | "contain" | "fill" })}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
+                          {["cover","contain","fill"].map((v) => <option key={v} value={v}>{v}</option>)}
+                        </select>
+                      </div>
+                    )}
+
+                    {/* Numeric props */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(["padding","borderRadius","opacity","zIndex"] as const).map((prop) => (
+                        <div key={prop}>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                            {prop === "padding" ? "Padding" : prop === "borderRadius" ? "Raio borda" : prop === "opacity" ? "Opacidade" : "Z-Index"}
+                          </label>
+                          <input type="number"
+                            step={prop === "opacity" ? 0.1 : 1} min={0} max={prop === "opacity" ? 1 : undefined}
+                            value={selectedEl[prop]}
+                            onChange={(e) => updateElement(selectedEl.id, { [prop]: Number(e.target.value) })}
+                            className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
-          );
-        })()}
+          )}
+        </div>
+      )}
 
-        {/* ── PUBLICAR ─────────────────────────────────────────────────────────── */}
-        {tab === "publicar" && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Left: controls */}
-              <div className="space-y-4">
-                {/* Article selector */}
-                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-                  <h3 className="font-semibold text-gray-800">Selecionar artigo</h3>
-                  {articles.length === 0 ? (
-                    <p className="text-sm text-gray-400">Carregando artigos…</p>
-                  ) : (
-                    <select
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={selArt?.id ?? ""}
-                      onChange={e => {
-                        const found = articles.find(a => a.id === e.target.value) ?? null;
-                        setSelArt(found);
-                        setTimeout(redrawCanvas, 100);
-                      }}>
-                      {articles.map(a => (
-                        <option key={a.id} value={a.id}>
-                          [{a.tag ?? a.category}] {a.title.slice(0, 55)}{a.title.length > 55 ? "…" : ""}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                  {selArt && (
-                    <div className="p-3 bg-gray-50 rounded-lg text-xs text-gray-600 space-y-1">
-                      <p className="font-medium text-gray-800 line-clamp-2">{selArt.title}</p>
-                      {selArt.subtitle && <p className="line-clamp-2 text-gray-500">{selArt.subtitle}</p>}
-                    </div>
+      {/* ══════════ FILA ════════════════════════════════════════════════════ */}
+      {tab === "queue" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h2 className="text-lg font-bold text-slate-800 flex-1">Fila de publicação</h2>
+            <select value={queueFilter} onChange={(e) => setQueueFilter(e.target.value)}
+              className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+              <option value="all">Todos</option>
+              <option value="pending">Aguardando</option>
+              <option value="processing">Processando</option>
+              <option value="published">Publicado</option>
+              <option value="failed">Falhou</option>
+            </select>
+            <button onClick={() => { void processQueue(); }} disabled={processing}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+              style={{ background: "#16A34A" }}>
+              {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+              {processing ? "Processando…" : "Processar agora"}
+            </button>
+            <button onClick={() => { void fetchQueue(); }} title="Atualizar"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+              <RefreshCw size={14} />
+            </button>
+            <button onClick={() => { void openQueueModal(); }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+              style={{ background: PRIMARY }}>
+              <Plus size={15} /> Adicionar à fila
+            </button>
+          </div>
+
+          {queueLoading ? (
+            <div className="flex items-center gap-2 text-slate-400 py-8"><Loader2 size={18} className="animate-spin" /> Carregando…</div>
+          ) : queue.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
+              <Clock size={32} className="text-slate-200 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Nenhum item na fila</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl overflow-hidden overflow-x-auto" style={{ boxShadow: CARD_SHADOW }}>
+              <table className="w-full min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    {["Artigo","Conta","Tipo","Status","Agendado","Ações"].map((h) => (
+                      <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {queue.map((item) => {
+                    const sc: Record<string, string> = { pending:"bg-amber-50 text-amber-600", processing:"bg-blue-50 text-blue-600", published:"bg-green-50 text-green-700", failed:"bg-red-50 text-red-600" };
+                    const sl: Record<string, string> = { pending:"Aguardando", processing:"Processando", published:"Publicado", failed:"Falhou" };
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-50/60 group transition-colors">
+                        <td className="px-4 py-3">
+                          <p className="text-sm text-slate-800 font-medium truncate max-w-[200px]" title={item.articleTitle ?? ""}>
+                            {item.articleTitle ?? item.articleId.slice(0, 8) + "…"}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600 whitespace-nowrap">{item.accountName ?? "—"}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.type === "story" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}>
+                            {item.type === "story" ? "Story" : "Feed"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sc[item.status] ?? "bg-slate-100 text-slate-500"}`}>
+                            {sl[item.status] ?? item.status}
+                          </span>
+                          {item.errorMessage && (
+                            <p className="text-[11px] text-red-500 mt-0.5 truncate max-w-[140px]" title={item.errorMessage}>{item.errorMessage}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+                          {item.status === "published" ? fmtDate(item.publishedAt) : fmtDate(item.scheduledAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {item.status === "failed" && (
+                              <button onClick={() => { void retryQueueItem(item.id); }} title="Tentar novamente"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors">
+                                <RefreshCw size={12} />
+                              </button>
+                            )}
+                            {item.metaPostId && (
+                              <a href={`https://www.instagram.com/p/${item.metaPostId}`} target="_blank" rel="noreferrer"
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                                <Link2 size={12} />
+                              </a>
+                            )}
+                            <button onClick={() => { void removeFromQueue(item.id); }} title="Remover"
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════ MODAL — Conta ══════════════════════════════════════════ */}
+      {showAccountModal && editingAccount && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">{editingAccount.id ? "Editar Conta" : "Adicionar Conta Meta"}</h3>
+              <button onClick={() => { setShowAccountModal(false); setEditingAccount(null); }}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {[
+                { key: "name",          label: "Nome da conta *",                    placeholder: "Ex: SBC Agora Instagram",     pw: false },
+                { key: "pageId",        label: "Facebook Page ID",                   placeholder: "123456789012345",             pw: false },
+                { key: "pageName",      label: "Nome da Página (opcional)",          placeholder: "SBC Agora",                   pw: false },
+                { key: "instagramId",   label: "Instagram Business Account ID",      placeholder: "123456789012345",             pw: false },
+                { key: "instagramName", label: "Nome do Instagram (opcional)",        placeholder: "@sbcagora",                  pw: false },
+                { key: "metaAppId",     label: "Meta App ID",                        placeholder: "123456789",                   pw: false },
+                { key: "metaAppSecret", label: "Meta App Secret",                    placeholder: "••••••••",                    pw: true  },
+                { key: "accessToken",   label: "Page Access Token (long-lived)",     placeholder: "EAABxx…",                     pw: true  },
+              ].map(({ key, label, placeholder, pw }) => (
+                <div key={key}>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{label}</label>
+                  <input
+                    type={pw ? "password" : "text"}
+                    value={(editingAccount[key as keyof typeof editingAccount] as string) ?? ""}
+                    onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, [key]: e.target.value } : prev)}
+                    placeholder={placeholder}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50"
+                  />
+                </div>
+              ))}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editingAccount.isActive ?? true}
+                  onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)} />
+                <span className="text-sm text-slate-700">Conta ativa</span>
+              </label>
+            </div>
+            <div className="flex gap-2 p-6 pt-0">
+              <button onClick={() => { void saveAccount(); }} disabled={accountSaving}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+                style={{ background: PRIMARY }}>
+                {accountSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {accountSaving ? "Salvando…" : "Salvar"}
+              </button>
+              <button onClick={() => { setShowAccountModal(false); setEditingAccount(null); }}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ MODAL — Adicionar à fila ═══════════════════════════════ */}
+      {showQueueModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <h3 className="text-base font-bold text-slate-800">Adicionar à fila de publicação</h3>
+              <button onClick={() => setShowQueueModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Artigo *</label>
+                <select value={queueForm.articleId}
+                  onChange={(e) => setQueueForm((f) => ({ ...f, articleId: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
+                  <option value="">— Selecionar artigo —</option>
+                  {articles.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Contas *</label>
+                <div className="space-y-2">
+                  {accounts.filter((a) => a.isActive).map((acc) => (
+                    <label key={acc.id} className="flex items-center gap-2.5 cursor-pointer">
+                      <input type="checkbox"
+                        checked={queueForm.accountIds.includes(acc.id)}
+                        onChange={(e) => setQueueForm((f) => ({
+                          ...f,
+                          accountIds: e.target.checked ? [...f.accountIds, acc.id] : f.accountIds.filter((id) => id !== acc.id),
+                        }))} />
+                      <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0" style={{ background: acc.instagramId ? "#E1306C" : "#1877F2" }}>
+                        {acc.instagramId ? <Instagram size={12} className="text-white" /> : <Facebook size={12} className="text-white" />}
+                      </div>
+                      <span className="text-sm text-slate-700">{acc.name}</span>
+                    </label>
+                  ))}
+                  {accounts.filter((a) => a.isActive).length === 0 && (
+                    <p className="text-sm text-slate-400">Nenhuma conta ativa. Adicione contas na aba "Contas".</p>
                   )}
                 </div>
-
-                {/* Destinations */}
-                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-                  <h3 className="font-semibold text-gray-800">Destinos</h3>
-                  {([
-                    { key: "publishFeed",     icon: <Instagram size={15}/>, label: "Instagram Feed",  sub: "1080×1350",  get: publishFeed,     set: setPublishFeed },
-                    { key: "publishStory",    icon: <Layers size={15}/>,    label: "Instagram Story", sub: "1080×1920",  get: publishStory,    set: setPublishStory },
-                    { key: "publishFacebook", icon: <Facebook size={15}/>,  label: "Facebook Page",   sub: "Foto",       get: publishFacebook, set: setPublishFacebook },
-                  ] as const).map(({ key, icon, label, sub, get, set }) => (
-                    <label key={key} className="flex items-center justify-between p-3 border border-gray-100 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                        {icon} {label} <span className="text-xs text-gray-400">{sub}</span>
-                      </span>
-                      <input type="checkbox" className="w-4 h-4 accent-[#E71D36]"
-                        checked={get} onChange={e => set(e.target.checked)} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Tipo</label>
+                <div className="flex gap-4">
+                  {(["feed","story"] as const).map((t) => (
+                    <label key={t} className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox"
+                        checked={queueForm.types.includes(t)}
+                        onChange={(e) => setQueueForm((f) => ({
+                          ...f, types: e.target.checked ? [...f.types, t] : f.types.filter((x) => x !== t),
+                        }))} />
+                      <span className="text-sm text-slate-700">{t === "feed" ? "Feed (1080×1350)" : "Story (1080×1920)"}</span>
                     </label>
                   ))}
                 </div>
-
-                {/* Caption preview */}
-                {selArt && (
-                  <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3">
-                    <h3 className="font-semibold text-gray-800 text-sm">Prévia da legenda</h3>
-                    <pre className="text-xs text-gray-600 whitespace-pre-wrap font-sans bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto">
-                      {buildCaption(cfg.feedCaption ?? DEFAULT_FEED_CAPTION, selArt)}
-                    </pre>
-                  </div>
-                )}
-
-                {/* Publish button */}
-                <button
-                  onClick={doPublish}
-                  disabled={publishing || !selArt || !cfg.pageAccessToken}
-                  className="w-full py-3 bg-gradient-to-r from-[#405de6] via-[#c13584] to-[#fd1d1d] text-white rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-40 flex items-center justify-center gap-2">
-                  {publishing ? <RefreshCw size={15} className="animate-spin" /> : <Send size={15} />}
-                  {publishing ? "Publicando…" : "Publicar agora"}
-                </button>
-
-                {!cfg.pageAccessToken && (
-                  <p className="text-xs text-center text-amber-600 flex items-center justify-center gap-1">
-                    <AlertTriangle size={12} /> Configure o Access Token na aba Credenciais
-                  </p>
-                )}
-
-                {/* Results */}
-                {publishResults && (
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2">
-                    <p className="text-sm font-semibold text-gray-700">Resultado</p>
-                    {Object.entries(publishResults).map(([key, val]) => (
-                      <div key={key} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600 capitalize">{key.replace(/_/g, " ")}</span>
-                        <div className="flex items-center gap-2">
-                          <Chip ok={val.ok} label={val.ok ? (val.id ? `ID: ${val.id.slice(0, 12)}…` : "OK") : (val.error ?? "Erro")} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-
-              {/* Right: canvas previews */}
-              <div className="space-y-4">
-                <p className="text-xs text-gray-500 font-medium uppercase tracking-wide text-center">Prévia das imagens</p>
-                <div className="flex gap-4 justify-center">
-                  {/* Feed */}
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-gray-400">Feed 1080×1350</span>
-                    <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-gray-900"
-                      style={{ width: 200, height: 250 }}>
-                      <canvas ref={feedCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                  </div>
-                  {/* Story */}
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs text-gray-400">Story 1080×1920</span>
-                    <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm bg-gray-900"
-                      style={{ width: 141, height: 250 }}>
-                      <canvas ref={storyCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-                    </div>
-                  </div>
+              {queueForm.types.includes("feed") && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Template Feed</label>
+                  <select value={queueForm.templateFeedId}
+                    onChange={(e) => setQueueForm((f) => ({ ...f, templateFeedId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
+                    <option value="">Sem template (sem arte)</option>
+                    {templates.filter((t) => t.type === "feed").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                 </div>
-                <div className="flex justify-center gap-3">
-                  <button onClick={() => {
-                    if (!feedCanvasRef.current) return;
-                    const a = document.createElement("a"); a.download = "feed.jpg";
-                    a.href = feedCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click();
-                  }} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                    <Eye size={11}/> Baixar Feed
-                  </button>
-                  <button onClick={() => {
-                    if (!storyCanvasRef.current) return;
-                    const a = document.createElement("a"); a.download = "story.jpg";
-                    a.href = storyCanvasRef.current.toDataURL("image/jpeg", 0.92); a.click();
-                  }} className="text-xs text-blue-600 hover:underline flex items-center gap-1">
-                    <Eye size={11}/> Baixar Story
-                  </button>
+              )}
+              {queueForm.types.includes("story") && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Template Story</label>
+                  <select value={queueForm.templateStoryId}
+                    onChange={(e) => setQueueForm((f) => ({ ...f, templateStoryId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
+                    <option value="">Sem template (sem arte)</option>
+                    {templates.filter((t) => t.type === "story").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                 </div>
+              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Legenda</label>
+                <textarea rows={3} value={queueForm.caption}
+                  onChange={(e) => setQueueForm((f) => ({ ...f, caption: e.target.value }))}
+                  placeholder="Escreva a legenda que acompanhará a publicação…"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] resize-none bg-slate-50" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Agendar para</label>
+                <input type="datetime-local" value={queueForm.scheduledAt}
+                  onChange={(e) => setQueueForm((f) => ({ ...f, scheduledAt: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50" />
+                <p className="text-[11px] text-slate-400 mt-1">Deixe em branco para publicar imediatamente (na próxima execução do cron)</p>
               </div>
             </div>
+            <div className="flex gap-2 p-6 pt-0">
+              <button
+                onClick={() => { void submitQueueForm(); }}
+                disabled={!queueForm.articleId || !queueForm.accountIds.length || !queueForm.types.length}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
+                style={{ background: PRIMARY }}>
+                <Send size={14} /> Adicionar à fila
+              </button>
+              <button onClick={() => setShowQueueModal(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                Cancelar
+              </button>
+            </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }

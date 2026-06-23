@@ -47,6 +47,7 @@ import UsersManager from "@/pages/admin/UsersManager";
 import Logs from "@/pages/admin/Logs";
 import SecurityCheckup from "@/pages/admin/SecurityCheckup";
 import EditorPermissions from "@/pages/admin/EditorPermissions";
+import SocialMedia from "@/pages/admin/SocialMedia";
 
 const queryClient = new QueryClient();
 
@@ -151,6 +152,9 @@ function Router() {
       </Route>
       <Route path="/admin/permissoes">
         <RequireAdmin><EditorPermissions /></RequireAdmin>
+      </Route>
+      <Route path="/admin/social">
+        <RequireAdmin><SocialMedia /></RequireAdmin>
       </Route>
 
       {/* Editor + Admin routes */}

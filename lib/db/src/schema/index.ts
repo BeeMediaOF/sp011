@@ -15,3 +15,6 @@ export * from "./article_views";
 export * from "./category_views";
 export * from "./push_subscriptions";
 export * from "./geo_stats";
+export * from "./social_accounts";
+export * from "./social_templates";
+export * from "./social_publication_queue";

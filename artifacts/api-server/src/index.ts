@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
 import { initStore, seedDefaultRssSources } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
+import { startSocialCron } from "./lib/social/queueProcessor.js";
 
 const rawPort = process.env["PORT"];
 
@@ -37,4 +38,7 @@ app.listen(port, async (err) => {
   } catch (migrateErr) {
     logger.warn({ err: migrateErr }, "Article migration skipped or failed");
   }
+
+  // Start social media publication queue cron (every 5 min)
+  startSocialCron();
 });

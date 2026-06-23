@@ -6,7 +6,7 @@ import {
   Users, BarChart2, LayoutGrid, Rss,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, Eye, AlertCircle, CheckCircle, Info,
-  Camera, Pencil, Moon, Sun,
+  Camera, Pencil, Moon, Sun, Share2,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 import { getStoredUser, setStoredUser, clearAuth } from "../../pages/Admin";
@@ -28,6 +28,7 @@ const NAV_MAIN = [
   { label: "Colunistas",    icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
   { label: "Fontes RSS",    icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
+  { label: "Redes Sociais", icon: Share2,           path: "/admin/social",       permKey: null },
 ];
 
 const NAV_CONFIG_PERMS = ["security.view", "logs.view"];
