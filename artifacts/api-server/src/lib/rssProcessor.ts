@@ -54,6 +54,8 @@ export interface RewriteJobItem {
   giveCredit: boolean;
   customPrompt?: string;
   finalStatus: "published" | "draft";
+  /** Number of times this item has been attempted (used to cap retries) */
+  attempts?: number;
 }
 
 let _rewriteQueue: ((item: RewriteJobItem) => void) | null = null;
@@ -86,7 +88,7 @@ export const TAG_MAP: Record<string, string> = {
 
 // ─── SEO / AIO journalist prompt ──────────────────────────────────────────────
 
-export const DEFAULT_PROMPT_TEMPLATE = `Você é um jornalista sênior especialista em SEO, Google Discover e jornalismo digital para portais de notícias brasileiros.
+export const DEFAULT_PROMPT_TEMPLATE = `Você é um jornalista sênior especialista em SEO técnico, Google Discover, AI Overview (SGE), LLMs e jornalismo digital para portais de notícias brasileiros.
 
 Com base na pauta e no conteúdo abaixo, produza uma matéria jornalística original em Português do Brasil.
 
@@ -99,44 +101,51 @@ Conteúdo da fonte:
 
 ## INSTRUÇÕES
 
-**TÍTULO:** Elabore um título único de cauda longa com cerca de 150 caracteres, altamente chamativo e otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes. NÃO repita o título dentro do content_html.
+**TÍTULO:** Elabore um título único de cauda longa com cerca de 150 caracteres, altamente chamativo e otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes (pessoas, lugares, organizações). NÃO repita o título dentro do content_html.
 
-**SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título e introduza o texto, ele será o primeiro <h2> dentro do content_html.
+**SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título, introduza o texto e contenha palavras-chave semânticas relacionadas. Ele será o primeiro <h2> dentro do content_html.
 
 **CONTEÚDO (content_html):**
-- Comece com o subtítulo como primeiro <h2> dentro do content_html
-- Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto e fazendo um gancho para o que o leitor irá encontrar
-- Ao final da lead, cite obrigatoriamente a fonte: por exemplo, "conforme informação divulgada por {{FONTE}}"
-- Escreva como jornalista — NUNCA escreva como se você fosse um redator da própria fonte; cite as informações atribuindo corretamente a origem
-- Use até 4 subtítulos <h3> para organizar o restante do texto
-- Parágrafos curtos: 150 a 250 caracteres cada — faça muitos parágrafos curtos
-- Extraia citações diretas e dados estatísticos presentes na fonte e inclua-os no texto, garantindo que sejam 100% fiéis ao original; se a citação estiver em idioma estrangeiro, traduza-a para o Português do Brasil
-- Utilize a palavra-chave principal (extraída do título) no título, no subtítulo e distribuída ao longo do texto; use também palavras-chave correlacionadas
-- Use <b> para negritos em palavras e frases importantes, NUNCA use ** ou outras marcações markdown
-- Prefira texto corrido; use <ul><li> apenas quando necessário para a didática do conteúdo
+- Comece com o subtítulo como primeiro <h2>
+- Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto, respondendo às perguntas: quem, o quê, quando, onde, por quê e como
+- Ao final da lead, cite obrigatoriamente a fonte: "conforme informação divulgada por {{FONTE}}"
+- Escreva como jornalista — cite as informações atribuindo corretamente a origem
+- Use até 4 subtítulos <h3> para organizar o restante do texto; cada <h3> deve conter uma palavra-chave de cauda longa relacionada ao tema
+- Parágrafos curtos: 150 a 250 caracteres cada
+- Extraia citações diretas e dados estatísticos da fonte, garantindo fidelidade ao original; se em idioma estrangeiro, traduza para o Português do Brasil
+- Utilize a palavra-chave principal no título, subtítulo e ao longo do texto de forma natural (densidade: 1-2%); inclua termos LSI (semanticamente relacionados)
+- Mencione entidades nomeadas: pessoas, cidades, empresas, cargos — isso ajuda motores de busca e LLMs a contextualizar a notícia
+- Use <b> para negritos em termos e frases importantes; NUNCA use ** ou markdown
+- Prefira texto corrido; use <ul><li> apenas quando necessário para didática
 - NUNCA coloque <h1> dentro do content_html
 - NUNCA use travessões (—), use sempre vírgula
-- NUNCA escreva códigos de idioma como "pt-BR", "en-US" ou similares em nenhuma parte da resposta
 - Linguagem clara, acessível e fácil de entender pelo público brasileiro
 - Somente use informações presentes no conteúdo da fonte, nunca invente dados
 
+**SEÇÃO FAQ (obrigatória):**
+Após o conteúdo principal, inclua uma seção com o título <h2>Perguntas Frequentes</h2> e 3 a 5 perguntas e respostas em formato <h3>Pergunta?</h3><p>Resposta.</p>.
+- As perguntas devem ser frases que o público pesquisaria no Google ou perguntaria a um assistente de IA
+- As respostas devem ser diretas (1 a 3 frases), ricas em entidades e palavras-chave
+- Esta seção aumenta a probabilidade de aparecer no Google AI Overview, Perguntas Relacionadas e respostas de LLMs
+
 **METADADOS:**
-- slug: kebab-case sem acentos, MÁXIMO 5 PALAVRAS SIGNIFICATIVAS (ignore artigos: o, a, os, as, de, da, do, dos, das, para, com, em, e, ou, um, uma). Exemplo: "prefeito-inaugura-hospital-sao-paulo" (5 palavras). NUNCA gere slug com mais de 55 caracteres.
-- keywords: 6 palavras-chave relevantes separadas por vírgula
+- slug: kebab-case sem acentos, MÁXIMO 5 PALAVRAS SIGNIFICATIVAS (ignore artigos e preposições). Exemplo: "prefeito-inaugura-hospital-sao-paulo". NUNCA mais de 55 caracteres.
+- keywords: 8 palavras-chave relevantes separadas por vírgula, incluindo variações de cauda longa
 
 ## REGRAS ABSOLUTAS
 - Retorne EXCLUSIVAMENTE JSON válido, sem markdown, sem \`\`\`json, sem explicações antes ou depois
-- O content_html deve conter HTML pronto para WordPress (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), sem <html>, <body> ou <script>
+- O content_html deve conter HTML pronto para publicação (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), sem <html>, <body> ou <script>
 - O subtítulo <h2> deve estar DENTRO do content_html
+- A seção FAQ deve estar DENTRO do content_html, após o conteúdo principal
 - Comece o título e o subtítulo diretamente com o conteúdo, sem prefixos
 
 ## RESPOSTA (apenas JSON, direto, sem delimitadores de código):
 {
   "title": "...",
   "subtitle": "...",
-  "content_html": "<h2>...</h2><p>...</p>...",
+  "content_html": "<h2>...</h2><p>...</p>...<h2>Perguntas Frequentes</h2><h3>...?</h3><p>...</p>",
   "slug": "titulo-seo-kebab-case",
-  "keywords": "palavra1, palavra2, palavra3, palavra4, palavra5, palavra6"
+  "keywords": "palavra1, palavra2, palavra3, palavra4, palavra5, palavra6, palavra7, palavra8"
 }`;
 
 export function applyPromptTemplate(
@@ -419,6 +428,19 @@ function parseCooldownMs(errMsg: string): number {
   return 70_000; // Default: 70s (safe margin for free-tier RPM reset)
 }
 
+/**
+ * Return how many Gemini keys are currently NOT on per-key cooldown.
+ * Used by the rewrite worker to decide how many articles to process in parallel.
+ */
+export function getAvailableKeyCount(): number {
+  const settings = store.getSettings();
+  const keys = getGeminiKeys(settings);
+  if (keys.length === 0) return 0;
+  const now = Date.now();
+  const available = keys.filter((k) => (_keyCooldowns.get(k) ?? 0) < now).length;
+  return Math.max(1, available); // always at least 1 so the queue can progress
+}
+
 export function getAIQuotaStatus() {
   refreshDay();
   const now = Date.now();
@@ -495,7 +517,8 @@ export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
   checkQuota();
-  await enforceCallInterval();
+  // Note: enforceCallInterval removed — per-key cooldown + 429 handling manage rate limiting.
+  // This allows N parallel workers (one per key) to run without serialising each other.
 
   const settings = store.getSettings();
   // Default: gemini_direct (GEMINI_API_KEY env var, Google AI Studio free tier)
