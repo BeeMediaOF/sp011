@@ -56,9 +56,9 @@ export interface SiteSettings {
   adminSidebarColor?: string; adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai";
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;
-  diffbotApiKey?: string; geminiApiKey?: string; openaiApiKey?: string;
-  youtubeApiKey?: string; bylineName?: string; bylineLogoBase64?: string;
-  webhookApiKey?: string; siteUrl?: string;
+  diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
+  openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
+  bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;
 }
 
 export type ColumnistSpecialty =
@@ -430,20 +430,22 @@ export const store = {
 
   getPublicSettings: () => {
     const s = { ..._cache.settings };
+    const allGeminiKeys = (s.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
     const out: Record<string, unknown> = {
       ...s,
-      hasRssAiKey:   !!s.rssAiApiKey,
-      hasDiffbotKey: !!s.diffbotApiKey,
-      hasGeminiKey:  !!s.geminiApiKey,
-      hasOpenaiKey:  !!s.openaiApiKey,
-      hasYoutubeKey: !!s.youtubeApiKey,
+      hasRssAiKey:    !!s.rssAiApiKey,
+      hasDiffbotKey:  !!s.diffbotApiKey,
+      hasGeminiKey:   !!s.geminiApiKey || allGeminiKeys.length > 0,
+      hasOpenaiKey:   !!s.openaiApiKey,
+      hasYoutubeKey:  !!s.youtubeApiKey,
     };
     delete out["rssAiApiKey"];
     delete out["diffbotApiKey"];
     delete out["geminiApiKey"];
+    delete out["geminiApiKeys"];
     delete out["openaiApiKey"];
     delete out["youtubeApiKey"];
-    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"openaiApiKey"|"youtubeApiKey"> & {
+    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"> & {
       hasRssAiKey: boolean; hasDiffbotKey: boolean; hasGeminiKey: boolean;
       hasOpenaiKey: boolean; hasYoutubeKey: boolean;
     };

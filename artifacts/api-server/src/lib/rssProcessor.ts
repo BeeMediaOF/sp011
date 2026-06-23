@@ -282,6 +282,103 @@ interface QuotaState {
 let _quota: QuotaState = { dateKey: "", usedToday: 0, cooldownUntil: 0 };
 let _lastCallTime = 0;
 
+// ─── Gemini multi-key rotation ────────────────────────────────────────────────
+
+/** Per-key cooldown map: key value → unix ms when it becomes available again */
+const _keyCooldowns = new Map<string, number>();
+/** Round-robin cursor — index into the keys array for the next call */
+let _keyRoundRobin = 0;
+
+/** Return all configured Gemini API keys (array takes priority over single key) */
+function getGeminiKeys(settings: ReturnType<typeof store.getSettings>): string[] {
+  const arr = (settings.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
+  if (arr.length > 0) return arr;
+  if (settings.geminiApiKey?.trim()) return [settings.geminiApiKey.trim()];
+  return [];
+}
+
+/** Pick the next available key using round-robin; skip keys on cooldown */
+function pickKey(keys: string[]): string | null {
+  const now = Date.now();
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (_keyRoundRobin + i) % keys.length;
+    const key = keys[idx]!;
+    if ((_keyCooldowns.get(key) ?? 0) <= now) {
+      _keyRoundRobin = (idx + 1) % keys.length;
+      return key;
+    }
+  }
+  return null; // all on cooldown
+}
+
+/**
+ * Call Gemini with round-robin key rotation.
+ * On 429 for a specific key → mark it on cooldown and try next key.
+ * Only throws QUOTA_COOLDOWN once ALL keys are exhausted.
+ * Retries 503/overloaded errors on the same key before rotating.
+ */
+async function callGeminiWithRotation(keys: string[], model: string, prompt: string): Promise<string> {
+  const tried = new Set<string>();
+
+  while (tried.size < keys.length) {
+    // Pick next available key from the untried set
+    const available = keys.filter((k) => !tried.has(k));
+    const key = pickKey(available) ?? available[0]!;
+    tried.add(key);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: key });
+      // Retry 503/overload on same key
+      return await withRetry503(async () => {
+        const resp = await ai.models.generateContent({
+          model,
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          config: { maxOutputTokens: 8192 },
+        });
+        return resp.text ?? "";
+      });
+    } catch (err) {
+      const msg = String(err);
+      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED") || msg.includes("quota")) {
+        const cooldownMs = parseCooldownMs(msg);
+        _keyCooldowns.set(key, Date.now() + cooldownMs);
+        logger.warn(
+          { keyHint: `...${key.slice(-4)}`, cooldownMs, remaining: keys.length - tried.size },
+          "Gemini 429 — rotating to next key",
+        );
+        continue; // try the next key
+      }
+      throw err; // non-quota error: propagate immediately
+    }
+  }
+
+  // All keys exhausted — compute minimum wait and set global cooldown
+  const minCooldown = Math.min(...keys.map((k) => _keyCooldowns.get(k) ?? 0));
+  const waitSecs = Math.max(0, Math.ceil((minCooldown - Date.now()) / 1_000));
+  const globalCooldownMs = waitSecs > 0 ? waitSecs * 1_000 + 2_000 : 65_000;
+  _quota.cooldownUntil = Date.now() + globalCooldownMs;
+  throw new Error(
+    `QUOTA_COOLDOWN:Todas as ${keys.length} API key(s) do Gemini atingiram o limite de requisições. Aguardando ${waitSecs || 65}s.`,
+  );
+}
+
+/** Retry helper for 503/overloaded errors only — does NOT intercept 429 */
+async function withRetry503<T>(fn: () => Promise<T>, maxAttempts = 3, baseDelayMs = 5_000): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err);
+      const retryable = msg.includes("503") || msg.includes("UNAVAILABLE") || msg.includes("overloaded") || msg.includes("high demand");
+      if (!retryable || attempt === maxAttempts) throw err;
+      await new Promise((r) => setTimeout(r, baseDelayMs * attempt));
+    }
+  }
+  throw lastErr;
+}
+
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -422,18 +519,10 @@ export async function rewriteWithAI(
       return resp.text ?? "";
     });
   } else if (provider === "gemini_paid") {
-    const apiKey = settings.geminiApiKey || settings.rssAiApiKey;
-    if (!apiKey) throw new Error("API key do Gemini não configurada. Configure em Configurações → API Gemini.");
+    const keys = getGeminiKeys(settings);
+    if (keys.length === 0) throw new Error("API key do Gemini não configurada. Configure em Configurações → API Keys Gemini.");
     const model = settings.rssAiModel || "gemini-2.0-flash";
-    const ai = new GoogleGenAI({ apiKey });
-    raw = await withRetry(async () => {
-      const resp = await ai.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { maxOutputTokens: 8192 },
-      });
-      return resp.text ?? "";
-    });
+    raw = await callGeminiWithRotation(keys, model, prompt);
   } else {
     // gemini_free: Replit AI Integrations (uses Replit credits)
     const ai    = getGeminiFree();

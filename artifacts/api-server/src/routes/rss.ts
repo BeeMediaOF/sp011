@@ -225,15 +225,22 @@ router.post("/import", async (req, res) => {
 /** GET /api/admin/rss/ai-settings */
 router.get("/ai-settings", (_req, res) => {
   const s = store.getSettings();
+  const allKeys = (s.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
+  // Return masked hints (last 6 chars) so the UI can identify keys without exposing them
+  const geminiKeyHints = allKeys.map((k) => `...${k.slice(-6)}`);
+  // Merge legacy single key into count if not already in array
+  const geminiKeyCount = allKeys.length + (s.geminiApiKey && !allKeys.includes(s.geminiApiKey) ? 1 : 0);
   res.json({
-    provider:       s.rssAiProvider ?? "gemini_direct",
-    model:          s.rssAiModel ?? "",
-    hasKey:         !!s.rssAiApiKey,
-    outputPrompt:   s.rssAiOutputPrompt ?? "",
-    hasDiffbotKey:  !!s.diffbotApiKey,
-    hasGeminiKey:   !!s.geminiApiKey,
-    hasOpenaiKey:   !!s.openaiApiKey,
-    hasYoutubeKey:  !!s.youtubeApiKey,
+    provider:         s.rssAiProvider ?? "gemini_direct",
+    model:            s.rssAiModel ?? "",
+    hasKey:           !!s.rssAiApiKey,
+    outputPrompt:     s.rssAiOutputPrompt ?? "",
+    hasDiffbotKey:    !!s.diffbotApiKey,
+    hasGeminiKey:     !!s.geminiApiKey,
+    hasOpenaiKey:     !!s.openaiApiKey,
+    hasYoutubeKey:    !!s.youtubeApiKey,
+    geminiKeyCount,
+    geminiKeyHints,
   });
 });
 
@@ -244,7 +251,7 @@ router.put("/ai-settings", (req, res) => {
     outputPrompt?: string; diffbotApiKey?: string;
     geminiApiKey?: string; openaiApiKey?: string; youtubeApiKey?: string;
   };
-  const update: Record<string, string | undefined> = {};
+  const update: Record<string, unknown> = {};
   if (provider) update["rssAiProvider"] = provider;
   if (model !== undefined) update["rssAiModel"] = model;
   if (apiKey !== undefined) update["rssAiApiKey"] = apiKey || undefined;
@@ -255,6 +262,29 @@ router.put("/ai-settings", (req, res) => {
   if (youtubeApiKey !== undefined) update["youtubeApiKey"] = youtubeApiKey || undefined;
   store.updateSettings(update as Parameters<typeof store.updateSettings>[0]);
   res.json({ ok: true });
+});
+
+/** POST /api/admin/rss/ai-settings/gemini-keys — add one Gemini API key */
+router.post("/ai-settings/gemini-keys", (req, res): void => {
+  const { key } = req.body as { key?: string };
+  if (!key?.trim()) { res.status(400).json({ error: "key is required" }); return; }
+  const s = store.getSettings();
+  const existing = (s.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
+  if (existing.includes(key.trim())) { res.status(409).json({ error: "key already exists" }); return; }
+  store.updateSettings({ geminiApiKeys: [...existing, key.trim()] });
+  const allKeys = store.getSettings().geminiApiKeys ?? [];
+  res.json({ ok: true, geminiKeyCount: allKeys.length, geminiKeyHints: allKeys.map((k) => `...${k.slice(-6)}`) });
+});
+
+/** DELETE /api/admin/rss/ai-settings/gemini-keys/:index — remove a Gemini API key by index */
+router.delete("/ai-settings/gemini-keys/:index", (req, res): void => {
+  const idx = parseInt(req.params["index"] ?? "", 10);
+  const s = store.getSettings();
+  const existing = (s.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
+  if (isNaN(idx) || idx < 0 || idx >= existing.length) { res.status(400).json({ error: "invalid index" }); return; }
+  const updated = existing.filter((_, i) => i !== idx);
+  store.updateSettings({ geminiApiKeys: updated.length > 0 ? updated : undefined });
+  res.json({ ok: true, geminiKeyCount: updated.length, geminiKeyHints: updated.map((k) => `...${k.slice(-6)}`) });
 });
 
 export default router;

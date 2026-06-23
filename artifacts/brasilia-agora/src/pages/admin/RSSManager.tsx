@@ -46,6 +46,8 @@ interface ArticleState extends FetchedArticle {
 
 interface AiSettings {
   provider: AiProvider; model: string; hasKey: boolean;
+  geminiKeyCount?: number; geminiKeyHints?: string[];
+  hasGeminiKey?: boolean;
 }
 
 interface RssPrompts {
@@ -236,6 +238,11 @@ export default function RSSManager() {
   const [aiSaving, setAiSaving]       = useState(false);
   const [aiSaved, setAiSaved]         = useState(false);
   const [aiError, setAiError]         = useState("");
+  // ── Gemini multi-key management ──
+  const [geminiKeyHints, setGeminiKeyHints] = useState<string[]>([]);
+  const [newGeminiKey, setNewGeminiKey]     = useState("");
+  const [keyAdding, setKeyAdding]           = useState(false);
+  const [keyRemoving, setKeyRemoving]       = useState<number | null>(null);
   const [aiQuota, setAiQuota]         = useState<{
     usedToday: number; dailyLimit: number; remaining: number;
     isQuotaExhausted: boolean; isOnCooldown: boolean;
@@ -338,6 +345,7 @@ export default function RSSManager() {
     try {
       const d = await apiFetch<AiSettings>("/ai-settings");
       setAiSettings(d);
+      setGeminiKeyHints(d.geminiKeyHints ?? []);
     } catch { /* ignore */ }
   }, []);
 
@@ -511,6 +519,33 @@ export default function RSSManager() {
       setTimeout(() => setAiSaved(false), 2500);
     } catch (e) { setAiError(String(e)); }
     finally { setAiSaving(false); }
+  }
+
+  async function addGeminiKey() {
+    if (!newGeminiKey.trim()) return;
+    setKeyAdding(true);
+    try {
+      const res = await apiFetch<{ geminiKeyHints: string[] }>("/ai-settings/gemini-keys", {
+        method: "POST",
+        body: JSON.stringify({ key: newGeminiKey.trim() }),
+      });
+      setGeminiKeyHints(res.geminiKeyHints);
+      setAiSettings((a) => ({ ...a, geminiKeyCount: res.geminiKeyHints.length }));
+      setNewGeminiKey("");
+    } catch (e) { setAiError(String(e)); }
+    finally { setKeyAdding(false); }
+  }
+
+  async function removeGeminiKey(index: number) {
+    setKeyRemoving(index);
+    try {
+      const res = await apiFetch<{ geminiKeyHints: string[] }>(`/ai-settings/gemini-keys/${index}`, {
+        method: "DELETE",
+      });
+      setGeminiKeyHints(res.geminiKeyHints);
+      setAiSettings((a) => ({ ...a, geminiKeyCount: res.geminiKeyHints.length }));
+    } catch (e) { setAiError(String(e)); }
+    finally { setKeyRemoving(null); }
   }
 
   // ─── Prompts ─────────────────────────────────────────────────────────────────
@@ -1544,7 +1579,7 @@ export default function RSSManager() {
                         <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       </div>
                     </div>
-                    {needsKey && (
+                    {needsKey && aiSettings.provider !== "gemini_paid" && (
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                           API Key {aiSettings.hasKey && <span className="text-green-600 ml-1">✓ configurada</span>}
@@ -1563,16 +1598,75 @@ export default function RSSManager() {
                             {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
                           </button>
                         </div>
-                        {aiSettings.provider === "gemini_paid" && (
-                          <p className="text-[10px] text-slate-400 mt-1">
-                            Chave gratuita em{" "}
-                            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
-                              className="text-purple-600 underline hover:text-purple-700">
-                              aistudio.google.com/apikey
-                            </a>
-                            {" "}— tier gratuito: 15 req/min, 1.500 req/dia
-                          </p>
+                      </div>
+                    )}
+
+                    {/* ── Gemini multi-key manager ── */}
+                    {aiSettings.provider === "gemini_paid" && (
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                          API Keys Gemini{" "}
+                          {geminiKeyHints.length > 0 && (
+                            <span className="text-green-600 ml-1">✓ {geminiKeyHints.length} configurada(s)</span>
+                          )}
+                        </label>
+                        <p className="text-[10px] text-slate-400 mb-2">
+                          Múltiplas chaves fazem rodízio automático — se uma atingir o limite (429), a próxima assume.{" "}
+                          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer"
+                            className="text-purple-600 underline hover:text-purple-700">Criar chave gratuita →</a>
+                        </p>
+
+                        {/* List of existing keys */}
+                        {geminiKeyHints.length > 0 && (
+                          <div className="mb-2 space-y-1">
+                            {geminiKeyHints.map((hint, i) => (
+                              <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200">
+                                <Key size={11} className="text-green-600 shrink-0"/>
+                                <span className="text-[11px] font-mono text-green-700 flex-1">Chave {i + 1} — {hint}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => { void removeGeminiKey(i); }}
+                                  disabled={keyRemoving === i}
+                                  className="text-red-400 hover:text-red-600 disabled:opacity-40 transition-colors"
+                                  title="Remover chave"
+                                >
+                                  {keyRemoving === i
+                                    ? <Loader2 size={12} className="animate-spin"/>
+                                    : <X size={12}/>
+                                  }
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         )}
+
+                        {/* Add new key input */}
+                        <div className="flex gap-2">
+                          <div className="relative flex-1">
+                            <Key size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type={showApiKey ? "text" : "password"}
+                              value={newGeminiKey}
+                              onChange={(e) => setNewGeminiKey(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addGeminiKey(); } }}
+                              placeholder="AIzaSy... (nova chave)"
+                              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-purple-400 bg-slate-50"
+                            />
+                            <button type="button" onClick={() => setShowApiKey((s) => !s)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                              {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => { void addGeminiKey(); }}
+                            disabled={!newGeminiKey.trim() || keyAdding}
+                            className="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 transition-colors flex items-center gap-1 shrink-0"
+                          >
+                            {keyAdding ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>}
+                            Adicionar
+                          </button>
+                        </div>
                       </div>
                     )}
                     {aiError && <p className="text-xs text-red-500">{aiError}</p>}
@@ -1820,15 +1914,26 @@ export default function RSSManager() {
                             fetch:"text-blue-600",rewrite:"text-purple-600",publish:"text-green-600",
                             draft:"text-amber-600",skip:"text-slate-400",error:"text-red-600",duplicate:"text-slate-400",
                           };
+                          const cleanMsg = entry.message
+                            ?.replace(/^QUOTA_COOLDOWN:/i, "⏱ Cooldown: ")
+                            .replace(/^QUOTA_EXHAUSTED:/i, "🚫 Quota esgotada: ")
+                            .replace(/^Error:\s*/i, "");
+                          const isError = entry.type === "error";
                           return (
-                            <div key={entry.id} className="flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0">
-                              <span className="text-sm shrink-0">{icons[entry.type]}</span>
+                            <div key={entry.id} className={`flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0 ${isError ? "bg-red-50 -mx-1 px-1 rounded" : ""}`}>
+                              <span className="text-sm shrink-0 mt-0.5">{icons[entry.type]}</span>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
                                   <span className={`text-[10px] font-bold uppercase ${clrs[entry.type]}`}>{entry.type}</span>
                                   <span className="text-[10px] text-slate-400 ml-auto shrink-0">{new Date(entry.ts).toLocaleTimeString("pt-BR")}</span>
                                 </div>
-                                <p className="text-[11px] text-slate-500 truncate">{entry.articleTitle ?? entry.sourceName}</p>
+                                <p className="text-[11px] text-slate-600 truncate">{entry.articleTitle ?? entry.sourceName}</p>
+                                {cleanMsg && (
+                                  <p className={`text-[10px] mt-0.5 leading-snug break-words ${isError ? "text-red-600 font-medium" : "text-slate-400"}`}
+                                     title={cleanMsg}>
+                                    {cleanMsg.length > 120 ? cleanMsg.slice(0, 120) + "…" : cleanMsg}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           );

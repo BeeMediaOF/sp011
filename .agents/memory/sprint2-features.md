@@ -39,6 +39,15 @@ description: Web Push, Tiptap editor, ArtigosRelacionados, LazyImage, Google New
 - Campo "URL Canônica" na aba SEO do ArticleEdit (salvo como `canonicalUrl` no DB)
 - Schema: `canonicalUrl text` adicionado à tabela `articles`
 
+### 7. Log de Coleta — mensagem de erro visível
+- `RSSManager.tsx` log map: mostra `entry.message` abaixo do título; limpa prefixos `QUOTA_COOLDOWN:` e `QUOTA_EXHAUSTED:`; fundo vermelho para erros
+
+### 8. Gemini multi-key rotation (round-robin + fallback)
+- `store.ts`: `SiteSettings.geminiApiKeys?: string[]`
+- `rssProcessor.ts`: `_keyCooldowns` Map + `_keyRoundRobin` counter; `callGeminiWithRotation()` → tenta cada key em round-robin, na 429 marca cooldown da key e passa para a próxima; `withRetry503()` para 503 na mesma key
+- `routes/rss.ts`: GET retorna `geminiKeyCount + geminiKeyHints` (últimos 6 chars); POST `/ai-settings/gemini-keys` adiciona key; DELETE `/ai-settings/gemini-keys/:index` remove por índice
+- `RSSManager.tsx`: UI de gerenciamento individual (lista de hints + ×, input + "Adicionar"); funções `addGeminiKey` / `removeGeminiKey`
+
 ## Importante
 - `store.getArticles()` em api-server retorna array vazio — usar `articleService.getArticles()` para dados reais
 - `pnpm add` falha com código -1; usar edição manual de package.json + `pnpm install`
