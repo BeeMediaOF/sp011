@@ -799,10 +799,23 @@ export default function HomeBlocksManager() {
     return () => window.removeEventListener("message", handleMessage);
   }, [blocks]);
 
-  // ── History ─────────────────────────────────────────────────────────────────
+  // ── Instant preview helpers ─────────────────────────────────────────────────
+  function postAllBlocks(bl: HomeBlock[]) {
+    const sorted = [...bl].sort((a, b) => a.order - b.order).filter((b) => b.visible);
+    iframeRef.current?.contentWindow?.postMessage({ type: "blocks:update", blocks: sorted }, "*");
+  }
+
+  function postStylePreview(hBg: string, fBg: string) {
+    iframeRef.current?.contentWindow?.postMessage({ type: "style:preview", headerBgColor: hBg, footerBgColor: fBg }, "*");
+  }
+
+  // ── History (max 20 states) ──────────────────────────────────────────────────
   function pushHistory(next: HomeBlock[]) {
-    setHistory((h) => [...h.slice(0, historyIdx + 1), next]);
-    setHistoryIdx((i) => i + 1);
+    setHistory((h) => {
+      const base = h.slice(0, historyIdx + 1);
+      return [...base, next].slice(-20);
+    });
+    setHistoryIdx((i) => Math.min(i + 1, 19));
   }
   function undo() {
     if (historyIdx <= 0) return;
@@ -961,7 +974,9 @@ export default function HomeBlocksManager() {
   // ── Block actions ───────────────────────────────────────────────────────────
   function toggleVisible(idx: number) {
     const next = blocks.map((b, i) => i === idx ? { ...b, visible: !b.visible } : b);
-    pushHistory(next); setBlocks(next); debounceSave(next);
+    pushHistory(next); setBlocks(next);
+    postAllBlocks(next);
+    debounceSave(next);
   }
 
   function deleteBlock(id: string) {
@@ -1010,7 +1025,12 @@ export default function HomeBlocksManager() {
     });
     setDragIdx(idx);
   }
-  function handleDragEnd() { setDragIdx(null); debounceSave(blocks); pushHistory(blocks); }
+  function handleDragEnd() {
+    setDragIdx(null);
+    postAllBlocks(blocksRef.current);
+    debounceSave(blocksRef.current);
+    pushHistory(blocksRef.current);
+  }
 
   // ── Edit block ──────────────────────────────────────────────────────────────
   function openEdit(block: HomeBlock) {
@@ -1142,7 +1162,7 @@ export default function HomeBlocksManager() {
             <button onClick={saveAll} disabled={saving || loading}
               className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold text-white bg-[#E71D36] rounded-xl hover:bg-[#c0112a] disabled:opacity-50 shadow-sm transition-colors">
               {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              Salvar alterações
+              {saving ? "Salvando…" : "Salvar alterações"}
             </button>
           </div>
         </div>
@@ -1471,16 +1491,18 @@ export default function HomeBlocksManager() {
                 <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
                   <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Cor de fundo</p>
                   <div className="flex gap-2">
-                    <input type="color" value={headerBgColor} onChange={(e) => setHeaderBgColor(e.target.value)}
+                    <input type="color" value={headerBgColor}
+                      onInput={(e) => { const c = (e.target as HTMLInputElement).value; setHeaderBgColor(c); postStylePreview(c, footerBgColor); }}
+                      onChange={(e) => setHeaderBgColor(e.target.value)}
                       className="w-10 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
-                    <input type="text" value={headerBgColor} onChange={(e) => setHeaderBgColor(e.target.value)}
+                    <input type="text" value={headerBgColor} onChange={(e) => { setHeaderBgColor(e.target.value); postStylePreview(e.target.value, footerBgColor); }}
                       className="flex-1 border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
                     <button onClick={() => saveHeaderFooter(headerStyle, footerStyle, headerBgColor)}
                       className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">OK</button>
                   </div>
                   <div className="flex gap-1.5 flex-wrap">
                     {["#ffffff","#f8fafc","#f1f5f9","#0B2A66","#E71D36","#18181b"].map((c) => (
-                      <button key={c} type="button" onClick={() => setHeaderBgColor(c)}
+                      <button key={c} type="button" onClick={() => { setHeaderBgColor(c); postStylePreview(c, footerBgColor); }}
                         className={`w-6 h-6 rounded-lg border-2 transition-all ${headerBgColor === c ? "border-[#0B2A66] scale-110" : "border-[#E2E8F0] hover:border-[#94A3B8]"}`}
                         style={{ backgroundColor: c }} />
                     ))}
@@ -1544,16 +1566,18 @@ export default function HomeBlocksManager() {
                 <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
                   <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Cor de fundo</p>
                   <div className="flex gap-2">
-                    <input type="color" value={footerBgColor} onChange={(e) => setFooterBgColor(e.target.value)}
+                    <input type="color" value={footerBgColor}
+                      onInput={(e) => { const c = (e.target as HTMLInputElement).value; setFooterBgColor(c); postStylePreview(headerBgColor, c); }}
+                      onChange={(e) => setFooterBgColor(e.target.value)}
                       className="w-10 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
-                    <input type="text" value={footerBgColor} onChange={(e) => setFooterBgColor(e.target.value)}
+                    <input type="text" value={footerBgColor} onChange={(e) => { setFooterBgColor(e.target.value); postStylePreview(headerBgColor, e.target.value); }}
                       className="flex-1 border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
                     <button onClick={() => saveHeaderFooter(headerStyle, footerStyle, undefined, footerBgColor)}
                       className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">OK</button>
                   </div>
                   <div className="flex gap-1.5 flex-wrap">
                     {["#000000","#18181b","#0f172a","#1e293b","#ffffff","#f8fafc"].map((c) => (
-                      <button key={c} type="button" onClick={() => setFooterBgColor(c)}
+                      <button key={c} type="button" onClick={() => { setFooterBgColor(c); postStylePreview(headerBgColor, c); }}
                         className={`w-6 h-6 rounded-lg border-2 transition-all ${footerBgColor === c ? "border-[#0B2A66] scale-110" : "border-[#E2E8F0] hover:border-[#94A3B8]"}`}
                         style={{ backgroundColor: c }} />
                     ))}

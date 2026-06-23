@@ -428,6 +428,21 @@ export default function Home() {
           prev.map((b) => b.id === updated.id ? { ...b, ...updated } : b)
         );
       }
+      // Full blocks list update (reorder / visibility toggle)
+      if (e.data.type === "blocks:update" && Array.isArray(e.data.blocks)) {
+        setPreviewBlocks(e.data.blocks as HomeBlock[]);
+      }
+      // Live color preview for header and footer
+      if (e.data.type === "style:preview") {
+        if (e.data.headerBgColor) {
+          const hdr = document.querySelector<HTMLElement>("header");
+          if (hdr) hdr.style.backgroundColor = e.data.headerBgColor as string;
+        }
+        if (e.data.footerBgColor) {
+          const ftr = document.querySelector<HTMLElement>("footer");
+          if (ftr) ftr.style.backgroundColor = e.data.footerBgColor as string;
+        }
+      }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
