@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
+import { trackSearch } from "../hooks/useAnalytics";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_brasilia_agora.png";
 
@@ -96,8 +97,17 @@ function TickerBar() {
 export default function Header() {
   const { settings }            = useSite();
   const [location]              = useLocation();
-  const [menuOpen, setMenu]     = useState(false);
-  const [searchOpen, setSearch] = useState(false);
+  const [menuOpen, setMenu]       = useState(false);
+  const [searchOpen, setSearch]   = useState(false);
+  const [searchQuery, setSearchQ] = useState("");
+
+  function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      trackSearch(searchQuery.trim());
+      setSearch(false);
+      setSearchQ("");
+    }
+  }
 
   const style = settings?.headerStyle ?? "standard";
 
@@ -153,9 +163,12 @@ export default function Header() {
               {searchOpen ? (
                 <>
                   <input autoFocus type="text" placeholder="Pesquisar..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQ(e.target.value)}
+                    onKeyDown={handleSearchKey}
                     className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
                   />
-                  <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
+                  <button onClick={() => { setSearch(false); setSearchQ(""); }} className="text-gray-400 hover:text-gray-800 p-1">
                     <X size={14} />
                   </button>
                 </>
@@ -235,9 +248,12 @@ export default function Header() {
           {searchOpen && (
             <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
               <input autoFocus type="text" placeholder="Pesquisar..."
+                value={searchQuery}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={handleSearchKey}
                 className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
               />
-              <button onClick={() => setSearch(false)} className="text-gray-400 hover:text-gray-800 p-1">
+              <button onClick={() => { setSearch(false); setSearchQ(""); }} className="text-gray-400 hover:text-gray-800 p-1">
                 <X size={16} />
               </button>
             </div>
@@ -310,10 +326,13 @@ export default function Header() {
                   autoFocus
                   type="text"
                   placeholder="Pesquisar..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  onKeyDown={handleSearchKey}
                   className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
                 />
                 <button
-                  onClick={() => setSearch(false)}
+                  onClick={() => { setSearch(false); setSearchQ(""); }}
                   className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
                 >
                   <X size={15} />

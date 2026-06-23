@@ -102,6 +102,26 @@ export function useAnalytics() {
   return { trackCategory, trackArticle, trackShare };
 }
 
+function sendBehavior(payload: Record<string, unknown>) {
+  if (getConsent() !== "accepted") return;
+  const data = { ...payload, sessionId: getSessionId() };
+  fetch("/api/analytics/behavior", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+    keepalive: true,
+  }).catch(() => {});
+}
+
+export function trackSearch(query: string) {
+  if (!query.trim()) return;
+  sendBehavior({ eventType: "search", value: query.trim().slice(0, 200) });
+}
+
+export function trackLinkClick(url: string, articleId?: string) {
+  sendBehavior({ eventType: "link_click", value: url.slice(0, 500), articleId });
+}
+
 /** Track scroll depth milestones (25/50/75/100%) on article pages. */
 export function useScrollDepth(articleId: string | undefined) {
   const [location] = useLocation();

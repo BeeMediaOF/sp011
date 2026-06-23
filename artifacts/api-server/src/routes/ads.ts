@@ -1,8 +1,28 @@
 import { Router } from "express";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
-import { db, adsTable, parseTargetDevices } from "@workspace/db";
+import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
 
 const router = Router();
+
+function todayStr(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function upsertDailyStat(adId: string, field: "impressions" | "clicks") {
+  const date = todayStr();
+  await db
+    .insert(adDailyStatsTable)
+    .values({ adId, date, impressions: field === "impressions" ? 1 : 0, clicks: field === "clicks" ? 1 : 0 })
+    .onConflictDoNothing();
+  await db
+    .update(adDailyStatsTable)
+    .set(
+      field === "impressions"
+        ? { impressions: sql`${adDailyStatsTable.impressions} + 1` }
+        : { clicks: sql`${adDailyStatsTable.clicks} + 1` }
+    )
+    .where(and(eq(adDailyStatsTable.adId, adId), eq(adDailyStatsTable.date, date)));
+}
 
 /** GET /api/ads — list active non-expired ads (public) */
 router.get("/", async (_req, res) => {
@@ -14,14 +34,12 @@ router.get("/", async (_req, res) => {
     .where(
       and(
         eq(adsTable.active, true),
-        // Include ads with no expiry, or expiry in the future
         or(isNull(adsTable.expiresAt), gte(adsTable.expiresAt, now))
       )
     );
 
   const ads = rows.map((r) => ({
     id: r.id,
-    // Omit imageBase64 when imageUrl is present (ghost field fix)
     ...(r.imageUrl ? { imageUrl: r.imageUrl } : { imageBase64: r.imageBase64 }),
     link: r.link,
     position: r.position,
@@ -51,6 +69,8 @@ router.post("/:id/click", async (req, res) => {
     .set({ clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
     .where(eq(adsTable.id, id));
 
+  void upsertDailyStat(id, "clicks");
+
   res.json({ ok: true, message: "Click tracked" });
 });
 
@@ -70,6 +90,8 @@ router.post("/:id/impression", async (req, res) => {
     .update(adsTable)
     .set({ impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() })
     .where(eq(adsTable.id, id));
+
+  void upsertDailyStat(id, "impressions");
 
   res.json({ ok: true });
 });

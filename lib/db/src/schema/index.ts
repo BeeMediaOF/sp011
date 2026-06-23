@@ -18,3 +18,5 @@ export * from "./geo_stats";
 export * from "./social_accounts";
 export * from "./social_templates";
 export * from "./social_publication_queue";
+export * from "./ad_daily_stats";
+export * from "./behavior_events";

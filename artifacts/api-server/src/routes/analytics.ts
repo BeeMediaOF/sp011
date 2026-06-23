@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { gte, eq, count, sql } from "drizzle-orm";
-import { db, analyticsEventsTable, geoStatsTable } from "@workspace/db";
+import { gte, eq, count, sql, and, desc } from "drizzle-orm";
+import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, behaviorEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
@@ -82,7 +82,6 @@ interface GeoResult { city: string; region: string; country: string }
 const _geoCache = new Map<string, GeoResult | null>();
 const _geoPending = new Set<string>();
 
-// Skip loopback / private IPs
 function isPrivateIp(ip: string): boolean {
   return (
     ip === "127.0.0.1" ||
@@ -113,7 +112,6 @@ function lookupGeoAsync(ip: string): void {
         country: d.countryCode ?? "BR",
       };
       _geoCache.set(ip, geo);
-      // Persist to DB — upsert by city+region key
       const id = `${geo.city}::${geo.region}`;
       void db
         .insert(geoStatsTable)
@@ -142,7 +140,6 @@ router.post("/event", (req, res) => {
   const ua  = req.headers["user-agent"] ?? "";
   const ip  = (req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? req.ip ?? "";
 
-  // Fire-and-forget geo lookup (only on pageviews to reduce API calls)
   if (type === "pageview") lookupGeoAsync(ip);
 
   const cachedGeo = _geoCache.get(ip);
@@ -166,16 +163,52 @@ router.post("/event", (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── POST /api/analytics/behavior — track search / link_click / newsletter ────
+router.post("/behavior", async (req, res) => {
+  try {
+    const { eventType, value, sessionId, articleId } = req.body as {
+      eventType?: string; value?: string; sessionId?: string; articleId?: string;
+    };
+    if (!eventType || !sessionId) { res.status(400).json({ ok: false }); return; }
+
+    const ALLOWED = new Set(["search", "link_click", "newsletter", "video_play", "download"]);
+    if (!ALLOWED.has(eventType)) { res.status(400).json({ ok: false }); return; }
+
+    const ua = req.headers["user-agent"] ?? "";
+    await db.insert(behaviorEventsTable).values({
+      eventType,
+      value:     value ?? null,
+      sessionId,
+      device:    detectDevice(ua),
+      articleId: articleId ?? null,
+      ts:        new Date(),
+    });
+    res.json({ ok: true });
+  } catch {
+    res.json({ ok: true }); // silent — never fail the client
+  }
+});
+
 // ─── GET /api/analytics/stats ─────────────────────────────────────────────────
 router.get("/stats", authMiddleware, async (_req, res) => {
   const now = Date.now();
   const DAY = 86_400_000;
   const thirtyDaysAgo = new Date(now - 30 * DAY);
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().slice(0, 10);
 
-  const [dbRows, allTimeResult, geoRows] = await Promise.all([
+  const [dbRows, allTimeResult, geoRows, allAds, adDailyRows, behaviorRows] = await Promise.all([
     db.select().from(analyticsEventsTable).where(gte(analyticsEventsTable.ts, thirtyDaysAgo)),
     db.select({ count: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.type, "pageview")),
     db.select().from(geoStatsTable),
+    db.select({
+      id: adsTable.id, name: adsTable.name, position: adsTable.position,
+      impressions: adsTable.impressions, clicks: adsTable.clicks,
+      active: adsTable.active, createdAt: adsTable.createdAt,
+    }).from(adsTable).orderBy(desc(adsTable.impressions)),
+    db.select().from(adDailyStatsTable)
+      .where(gte(adDailyStatsTable.date, thirtyDaysAgoStr)),
+    db.select().from(behaviorEventsTable)
+      .where(gte(behaviorEventsTable.ts, thirtyDaysAgo)),
   ]);
 
   type EventLike = {
@@ -310,13 +343,86 @@ router.get("/stats", authMiddleware, async (_req, res) => {
 
   const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-  // Build top cities and regions from persistent geo_stats table (all-time)
   const cityTotals:   Record<string, number> = {};
   const regionTotals: Record<string, number> = {};
   for (const row of geoRows) {
     if (row.city)   cityTotals[row.city]     = (cityTotals[row.city]     ?? 0) + row.views;
     if (row.region) regionTotals[row.region] = (regionTotals[row.region] ?? 0) + row.views;
   }
+
+  // ── Ad stats ──────────────────────────────────────────────────────────────
+  const adStats = allAds.map((ad) => ({
+    id:          ad.id,
+    name:        ad.name,
+    position:    ad.position,
+    active:      ad.active,
+    impressions: ad.impressions,
+    clicks:      ad.clicks,
+    ctr:         ad.impressions > 0 ? Number(((ad.clicks / ad.impressions) * 100).toFixed(2)) : 0,
+  }));
+
+  // Build 30-day daily chart for top 3 ads by impressions
+  const top3AdIds = adStats.slice(0, 3).map((a) => a.id);
+  const adDailyByDate: Record<string, Record<string, { impressions: number; clicks: number }>> = {};
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now - i * DAY).toISOString().slice(0, 10);
+    adDailyByDate[d] = {};
+    for (const adId of top3AdIds) adDailyByDate[d]![adId] = { impressions: 0, clicks: 0 };
+  }
+  for (const row of adDailyRows) {
+    if (top3AdIds.includes(row.adId) && adDailyByDate[row.date]) {
+      adDailyByDate[row.date]![row.adId] = { impressions: row.impressions, clicks: row.clicks };
+    }
+  }
+  const adDailyChart = Object.entries(adDailyByDate).map(([date, byAd]) => {
+    const entry: Record<string, unknown> = { date };
+    for (const adId of top3AdIds) {
+      const adName = adStats.find((a) => a.id === adId)?.name ?? adId;
+      entry[adName] = byAd[adId]?.impressions ?? 0;
+    }
+    return entry;
+  });
+
+  // Total ad KPIs
+  const totalAdImpressions = adStats.reduce((s, a) => s + a.impressions, 0);
+  const totalAdClicks       = adStats.reduce((s, a) => s + a.clicks, 0);
+  const avgCtr              = totalAdImpressions > 0
+    ? Number(((totalAdClicks / totalAdImpressions) * 100).toFixed(2))
+    : 0;
+  const bestAd = adStats.length > 0
+    ? adStats.reduce((best, a) => (a.ctr > best.ctr ? a : best), adStats[0]!)
+    : null;
+
+  // ── Behavior stats ────────────────────────────────────────────────────────
+  const searchTerms: Record<string, number> = {};
+  const linkDomains: Record<string, number> = {};
+  let newsletterSignups = 0;
+
+  for (const ev of behaviorRows) {
+    if (ev.eventType === "search" && ev.value) {
+      const term = ev.value.toLowerCase().trim();
+      searchTerms[term] = (searchTerms[term] ?? 0) + 1;
+    }
+    if (ev.eventType === "link_click" && ev.value) {
+      try {
+        const domain = new URL(ev.value).hostname.replace(/^www\./, "");
+        linkDomains[domain] = (linkDomains[domain] ?? 0) + 1;
+      } catch { /* invalid URL */ }
+    }
+    if (ev.eventType === "newsletter") newsletterSignups++;
+  }
+
+  const topSearchTerms = Object.entries(searchTerms)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([term, count]) => ({ term, count }));
+
+  const topLinkDomains = Object.entries(linkDomains)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([domain, count]) => ({ domain, count }));
+
+  const totalBehaviorEvents = behaviorRows.length;
 
   res.json({
     totals: { today, week, month, allTime },
@@ -334,6 +440,24 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     scrollDepthChart: [25,50,75,100].map((depth) => ({ depth, count: scrollMap[depth] ?? 0 })),
     referrerChart:   Object.entries(referrerMap).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),
     shareChart:      Object.entries(shareMap).map(([platform,count])=>({platform,count})).sort((a,b)=>b.count-a.count),
+    // Ad analytics
+    adStats,
+    adDailyChart,
+    adTopNames: top3AdIds.map((id) => adStats.find((a) => a.id === id)?.name ?? id),
+    adKpis: {
+      totalImpressions: totalAdImpressions,
+      totalClicks:      totalAdClicks,
+      avgCtr,
+      bestAdName:       bestAd?.name ?? null,
+      bestAdCtr:        bestAd?.ctr ?? 0,
+    },
+    // Behavior analytics
+    behaviorStats: {
+      totalEvents:     totalBehaviorEvents,
+      newsletterSignups,
+      topSearchTerms,
+      topLinkDomains,
+    },
   });
 });
 

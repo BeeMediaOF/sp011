@@ -8,10 +8,15 @@ import {
 import {
   Eye, Users, Clock, TrendingDown, TrendingUp, ArrowUpRight,
   ArrowDownRight, FileText, Info, Smartphone, Monitor, Tablet,
-  RefreshCw, Download,
+  RefreshCw, Download, Megaphone, MousePointerClick, Search,
+  ExternalLink, BarChart2, Mail,
 } from "lucide-react";
 import { Link } from "wouter";
 
+interface AdStat {
+  id: string; name: string; position: string; active: boolean;
+  impressions: number; clicks: number; ctr: number;
+}
 interface Stats {
   totals: { today: number; week: number; month: number; allTime: number };
   engagement?: { uniqueSessions: number; avgReadTime: number; bounceRate: number; readCompletions: number };
@@ -28,6 +33,20 @@ interface Stats {
   scrollDepthChart?: { depth: number; count: number }[];
   referrerChart?: { name: string; value: number }[];
   shareChart?: { platform: string; count: number }[];
+  // Ad analytics
+  adStats?: AdStat[];
+  adDailyChart?: Record<string, unknown>[];
+  adTopNames?: string[];
+  adKpis?: {
+    totalImpressions: number; totalClicks: number;
+    avgCtr: number; bestAdName: string | null; bestAdCtr: number;
+  };
+  // Behavior analytics
+  behaviorStats?: {
+    totalEvents: number; newsletterSignups: number;
+    topSearchTerms: { term: string; count: number }[];
+    topLinkDomains: { domain: string; count: number }[];
+  };
 }
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -786,6 +805,305 @@ export default function Analytics() {
                 })}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* ══ PROPAGANDAS ═══════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Megaphone size={16} className="text-[#E71D36]" />
+            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">Propagandas</h2>
+          </div>
+
+          {/* KPIs de anúncios */}
+          {stats.adKpis && (
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+              {[
+                {
+                  label: "Total de impressões",
+                  value: (stats.adKpis.totalImpressions).toLocaleString("pt-BR"),
+                  icon: Eye, iconBg: "#EEF4FF", iconClr: "#2563EB",
+                },
+                {
+                  label: "Total de cliques",
+                  value: (stats.adKpis.totalClicks).toLocaleString("pt-BR"),
+                  icon: MousePointerClick, iconBg: "#ECFDF5", iconClr: "#16A34A",
+                },
+                {
+                  label: "CTR médio",
+                  value: `${stats.adKpis.avgCtr.toFixed(2)}%`,
+                  icon: BarChart2, iconBg: "#FFF7ED", iconClr: "#F97316",
+                },
+                {
+                  label: "Melhor anúncio",
+                  value: stats.adKpis.bestAdName
+                    ? `${stats.adKpis.bestAdCtr.toFixed(2)}% CTR`
+                    : "—",
+                  sub: stats.adKpis.bestAdName ?? "",
+                  icon: ArrowUpRight, iconBg: "#FEF2F2", iconClr: "#E71D36",
+                },
+              ].map(({ label, value, sub, icon: Icon, iconBg, iconClr }) => (
+                <div key={label} className="bg-white rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: CARD_SHADOW }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
+                    <Icon size={18} style={{ color: iconClr }} />
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-[#0F172A] leading-none">{value}</p>
+                    {sub && <p className="text-[11px] text-slate-400 mt-0.5 truncate">{sub}</p>}
+                    <p className="text-sm text-slate-600 mt-1">{label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 xl:grid-cols-10 gap-4">
+            {/* Tabela de anúncios */}
+            <div className="xl:col-span-6 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-4">Desempenho por anúncio</h3>
+              {!stats.adStats || stats.adStats.length === 0 ? (
+                <EmptyState label="Nenhum anúncio cadastrado ainda" />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Anúncio</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Impressões</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Cliques</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">CTR</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {stats.adStats.map((ad) => {
+                        const ctrColor = ad.ctr >= 2 ? "#16A34A" : ad.ctr >= 0.5 ? "#F97316" : "#94A3B8";
+                        const maxImpr  = Math.max(...(stats.adStats ?? []).map(a => a.impressions), 1);
+                        return (
+                          <tr key={ad.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                            <td className="py-3 px-3">
+                              <div className="font-medium text-slate-800 truncate max-w-[200px]">{ad.name}</div>
+                              <div className="text-[10px] text-slate-400 mt-0.5">{ad.position}</div>
+                              <div className="h-1 bg-slate-100 rounded-full mt-1.5 w-full max-w-[180px]">
+                                <div
+                                  className="h-full rounded-full bg-[#2563EB]/60"
+                                  style={{ width: `${(ad.impressions / maxImpr) * 100}%` }}
+                                />
+                              </div>
+                            </td>
+                            <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                              {ad.impressions.toLocaleString("pt-BR")}
+                            </td>
+                            <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                              {ad.clicks.toLocaleString("pt-BR")}
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <span className="font-bold text-sm" style={{ color: ctrColor }}>{ad.ctr.toFixed(2)}%</span>
+                            </td>
+                            <td className="py-3 px-3 text-right">
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                ad.active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${ad.active ? "bg-green-500" : "bg-slate-400"}`} />
+                                {ad.active ? "Ativo" : "Pausado"}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Gráfico de impressões dos top 3 anúncios */}
+            <div className="xl:col-span-4 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Impressões — top 3 (30 dias)</h3>
+              <p className="text-xs text-slate-400 mb-4">Histórico diário dos anúncios com mais visualizações</p>
+              {!stats.adDailyChart || stats.adDailyChart.every(d => (stats.adTopNames ?? []).every(n => (d[n] as number) === 0)) ? (
+                <EmptyState label="Acumulando dados diários…" />
+              ) : (
+                <ResponsiveContainer width="100%" height={210}>
+                  <LineChart data={stats.adDailyChart as { date: string; [key: string]: unknown }[]} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
+                    <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: "#94A3B8" }}
+                      axisLine={false}
+                      tickLine={false}
+                      interval={6}
+                      tickFormatter={fmtDate}
+                    />
+                    <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
+                    />
+                    {(stats.adTopNames ?? []).map((name, i) => (
+                      <Line
+                        key={name}
+                        type="monotone"
+                        dataKey={name}
+                        stroke={["#2563EB","#E71D36","#F97316"][i] ?? "#64748B"}
+                        strokeWidth={2}
+                        dot={false}
+                        name={name}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
+              {(stats.adTopNames ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {(stats.adTopNames ?? []).map((name, i) => (
+                    <span key={name} className="flex items-center gap-1 text-[10px] text-slate-500">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: ["#2563EB","#E71D36","#F97316"][i] ?? "#64748B" }} />
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ══ COMPORTAMENTO ═════════════════════════════════════ */}
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart2 size={16} className="text-[#7C3AED]" />
+            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">Comportamento no site</h2>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+
+            {/* Termos buscados */}
+            <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-purple-50 flex items-center justify-center">
+                  <Search size={14} className="text-[#7C3AED]" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-700">Termos mais buscados</h3>
+                  <p className="text-[10px] text-slate-400">Últimos 30 dias</p>
+                </div>
+              </div>
+              {!stats.behaviorStats?.topSearchTerms.length ? (
+                <EmptyState label="Nenhuma busca registrada" />
+              ) : (
+                <div className="space-y-2">
+                  {stats.behaviorStats.topSearchTerms.slice(0, 8).map(({ term, count }, i) => {
+                    const maxC = stats.behaviorStats!.topSearchTerms[0]!.count;
+                    return (
+                      <div key={term}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-700 font-medium truncate max-w-[160px]">{term}</span>
+                          <span className="text-xs font-semibold text-slate-500">{count}×</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${(count / maxC) * 100}%`, background: ["#7C3AED","#2563EB","#F97316","#16A34A","#E71D36","#0891b2","#F59E0B","#64748B"][i % 8] }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Links externos mais clicados */}
+            <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <ExternalLink size={14} className="text-[#2563EB]" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-700">Links externos clicados</h3>
+                  <p className="text-[10px] text-slate-400">Domínios de destino</p>
+                </div>
+              </div>
+              {!stats.behaviorStats?.topLinkDomains.length ? (
+                <EmptyState label="Nenhum clique externo registrado" />
+              ) : (
+                <div className="space-y-2">
+                  {stats.behaviorStats.topLinkDomains.slice(0, 8).map(({ domain, count }, i) => {
+                    const maxC = stats.behaviorStats!.topLinkDomains[0]!.count;
+                    return (
+                      <div key={domain}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-700 font-medium truncate max-w-[160px]">{domain}</span>
+                          <span className="text-xs font-semibold text-slate-500">{count}×</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{ width: `${(count / maxC) * 100}%`, background: ["#2563EB","#16A34A","#F97316","#E71D36","#7C3AED","#0891b2","#F59E0B","#64748B"][i % 8] }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Resumo de comportamento */}
+            <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center">
+                  <FileText size={14} className="text-[#F97316]" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-700">Resumo de interações</h3>
+                  <p className="text-[10px] text-slate-400">30 dias</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {[
+                  {
+                    label: "Total de eventos",
+                    value: (stats.behaviorStats?.totalEvents ?? 0).toLocaleString("pt-BR"),
+                    icon: BarChart2, color: "#7C3AED", bg: "#F5F3FF",
+                  },
+                  {
+                    label: "Buscas realizadas",
+                    value: (stats.behaviorStats?.topSearchTerms.reduce((s, t) => s + t.count, 0) ?? 0).toLocaleString("pt-BR"),
+                    icon: Search, color: "#2563EB", bg: "#EEF4FF",
+                  },
+                  {
+                    label: "Cliques externos",
+                    value: (stats.behaviorStats?.topLinkDomains.reduce((s, d) => s + d.count, 0) ?? 0).toLocaleString("pt-BR"),
+                    icon: ExternalLink, color: "#16A34A", bg: "#ECFDF5",
+                  },
+                  {
+                    label: "Newsletters enviadas",
+                    value: (stats.behaviorStats?.newsletterSignups ?? 0).toLocaleString("pt-BR"),
+                    icon: Mail, color: "#F97316", bg: "#FFF7ED",
+                  },
+                  {
+                    label: "Compartilhamentos",
+                    value: (stats.shareChart ?? []).reduce((s, p) => s + p.count, 0).toLocaleString("pt-BR"),
+                    icon: ArrowUpRight, color: "#E71D36", bg: "#FEF2F2",
+                  },
+                  {
+                    label: "Leram 100% do artigo",
+                    value: (stats.engagement?.readCompletions ?? 0).toLocaleString("pt-BR"),
+                    icon: Eye, color: "#0891b2", bg: "#ECFEFF",
+                  },
+                ].map(({ label, value, icon: Icon, color, bg }) => (
+                  <div key={label} className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: bg }}>
+                      <Icon size={14} style={{ color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-500 truncate">{label}</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#0F172A]">{value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
