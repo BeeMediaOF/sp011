@@ -10,3 +10,4 @@
 - [Features de segurança implementadas](security-features.md) — TOTP 2FA completo, math CAPTCHA pós-3-falhas, token 8h, lastSeenAt, log retention cron, AMP route, OG dinâmico
 - [Sprint 2 — features implementadas](sprint2-features.md) — Web Push VAPID, Tiptap editor, ArtigosRelacionados, LazyImage, Google News Sitemap, canonical+hreflang
 - [Sistema de publicação social](social-system.md) — sharp+SVG para arte, queue DB-backed com cron 5min, 3 tabs admin (/admin/social), authMiddleware obrigatório, libs devem ser reconstruídas com typecheck:libs após novos schemas
+- [Object Storage GCS — uploads](object-storage-uploads.md) — uploads migrados para GCS via sidecar HTTP (sem npm package); padrão de streaming e fallback para disco local
