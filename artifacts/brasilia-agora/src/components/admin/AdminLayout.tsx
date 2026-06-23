@@ -476,7 +476,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
       style={{ background: isDark ? "#0F172A" : "#F7F9FC", fontFamily: "Inter, sans-serif" }}>
 
       {/* ── Sidebar ──────────────────────────────── */}
-      <aside className="w-[260px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-700 flex flex-col h-full overflow-y-auto">
+      <aside className="w-[260px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-700 flex flex-col h-full">
 
         {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-700">
@@ -495,7 +495,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
         )}
 
         {/* Nav */}
-        <nav className="flex-1 py-4 space-y-0.5 pr-2">
+        <nav className="flex-1 py-4 space-y-0.5 pr-2 overflow-y-auto min-h-0">
           {visibleMain.map(({ label, icon: Icon, path }) => navItem(label, Icon, path))}
 
           {/* Configurações — single direct link */}
