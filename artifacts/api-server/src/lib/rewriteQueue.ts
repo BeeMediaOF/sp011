@@ -41,11 +41,24 @@ let _currentItem: (RewriteJobItem & { startedAt: number }) | null = null;
 const _recentHistory: HistoryEntry[] = [];
 const HISTORY_MAX = 20;
 
+/**
+ * Add an article to the BACK of the queue (used by sweep — drafts recovery).
+ * Sweep already fetches drafts newest-first, so the queue remains newest→oldest.
+ */
 export function enqueueRewrite(item: RewriteJobItem): void {
-  // Avoid duplicates already in queue
   if (_queue.some((q) => q.articleId === item.articleId)) return;
   _queue.push(item);
-  logger.info({ articleId: item.articleId, queueLength: _queue.length }, "Article queued for AI rewrite");
+  logger.info({ articleId: item.articleId, queueLength: _queue.length }, "Article queued for AI rewrite (sweep)");
+}
+
+/**
+ * Add a FRESH article to the FRONT of the queue (used by RSS processor).
+ * New articles always have priority over the backlog.
+ */
+export function enqueueRewriteFront(item: RewriteJobItem): void {
+  if (_queue.some((q) => q.articleId === item.articleId)) return;
+  _queue.unshift(item);
+  logger.info({ articleId: item.articleId, queueLength: _queue.length }, "Article queued at FRONT for AI rewrite (new)");
 }
 
 export function getQueueStats() {
@@ -174,7 +187,8 @@ async function processNext(): Promise<void> {
 
 // ── Startup ───────────────────────────────────────────────────────────────────
 export function startRewriteWorker(): void {
-  registerRewriteQueue(enqueueRewrite);
+  // New articles from RSS → front of queue (highest priority)
+  registerRewriteQueue(enqueueRewriteFront);
 
   setInterval(() => { void processNext(); }, PROCESS_INTERVAL_MS);
   setInterval(() => { void sweepPendingDrafts(); }, SWEEP_INTERVAL_MS);

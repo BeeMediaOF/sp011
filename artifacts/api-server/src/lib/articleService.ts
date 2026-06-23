@@ -98,7 +98,7 @@ export const articleService = {
           ),
         ),
       )
-      .orderBy(articlesTable.createdAt)
+      .orderBy(desc(articlesTable.createdAt))
       .limit(limit);
     return rows.map(rowToArticle);
   },
