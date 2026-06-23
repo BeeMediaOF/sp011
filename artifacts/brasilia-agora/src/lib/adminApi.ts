@@ -118,10 +118,12 @@ export const adminApi = {
     req<{ permissions: string[] }>("GET", "/permissions/me"),
 
   // Image upload (multipart)
-  uploadImage: (file: File): Promise<{ ok: boolean; url: string; filename: string; size: number }> => {
+  // Pass `title` to get a SEO-friendly filename like "titulo-da-noticia-abc123.png"
+  uploadImage: (file: File, title?: string): Promise<{ ok: boolean; url: string; filename: string; size: number }> => {
     const token = getToken();
     const form = new FormData();
     form.append("image", file);
+    if (title?.trim()) form.append("title", title.trim());
     return fetch("/api/uploads/image", {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -136,10 +138,12 @@ export const adminApi = {
   },
 
   // Media upload — images + videos (multipart)
-  uploadMedia: (file: File): Promise<{ ok: boolean; url: string; filename: string; size: number; mediaType: "image" | "video" }> => {
+  // Pass `title` to get a SEO-friendly filename like "titulo-da-noticia-abc123.mp4"
+  uploadMedia: (file: File, title?: string): Promise<{ ok: boolean; url: string; filename: string; size: number; mediaType: "image" | "video" }> => {
     const token = getToken();
     const form = new FormData();
     form.append("media", file);
+    if (title?.trim()) form.append("title", title.trim());
     return fetch("/api/uploads/media", {
       method: "POST",
       headers: token ? { Authorization: `Bearer ${token}` } : {},

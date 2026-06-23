@@ -191,7 +191,7 @@ export default function ArticleEdit() {
   async function handleImageFile(file: File) {
     setUploadingImage(true);
     try {
-      const { url } = await adminApi.uploadImage(file);
+      const { url } = await adminApi.uploadImage(file, form.title);
       setField("imageUrl", url);
     } catch {
       // Fallback to Base64 if upload fails (e.g., server unreachable)
@@ -641,7 +641,7 @@ export default function ArticleEdit() {
                 onPasteClick={() => { setPasteRaw(""); setPasteOpen(true); }}
                 onFormatClick={handleFormatContent}
                 onUploadFile={async (file) => {
-                  const res = await adminApi.uploadMedia(file);
+                  const res = await adminApi.uploadMedia(file, form.title);
                   return { url: res.url, mediaType: res.mediaType };
                 }}
               />
