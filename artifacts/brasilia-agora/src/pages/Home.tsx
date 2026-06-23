@@ -557,7 +557,7 @@ export default function Home() {
 
         {/* slot_09 — Rodapé da Home */}
         <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <AdBanner slot="slot_09" placeholder="Publicidade" />
+          <AdBanner slot="slot_09" />
         </div>
       </main>
 

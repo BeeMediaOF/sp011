@@ -62,7 +62,7 @@ function ArticleSidebar() {
 
       {/* Propaganda sidebar — gerenciada pelo painel */}
       <div className="sticky top-24">
-        <AdBanner slot="slot_07" placeholder="Publicidade" />
+        <AdBanner slot="slot_07" />
       </div>
     </aside>
   );
@@ -616,7 +616,7 @@ export default function Artigo() {
 
                   {/* Propaganda in-content — entre a imagem e o corpo */}
                   <div className="mb-5">
-                    <AdBanner slot="slot_10" placeholder="Publicidade" />
+                    <AdBanner slot="slot_10" />
                   </div>
 
                   {/* Corpo */}
@@ -678,7 +678,7 @@ export default function Artigo() {
 
                   {/* Banner horizontal — gerenciado pelo painel */}
                   <div className="mt-8">
-                    <AdBanner slot="slot_06" placeholder="Publicidade" />
+                    <AdBanner slot="slot_06" />
                   </div>
                 </>
               )}

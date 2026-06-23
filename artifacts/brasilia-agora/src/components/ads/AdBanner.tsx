@@ -8,7 +8,7 @@ interface Props {
   interval?: number;
 }
 
-export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) {
+export default function AdBanner({ slot, interval = 5000 }: Props) {
   const { getSlotAll, loading } = useAds();
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
@@ -48,7 +48,6 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
     if (index >= items.length && items.length > 0) setIndex(0);
   }, [index, items.length]);
 
-  // Track impression once per unique ad shown
   const trackedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const ad = items[index];
@@ -58,22 +57,8 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
     }
   }, [index, items]);
 
-  if (loading) {
-    return (
-      <div className="w-full h-[60px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center animate-pulse">
-        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">Publicidade</p>
-      </div>
-    );
-  }
-
-  if (items.length === 0) {
-    if (!placeholder) return null;
-    return (
-      <div className="w-full h-[60px] mx-auto bg-gray-50 rounded-lg border border-gray-100 flex items-center justify-center">
-        <p className="text-[10px] font-semibold tracking-wider text-gray-300 uppercase">{placeholder}</p>
-      </div>
-    );
-  }
+  // Hide completely while loading or when there are no ads for this slot
+  if (loading || items.length === 0) return null;
 
   const ad = items[index] ?? items[0];
   const isCarousel = items.length > 1;
@@ -81,7 +66,6 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
   return (
     <div className="w-full flex justify-center">
       <div className="relative w-full group">
-        {/* Ad image */}
         <a
           href={ad.link}
           target="_blank"
@@ -97,10 +81,8 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
           />
         </a>
 
-        {/* Carousel controls */}
         {isCarousel && (
           <>
-            {/* Prev / Next arrows — appear on hover */}
             <button
               onClick={(e) => { e.stopPropagation(); prev(); }}
               className="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/40 hover:bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10"
@@ -116,7 +98,6 @@ export default function AdBanner({ slot, placeholder, interval = 5000 }: Props) 
               <ChevronRight size={16} />
             </button>
 
-            {/* Dots */}
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
               {items.map((_, i) => (
                 <button

@@ -98,7 +98,7 @@ export default function CategoryPage({
           </div>
 
           <div className="mb-8">
-            <AdBanner slot="slot_05" placeholder="Publicidade" />
+            <AdBanner slot="slot_05" />
           </div>
 
           {/* Divider */}
@@ -125,7 +125,7 @@ export default function CategoryPage({
             <div className="w-full lg:w-1/3 space-y-8">
               {/* Propaganda sidebar — gerenciada pelo painel */}
               <div>
-                <AdBanner slot="slot_11" placeholder="Publicidade" />
+                <AdBanner slot="slot_11" />
               </div>
 
               {/* Mais Lidas */}
