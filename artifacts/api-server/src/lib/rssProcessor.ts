@@ -289,12 +289,25 @@ const _keyCooldowns = new Map<string, number>();
 /** Round-robin cursor — index into the keys array for the next call */
 let _keyRoundRobin = 0;
 
-/** Return all configured Gemini API keys (array takes priority over single key) */
+/**
+ * Return ALL configured Gemini API keys: env var + settings array + settings single key.
+ * Deduplicates so the same key never appears twice.
+ * The env var key is always first so it's tried first in round-robin.
+ */
 function getGeminiKeys(settings: ReturnType<typeof store.getSettings>): string[] {
-  const arr = (settings.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
-  if (arr.length > 0) return arr;
-  if (settings.geminiApiKey?.trim()) return [settings.geminiApiKey.trim()];
-  return [];
+  const seen = new Set<string>();
+  const pool: string[] = [];
+  function add(k: string) {
+    const t = k.trim();
+    if (t && !seen.has(t)) { seen.add(t); pool.push(t); }
+  }
+  // 1. GEMINI_API_KEY env var (Replit Secret)
+  add(process.env["GEMINI_API_KEY"] ?? "");
+  // 2. Settings array (added via admin UI)
+  for (const k of settings.geminiApiKeys ?? []) add(k);
+  // 3. Legacy single-key setting
+  add(settings.geminiApiKey ?? "");
+  return pool;
 }
 
 /** Pick the next available key using round-robin; skip keys on cooldown */
@@ -314,21 +327,25 @@ function pickKey(keys: string[]): string | null {
 /**
  * Call Gemini with round-robin key rotation.
  * On 429 for a specific key → mark it on cooldown and try next key.
- * Only throws QUOTA_COOLDOWN once ALL keys are exhausted.
+ * NEVER falls back to a key that is still on cooldown.
+ * Throws QUOTA_COOLDOWN only when ALL keys are exhausted or on cooldown.
  * Retries 503/overloaded errors on the same key before rotating.
  */
 async function callGeminiWithRotation(keys: string[], model: string, prompt: string): Promise<string> {
   const tried = new Set<string>();
 
   while (tried.size < keys.length) {
-    // Pick next available key from the untried set
+    // Only consider keys not yet tried in this call
     const available = keys.filter((k) => !tried.has(k));
-    const key = pickKey(available) ?? available[0]!;
+    // Pick next key that is NOT on per-key cooldown — never force a cooled-down key
+    const key = pickKey(available);
+    if (!key) break; // all remaining keys are on cooldown → stop trying
+
     tried.add(key);
 
     try {
       const ai = new GoogleGenAI({ apiKey: key });
-      // Retry 503/overload on same key
+      // Retry 503/overload on same key before rotating
       return await withRetry503(async () => {
         const resp = await ai.models.generateContent({
           model,
@@ -352,13 +369,18 @@ async function callGeminiWithRotation(keys: string[], model: string, prompt: str
     }
   }
 
-  // All keys exhausted — compute minimum wait and set global cooldown
-  const minCooldown = Math.min(...keys.map((k) => _keyCooldowns.get(k) ?? 0));
-  const waitSecs = Math.max(0, Math.ceil((minCooldown - Date.now()) / 1_000));
-  const globalCooldownMs = waitSecs > 0 ? waitSecs * 1_000 + 2_000 : 65_000;
-  _quota.cooldownUntil = Date.now() + globalCooldownMs;
+  // All keys tried or all remaining are on per-key cooldown
+  // Compute when the FIRST key will be available again
+  const now = Date.now();
+  const cooldownTimes = keys.map((k) => _keyCooldowns.get(k) ?? 0);
+  const minCooldown = Math.min(...cooldownTimes);
+  const waitSecs = Math.max(0, Math.ceil((minCooldown - now) / 1_000));
+  // Add 8s buffer to ensure the minute window fully resets before retrying
+  const globalCooldownMs = waitSecs > 0 ? waitSecs * 1_000 + 8_000 : 70_000;
+  _quota.cooldownUntil = now + globalCooldownMs;
+  const waitDisplay = waitSecs > 0 ? waitSecs + 8 : 70;
   throw new Error(
-    `QUOTA_COOLDOWN:Todas as ${keys.length} API key(s) do Gemini atingiram o limite de requisições. Aguardando ${waitSecs || 65}s.`,
+    `QUOTA_COOLDOWN:Todas as ${keys.length} API key(s) do Gemini atingiram o limite. Aguardando ${waitDisplay}s.`,
   );
 }
 
@@ -391,9 +413,10 @@ function refreshDay() {
 }
 
 function parseCooldownMs(errMsg: string): number {
-  const m = errMsg.match(/retry[^\d]*(\d+(?:\.\d+)?)\s*s/i);
-  if (m) return Math.ceil(parseFloat(m[1]!) * 1_000) + 3_000; // +3s buffer
-  return 65_000;
+  // Handle various formats: "retryDelay: 60s", "retry after 60s", "retry-after: 60", "Retry in 60 seconds"
+  const m = errMsg.match(/(?:retryDelay|retry[\s-]*after|retry\s+in)[^\d]*(\d+(?:\.\d+)?)\s*s/i);
+  if (m) return Math.ceil(parseFloat(m[1]!) * 1_000) + 8_000; // +8s buffer for minute window reset
+  return 70_000; // Default: 70s (safe margin for free-tier RPM reset)
 }
 
 export function getAIQuotaStatus() {
@@ -506,21 +529,10 @@ export async function rewriteWithAI(
       const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
       return data.choices?.[0]?.message?.content ?? "";
     });
-  } else if (provider === "gemini_direct") {
-    // Google AI Studio free tier — uses GEMINI_API_KEY env var, no Replit credits
-    const ai    = getGeminiDirect();
-    const model = settings.rssAiModel || "gemini-2.0-flash";
-    raw = await withRetry(async () => {
-      const resp = await ai.models.generateContent({
-        model,
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        config: { maxOutputTokens: 8192 },
-      });
-      return resp.text ?? "";
-    });
-  } else if (provider === "gemini_paid") {
+  } else if (provider === "gemini_direct" || provider === "gemini_paid") {
+    // Use ALL available Gemini keys (env var + settings) with full rotation
     const keys = getGeminiKeys(settings);
-    if (keys.length === 0) throw new Error("API key do Gemini não configurada. Configure em Configurações → API Keys Gemini.");
+    if (keys.length === 0) throw new Error("API key do Gemini não configurada. Adicione sua chave em aistudio.google.com e configure nas Configurações.");
     const model = settings.rssAiModel || "gemini-2.0-flash";
     raw = await callGeminiWithRotation(keys, model, prompt);
   } else {

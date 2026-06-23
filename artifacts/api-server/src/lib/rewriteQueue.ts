@@ -18,8 +18,9 @@ import {
 import { logger } from "./logger.js";
 
 // ── Timing constants ─────────────────────────────────────────────────────────
-// 1 article every 8 s = 7.5/min — comfortable margin below Gemini free-tier 15 RPM
-const PROCESS_INTERVAL_MS = 8_000;
+// 1 article every 4 s = 15/min — matches Gemini free-tier RPM; rotation across
+// multiple keys multiplies effective throughput (N keys = N × 15 RPM capacity)
+const PROCESS_INTERVAL_MS = 4_000;
 // Sweep for new unprocessed drafts every 5 minutes
 const SWEEP_INTERVAL_MS = 5 * 60_000;
 
@@ -196,5 +197,5 @@ export function startRewriteWorker(): void {
   // Initial sweep after 30 s to catch drafts that already exist at boot
   setTimeout(() => { void sweepPendingDrafts(); }, 30_000);
 
-  logger.info("Rewrite queue worker started (1 article / 8s, sweep every 5 min)");
+  logger.info("Rewrite queue worker started (1 article / 4s, sweep every 5 min)");
 }
