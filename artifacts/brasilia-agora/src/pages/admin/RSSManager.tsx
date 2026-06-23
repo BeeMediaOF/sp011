@@ -452,6 +452,28 @@ export default function RSSManager() {
     ];
   }, [menuCategories]);
 
+  // ── Filtered / grouped sources ───────────────────────────────────────────────
+  const filteredSources = useMemo(() => {
+    const q = sourceSearch.toLowerCase();
+    let list = q
+      ? sources.filter((s) =>
+          s.name.toLowerCase().includes(q) ||
+          s.url.toLowerCase().includes(q) ||
+          (TAG_MAP[s.category] ?? s.category).toLowerCase().includes(q)
+        )
+      : [...sources];
+    if (statusFilter === "Ativo")   list = list.filter((s) => s.active);
+    if (statusFilter === "Pausado") list = list.filter((s) => !s.active);
+    if (categoryFilter !== "Todas") {
+      const target = categoryFilter.toLowerCase();
+      list = list.filter((s) =>
+        (TAG_MAP[s.category] ?? s.category).toLowerCase() === target ||
+        s.category.toLowerCase() === target,
+      );
+    }
+    return list;
+  }, [sources, sourceSearch, statusFilter, categoryFilter]);
+
   /** Extract publisher name: "Agência Brasil - Política" → "Agência Brasil" */
   function extractPublisher(name: string): string {
     const idx = name.search(/\s[–\-]\s/);
@@ -911,28 +933,6 @@ export default function RSSManager() {
         : a
     ));
   }
-
-  // ── Filtered / grouped sources ───────────────────────────────────────────────
-  const filteredSources = useMemo(() => {
-    const q = sourceSearch.toLowerCase();
-    let list = q
-      ? sources.filter((s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.url.toLowerCase().includes(q) ||
-          (TAG_MAP[s.category] ?? s.category).toLowerCase().includes(q)
-        )
-      : [...sources];
-    if (statusFilter === "Ativo")   list = list.filter((s) => s.active);
-    if (statusFilter === "Pausado") list = list.filter((s) => !s.active);
-    if (categoryFilter !== "Todas") {
-      const target = categoryFilter.toLowerCase();
-      list = list.filter((s) =>
-        (TAG_MAP[s.category] ?? s.category).toLowerCase() === target ||
-        s.category.toLowerCase() === target,
-      );
-    }
-    return list;
-  }, [sources, sourceSearch, statusFilter, categoryFilter]);
 
   function srcInitials(name: string): string {
     const words = name.replace(/[^a-zA-ZÀ-ÿ\s]/g, "").trim().split(/\s+/);
