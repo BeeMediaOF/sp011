@@ -133,6 +133,109 @@ async function apiFetch(path: string, opts?: RequestInit) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ACCOUNT MODAL — simplified: Name + App ID + App Secret as primary fields
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function AccountModal({
+  editingAccount,
+  setEditingAccount,
+  accountSaving,
+  onSave,
+  onClose,
+}: {
+  editingAccount: Partial<SocialAccount & { accessToken: string }>;
+  setEditingAccount: React.Dispatch<React.SetStateAction<Partial<SocialAccount & { accessToken: string }> | null>>;
+  accountSaving: boolean;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const [showAdvanced, setShowAdvanced] = React.useState(
+    !!(editingAccount.pageId || editingAccount.instagramId || editingAccount.accessToken)
+  );
+
+  const Field = ({ fieldKey, label, placeholder, pw = false }: { fieldKey: string; label: string; placeholder: string; pw?: boolean }) => (
+    <div>
+      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{label}</label>
+      <input
+        type={pw ? "password" : "text"}
+        value={(editingAccount[fieldKey as keyof typeof editingAccount] as string) ?? ""}
+        onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, [fieldKey]: e.target.value } : prev)}
+        placeholder={placeholder}
+        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50"
+      />
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-800">
+            {editingAccount.id ? "Editar Conta" : "Adicionar Conta Meta"}
+          </h3>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* ── Campos principais ── */}
+          <Field fieldKey="name" label="Nome da conta *" placeholder="Ex: SBC Agora" />
+          <Field fieldKey="metaAppId" label="ID do Aplicativo Meta" placeholder="123456789012345" />
+          <Field fieldKey="metaAppSecret" label="Chave Secreta do App" placeholder="••••••••••••••••" pw />
+
+          {/* ── Avançado ── */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#0B2A66] hover:underline"
+            >
+              {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              {showAdvanced ? "Ocultar campos avançados" : "Configuração avançada (Page ID, Instagram, Token)"}
+            </button>
+          </div>
+
+          {showAdvanced && (
+            <div className="space-y-4 border-t border-slate-100 pt-4">
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Preencha o <strong>Page Access Token</strong> com um token de longa duração obtido no Meta Business Suite
+                ou pelo fluxo OAuth. O Page ID e o Instagram ID são preenchidos automaticamente ao testar a conexão.
+              </p>
+              <Field fieldKey="accessToken" label="Page Access Token (long-lived)" placeholder="EAABxx…" pw />
+              <Field fieldKey="pageId" label="Facebook Page ID" placeholder="123456789012345" />
+              <Field fieldKey="pageName" label="Nome da Página (opcional)" placeholder="SBC Agora" />
+              <Field fieldKey="instagramId" label="Instagram Business Account ID" placeholder="123456789012345" />
+              <Field fieldKey="instagramName" label="Nome do Instagram (opcional)" placeholder="@sbcagora" />
+            </div>
+          )}
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={editingAccount.isActive ?? true}
+              onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)} />
+            <span className="text-sm text-slate-700">Conta ativa</span>
+          </label>
+        </div>
+
+        <div className="flex gap-2 p-6 pt-0">
+          <button onClick={onSave} disabled={accountSaving || !editingAccount.name}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+            style={{ background: PRIMARY }}>
+            {accountSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {accountSaving ? "Salvando…" : "Salvar"}
+          </button>
+          <button onClick={onClose}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -165,6 +268,7 @@ export default function SocialMedia() {
   const [showQueueModal, setShowQueueModal] = useState(false);
   const [articles,       setArticles]       = useState<ArticleOption[]>([]);
   const [processing,     setProcessing]     = useState(false);
+  const [articleSearch,  setArticleSearch]  = useState("");
   const [queueForm, setQueueForm] = useState({
     articleId: "",
     accountIds: [] as string[],
@@ -334,11 +438,12 @@ export default function SocialMedia() {
 
   async function openQueueModal() {
     try {
-      const data = (await fetch("/api/articles?limit=100").then((r) => r.json())) as { articles?: ArticleOption[] } | ArticleOption[];
+      const data = (await fetch("/api/articles?limit=200&status=published").then((r) => r.json())) as { articles?: ArticleOption[] } | ArticleOption[];
       const list = Array.isArray(data) ? data : (data.articles ?? []);
       setArticles(list as ArticleOption[]);
     } catch { setArticles([]); }
     setQueueForm({ articleId: "", accountIds: [], templateFeedId: templates[0]?.id ?? "", templateStoryId: "", caption: "", types: ["feed"], scheduledAt: "" });
+    setArticleSearch("");
     setShowQueueModal(true);
   }
 
@@ -889,57 +994,13 @@ export default function SocialMedia() {
 
       {/* ══════════ MODAL — Conta ══════════════════════════════════════════ */}
       {showAccountModal && editingAccount && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">{editingAccount.id ? "Editar Conta" : "Adicionar Conta Meta"}</h3>
-              <button onClick={() => { setShowAccountModal(false); setEditingAccount(null); }}
-                className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              {[
-                { key: "name",          label: "Nome da conta *",                    placeholder: "Ex: SBC Agora Instagram",     pw: false },
-                { key: "pageId",        label: "Facebook Page ID",                   placeholder: "123456789012345",             pw: false },
-                { key: "pageName",      label: "Nome da Página (opcional)",          placeholder: "SBC Agora",                   pw: false },
-                { key: "instagramId",   label: "Instagram Business Account ID",      placeholder: "123456789012345",             pw: false },
-                { key: "instagramName", label: "Nome do Instagram (opcional)",        placeholder: "@sbcagora",                  pw: false },
-                { key: "metaAppId",     label: "Meta App ID",                        placeholder: "123456789",                   pw: false },
-                { key: "metaAppSecret", label: "Meta App Secret",                    placeholder: "••••••••",                    pw: true  },
-                { key: "accessToken",   label: "Page Access Token (long-lived)",     placeholder: "EAABxx…",                     pw: true  },
-              ].map(({ key, label, placeholder, pw }) => (
-                <div key={key}>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{label}</label>
-                  <input
-                    type={pw ? "password" : "text"}
-                    value={(editingAccount[key as keyof typeof editingAccount] as string) ?? ""}
-                    onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, [key]: e.target.value } : prev)}
-                    placeholder={placeholder}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50"
-                  />
-                </div>
-              ))}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={editingAccount.isActive ?? true}
-                  onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)} />
-                <span className="text-sm text-slate-700">Conta ativa</span>
-              </label>
-            </div>
-            <div className="flex gap-2 p-6 pt-0">
-              <button onClick={() => { void saveAccount(); }} disabled={accountSaving}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
-                style={{ background: PRIMARY }}>
-                {accountSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {accountSaving ? "Salvando…" : "Salvar"}
-              </button>
-              <button onClick={() => { setShowAccountModal(false); setEditingAccount(null); }}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+        <AccountModal
+          editingAccount={editingAccount}
+          setEditingAccount={setEditingAccount}
+          accountSaving={accountSaving}
+          onSave={() => { void saveAccount(); }}
+          onClose={() => { setShowAccountModal(false); setEditingAccount(null); }}
+        />
       )}
 
       {/* ══════════ MODAL — Adicionar à fila ═══════════════════════════════ */}
@@ -956,12 +1017,43 @@ export default function SocialMedia() {
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Artigo *</label>
-                <select value={queueForm.articleId}
-                  onChange={(e) => setQueueForm((f) => ({ ...f, articleId: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
-                  <option value="">— Selecionar artigo —</option>
-                  {articles.map((a) => <option key={a.id} value={a.id}>{a.title}</option>)}
-                </select>
+                <input
+                  type="text"
+                  value={articleSearch}
+                  onChange={(e) => setArticleSearch(e.target.value)}
+                  placeholder="Buscar por título ou editoria…"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50 mb-2"
+                />
+                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-52 overflow-y-auto bg-slate-50">
+                  {articles.length === 0 && (
+                    <p className="text-sm text-slate-400 p-3 text-center">Nenhum artigo publicado encontrado.</p>
+                  )}
+                  {articles
+                    .filter((a) => {
+                      const q = articleSearch.toLowerCase();
+                      return !q || a.title.toLowerCase().includes(q) || (a.category ?? "").toLowerCase().includes(q);
+                    })
+                    .map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setQueueForm((f) => ({ ...f, articleId: a.id }))}
+                        className={`w-full text-left px-3 py-2.5 flex items-start gap-2 border-b border-slate-100 last:border-0 hover:bg-white transition-colors ${queueForm.articleId === a.id ? "bg-blue-50 border-l-2 border-l-[#0B2A66]" : ""}`}
+                      >
+                        {a.imageUrl && (
+                          <img src={a.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover shrink-0 mt-0.5" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate leading-tight">{a.title}</p>
+                          {a.category && <p className="text-[11px] text-slate-400 mt-0.5">{a.category}</p>}
+                        </div>
+                        {queueForm.articleId === a.id && (
+                          <CheckCircle size={14} className="text-[#0B2A66] shrink-0 mt-1" />
+                        )}
+                      </button>
+                    ))
+                  }
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Contas *</label>
