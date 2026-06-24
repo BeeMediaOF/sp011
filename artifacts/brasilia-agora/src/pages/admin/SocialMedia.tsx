@@ -116,11 +116,18 @@ function fmtDate(iso?: string | null): string {
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem("admin_token");
+  return {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
+
 async function apiFetch(path: string, opts?: RequestInit) {
   const res = await fetch(`/api/admin/social${path}`, {
     ...opts,
-    headers: { "Content-Type": "application/json", ...(opts?.headers ?? {}) },
-    credentials: "include",
+    headers: { ...getAuthHeaders(), ...(opts?.headers ?? {}) },
   });
   return res.json() as Promise<unknown>;
 }
