@@ -51,6 +51,7 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 function resolveContent(content: string, article: ArticleData): string {
   return content
     .replace(/\{\{title\}\}/gi, article.title)
+    .replace(/\{\{CATEGORY\}\}/g, article.category.toUpperCase())
     .replace(/\{\{category\}\}/gi, article.category)
     .replace(/\{\{cta\}\}/gi, content.includes("{{cta}}") ? content.replace(/\{\{cta\}\}/gi, "") : content);
 }
@@ -160,7 +161,8 @@ export async function generateArt(template: SocialTemplate, article: ArticleData
         });
       } else {
         const text = resolveContent(el.content || "", article);
-        if (!text.trim()) continue;
+        const hasBg = el.backgroundColor && el.backgroundColor !== "transparent" && el.backgroundColor !== "rgba(0,0,0,0)";
+        if (!text.trim() && !hasBg) continue;
         const svg = buildTextSvg(el, text, width, height);
         composites.push({ input: Buffer.from(svg), top: 0, left: 0, blend: "over" });
       }
