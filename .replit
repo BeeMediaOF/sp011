@@ -36,3 +36,6 @@ externalPort = 3001
 [userenv.shared]
 VAPID_PUBLIC_KEY = "BO72XOWGirKIypx3ZJmaNm8bidiYnmxBIDRAOx5D2YpAnyLsrsTXbSU-Ba-FiDHtSza2py0ctbVDKydgOqPO6gA"
 VAPID_PRIVATE_KEY = "cDqav1yCCZA6b_eQsUoc-dMPysEWJhyYuN5mhpCddxQ"
+
+[nix]
+channel = "stable-25_05"
