@@ -279,7 +279,7 @@ function parseRewriteResult(raw: string): RewriteResult {
 
 // ─── AI Quota Manager ─────────────────────────────────────────────────────────
 
-const DEFAULT_DAILY_LIMIT = 200; // Gemini free tier: 1500 RPD; 200 = safe daily budget
+const DEFAULT_DAILY_LIMIT = 500; // 3 keys × 1500 RPD free tier; 500 = ~167/key/day, well within limits
 const MIN_CALL_INTERVAL_MS = 3_000; // 3 s between successive AI calls
 
 interface QuotaState {
