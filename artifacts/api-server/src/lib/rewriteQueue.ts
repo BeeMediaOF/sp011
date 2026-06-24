@@ -23,16 +23,20 @@ import {
 import { logger } from "./logger.js";
 
 // ── Timing constants ─────────────────────────────────────────────────────────
-// Gemini 2.5 Flash free tier: 10 RPM per project (keys share the limit).
-// 7 s interval = ~8.5 RPM — safely under the 10 RPM cap even with 1 parallel worker.
+// Gemini 2.5 Flash free tier: 10 RPM per key.
+// With N keys each getting 1 request per batch, interval must be > 6 s (60s / 10 RPM).
+// 7 s gives ~8.5 RPM per key — safely under the cap.
 const PROCESS_INTERVAL_MS = 7_000;
+// Within each batch, stagger requests by this many ms so all keys don't fire simultaneously.
+// 9 keys × 700 ms = 6.3 s spread — distributes load evenly across the interval.
+const STAGGER_MS = 700;
 // Sweep for new unprocessed drafts every 5 minutes
 const SWEEP_INTERVAL_MS = 5 * 60_000;
 // Maximum content/network error retries before permanently dropping an article.
 // NOTE: quota errors do NOT consume this counter — they retry indefinitely.
 const MAX_ATTEMPTS = 3;
-// Maximum parallel workers. Keep at 2 to avoid burst-throttling all keys at once.
-const MAX_CONCURRENCY = 2;
+// Maximum parallel workers = max number of configured Gemini keys (currently 9).
+const MAX_CONCURRENCY = 9;
 
 // ── History entry ─────────────────────────────────────────────────────────────
 export interface HistoryEntry {
@@ -232,8 +236,12 @@ async function processBatch(): Promise<void> {
     "Rewrite queue: starting parallel batch",
   );
 
-  // Process all items in the batch simultaneously — each uses a different Gemini key
-  await Promise.allSettled(batch.map((item) => processItem(item)));
+  // Process items in parallel but stagger start times so all keys don't fire at once.
+  // e.g. 9 keys × 700 ms = item[0] at t=0, item[1] at t=700ms … item[8] at t=5.6s
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+  await Promise.allSettled(
+    batch.map((item, i) => sleep(i * STAGGER_MS).then(() => processItem(item))),
+  );
 }
 
 // ── Startup ───────────────────────────────────────────────────────────────────
