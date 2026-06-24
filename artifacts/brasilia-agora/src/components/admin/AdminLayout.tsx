@@ -9,7 +9,7 @@ import {
   Camera, Pencil, Moon, Sun, Share2,
 } from "lucide-react";
 import logoFallback from "../../assets/images/logo_sbc_negativo.png";
-import { getStoredUser, setStoredUser, clearAuth } from "../../pages/Admin";
+import { getStoredUser, setStoredUser, clearAuth, getStoredRole } from "../../pages/Admin";
 import { adminApi } from "../../lib/adminApi";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { getAdminDarkMode, setAdminDarkMode } from "../../lib/adminDarkMode";
@@ -422,7 +422,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
   const [location, navigate] = useLocation();
   const { accent, logo } = usePanelTheme();
   const user = getStoredUser();
-  const role = user?.role ?? "editor";
+  const role = user?.role || getStoredRole() || "editor";
 
   function toggleDark() {
     setIsDark((d) => {
