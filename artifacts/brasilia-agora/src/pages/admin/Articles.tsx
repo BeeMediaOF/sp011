@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
 import {
@@ -88,6 +88,9 @@ export default function Articles() {
   const [repairLoading, setRepairLoading] = useState(false);
   const [repairResult, setRepairResult]   = useState<{ fixed: number; total: number } | null>(null);
 
+  const sessionBaselineRef = useRef<{ processedTotal: number; initialPending: number } | null>(null);
+  const [sessionProgress, setSessionProgress] = useState<{ done: number; total: number; finished: boolean } | null>(null);
+
   const load = useCallback(() => {
     setLoading(true);
     adminApi.getArticles()
@@ -101,14 +104,31 @@ export default function Articles() {
       const res = await fetch(`${BASE}api/admin/queue/status`, {
         headers: { Authorization: `Bearer ${token()}` },
       });
-      if (res.ok) setQueueStatus(await res.json() as QueueStatus);
+      if (!res.ok) return;
+      const data = await res.json() as QueueStatus;
+      setQueueStatus(data);
+
+      const isActive = data.pending > 0 || data.quota.isOnCooldown;
+      if (isActive) {
+        if (!sessionBaselineRef.current) {
+          sessionBaselineRef.current = { processedTotal: data.processedTotal, initialPending: data.pending };
+        }
+        const done  = data.processedTotal - sessionBaselineRef.current.processedTotal;
+        const total = sessionBaselineRef.current.initialPending;
+        setSessionProgress({ done, total, finished: false });
+      } else if (sessionBaselineRef.current) {
+        const done  = data.processedTotal - sessionBaselineRef.current.processedTotal;
+        const total = sessionBaselineRef.current.initialPending;
+        setSessionProgress({ done, total, finished: true });
+        setTimeout(() => { sessionBaselineRef.current = null; setSessionProgress(null); }, 20_000);
+      }
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
     load();
     void loadQueue();
-    const iv = setInterval(() => { void loadQueue(); }, 6_000);
+    const iv = setInterval(() => { void loadQueue(); }, 4_000);
     return () => clearInterval(iv);
   }, [load, loadQueue]);
 
@@ -308,8 +328,38 @@ export default function Articles() {
           </div>
 
           {/* Row 2: queue monitor — only when queue has activity */}
-          {queueStatus && (queueStatus.pending > 0 || queueStatus.currentItem || queueStatus.quota.isOnCooldown || queueStatus.recentHistory.length > 0) && (
+          {queueStatus && (sessionProgress || queueStatus.pending > 0 || queueStatus.currentItem || queueStatus.quota.isOnCooldown || queueStatus.recentHistory.length > 0) && (
             <div className="border-t border-slate-100 pt-3 space-y-2">
+
+              {/* Session progress bar */}
+              {sessionProgress && sessionProgress.total > 0 && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold text-purple-700 flex items-center gap-1.5">
+                      {sessionProgress.finished
+                        ? <CheckCircle2 size={11} className="text-green-500" />
+                        : <Loader2 size={11} className="animate-spin" />
+                      }
+                      {sessionProgress.finished ? "Sessão concluída" : "Reescrevendo com IA"}
+                    </span>
+                    <span className="text-[11px] font-bold text-purple-700">
+                      {sessionProgress.done} / {sessionProgress.total} artigos
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${sessionProgress.finished ? "bg-green-500" : "bg-gradient-to-r from-purple-500 to-purple-400"}`}
+                      style={{ width: `${Math.min(100, sessionProgress.total > 0 ? Math.round((sessionProgress.done / sessionProgress.total) * 100) : 0)}%` }}
+                    />
+                  </div>
+                  {!sessionProgress.finished && queueStatus.pending > 0 && (
+                    <div className="flex justify-between text-[10px] text-slate-400">
+                      <span>{queueStatus.pending} restantes na fila</span>
+                      <span>~{Math.max(1, Math.ceil(queueStatus.pending * 7 / 9 / 60))} min</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Currently processing */}
               {queueStatus.currentItem && (
@@ -333,16 +383,6 @@ export default function Articles() {
                   <p className="text-[11px] text-red-600 font-semibold">
                     Cooldown Gemini — aguardando {queueStatus.quota.cooldownSecs}s para retomar
                   </p>
-                </div>
-              )}
-
-              {/* Queue size + timing */}
-              {queueStatus.pending > 0 && !queueStatus.quota.isOnCooldown && !queueStatus.currentItem && (
-                <div className="flex items-center gap-2 text-[11px] text-amber-700">
-                  <Clock size={12} className="shrink-0" />
-                  <span>
-                    {queueStatus.pending} na fila · próximo em ~8s · ~{Math.ceil(queueStatus.pending * 8 / 60)} min no total
-                  </span>
                 </div>
               )}
 
