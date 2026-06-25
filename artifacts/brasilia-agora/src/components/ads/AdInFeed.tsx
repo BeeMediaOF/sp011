@@ -35,7 +35,7 @@ export default function AdInFeed({ className = "" }: AdInFeedProps) {
           onClick={() => trackClick(ad.id)}
           className="block h-full min-h-[200px] rounded-xl border border-gray-100 overflow-hidden group relative"
         >
-          <img src={ad.imageBase64} alt="Publicidade" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+          <img src={ad.imageUrl} alt="Publicidade" width={480} height={200} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
         </a>
       )}
     </div>

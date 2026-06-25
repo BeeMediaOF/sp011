@@ -29,7 +29,7 @@ export default function AdSlot({ size = "sm", className = "", sticky = false, ch
         onClick={() => trackClick(ad.id)}
         className={`block ${SIZE_STYLES[size]} rounded-lg border border-gray-100 overflow-hidden group relative`}
       >
-        <img src={ad.imageBase64} alt="Publicidade" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+        <img src={ad.imageUrl} alt="Publicidade" width={728} height={250} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
       </a>
       <p className="text-[8px] text-gray-300 mt-1 tracking-wider uppercase">Publicidade</p>
       {children}

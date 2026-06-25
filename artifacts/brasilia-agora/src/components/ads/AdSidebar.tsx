@@ -32,7 +32,7 @@ export default function AdSidebar({ className = "" }: AdSidebarProps) {
             onClick={() => trackClick(ad.id)}
             className="block w-36 h-[600px] rounded-xl border border-gray-100 overflow-hidden group relative"
           >
-            <img src={ad.imageBase64} alt="Publicidade" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
+            <img src={ad.imageUrl} alt="Publicidade" width={144} height={600} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform" />
           </a>
         )}
         <p className="text-[8px] text-gray-300 mt-1 text-center tracking-wider uppercase">Publicidade</p>

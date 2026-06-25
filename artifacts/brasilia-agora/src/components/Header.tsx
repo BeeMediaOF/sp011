@@ -164,17 +164,18 @@ export default function Header() {
               {searchOpen ? (
                 <>
                   <input autoFocus type="text" placeholder="Pesquisar..."
+                    aria-label="Pesquisar no site"
                     value={searchQuery}
                     onChange={(e) => setSearchQ(e.target.value)}
                     onKeyDown={handleSearchKey}
                     className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
                   />
-                  <button onClick={() => { setSearch(false); setSearchQ(""); }} className="text-gray-400 hover:text-gray-800 p-1">
+                  <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
                     <X size={14} />
                   </button>
                 </>
               ) : (
-                <button onClick={() => setSearch(true)} className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
+                <button onClick={() => setSearch(true)} aria-label="Abrir busca" className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
                   <Search size={15} />
                 </button>
               )}
@@ -226,6 +227,7 @@ export default function Header() {
 
             <button
               onClick={() => setSearch(v => !v)}
+              aria-label={searchOpen ? "Fechar busca" : "Abrir busca"}
               className="absolute right-4 text-gray-500 hover:text-gray-900 p-1.5 rounded"
             >
               <Search size={17} />
@@ -249,12 +251,13 @@ export default function Header() {
           {searchOpen && (
             <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
               <input autoFocus type="text" placeholder="Pesquisar..."
+                aria-label="Pesquisar no site"
                 value={searchQuery}
                 onChange={(e) => setSearchQ(e.target.value)}
                 onKeyDown={handleSearchKey}
                 className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
               />
-              <button onClick={() => { setSearch(false); setSearchQ(""); }} className="text-gray-400 hover:text-gray-800 p-1">
+              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
                 <X size={16} />
               </button>
             </div>
@@ -327,6 +330,7 @@ export default function Header() {
                   autoFocus
                   type="text"
                   placeholder="Pesquisar..."
+                  aria-label="Pesquisar no site"
                   value={searchQuery}
                   onChange={(e) => setSearchQ(e.target.value)}
                   onKeyDown={handleSearchKey}
@@ -334,6 +338,7 @@ export default function Header() {
                 />
                 <button
                   onClick={() => { setSearch(false); setSearchQ(""); }}
+                  aria-label="Fechar busca"
                   className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
                 >
                   <X size={15} />
@@ -342,6 +347,7 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => setSearch(true)}
+                aria-label="Abrir busca"
                 className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
               >
                 <Search size={17} />

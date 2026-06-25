@@ -27,8 +27,12 @@ export default function AdCentral() {
         className="block rounded-lg border border-gray-100 overflow-hidden group"
       >
         <img
-          src={ad.imageBase64}
+          src={ad.imageUrl}
           alt="Publicidade"
+          width={728}
+          height={264}
+          loading="lazy"
+          decoding="async"
           className="block max-w-full h-auto group-hover:scale-[1.02] transition-transform"
         />
       </a>

@@ -13,9 +13,14 @@ interface Props {
    * Use 0 se não quiser reservar espaço para este slot.
    */
   skeletonHeight?: number;
+  /**
+   * Se true, imagem carrega eager + fetchpriority=high (usar apenas no
+   * primeiro banner acima da dobra para melhorar LCP).
+   */
+  priority?: boolean;
 }
 
-export default function AdBanner({ slot, interval = 5000, skeletonHeight = 90 }: Props) {
+export default function AdBanner({ slot, interval = 5000, skeletonHeight = 90, priority = false }: Props) {
   const { getSlotAll, loading } = useAds();
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
@@ -98,9 +103,14 @@ export default function AdBanner({ slot, interval = 5000, skeletonHeight = 90 }:
           style={{ opacity: fading ? 0 : 1, transition: "opacity 0.22s ease" }}
         >
           <img
-            src={ad.imageBase64}
+            src={ad.imageUrl}
             alt="Publicidade"
             className="block max-w-full h-auto w-full object-cover"
+            width={728}
+            height={90}
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
+            decoding={priority ? "sync" : "async"}
           />
         </a>
 

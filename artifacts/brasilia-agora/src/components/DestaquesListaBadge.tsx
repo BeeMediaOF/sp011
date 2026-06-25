@@ -98,7 +98,7 @@ function AdSidebarInline() {
           onClick={() => trackClick(ad.id)}
           className="block w-full h-[280px] rounded border border-gray-100 overflow-hidden"
         >
-          <img src={ad.imageBase64} alt="Publicidade" className="w-full h-full object-cover" />
+          <img src={ad.imageUrl} alt="Publicidade" width={300} height={280} loading="lazy" decoding="async" className="w-full h-full object-cover" />
         </a>
       )}
     </div>

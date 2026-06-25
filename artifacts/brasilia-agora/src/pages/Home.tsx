@@ -520,7 +520,7 @@ export default function Home() {
         {visibleBlocks.map((block, idx) => {
           const content = (
             <>
-              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" skeletonHeight={90} /></div>}
+              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" skeletonHeight={90} priority /></div>}
               {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" skeletonHeight={90} /></div>}
               {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" skeletonHeight={90} /></div>}
               {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" skeletonHeight={90} /></div>}

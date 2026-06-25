@@ -4,7 +4,7 @@ export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05
 
 export interface AdItem {
   id: string;
-  imageBase64: string;
+  imageUrl: string;
   link: string;
   position: string;
 }
