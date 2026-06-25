@@ -4,6 +4,7 @@ import { seedAdminUser } from "./lib/seed.js";
 import { initStore, seedDefaultRssSources } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
+import { migrateJsonContent } from "./lib/migrateJsonContent.js";
 import { db, articlesTable } from "@workspace/db";
 import { desc, isNotNull } from "drizzle-orm";
 import { warmImageCache } from "./routes/image.js";
@@ -40,6 +41,15 @@ app.listen(port, async (err) => {
     }
   } catch (migrateErr) {
     logger.warn({ err: migrateErr }, "Article migration skipped or failed");
+  }
+
+  // Repair any articles whose content is a raw JSON blob or code-fenced JSON.
+  // Idempotent: reads all articles, detects zero candidates on a clean DB,
+  // and returns immediately without any writes. Safe to run on every boot.
+  try {
+    await migrateJsonContent();
+  } catch (jsonMigrateErr) {
+    logger.warn({ err: jsonMigrateErr }, "JSON-content migration failed (non-fatal)");
   }
 
   // Start social media publication queue cron (every 5 min)
