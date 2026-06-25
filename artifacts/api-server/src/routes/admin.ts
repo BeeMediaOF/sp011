@@ -540,6 +540,56 @@ router.post("/articles/repair-content", async (_req, res) => {
   res.json({ fixed, skipped, total: articles.length });
 });
 
+/**
+ * POST /api/admin/articles/delete-invalid
+ * Apaga todos os artigos cujo conteúdo é ilegível (JSON malformado que não pode ser extraído,
+ * conteúdo vazio, ou apenas metadados sem texto real). Útil para limpar o banco de artigos
+ * que o pipeline de reescrita não conseguiu processar corretamente.
+ */
+router.post("/articles/delete-invalid", authMiddleware, async (req, res) => {
+  /**
+   * Returns true for articles that had the red "Conteúdo com formatação inválida" error.
+   * These are articles where the content looks like JSON but neither a clean JSON parse
+   * nor a regex extraction can recover a readable `content_html` value.
+   * HTML content, plain text, and correctly-formed JSON all return false (keep).
+   */
+  function isContentInvalid(content: string): boolean {
+    if (!content || content.trim().length < 20) return true;
+    const stripped = content.trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
+    // HTML or plain text → fine
+    if (!stripped.startsWith("{") && !stripped.startsWith("[")) return false;
+    // Try clean JSON parse → look for any content-bearing field
+    try {
+      const parsed = JSON.parse(stripped) as Record<string, unknown>;
+      const html = (parsed["content_html"] ?? parsed["contentHtml"] ?? parsed["content"] ?? "") as string;
+      if (html.trim().length > 50) return false;
+    } catch { /* fall through */ }
+    // Regex for content_html (handles truncated JSON)
+    const m = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
+    if (m?.[1]?.replace(/\\n/g, "\n").replace(/\\"/g, '"').trim().length ?? 0 > 50) return false;
+    // JSON-like, nothing extractable → invalid
+    return true;
+  }
+
+  const articles = await articleService.getArticles();
+  let deleted = 0;
+  const ids: string[] = [];
+
+  for (const article of articles) {
+    if (isContentInvalid(article.content ?? "")) {
+      await articleService.deleteArticle(article.id);
+      deleted++;
+      ids.push(article.id);
+    }
+  }
+
+  req.log.info({ deleted, total: articles.length }, "admin: deleted invalid-content articles");
+  res.json({ deleted, total: articles.length, ids });
+});
+
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
 router.post("/bulk-publish", async (_req, res) => {
   const articles = await articleService.getArticles();

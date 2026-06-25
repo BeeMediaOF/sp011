@@ -22,6 +22,39 @@ import {
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
 
+// ── Content quality guard ─────────────────────────────────────────────────────
+/**
+ * Returns true if the content string can be rendered to the reader.
+ * HTML and plain text always pass. JSON-like content is accepted only if
+ * a `content_html` (or similar) field can be extracted from it.
+ */
+function isContentRenderable(content: string): boolean {
+  if (!content || content.trim().length < 20) return false;
+  const stripped = content.trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+  // HTML or plain text → always renderable
+  if (!stripped.startsWith("{") && !stripped.startsWith("[")) return true;
+  // Try clean JSON parse
+  try {
+    const parsed = JSON.parse(stripped) as Record<string, unknown>;
+    const html = (parsed["content_html"] ?? parsed["contentHtml"] ?? parsed["content"] ?? "") as string;
+    if (html.trim()) return true;
+  } catch { /* fall through */ }
+  // Regex for content_html (handles truncated JSON)
+  const m = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
+  if (m?.[1]?.trim()) return true;
+  // Any content-like key with substantial text
+  const anyValue = stripped.match(/"(?:content|html|body|text|rewritten|conteudo)[^"]*"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/i);
+  if ((anyValue?.[1]?.trim().length ?? 0) > 20) return true;
+  // Long prose values anywhere in the JSON
+  const allStrings = [...stripped.matchAll(/"[^"]*"\s*:\s*"((?:[^"\\]|\\[\s\S])*?)"/g)]
+    .map((x) => x[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').trim())
+    .filter((v) => v.length > 60 && !v.startsWith("http"));
+  return allStrings.length > 0;
+}
+
 // ── Timing constants ─────────────────────────────────────────────────────────
 // Gemini 2.5 Flash free tier: 10 RPM per key.
 // With N keys each getting 1 request per batch, interval must be > 6 s (60s / 10 RPM).
@@ -145,6 +178,18 @@ async function processItem(item: RewriteJobItem): Promise<void> {
       item.customPrompt,
     );
 
+    // Verify the rewritten content is actually renderable before publishing.
+    // If the AI returned malformed JSON or empty content, delete the article
+    // instead of publishing something unreadable.
+    if (!isContentRenderable(result.content)) {
+      await articleService.deleteArticle(item.articleId);
+      _failedTotal++;
+      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: "Conteúdo reescrito ilegível — artigo excluído automaticamente" });
+      pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: "unrenderable_content" });
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: deleted article with unrenderable content after rewrite");
+      return;
+    }
+
     await articleService.updateArticle(item.articleId, {
       ...(result.title    && { title:    result.title }),
       ...(result.subtitle && { subtitle: result.subtitle }),
@@ -193,11 +238,17 @@ async function processItem(item: RewriteJobItem): Promise<void> {
         );
       }
     } else {
-      // Real error, max attempts reached: drop permanently
-      logger.warn(
-        { articleId: item.articleId, attempt },
-        `Article permanently dropped after ${MAX_ATTEMPTS} content/network failures`,
-      );
+      // Real error, max attempts reached: delete the article so it never shows as broken
+      try {
+        await articleService.deleteArticle(item.articleId);
+        logger.warn(
+          { articleId: item.articleId, attempt },
+          `Article deleted after ${MAX_ATTEMPTS} failed rewrite attempts`,
+        );
+        addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Artigo excluído após ${MAX_ATTEMPTS} tentativas de reescrita sem sucesso` });
+      } catch (delErr) {
+        logger.warn({ err: delErr, articleId: item.articleId }, "Failed to delete article after max attempts");
+      }
     }
   } finally {
     _activeCount--;
