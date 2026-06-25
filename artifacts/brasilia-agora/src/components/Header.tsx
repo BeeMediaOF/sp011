@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X } from "lucide-react";
@@ -28,10 +28,7 @@ interface QuotesData {
 }
 
 function TickerBar() {
-  const [data, setData]   = useState<QuotesData | null>(null);
-  const railRef           = useRef<HTMLDivElement>(null);
-  const posRef            = useRef(0);
-  const rafRef            = useRef<number>(0);
+  const [data, setData] = useState<QuotesData | null>(null);
 
   useEffect(() => {
     const load = () =>
@@ -41,48 +38,52 @@ function TickerBar() {
     return () => clearInterval(t);
   }, []);
 
-  useEffect(() => {
-    const rail = railRef.current;
-    if (!rail) return;
-    const SPEED = 0.5;
-    const singleW = () => rail.scrollWidth / 3;
-    function step() {
-      posRef.current += SPEED;
-      if (posRef.current >= singleW()) posRef.current -= singleW();
-      rail!.style.transform = `translateX(-${posRef.current}px)`;
-      rafRef.current = requestAnimationFrame(step);
-    }
-    rafRef.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [data]);
-
   const f2 = (v: string) =>
     `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const f0 = (v: string) =>
     `R$ ${parseFloat(v).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
   const items = [
-    { code: "USD",     value: data?.fx?.USDBRL     ? f2(data.fx.USDBRL.bid)         : "—", pct: data?.fx?.USDBRL?.pctChange     ?? "0" },
-    { code: "EUR",     value: data?.fx?.EURBRL     ? f2(data.fx.EURBRL.bid)         : "—", pct: data?.fx?.EURBRL?.pctChange     ?? "0" },
-    { code: "GBP",     value: data?.fx?.GBPBRL     ? f2(data.fx.GBPBRL.bid)         : "—", pct: data?.fx?.GBPBRL?.pctChange     ?? "0" },
-    { code: "BTC",     value: data?.crypto?.BTCBRL ? f0(data.crypto.BTCBRL.bid)     : "—", pct: data?.crypto?.BTCBRL?.pctChange ?? "0" },
-    { code: "ETH",     value: data?.crypto?.ETHBRL ? f0(data.crypto.ETHBRL.bid)     : "—", pct: data?.crypto?.ETHBRL?.pctChange ?? "0" },
+    { code: "USD", value: data?.fx?.USDBRL     ? f2(data.fx.USDBRL.bid)     : "—", pct: data?.fx?.USDBRL?.pctChange     ?? "0" },
+    { code: "EUR", value: data?.fx?.EURBRL     ? f2(data.fx.EURBRL.bid)     : "—", pct: data?.fx?.EURBRL?.pctChange     ?? "0" },
+    { code: "GBP", value: data?.fx?.GBPBRL     ? f2(data.fx.GBPBRL.bid)     : "—", pct: data?.fx?.GBPBRL?.pctChange     ?? "0" },
+    { code: "BTC", value: data?.crypto?.BTCBRL ? f0(data.crypto.BTCBRL.bid) : "—", pct: data?.crypto?.BTCBRL?.pctChange ?? "0" },
+    { code: "ETH", value: data?.crypto?.ETHBRL ? f0(data.crypto.ETHBRL.bid) : "—", pct: data?.crypto?.ETHBRL?.pctChange ?? "0" },
   ];
 
+  /* Triplicamos para que o loop CSS pareça infinito */
   const track = [...items, ...items, ...items];
 
   return (
-    <div className="bg-gray-100 border-b border-gray-200 overflow-hidden h-8 flex items-center select-none">
-      <div className="overflow-hidden flex-1">
-        <div ref={railRef} className="flex items-center gap-10 w-max will-change-transform">
+    /*
+     * h-8 fixo → o ticker nunca muda de altura e não causa CLS.
+     * A animação é 100% CSS (@keyframes), sem leitura de scrollWidth em JS.
+     * Elimina o "reflow forçado" que o Lighthouse apontava no RAF anterior.
+     */
+    <div
+      className="bg-gray-100 border-b border-gray-200 overflow-hidden select-none"
+      style={{ height: 32 }}
+      aria-hidden="true"
+    >
+      <style>{`
+        @keyframes ticker-scroll {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-33.333%); }
+        }
+      `}</style>
+      <div className="overflow-hidden h-full flex items-center">
+        <div
+          className="flex items-center gap-10 w-max"
+          style={{ animation: "ticker-scroll 30s linear infinite" }}
+        >
           {track.map(({ code, value, pct }, i) => {
             const val = parseFloat(pct);
             const up  = val >= 0;
             return (
               <span key={i} className="flex items-center gap-1.5 shrink-0 text-[11px]">
-                <span className="font-bold text-gray-400 uppercase tracking-wider">{code}</span>
+                <span className="font-bold text-gray-600 uppercase tracking-wider">{code}</span>
                 <span className="text-gray-800 font-medium">{value}</span>
-                <span className="font-bold" style={{ color: up ? "#16a34a" : "#dc2626" }}>
+                <span className="font-bold" style={{ color: up ? "#15803d" : "#dc2626" }}>
                   {up ? "▲" : "▼"} {Math.abs(val).toFixed(2)}%
                 </span>
               </span>

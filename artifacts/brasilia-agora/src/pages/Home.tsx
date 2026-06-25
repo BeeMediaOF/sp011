@@ -1,4 +1,4 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import HeroSection from "../components/HeroSection";
@@ -12,10 +12,13 @@ import SectionBlockManchete from "../components/SectionBlockManchete";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
 import AdBanner from "../components/ads/AdBanner";
-import ColumnistsSection from "../components/ColumnistsSection";
 import { useArticles } from "../hooks/useArticles";
+
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
+
+/* Lazy: ColumnistsSection não é crítico para LCP — carregado sob demanda */
+const ColumnistsSection = lazy(() => import("../components/ColumnistsSection"));
 
 // ─── Colors per section ───────────────────────────────────────────────────────
 const EDITORIA_COLORS: Record<string, string> = {
@@ -311,7 +314,7 @@ function PredefinedBlock({ block, getArticles }: {
   // Special fixed blocks (no category makes sense)
   if (block.id === "hero")       return <HeroSection />;
   if (block.id === "mais-lidas") return <MostRead />;
-  if (block.id === "colunistas") return <ColumnistsSection limit={4} />;
+  if (block.id === "colunistas") return <Suspense fallback={null}><ColumnistsSection limit={4} /></Suspense>;
   if (block.id === "ultimas")    return <DestaquesListaBadge />;
 
   // All other predefined blocks are fully configurable

@@ -34,7 +34,7 @@ export default function Footer() {
     return (
       <footer className="border-t border-gray-200 py-4"
         style={{ backgroundColor: bgColor ?? "#f3f4f6" }}>
-        <div className="max-w-[1280px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+        <div className="max-w-[1280px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
           <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
           <div className="flex items-center gap-4">
             {NAV_LINKS.slice(0, 5).map(({ href, label }) => (
@@ -63,7 +63,7 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
               <img src={logoColorImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
-              <p className="text-gray-500 text-xs leading-relaxed max-w-[280px]">
+              <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">
                 Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
               </p>
             </div>
@@ -80,7 +80,7 @@ export default function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
             <div>
               <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">Seções</h3>
-              <ul className="flex flex-col gap-1.5 text-xs text-gray-500">
+              <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
                 {NAV_LINKS.map(({ href, label }) => (
                   <li key={href}><Link href={href} className="hover:text-gray-900 transition-colors">{label}</Link></li>
                 ))}
@@ -89,7 +89,7 @@ export default function Footer() {
 
             <div>
               <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">Institucional</h3>
-              <ul className="flex flex-col gap-1.5 text-xs text-gray-500">
+              <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
                 <li><Link href="/contato" className="hover:text-gray-900 transition-colors">Sobre nós</Link></li>
                 <li><Link href="/contato" className="hover:text-gray-900 transition-colors">Fale Conosco</Link></li>
                 <li><Link href="/contato" className="hover:text-gray-900 transition-colors">Anuncie</Link></li>
@@ -100,11 +100,11 @@ export default function Footer() {
 
             <div className="col-span-2">
               <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">Contato &amp; Newsletter</h3>
-              <div className="text-gray-500 text-xs space-y-1 mb-4">
+              <div className="text-gray-600 text-xs space-y-1 mb-4">
                 <p className="text-gray-800 font-bold">(61) 99888-0000</p>
                 <p>contato@sbcagora.com.br</p>
               </div>
-              <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-400">Receba nossas notícias</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-600">Receba nossas notícias</p>
               <div className="flex max-w-[320px]">
                 <input type="email" placeholder="Seu e-mail"
                   className="flex-1 bg-white border border-gray-300 text-gray-800 placeholder-gray-400 px-3 py-2 text-xs focus:outline-none focus:border-[#c8102e]"
@@ -116,14 +116,14 @@ export default function Footer() {
             </div>
           </div>
 
-          <div className="border-t border-gray-200 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-400">
+          <div className="border-t border-gray-200 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-600">
             <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
             <div className="flex gap-3">
-              <Link href="/privacidade" className="hover:text-gray-700 transition-colors">Privacidade</Link>
-              <span className="text-gray-300">|</span>
-              <Link href="/termos" className="hover:text-gray-700 transition-colors">Termos</Link>
-              <span className="text-gray-300">|</span>
-              <Link href="/contato" className="hover:text-gray-700 transition-colors">Contato</Link>
+              <Link href="/privacidade" className="hover:text-gray-900 transition-colors">Privacidade</Link>
+              <span className="text-gray-400">|</span>
+              <Link href="/termos" className="hover:text-gray-900 transition-colors">Termos</Link>
+              <span className="text-gray-400">|</span>
+              <Link href="/contato" className="hover:text-gray-900 transition-colors">Contato</Link>
             </div>
           </div>
         </div>
@@ -140,7 +140,7 @@ export default function Footer() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
             <img src={logoImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
-            <p className="text-gray-500 text-xs leading-relaxed max-w-[280px]">
+            <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">
               Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
             </p>
           </div>
@@ -182,9 +182,10 @@ export default function Footer() {
               <p className="text-white font-bold">(61) 99888-0000</p>
               <p>contato@sbcagora.com.br</p>
             </div>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-500">Receba nossas notícias</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-400">Receba nossas notícias</p>
             <div className="flex max-w-[320px]">
               <input type="email" placeholder="Seu e-mail"
+                aria-label="Seu e-mail para newsletter"
                 className="flex-1 bg-white/10 border border-white/20 text-white placeholder-white/40 px-3 py-2 text-xs focus:outline-none focus:border-[#c8102e]"
               />
               <button className="text-black text-xs font-bold px-4 py-2 hover:bg-yellow-400 transition-colors bg-[#ffd300]">OK</button>
@@ -192,7 +193,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-500">
+        <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-400">
           <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
           <div className="flex gap-3">
             <Link href="/privacidade" className="hover:text-white transition-colors">Privacidade</Link>

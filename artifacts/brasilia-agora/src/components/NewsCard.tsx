@@ -49,10 +49,10 @@ export default function NewsCard({ id, slug, title, summary, image, chapeu, chap
       <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#c8102e] transition-colors line-clamp-3"
         dangerouslySetInnerHTML={{ __html: title }}
       />
-      <p className="text-gray-500 text-sm leading-relaxed mt-1.5 line-clamp-2">
+      <p className="text-gray-700 text-sm leading-relaxed mt-1.5 line-clamp-2">
         {summary}
       </p>
-      <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-2">
+      <div className="flex items-center gap-2 text-[11px] text-gray-600 mt-2">
         <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0" loading="lazy" />
         <span className="font-medium text-gray-600">{bylineName}</span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />

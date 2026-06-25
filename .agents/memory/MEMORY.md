@@ -12,3 +12,4 @@
 - [Sistema de publicação social](social-system.md) — sharp+SVG para arte, queue DB-backed com cron 5min, 3 tabs admin (/admin/social), authMiddleware obrigatório, libs devem ser reconstruídas com typecheck:libs após novos schemas
 - [Proxy de imagens /api/image](image-proxy.md) — sharp+LRU+disco; allowlist PROXY_HOSTS deve espelhar ALLOWED_HOSTS; metroimg HMAC cobre path completo (não apenas source URL)
 - [Object Storage GCS — uploads](object-storage-uploads.md) — uploads migrados para GCS via sidecar HTTP (sem npm package); padrão de streaming e fallback para disco local
+- [PageSpeed Rodada 6 — CLS e Acessibilidade](pagespeed-r6.md) — TickerBar: RAF→CSS keyframes; AdBanner: aspectRatio no skeleton E container = CLS 0; contraste gray-600+ no fundo claro, gray-400+ no escuro
