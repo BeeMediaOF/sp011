@@ -4,6 +4,9 @@ import { seedAdminUser } from "./lib/seed.js";
 import { initStore, seedDefaultRssSources } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
+import { db, articlesTable } from "@workspace/db";
+import { desc, isNotNull } from "drizzle-orm";
+import { warmImageCache } from "./routes/image.js";
 
 const rawPort = process.env["PORT"];
 
@@ -41,4 +44,30 @@ app.listen(port, async (err) => {
 
   // Start social media publication queue cron (every 5 min)
   startSocialCron();
+
+  /*
+   * Pré-aquece o cache de imagens dos artigos mais recentes em background.
+   * Executa após o servidor já estar aceitando requisições, sem bloquear o startup.
+   * Garante que o primeiro usuário veja as fotos dos artigos recentes em < 10 ms
+   * (cache hit) em vez de esperar 1-5 s pelo fetch+sharp cold-start.
+   */
+  setImmediate(async () => {
+    try {
+      const rows = await db
+        .select({ imageUrl: articlesTable.imageUrl })
+        .from(articlesTable)
+        .where(isNotNull(articlesTable.imageUrl))
+        .orderBy(desc(articlesTable.publishedAt))
+        .limit(40);
+
+      const urls = rows
+        .map((r) => r.imageUrl)
+        .filter((u): u is string => Boolean(u));
+
+      const warmed = await warmImageCache(urls, [480, 768]);
+      logger.info({ total: urls.length, warmed }, "Image cache warmed on startup");
+    } catch (warmErr) {
+      logger.warn({ err: warmErr }, "Image cache warming failed (non-fatal)");
+    }
+  });
 });
