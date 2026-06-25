@@ -590,6 +590,98 @@ router.post("/articles/delete-invalid", authMiddleware, async (req, res) => {
   res.json({ deleted, total: articles.length, ids });
 });
 
+/**
+ * POST /api/admin/articles/migrate-json-content
+ * Percorre TODOS os artigos e repara aqueles cujo campo `content` é um blob JSON bruto
+ * ou está envolto em cercas de código ```json ... ```.
+ * Extrai title / subtitle / content_html do JSON embutido e grava os valores corretos.
+ * Não chama a IA de novo — apenas re-parseia o que já existe no banco.
+ */
+router.post("/articles/migrate-json-content", authMiddleware, async (req, res) => {
+  function extractFromBlob(raw: string): {
+    content: string; title?: string; subtitle?: string; keywords?: string; slug?: string;
+  } | null {
+    if (!raw || raw.trim().length < 20) return null;
+    // Trim BEFORE the fence-strip regex so a leading \n doesn't break the ^ anchor
+    const stripped = raw.trim()
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```\s*$/, "")
+      .trim();
+    // Plain HTML / prose — not a JSON blob, no repair needed
+    if (!stripped.startsWith("{") && !stripped.startsWith("[")) return null;
+    // Try clean JSON parse
+    try {
+      const parsed = JSON.parse(stripped) as Record<string, unknown>;
+      const content = (
+        (parsed["content_html"] as string | undefined) ??
+        (parsed["contentHtml"]  as string | undefined) ??
+        (parsed["content"]      as string | undefined) ?? ""
+      ).trim();
+      if (content.length > 20) {
+        return {
+          content,
+          title:    ((parsed["title"]    as string | undefined) ?? "").trim() || undefined,
+          subtitle: ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
+          keywords: ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
+          slug:     ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
+        };
+      }
+    } catch { /* try regex */ }
+    // Regex fallback for truncated JSON
+    const mHtml = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/);
+    if (mHtml?.[1]) {
+      const content = mHtml[1]
+        .replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+      if (content.length > 20) {
+        const mTitle = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        const mSub   = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        const mKw    = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        const mSlug  = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        return {
+          content,
+          title:    mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+          subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
+          keywords: mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
+          slug:     mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
+        };
+      }
+    }
+    return null; // unextractable
+  }
+
+  const articles = await articleService.getArticles();
+  let fixed   = 0;
+  let skipped = 0;
+  let deleted = 0;
+
+  for (const article of articles) {
+    const raw = article.content ?? "";
+    // Only process articles whose content starts with a fence or a { brace
+    const looksRaw = raw.trimStart().startsWith("```") || raw.trimStart().startsWith("{");
+    if (!looksRaw) { skipped++; continue; }
+
+    const extracted = extractFromBlob(raw);
+    if (!extracted) {
+      // Nothing extractable — delete the article to avoid publishing garbage
+      await articleService.deleteArticle(article.id);
+      deleted++;
+      continue;
+    }
+
+    await articleService.updateArticle(article.id, {
+      content: extracted.content,
+      ...(extracted.title    && { title:    extracted.title }),
+      ...(extracted.subtitle && { subtitle: extracted.subtitle }),
+      ...(extracted.keywords && { keywords: extracted.keywords }),
+      ...(extracted.slug     && article.slug !== extracted.slug && { slug: extracted.slug }),
+    });
+    fixed++;
+  }
+
+  req.log.info({ fixed, deleted, skipped, total: articles.length }, "admin: migrate-json-content complete");
+  res.json({ fixed, deleted, skipped, total: articles.length });
+});
+
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
 router.post("/bulk-publish", async (_req, res) => {
   const articles = await articleService.getArticles();

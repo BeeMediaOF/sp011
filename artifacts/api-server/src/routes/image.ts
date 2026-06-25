@@ -117,6 +117,43 @@ async function diskWrite(key: string, buf: Buffer): Promise<void> {
   }
 }
 
+// ── Domain-specific fetch headers ────────────────────────────────────────────
+// Some origins block generic bot user-agents. Override per hostname as needed.
+const DOMAIN_HEADERS: Record<string, Record<string, string>> = {
+  // EBC (Agência Brasil / imagens.ebc.com.br) blocks non-browser UAs → use Googlebot
+  "agenciabrasil.ebc.com.br": {
+    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    "Referer":    "https://agenciabrasil.ebc.com.br/",
+    "Accept":     "image/*,*/*;q=0.8",
+  },
+  "imagens.ebc.com.br": {
+    "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+    "Referer":    "https://agenciabrasil.ebc.com.br/",
+    "Accept":     "image/*,*/*;q=0.8",
+  },
+};
+
+const DEFAULT_FETCH_HEADERS: Record<string, string> = {
+  "User-Agent": "Mozilla/5.0 (compatible; SBCAgora/2.0; +https://sbcagora.com.br)",
+  "Accept":     "image/*,*/*;q=0.8",
+};
+
+// ── Fallback placeholder ──────────────────────────────────────────────────────
+// Returned (as WebP) when the upstream image cannot be fetched, so the browser
+// never gets a broken-image box or a 502 error.
+const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
+  <rect width="800" height="450" fill="#f3f4f6"/>
+  <text x="400" y="210" font-family="system-ui,sans-serif" font-size="28" fill="#9ca3af" text-anchor="middle">SBC Agora</text>
+  <text x="400" y="250" font-family="system-ui,sans-serif" font-size="16" fill="#d1d5db" text-anchor="middle">Imagem indisponível</text>
+</svg>`;
+
+let _placeholderWebP: Buffer | null = null;
+async function getPlaceholder(): Promise<Buffer> {
+  if (_placeholderWebP) return _placeholderWebP;
+  _placeholderWebP = await sharp(Buffer.from(PLACEHOLDER_SVG)).webp({ quality: 60, effort: 1 }).toBuffer();
+  return _placeholderWebP;
+}
+
 // ── Request coalescing ────────────────────────────────────────────────────────
 // Evita que múltiplas requisições simultâneas para a mesma imagem disparem
 // N fetches upstream paralelos. O primeiro registra uma Promise; os demais
@@ -129,12 +166,15 @@ async function fetchAndProcess(
   q: number,
   fmt: "webp" | "avif"
 ): Promise<Buffer> {
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("invalid_url"); }
+
+  const domainHeaders = DOMAIN_HEADERS[parsed.hostname] ?? DEFAULT_FETCH_HEADERS;
+
   const resp = await fetch(url, {
-    headers: {
-      "User-Agent": "SBCAgora-ImageProxy/1.0",
-      Accept: "image/*,*/*;q=0.8",
-    },
-    signal: AbortSignal.timeout(6_000), // falha rápida (era 10 s)
+    headers: domainHeaders,
+    signal: AbortSignal.timeout(6_000),
+    redirect: "follow",
   });
 
   if (!resp.ok) throw new Error(`origin_error:${resp.status}`);
@@ -313,8 +353,19 @@ router.get("/image", async (req, res) => {
       try {
         processed = await pending;
       } catch (err) {
-        req.log.warn({ err, url: rawUrl }, "image-proxy: fetch/process failed");
-        res.status(502).json({ error: "Não foi possível buscar ou processar a imagem de origem." });
+        req.log.warn({ err, url: rawUrl }, "image-proxy: fetch/process failed — serving placeholder");
+        // Return a neutral placeholder instead of a 502, so the browser never
+        // shows a broken-image box. Short cache so the real image is retried soon.
+        try {
+          const placeholder = await getPlaceholder();
+          res
+            .set("Content-Type", "image/webp")
+            .set("Cache-Control", "public, max-age=300")
+            .set("X-Image-Cache", "PLACEHOLDER")
+            .end(placeholder);
+        } catch {
+          res.status(502).json({ error: "Imagem indisponível." });
+        }
         return;
       }
     }

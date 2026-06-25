@@ -22,37 +22,92 @@ import {
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
 
-// ── Content quality guard ─────────────────────────────────────────────────────
+// ── Content quality guard & JSON recovery ────────────────────────────────────
+
+interface ExtractedAI {
+  content: string;
+  title?: string;
+  subtitle?: string;
+  keywords?: string;
+  slug?: string;
+}
+
+/**
+ * Robustly extracts structured fields from a raw AI response.
+ *
+ * Fixes the root-cause bug where `parseRewriteResult` in rssProcessor.ts drops
+ * into the plain-text fallback when the AI returns `\n```json\n{...}` (leading
+ * newline before the fence), because the `^` regex anchor does not match mid-string.
+ * Here we `.trim()` first so the fence is always at position 0.
+ *
+ * Returns null when the content is neither valid HTML nor an extractable JSON blob,
+ * meaning the article should be retried or deleted.
+ */
+function extractFromRawAI(raw: string): ExtractedAI | null {
+  if (!raw || raw.trim().length < 20) return null;
+
+  // ── Step 1: strip markdown fences ────────────────────────────────────────
+  // IMPORTANT: trim() BEFORE the regex so leading newlines don't break the ^ anchor
+  const stripped = raw.trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/,        "")
+    .trim();
+
+  // ── Step 2: plain HTML or prose → keep as-is ─────────────────────────────
+  if (!stripped.startsWith("{") && !stripped.startsWith("[")) {
+    return stripped.length > 20 ? { content: stripped } : null;
+  }
+
+  // ── Step 3: try clean JSON parse ─────────────────────────────────────────
+  try {
+    const parsed = JSON.parse(stripped) as Record<string, unknown>;
+    const content = (
+      (parsed["content_html"] as string | undefined) ??
+      (parsed["contentHtml"]  as string | undefined) ??
+      (parsed["content"]      as string | undefined) ??
+      ""
+    ).trim();
+    if (content.length > 20) {
+      return {
+        content,
+        title:    ((parsed["title"]    as string | undefined) ?? "").trim() || undefined,
+        subtitle: ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
+        keywords: ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
+        slug:     ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
+      };
+    }
+  } catch { /* fall through to regex */ }
+
+  // ── Step 4: regex fallback for truncated JSON ─────────────────────────────
+  const mHtml = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/);
+  if (mHtml?.[1]) {
+    const content = mHtml[1]
+      .replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+    if (content.length > 20) {
+      const mTitle = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSub   = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mKw    = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSlug  = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      return {
+        content,
+        title:    mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+        subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
+        keywords: mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
+        slug:     mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
+      };
+    }
+  }
+
+  return null; // truly unextractable
+}
+
 /**
  * Returns true if the content string can be rendered to the reader.
  * HTML and plain text always pass. JSON-like content is accepted only if
  * a `content_html` (or similar) field can be extracted from it.
  */
 function isContentRenderable(content: string): boolean {
-  if (!content || content.trim().length < 20) return false;
-  const stripped = content.trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```\s*$/, "")
-    .trim();
-  // HTML or plain text → always renderable
-  if (!stripped.startsWith("{") && !stripped.startsWith("[")) return true;
-  // Try clean JSON parse
-  try {
-    const parsed = JSON.parse(stripped) as Record<string, unknown>;
-    const html = (parsed["content_html"] ?? parsed["contentHtml"] ?? parsed["content"] ?? "") as string;
-    if (html.trim()) return true;
-  } catch { /* fall through */ }
-  // Regex for content_html (handles truncated JSON)
-  const m = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:"\s*[,}]|"\s*$)/);
-  if (m?.[1]?.trim()) return true;
-  // Any content-like key with substantial text
-  const anyValue = stripped.match(/"(?:content|html|body|text|rewritten|conteudo)[^"]*"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/i);
-  if ((anyValue?.[1]?.trim().length ?? 0) > 20) return true;
-  // Long prose values anywhere in the JSON
-  const allStrings = [...stripped.matchAll(/"[^"]*"\s*:\s*"((?:[^"\\]|\\[\s\S])*?)"/g)]
-    .map((x) => x[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').trim())
-    .filter((v) => v.length > 60 && !v.startsWith("http"));
-  return allStrings.length > 0;
+  return extractFromRawAI(content) !== null;
 }
 
 // ── Timing constants ─────────────────────────────────────────────────────────
@@ -178,24 +233,51 @@ async function processItem(item: RewriteJobItem): Promise<void> {
       item.customPrompt,
     );
 
-    // Verify the rewritten content is actually renderable before publishing.
-    // If the AI returned malformed JSON or empty content, delete the article
-    // instead of publishing something unreadable.
-    if (!isContentRenderable(result.content)) {
+    /*
+     * Recovery pass: rssProcessor.parseRewriteResult may fall through to the
+     * plain-text fallback (saving raw JSON/fence as content) when the AI response
+     * starts with a leading newline before the ``` fence, because the ^ regex anchor
+     * doesn't match mid-string. We re-apply the full extraction here with a proper
+     * trim() before the fence-strip so we always catch the right content.
+     */
+    let finalContent  = result.content;
+    let finalTitle    = result.title;
+    let finalSubtitle = result.subtitle;
+    let finalKeywords = result.keywords;
+    let finalSlug     = result.slug;
+
+    const contentLooksRaw =
+      result.content.trimStart().startsWith("{") ||
+      result.content.trimStart().startsWith("```");
+
+    if (contentLooksRaw) {
+      const recovered = extractFromRawAI(result.content);
+      if (recovered) {
+        finalContent  = recovered.content;
+        finalTitle    = recovered.title    ?? result.title;
+        finalSubtitle = recovered.subtitle ?? result.subtitle;
+        finalKeywords = recovered.keywords ?? result.keywords;
+        finalSlug     = recovered.slug     ?? result.slug;
+        logger.info({ articleId: item.articleId }, "Rewrite queue: recovered content from raw JSON blob");
+      }
+    }
+
+    // Final quality gate: if content is still unreadable, delete rather than publish garbage
+    if (!isContentRenderable(finalContent)) {
       await articleService.deleteArticle(item.articleId);
       _failedTotal++;
-      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: "Conteúdo reescrito ilegível — artigo excluído automaticamente" });
+      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: "Conteúdo reescrito ilegível após tentativa de recuperação — artigo excluído" });
       pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: "unrenderable_content" });
-      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: deleted article with unrenderable content after rewrite");
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: deleted article — content unrenderable after recovery attempt");
       return;
     }
 
     await articleService.updateArticle(item.articleId, {
-      ...(result.title    && { title:    result.title }),
-      ...(result.subtitle && { subtitle: result.subtitle }),
-      content:     result.content,
-      ...(result.keywords && { keywords: result.keywords }),
-      ...(result.slug     && { slug:     result.slug }),
+      ...(finalTitle    && { title:    finalTitle }),
+      ...(finalSubtitle && { subtitle: finalSubtitle }),
+      content:     finalContent,
+      ...(finalKeywords && { keywords: finalKeywords }),
+      ...(finalSlug     && { slug:     finalSlug }),
       aiRewritten: true,
       status:      item.finalStatus,
       ...(item.finalStatus === "published" && { publishedAt: new Date().toISOString() }),
