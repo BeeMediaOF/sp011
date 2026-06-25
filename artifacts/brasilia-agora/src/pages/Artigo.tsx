@@ -112,7 +112,11 @@ export default function Artigo() {
     const ampUrl    = `${window.location.origin}/api/amp/artigos/${articleSlug}`;
     const title = article.title.replace(/<[^>]*>/g, "");
     const desc  = (article.subtitle || article.title).replace(/<[^>]*>/g, "").slice(0, 160);
-    const image = article.imageUrl || "/opengraph.jpg";
+    // og:image deve ser URL absoluta — crawlers do Facebook/WhatsApp rejeitam URLs relativas
+    const rawImage = article.imageUrl || "/opengraph.jpg";
+    const image = rawImage.startsWith("http")
+      ? rawImage
+      : `${window.location.origin}${rawImage.startsWith("/") ? rawImage : `/${rawImage}`}`;
     const prevTitle = document.title;
     document.title = `${title} — ${BRAND.titleSuffix}`;
 
@@ -133,10 +137,18 @@ export default function Artigo() {
     setMeta("og:title", title, true);
     setMeta("og:description", desc, true);
     setMeta("og:url", canonical, true);
+    setMeta("og:site_name", BRAND.name, true);
     setMeta("og:image", image, true);
+    setMeta("og:image:width", "1200", true);
+    setMeta("og:image:height", "630", true);
+    setMeta("og:image:type", "image/jpeg", true);
+    setMeta("twitter:card", "summary_large_image");
     setMeta("twitter:title", title);
     setMeta("twitter:description", desc);
     setMeta("twitter:image", image);
+    // Keywords por artigo (campo keywords do banco)
+    if (article.keywords) setMeta("keywords", article.keywords);
+    setMeta("description", desc);
     if (article.publishedAt) setMeta("article:published_time", new Date(article.publishedAt).toISOString(), true);
     if (article.category)    setMeta("article:section", article.category, true);
 
