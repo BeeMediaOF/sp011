@@ -400,7 +400,7 @@ export default function Artigo() {
   }
 
   const canonicalUrl = article
-    ? `https://brasilia-agora.com/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
+    ? `https://sbcagora.com.br/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
     : null;
 
   const newsArticleSchema = article
@@ -421,7 +421,7 @@ export default function Artigo() {
           name: BRAND.name,
           logo: {
             "@type": "ImageObject",
-            url: "https://brasilia-agora.com/favicon.jpg",
+            url: "https://sbcagora.com.br/favicon.jpg",
           },
         },
         mainEntityOfPage: {
@@ -440,13 +440,13 @@ export default function Artigo() {
             "@type": "ListItem",
             position: 1,
             name: "Início",
-            item: "https://brasilia-agora.com/",
+            item: "https://sbcagora.com.br/",
           },
           {
             "@type": "ListItem",
             position: 2,
             name: article.tag,
-            item: `https://brasilia-agora.com${categoryRoute(article.category)}`,
+            item: `https://sbcagora.com.br${categoryRoute(article.category)}`,
           },
           {
             "@type": "ListItem",

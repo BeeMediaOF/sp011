@@ -532,7 +532,7 @@ export default function Settings() {
                       value={settings.siteUrl ?? ""}
                       onChange={e => setField("siteUrl", e.target.value)}
                       className={INPUT}
-                      placeholder="https://brasilia-agora.com.br"
+                      placeholder="https://sbcagora.com.br"
                     />
                   </Field>
 

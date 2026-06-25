@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "Brasília Agora"
+title = "SBC Agora"
 version = "1.0.0"
 id = "artifacts/brasilia-agora"
 router = "path"
@@ -15,10 +15,10 @@ paths = [ "/" ]
 localPort = 22613
 
 [services.development]
-run = "pnpm --filter @workspace/brasilia-agora run dev"
+run = "pnpm --filter @workspace/sbc-agora run dev"
 
 [services.production]
-build = [ "pnpm", "--filter", "@workspace/brasilia-agora", "run", "build" ]
+build = [ "pnpm", "--filter", "@workspace/sbc-agora", "run", "build" ]
 publicDir = "artifacts/brasilia-agora/dist/public"
 serve = "static"
 

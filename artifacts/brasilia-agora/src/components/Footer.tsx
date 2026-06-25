@@ -4,7 +4,7 @@ import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import logoImg from "../assets/images/logo_sbc_negativo.png";
-import logoColorImg from "../assets/images/logo_brasilia_agora.png";
+import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
 
 const SOCIAL = [

@@ -5,7 +5,7 @@ import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
 import { trackSearch } from "../hooks/useAnalytics";
 import PushSubscribeButton from "./PushSubscribeButton";
-import logoImg from "../assets/images/logo_brasilia_agora.png";
+import logoImg from "../assets/images/logo_sbc_agora.png";
 
 const FALLBACK_NAV = [
   { label: "HOME",       path: "/" },
