@@ -6,9 +6,16 @@ interface Props {
   slot: AdSlotKey;
   placeholder?: string;
   interval?: number;
+  /**
+   * Altura em px reservada como skeleton enquanto os anúncios carregam.
+   * Evita CLS ao substituir o null pelo banner real.
+   * Padrão: 90 (leaderboard padrão IAB).
+   * Use 0 se não quiser reservar espaço para este slot.
+   */
+  skeletonHeight?: number;
 }
 
-export default function AdBanner({ slot, interval = 5000 }: Props) {
+export default function AdBanner({ slot, interval = 5000, skeletonHeight = 90 }: Props) {
   const { getSlotAll, loading } = useAds();
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
@@ -57,8 +64,24 @@ export default function AdBanner({ slot, interval = 5000 }: Props) {
     }
   }, [index, items]);
 
-  // Hide completely while loading or when there are no ads for this slot
-  if (loading || items.length === 0) return null;
+  /*
+   * SKELETON durante o carregamento — reserva o espaço vertical para evitar CLS.
+   * Quando o loading termina sem anúncios: retorna null (colapsa sem shift
+   * significativo pois o skeleton já estava presente).
+   */
+  if (loading) {
+    if (skeletonHeight <= 0) return null;
+    return (
+      <div
+        aria-hidden="true"
+        style={{ minHeight: skeletonHeight, background: "#f3f4f6", borderRadius: 8 }}
+        className="w-full"
+      />
+    );
+  }
+
+  // Sem anúncios para este slot após carregamento → não ocupa espaço
+  if (items.length === 0) return null;
 
   const ad = items[index] ?? items[0];
   const isCarousel = items.length > 1;

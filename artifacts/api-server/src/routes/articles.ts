@@ -49,7 +49,7 @@ router.get("/", async (_req, res) => {
       publishedAt: a.publishedAt,
       keywords: a.keywords,
     }));
-  res.setHeader("Cache-Control", "public, max-age=20, stale-while-revalidate=60");
+  res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30, stale-while-revalidate=300");
   res.json({ articles });
 });
 

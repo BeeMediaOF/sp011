@@ -98,7 +98,7 @@ function FeaturedCard({
         src={item.img || undefined}
         srcSet={srcset || undefined}
         sizes={srcset
-          ? "(max-width: 1024px) 100vw, 33vw"
+          ? "(max-width: 1024px) 100vw, (max-width: 1280px) 33vw, 427px"
           : undefined}
         alt={item.title.replace(/<[^>]*>/g, "")}
         width={800}
@@ -289,6 +289,25 @@ export default function HeroSection() {
   }));
 
   if (!loading && featured.length === 0) return null;
+
+  /* Skeleton com dimensões fixas enquanto os artigos carregam.
+     Reserva exatamente o mesmo espaço que o hero real vai ocupar → CLS=0. */
+  if (loading && featured.length === 0) {
+    return (
+      <section className="max-w-[1280px] mx-auto px-4 py-6">
+        {/* Mobile skeleton */}
+        <div className="block lg:hidden mb-5">
+          <div className="animate-pulse bg-gray-100 rounded-lg" style={{ aspectRatio: "16/9" }} />
+        </div>
+        {/* Desktop skeleton — mesma altura do DesktopGrid */}
+        <div className="hidden lg:grid lg:grid-cols-3 gap-3 h-[420px] mb-5">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="animate-pulse bg-gray-100 rounded-lg h-full" />
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">

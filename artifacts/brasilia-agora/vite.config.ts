@@ -3,6 +3,7 @@ import { BRAND } from "./src/brand";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
+import fs from "node:fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import type { IncomingMessage, ServerResponse } from "node:http";
 
@@ -86,6 +87,64 @@ ${imageUrl ? `<meta name="twitter:image" content="${esc(imageUrl)}">` : ""}
 ${imageUrl ? `<img src="${esc(imageUrl)}" alt="${esc(title)}" style="max-width:100%">` : ""}
 </body>
 </html>`;
+}
+
+/**
+ * staticCachePlugin — duas funções:
+ * 1. No dev server: middleware que serve /assets/* com headers imutáveis e
+ *    o index.html com no-cache, para simular a política de produção.
+ * 2. No closeBundle: gera dist/public/_headers (Netlify/Cloudflare/Replit)
+ *    com Cache-Control por tipo de recurso.
+ */
+function staticCachePlugin(): Plugin {
+  return {
+    name: "vite-static-cache",
+
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = req.url ?? "";
+        if (/^\/assets\//.test(url)) {
+          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        } else if (url === "/" || url.endsWith(".html")) {
+          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+          res.setHeader("Pragma", "no-cache");
+          res.setHeader("Expires", "0");
+        }
+        next();
+      });
+    },
+
+    closeBundle() {
+      const outDir = path.resolve(import.meta.dirname, "dist/public");
+      if (!fs.existsSync(outDir)) return;
+
+      const content = [
+        "# Arquivos com hash de conteúdo — imutáveis por 1 ano",
+        "/assets/*",
+        "  Cache-Control: public, max-age=31536000, immutable",
+        "",
+        "# Fontes woff/woff2",
+        "/*.woff2",
+        "  Cache-Control: public, max-age=31536000, immutable",
+        "/*.woff",
+        "  Cache-Control: public, max-age=31536000, immutable",
+        "",
+        "# HTML — nunca cachear; deve sempre buscar o mais recente",
+        "/*.html",
+        "  Cache-Control: no-store, no-cache, must-revalidate",
+        "/",
+        "  Cache-Control: no-store, no-cache, must-revalidate",
+        "",
+        "# Manifesto e service worker",
+        "/manifest.webmanifest",
+        "  Cache-Control: public, max-age=86400",
+        "/sw.js",
+        "  Cache-Control: no-store",
+      ].join("\n");
+
+      fs.writeFileSync(path.join(outDir, "_headers"), content, "utf-8");
+    },
+  };
 }
 
 function socialOgPlugin(apiBase: string): Plugin {
@@ -177,6 +236,7 @@ function socialOgPlugin(apiBase: string): Plugin {
 export default defineConfig({
   base: basePath,
   plugins: [
+    staticCachePlugin(),
     socialOgPlugin(process.env.API_URL ?? "http://localhost:8080"),
     react(),
     tailwindcss(),
@@ -244,11 +304,8 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
-    headers: {
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-    },
+    /* Cache-Control por path é gerenciado pelo staticCachePlugin acima.
+       Sem headers globais aqui para não sobrescrever os cabeçalhos por rota. */
     fs: {
       strict: true,
     },
@@ -263,10 +320,5 @@ export default defineConfig({
     port,
     host: "0.0.0.0",
     allowedHosts: true,
-    headers: {
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-    },
   },
 });

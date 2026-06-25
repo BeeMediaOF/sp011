@@ -26,9 +26,15 @@
     <link rel="sitemap" type="application/xml" title="Google News Sitemap" href="/api/sitemap-news.xml" />
     <link rel="canonical" href="https://sbcagora.com.br" />
 
-    <!-- Preconnect para DNS/TLS antecipado (não bloqueante) -->
+    <!-- Preconnect / dns-prefetch para recursos críticos -->
+    <!-- API interna — mesmo origin, mas o preconnect resolve o TLS da edge -->
+    <link rel="preconnect" href="/" />
+    <!-- Fontes Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- CDN de imagens — preconnect estabelece o socket antes do JS carregar -->
+    <link rel="dns-prefetch" href="https://i.metroimg.com" />
+    <link rel="dns-prefetch" href="https://images.metroimg.com" />
 
     <!--
       Fontes: carregamento NÃO-BLOQUEANTE via print trick.

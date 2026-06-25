@@ -517,14 +517,14 @@ export default function Home() {
       <main className="flex-1">
         <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
 
-        {settings && visibleBlocks.map((block, idx) => {
+        {visibleBlocks.map((block, idx) => {
           const content = (
             <>
-              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" /></div>}
-              {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
-              {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
-              {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
-              {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
+              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" skeletonHeight={90} /></div>}
+              {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" skeletonHeight={90} /></div>}
+              {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" skeletonHeight={90} /></div>}
+              {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" skeletonHeight={90} /></div>}
+              {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" skeletonHeight={90} /></div>}
               {block.custom
                 ? <CustomBlock block={block} getArticles={getArticles} />
                 : <PredefinedBlock block={block} getArticles={getArticles} />
