@@ -155,3 +155,9 @@ id = "Jr3Q0WzM1LzMl2q0yBZd4"
 uri = "file://beenews-frontend.zip"
 type = "unspecified"
 title = "BeeNews — HTML + CSS + JS (9.9 MB)"
+
+[[outputs]]
+id = "uJyos7P3nDueLb2lF16RF"
+uri = "file://TECHNICAL_OVERVIEW.md"
+type = "text"
+title = "SBC Agora — Visão Técnica Completa"
