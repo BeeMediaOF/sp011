@@ -4,6 +4,7 @@
  * The canonical page adds <link rel="amphtml"> pointing here.
  */
 import { Router } from "express";
+import { BRAND } from "../lib/brand.js";
 import { eq, or, sql } from "drizzle-orm";
 import { db, articlesTable } from "@workspace/db";
 import { logger } from "../lib/logger.js";
@@ -89,7 +90,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
       author: { "@type": "Person", name: article.author || "Redação" },
       publisher: {
         "@type": "Organization",
-        name: "SBC Agora",
+        name: BRAND.name,
         logo: { "@type": "ImageObject", url: `${base}/favicon.jpg` },
       },
     });
@@ -130,7 +131,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
 </head>
 <body>
   <header>
-    <a href="${escHtml(base)}">SBC Agora</a>
+    <a href="${escHtml(base)}">${BRAND.name}</a>
   </header>
   <main>
     <span class="chapeu">${escHtml(article.tag || article.category || "NOTÍCIA")}</span>

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { BRAND } from "../../brand";
 import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission } from "../../lib/adminApi";
@@ -156,7 +157,7 @@ export default function Settings() {
 
   /* ── settings state ── */
   const [settings, setSettings] = useState<SiteSettings>({
-    siteName: "SBC Agora",
+    siteName: BRAND.name,
     tagline: "Notícia. Agora. Sempre.",
     mobileEnabled: true,
     desktopEnabled: true,
@@ -440,7 +441,7 @@ export default function Settings() {
                   <SectionHeader icon={<Globe size={15}/>} label="Informações do Site"/>
                   <Field label="Nome do site">
                     <input value={settings.siteName} onChange={e => setField("siteName", e.target.value)}
-                      className={INPUT} placeholder="Ex: SBC Agora"/>
+                      className={INPUT} placeholder={`Ex: ${BRAND.name}`}/>
                   </Field>
                   <Field label="Tagline / Slogan">
                     <input value={settings.tagline} onChange={e => setField("tagline", e.target.value)}
@@ -860,7 +861,7 @@ export default function Settings() {
                 <p className="text-xs font-medium text-[#64748B] mb-2">Temas prontos</p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: "SBC Agora (padrão)", sidebar: "#0B2A66", accent: "#E71D36" },
+                    { label: `${BRAND.name} (padrão)`, sidebar: "#0B2A66", accent: "#E71D36" },
                     { label: "Oceano",   sidebar: "#0b3d91", accent: "#e8a020" },
                     { label: "Floresta", sidebar: "#1a3a2a", accent: "#22c55e" },
                     { label: "Grafite",  sidebar: "#18181b", accent: "#f59e0b" },

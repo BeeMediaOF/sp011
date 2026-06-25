@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { BRAND } from "../lib/brand.js";
 import { eq, sql } from "drizzle-orm";
 import { writeFileSync } from "fs";
 import { resolve } from "path";
@@ -141,7 +142,7 @@ router.post("/2fa/setup", authMiddleware, async (req, res) => {
       .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
     const secret = otpGenerateSecret();
-    const otpauth = otpGenerateURI({ label: user.email, issuer: "SBC Agora Admin", secret });
+    const otpauth = otpGenerateURI({ label: user.email, issuer: BRAND.adminIssuer, secret });
     const qrDataUrl = await QRCode.toDataURL(otpauth);
     // Store secret temporarily (user must verify before it's persisted)
     await db.update(usersTable).set({ twoFactorSecret: secret }).where(eq(usersTable.id, req.userId));
@@ -327,7 +328,7 @@ router.post("/articles", async (req, res) => {
     category: category ?? "geral",
     tag: tag ?? "GERAL",
     imageUrl: imageUrl ?? "",
-    author: author ?? "Redação SBC Agora",
+    author: author ?? BRAND.author,
     publishedAt: new Date().toISOString(),
     status: (status === "published" ? "published" : "draft"),
   });
@@ -590,8 +591,8 @@ function updateIndexHtml(settings: SiteSettings): void {
     const ogPath    = resolve(base, "public", "opengraph.jpg");
     const favPath   = resolve(base, "public", "favicon.jpg");
 
-    const siteName = escHtml(settings.siteName  || "SBC Agora");
-    const tagline  = escHtml(settings.tagline   || "Notícia. Agora. Sempre.");
+    const siteName = escHtml(settings.siteName  || BRAND.name);
+    const tagline  = escHtml(settings.tagline   || BRAND.tagline);
     const desc     = escHtml(settings.seoDescription || settings.tagline || "Informação com credibilidade sobre o Distrito Federal e o Brasil.");
     const siteUrl  = escHtml(settings.siteUrl   || "");
     const title    = `${siteName} — ${tagline}`;

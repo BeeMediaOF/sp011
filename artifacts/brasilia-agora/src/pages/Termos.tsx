@@ -1,4 +1,5 @@
 import TopBar from "../components/TopBar";
+import { BRAND } from "../brand";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 
@@ -19,14 +20,14 @@ export default function Termos() {
 
           <div className="prose prose-lg max-w-none text-[#1a1a1a] space-y-6">
             <p>
-              Ao acessar e utilizar o portal <strong>SBC Agora</strong>, você concorda com os
+              Ao acessar e utilizar o portal <strong>{BRAND.name}</strong>, você concorda com os
               presentes Termos de Uso. Caso não concorde com qualquer disposição, pedimos que não
               utilize o portal.
             </p>
 
             <h2 className="text-xl font-bold text-[#1a2448] mt-8">1. Uso do conteúdo</h2>
             <p>
-              Todo o conteúdo publicado no SBC Agora — textos, fotos, vídeos e infográficos — é
+              Todo o conteúdo publicado no {BRAND.name} — textos, fotos, vídeos e infográficos — é
               protegido por direitos autorais. É proibida a reprodução, total ou parcial, sem
               autorização expressa da redação, exceto para compartilhamento em redes sociais com
               indicação da fonte.
@@ -34,7 +35,7 @@ export default function Termos() {
 
             <h2 className="text-xl font-bold text-[#1a2448] mt-8">2. Responsabilidade editorial</h2>
             <p>
-              O SBC Agora zela pela veracidade das informações publicadas. Em caso de erro, a
+              O {BRAND.name} zela pela veracidade das informações publicadas. Em caso de erro, a
               correção será feita prontamente com nota de retificação. Opiniões expressas em colunas
               são de responsabilidade exclusiva de seus autores.
             </p>
@@ -49,7 +50,7 @@ export default function Termos() {
 
             <h2 className="text-xl font-bold text-[#1a2448] mt-8">4. Links externos</h2>
             <p>
-              O portal pode conter links para sites de terceiros. O SBC Agora não se responsabiliza
+              O portal pode conter links para sites de terceiros. O {BRAND.name} não se responsabiliza
               pelo conteúdo ou práticas de privacidade desses sites.
             </p>
 

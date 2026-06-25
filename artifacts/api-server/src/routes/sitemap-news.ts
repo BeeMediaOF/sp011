@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { BRAND } from "../lib/brand.js";
 import { db, articlesTable } from "@workspace/db";
 import { eq, gte, and, desc } from "drizzle-orm";
 
@@ -38,7 +39,7 @@ router.get("/sitemap-news.xml", async (req, res) => {
     <loc>${escapeXml(`${base}/artigo/${slug}`)}</loc>
     <news:news>
       <news:publication>
-        <news:name>SBC Agora</news:name>
+        <news:name>${BRAND.name}</news:name>
         <news:language>pt</news:language>
       </news:publication>
       <news:publication_date>${pubDate}</news:publication_date>

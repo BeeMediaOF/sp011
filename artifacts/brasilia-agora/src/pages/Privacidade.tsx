@@ -1,4 +1,5 @@
 import TopBar from "../components/TopBar";
+import { BRAND } from "../brand";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Link } from "wouter";
@@ -22,7 +23,7 @@ const SECTIONS: Section[] = [
     icon: Shield,
     color: "#0B2A66",
     title: "1. Quem somos",
-    content: `O <strong>SBC Agora</strong> é um portal de notícias dedicado à cobertura jornalística do Distrito Federal e do Brasil, operado pela redação localizada em Brasília – DF. Somos o controlador dos dados pessoais coletados neste site, nos termos da Lei Geral de Proteção de Dados (LGPD – Lei nº 13.709/2018).`,
+    content: `O <strong>${BRAND.name}</strong> é um portal de notícias dedicado à cobertura jornalística local e regional. Somos o controlador dos dados pessoais coletados neste site, nos termos da Lei Geral de Proteção de Dados (LGPD – Lei nº 13.709/2018).`,
   },
   {
     id: "dados-coletados",
@@ -137,7 +138,7 @@ const SECTIONS: Section[] = [
     icon: Mail,
     color: "#0B2A66",
     title: "11. Encarregado pelo tratamento de dados (DPO)",
-    content: `O SBC Agora designou um Encarregado pelo Tratamento de Dados (Data Protection Officer) para atender às solicitações dos titulares e comunicar-se com a Autoridade Nacional de Proteção de Dados (ANPD).<br/><br/>
+    content: `O ${BRAND.name} designou um Encarregado pelo Tratamento de Dados (Data Protection Officer) para atender às solicitações dos titulares e comunicar-se com a Autoridade Nacional de Proteção de Dados (ANPD).<br/><br/>
     <strong>Contato do DPO:</strong><br/>
     • E-mail: <strong>privacidade@brasiliaagora.com.br</strong><br/>
     • Endereço: Brasília, Distrito Federal, Brasil<br/><br/>

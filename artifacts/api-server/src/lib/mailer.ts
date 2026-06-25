@@ -26,6 +26,7 @@
 
 import net from "node:net";
 import tls from "node:tls";
+import { BRAND } from "./brand.js";
 
 type SocketLike = net.Socket | tls.TLSSocket;
 
@@ -201,7 +202,7 @@ function welcomeEmailHtml(name: string, email: string, tempPassword: string, por
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bem-vindo ao SBC Agora</title>
+  <title>Bem-vindo ao ${BRAND.name}</title>
 </head>
 <body style="margin:0;padding:0;background:#F0F4F8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F8;padding:40px 0;">
@@ -224,7 +225,7 @@ function welcomeEmailHtml(name: string, email: string, tempPassword: string, por
               <p style="margin:0 0 8px;color:#E71D36;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Acesso ao Painel</p>
               <h1 style="margin:0 0 20px;color:#0B2A66;font-size:24px;font-weight:800;line-height:1.3;">Bem-vindo, ${name}!</h1>
               <p style="margin:0 0 24px;color:#4A5568;font-size:15px;line-height:1.6;">
-                Seu acesso ao painel administrativo do <strong>SBC Agora</strong> foi criado com sucesso.
+                Seu acesso ao painel administrativo do <strong>${BRAND.name}</strong> foi criado com sucesso.
                 Abaixo estão suas credenciais de acesso.
               </p>
 
@@ -278,7 +279,7 @@ function welcomeEmailHtml(name: string, email: string, tempPassword: string, por
           <tr>
             <td style="background:#F7F9FC;border-top:1px solid #E2E8F0;padding:24px 40px;text-align:center;">
               <p style="margin:0 0 8px;color:#A0AEC0;font-size:12px;">
-                Este e-mail foi enviado automaticamente pelo sistema do <strong style="color:#0B2A66;">SBC Agora</strong>.
+                Este e-mail foi enviado automaticamente pelo sistema do <strong style="color:#0B2A66;">${BRAND.name}</strong>.
               </p>
               <p style="margin:0;color:#A0AEC0;font-size:12px;">
                 Em caso de dúvidas, entre em contato com o administrador do portal.
@@ -322,9 +323,9 @@ export async function sendWelcomeEmail(to: string, name: string, tempPassword: s
       pass,
       from,
       to,
-      subject: "Bem-vindo ao SBC Agora — Suas credenciais de acesso",
+      subject: `Bem-vindo ao ${BRAND.name} — Suas credenciais de acesso`,
       html: welcomeEmailHtml(name, to, tempPassword, baseUrl),
-      text: `Bem-vindo ao SBC Agora!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
+      text: `Bem-vindo ao ${BRAND.name}!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
     });
     return { sent: true };
   } catch (err) {

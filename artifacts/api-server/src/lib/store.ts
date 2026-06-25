@@ -7,6 +7,7 @@
  */
 
 import { randomUUID } from "crypto";
+import { BRAND } from "./brand.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -119,7 +120,7 @@ const DEFAULT_HOME_BLOCKS: HomeBlock[] = [
 ];
 
 const DEFAULT_SETTINGS: SiteSettings = {
-  siteName: "SBC Agora", tagline: "Notícia. Agora. Sempre.",
+  siteName: BRAND.name, tagline: BRAND.tagline,
   logoSize: 101, mobileEnabled: true, desktopEnabled: true,
   showTickerBar: true, showHeroStrip: true, homeBlocks: DEFAULT_HOME_BLOCKS,
 };

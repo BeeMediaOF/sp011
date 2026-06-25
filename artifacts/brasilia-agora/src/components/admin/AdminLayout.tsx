@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { BRAND } from "../../brand";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Settings, LogOut,
@@ -480,7 +481,7 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
 
         {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-700">
-          <img src={logo} alt="SBC Agora" className="h-9 w-auto object-contain" />
+          <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 tracking-wide">A notícia em tempo real</p>
         </div>
 

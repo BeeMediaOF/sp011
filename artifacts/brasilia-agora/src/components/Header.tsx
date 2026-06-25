@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X } from "lucide-react";
 import { useSite } from "../hooks/useSite";
@@ -138,7 +139,7 @@ export default function Header() {
             <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
               <img
                 src={logoImg}
-                alt={settings?.siteName ?? "SBC Agora"}
+                alt={settings?.siteName ?? BRAND.name}
                 style={{ height: settings?.logoSize ? settings.logoSize * 0.65 : 30 }}
                 className="w-auto object-contain block"
               />
@@ -217,7 +218,7 @@ export default function Header() {
             <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
               <img
                 src={logoImg}
-                alt={settings?.siteName ?? "SBC Agora"}
+                alt={settings?.siteName ?? BRAND.name}
                 style={{ height: settings?.logoSize ?? 48 }}
                 className="w-auto object-contain block"
               />
@@ -298,7 +299,7 @@ export default function Header() {
           <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
             <img
               src={logoImg}
-              alt={settings?.siteName ?? "SBC Agora"}
+              alt={settings?.siteName ?? BRAND.name}
               style={{ height: settings?.logoSize ?? 48 }}
               className="w-auto object-contain block"
             />

@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from "vite";
+import { BRAND } from "./src/brand";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -57,10 +58,10 @@ function buildOgHtml(params: {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} — SBC Agora</title>
+<title>${esc(title)} — ${BRAND.titleSuffix}</title>
 <meta name="description" content="${esc(description)}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="SBC Agora">
+<meta property="og:site_name" content="${BRAND.name}">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">

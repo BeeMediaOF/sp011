@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { BRAND } from "../../brand";
 import AdminLayout from "../../components/admin/AdminLayout";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -199,7 +200,7 @@ export default function Analytics() {
     ${(stats.topCities ?? []).map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString("pt-BR")}</td></tr>`).join("")}
   </table>` : ""}
 
-  <div class="footer">Portal SBC Agora · Relatório gerado automaticamente pelo sistema de analytics</div>
+  <div class="footer">Portal ${BRAND.name} · Relatório gerado automaticamente pelo sistema de analytics</div>
 </body>
 </html>`);
     win.document.close();

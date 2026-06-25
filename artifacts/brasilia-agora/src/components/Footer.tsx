@@ -1,4 +1,5 @@
 import React from "react";
+import { BRAND } from "../brand";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
@@ -34,7 +35,7 @@ export default function Footer() {
       <footer className="border-t border-gray-200 py-4"
         style={{ backgroundColor: bgColor ?? "#f3f4f6" }}>
         <div className="max-w-[1280px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
-          <p>© {new Date().getFullYear()} SBC Agora. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
           <div className="flex items-center gap-4">
             {NAV_LINKS.slice(0, 5).map(({ href, label }) => (
               <Link key={href} href={href} className="hover:text-gray-800 transition-colors">{label}</Link>
@@ -61,7 +62,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              <img src={logoColorImg} alt="SBC Agora" className="h-10 w-auto object-contain mb-2" />
+              <img src={logoColorImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
               <p className="text-gray-500 text-xs leading-relaxed max-w-[280px]">
                 Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
               </p>
@@ -116,7 +117,7 @@ export default function Footer() {
           </div>
 
           <div className="border-t border-gray-200 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-400">
-            <p>© {new Date().getFullYear()} SBC Agora. Todos os direitos reservados.</p>
+            <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
             <div className="flex gap-3">
               <Link href="/privacidade" className="hover:text-gray-700 transition-colors">Privacidade</Link>
               <span className="text-gray-300">|</span>
@@ -138,7 +139,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            <img src={logoImg} alt="SBC Agora" className="h-10 w-auto object-contain mb-2" />
+            <img src={logoImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
             <p className="text-gray-500 text-xs leading-relaxed max-w-[280px]">
               Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
             </p>
@@ -192,7 +193,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-500">
-          <p>© {new Date().getFullYear()} SBC Agora. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} {BRAND.name}. Todos os direitos reservados.</p>
           <div className="flex gap-3">
             <Link href="/privacidade" className="hover:text-white transition-colors">Privacidade</Link>
             <span className="text-gray-700">|</span>

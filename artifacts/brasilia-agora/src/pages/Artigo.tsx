@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { BRAND } from "../brand";
 import { useParams, Link } from "wouter";
 import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
@@ -112,7 +113,7 @@ export default function Artigo() {
     const desc  = (article.subtitle || article.title).replace(/<[^>]*>/g, "").slice(0, 160);
     const image = article.imageUrl || "/opengraph.jpg";
     const prevTitle = document.title;
-    document.title = `${title} — SBC Agora`;
+    document.title = `${title} — ${BRAND.titleSuffix}`;
 
     function setMeta(prop: string, content: string, isOg = false): HTMLMetaElement {
       const attr = isOg ? "property" : "name";
@@ -412,11 +413,11 @@ export default function Artigo() {
         dateModified: article.publishedAt,
         author: {
           "@type": "Person",
-          name: article.author ?? "Redação SBC Agora",
+          name: article.author ?? BRAND.author,
         },
         publisher: {
           "@type": "Organization",
-          name: "SBC Agora",
+          name: BRAND.name,
           logo: {
             "@type": "ImageObject",
             url: "https://brasilia-agora.com/favicon.jpg",

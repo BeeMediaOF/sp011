@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { BRAND } from "../../brand";
 import {
   Share2, Plus, Trash2, Pencil, CheckCircle, AlertCircle, Loader2, X,
   Play, RefreshCw, ChevronDown, ChevronUp, Image as ImageIcon, Type,
@@ -181,7 +182,7 @@ function AccountModal({
 
         <div className="p-6 space-y-4">
           {/* ── Campos principais ── */}
-          <Field fieldKey="name" label="Nome da conta *" placeholder="Ex: SBC Agora" />
+          <Field fieldKey="name" label="Nome da conta *" placeholder={`Ex: ${BRAND.name}`} />
           <Field fieldKey="metaAppId" label="ID do Aplicativo Meta" placeholder="123456789012345" />
           <Field fieldKey="metaAppSecret" label="Chave Secreta do App" placeholder="••••••••••••••••" pw />
 
@@ -205,7 +206,7 @@ function AccountModal({
               </p>
               <Field fieldKey="accessToken" label="Page Access Token (long-lived)" placeholder="EAABxx…" pw />
               <Field fieldKey="pageId" label="Facebook Page ID" placeholder="123456789012345" />
-              <Field fieldKey="pageName" label="Nome da Página (opcional)" placeholder="SBC Agora" />
+              <Field fieldKey="pageName" label="Nome da Página (opcional)" placeholder={BRAND.name} />
               <Field fieldKey="instagramId" label="Instagram Business Account ID" placeholder="123456789012345" />
               <Field fieldKey="instagramName" label="Nome do Instagram (opcional)" placeholder="@sbcagora" />
             </div>

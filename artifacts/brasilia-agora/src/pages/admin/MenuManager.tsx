@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { BRAND } from "../../brand";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type MenuItem } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
@@ -16,7 +17,7 @@ type PagesTab = "paginas" | "categorias" | "links";
 
 const AVAILABLE_PAGES = [
   "Página Inicial",
-  "Sobre o SBC Agora",
+  `Sobre o ${BRAND.name}`,
   "Contato",
   "Anuncie",
   "Termos de Uso",
