@@ -87,7 +87,7 @@ export default function Webhook() {
     "category": "politica",
     "tag": "POLÍTICA",
     "imageUrl": "https://exemplo.com/imagem.jpg",
-    "author": "Redação Brasília Hoje"
+    "author": "Redação SBC Agora"
   }'`;
 
   const curlPublishId = `curl -X POST "${publishUrl}/<id-do-artigo>" \\

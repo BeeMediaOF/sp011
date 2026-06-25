@@ -43,7 +43,7 @@ export default function Contato() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-black text-[#1a2448] uppercase tracking-tight mb-3">Fale Conosco</h1>
-            <p className="text-gray-500 max-w-2xl mx-auto">Envie sua mensagem para a redação do Brasília Agora. Responderemos o mais breve possível.</p>
+            <p className="text-gray-500 max-w-2xl mx-auto">Envie sua mensagem para a redação do SBC Agora. Responderemos o mais breve possível.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

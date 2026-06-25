@@ -38,7 +38,7 @@ router.get("/sitemap-news.xml", async (req, res) => {
     <loc>${escapeXml(`${base}/artigo/${slug}`)}</loc>
     <news:news>
       <news:publication>
-        <news:name>Brasília Agora</news:name>
+        <news:name>SBC Agora</news:name>
         <news:language>pt</news:language>
       </news:publication>
       <news:publication_date>${pubDate}</news:publication_date>

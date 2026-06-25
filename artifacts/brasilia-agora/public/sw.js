@@ -1,7 +1,7 @@
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch {}
-  const title = data.title || "Brasília Agora";
+  const title = data.title || "SBC Agora";
   const options = {
     body: data.body || "",
     icon: "/favicon.jpg",

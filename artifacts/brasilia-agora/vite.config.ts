@@ -57,10 +57,10 @@ function buildOgHtml(params: {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} — Brasília Agora</title>
+<title>${esc(title)} — SBC Agora</title>
 <meta name="description" content="${esc(description)}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="Brasília Agora">
+<meta property="og:site_name" content="SBC Agora">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">

@@ -1,6 +1,6 @@
-# Brasília Agora
+# SBC Agora
 
-Brasília Agora é um portal de jornalismo independente focado na cobertura de Brasília e do Distrito Federal. Publicamos notícias factuais, reportagens investigativas e colunas de opinião sobre política, cidade, segurança pública, transporte, saúde, educação, cultura, esportes, Brasil e mundo.
+SBC Agora é um portal de jornalismo independente focado na cobertura de São Bernardo do Campo e da região do Grande ABC. Publicamos notícias factuais, reportagens investigativas e colunas de opinião sobre política, cidade, segurança pública, transporte, saúde, educação, cultura, esportes, Brasil e mundo.
 
 ## Seções principais
 

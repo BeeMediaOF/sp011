@@ -62,7 +62,7 @@ function deriveTitle(subtitle?: string, content?: string): string {
  *   category    string  optional  default: "geral"
  *   tag         string  optional  default: "GERAL"
  *   imageUrl    string  optional
- *   author      string  optional  default: "Redação Brasília Hoje"
+ *   author      string  optional  default: "Redação SBC Agora"
  *   id          string  optional  if provided without title, publishes an existing draft
  */
 router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
@@ -133,7 +133,7 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
     category: category?.trim() ?? "geral",
     tag: tag?.trim() ?? "GERAL",
     imageUrl: imageUrl?.trim() ?? "",
-    author: author?.trim() ?? "Redação Brasília Hoje",
+    author: author?.trim() ?? "Redação SBC Agora",
     publishedAt: new Date().toISOString(),
     status: "published",
   });

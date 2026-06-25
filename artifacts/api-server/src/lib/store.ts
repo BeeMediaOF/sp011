@@ -119,7 +119,7 @@ const DEFAULT_HOME_BLOCKS: HomeBlock[] = [
 ];
 
 const DEFAULT_SETTINGS: SiteSettings = {
-  siteName: "Brasília Hoje", tagline: "A notícia da nossa capital, agora.",
+  siteName: "SBC Agora", tagline: "Notícia. Agora. Sempre.",
   logoSize: 101, mobileEnabled: true, desktopEnabled: true,
   showTickerBar: true, showHeroStrip: true, homeBlocks: DEFAULT_HOME_BLOCKS,
 };

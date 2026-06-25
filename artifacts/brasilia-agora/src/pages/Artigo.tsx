@@ -112,7 +112,7 @@ export default function Artigo() {
     const desc  = (article.subtitle || article.title).replace(/<[^>]*>/g, "").slice(0, 160);
     const image = article.imageUrl || "/opengraph.jpg";
     const prevTitle = document.title;
-    document.title = `${title} — Brasília Agora`;
+    document.title = `${title} — SBC Agora`;
 
     function setMeta(prop: string, content: string, isOg = false): HTMLMetaElement {
       const attr = isOg ? "property" : "name";
@@ -412,11 +412,11 @@ export default function Artigo() {
         dateModified: article.publishedAt,
         author: {
           "@type": "Person",
-          name: article.author ?? "Redação Brasília Agora",
+          name: article.author ?? "Redação SBC Agora",
         },
         publisher: {
           "@type": "Organization",
-          name: "Brasília Agora",
+          name: "SBC Agora",
           logo: {
             "@type": "ImageObject",
             url: "https://brasilia-agora.com/favicon.jpg",

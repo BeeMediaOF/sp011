@@ -156,8 +156,8 @@ export default function Settings() {
 
   /* ── settings state ── */
   const [settings, setSettings] = useState<SiteSettings>({
-    siteName: "Brasília Hoje",
-    tagline: "A notícia da nossa capital, agora.",
+    siteName: "SBC Agora",
+    tagline: "Notícia. Agora. Sempre.",
     mobileEnabled: true,
     desktopEnabled: true,
     seoDescription: "",
