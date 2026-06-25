@@ -299,10 +299,28 @@ export default function Artigo() {
         const html = m[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
         if (html) return renderContent(html);
       }
-      // 3. If it looks like JSON but we couldn't extract content — show error placeholder
+      // 3. Try any other string key whose value looks like HTML or long prose
+      const anyValue = stripped.match(/"(?:content|html|body|text|rewritten|conteudo)[^"]*"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/i);
+      if (anyValue?.[1]) {
+        const val = anyValue[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
+        if (val.length > 20) return renderContent(val);
+      }
+      // 4. Collect all long string values from the JSON blob and join as paragraphs
+      const allStrings = [...stripped.matchAll(/"[^"]*"\s*:\s*"((?:[^"\\]|\\[\s\S])*?)"/g)]
+        .map((x) => x[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim())
+        .filter((v) => v.length > 60 && !v.startsWith("http"));
+      if (allStrings.length > 0) return renderContent(allStrings.join("\n\n"));
+      // 5. Last resort — strip JSON scaffolding and render whatever text remains
+      const rawText = stripped
+        .replace(/^\{/, "").replace(/\}$/, "")
+        .replace(/"[^"]+"\s*:\s*/g, "")
+        .replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\")
+        .replace(/[{}\[\]"]/g, "").trim();
+      if (rawText.length > 20) return renderContent(rawText);
+      // 6. Truly empty — show neutral placeholder, never a red error
       return [
-        <p key="json-err" className="text-sm text-red-500 italic p-4 border border-red-200 rounded-xl bg-red-50">
-          Conteúdo com formatação inválida. Use "Reparar conteúdo" no painel administrativo.
+        <p key="empty" className="text-gray-400 text-sm italic">
+          Conteúdo não disponível para este artigo.
         </p>,
       ];
     }
