@@ -592,26 +592,56 @@ router.post("/articles/delete-invalid", authMiddleware, async (req, res) => {
 
 /**
  * POST /api/admin/articles/migrate-json-content
- * Percorre TODOS os artigos e repara aqueles cujo campo `content` é um blob JSON bruto
- * ou está envolto em cercas de código ```json ... ```.
- * Extrai title / subtitle / content_html do JSON embutido e grava os valores corretos.
- * Não chama a IA de novo — apenas re-parseia o que já existe no banco.
+ *
+ * Varre TODOS os artigos do banco (sem cache, sem filtro de status) e repara
+ * qualquer um cujo campo `content` seja um blob JSON bruto ou envolto em cercas
+ * de código Markdown (```json ... ```).
+ *
+ * Regras de detecção (após .trim()):
+ *   • começa com ``` (com ou sem "json" após)
+ *   • começa com { (JSON sem cerca)
+ *
+ * Para cada um detectado:
+ *   1. Remove cercas de código do início e do fim
+ *   2. Tenta JSON.parse do resultado
+ *   3. Extrai content_html / contentHtml / content + title / subtitle / keywords / slug
+ *   4. Grava os valores corretos no banco
+ *   Se o parse falhar, loga o slug e CONTINUA (não cancela o lote, não deleta).
+ *
+ * Resposta: { fixed, failed, failedSlugs, skipped, total, remainingBroken }
  */
 router.post("/articles/migrate-json-content", authMiddleware, async (req, res) => {
-  function extractFromBlob(raw: string): {
-    content: string; title?: string; subtitle?: string; keywords?: string; slug?: string;
+  /** Strip code fences and return the JSON body (or null if it's plain HTML). */
+  function stripFences(raw: string): string | null {
+    // 1. Hard trim — remove ALL leading/trailing whitespace and newlines
+    const t = raw.trim();
+    if (t.length < 10) return null;
+
+    // 2. Remove opening fence (```json or ``` or no fence at all)
+    const afterOpen = t.replace(/^```(?:json)?\s*/i, "").trimStart();
+
+    // 3. After stripping the fence, must start with { or [ to be JSON
+    if (!afterOpen.startsWith("{") && !afterOpen.startsWith("[")) {
+      // The raw content didn't start with a fence and is not a JSON object
+      // (it might be plain HTML that happens to start with ``` in a code block)
+      return null;
+    }
+
+    // 4. Remove closing fence if present
+    const withoutClose = afterOpen.replace(/\s*```\s*$/, "").trim();
+    return withoutClose;
+  }
+
+  function extractFromJSON(jsonStr: string): {
+    content: string;
+    title?: string;
+    subtitle?: string;
+    keywords?: string;
+    slug?: string;
   } | null {
-    if (!raw || raw.trim().length < 20) return null;
-    // Trim BEFORE the fence-strip regex so a leading \n doesn't break the ^ anchor
-    const stripped = raw.trim()
-      .replace(/^```(?:json)?\s*/i, "")
-      .replace(/\s*```\s*$/, "")
-      .trim();
-    // Plain HTML / prose — not a JSON blob, no repair needed
-    if (!stripped.startsWith("{") && !stripped.startsWith("[")) return null;
-    // Try clean JSON parse
+    // --- Attempt 1: clean JSON.parse ---
     try {
-      const parsed = JSON.parse(stripped) as Record<string, unknown>;
+      const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
       const content = (
         (parsed["content_html"] as string | undefined) ??
         (parsed["contentHtml"]  as string | undefined) ??
@@ -626,60 +656,100 @@ router.post("/articles/migrate-json-content", authMiddleware, async (req, res) =
           slug:     ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
         };
       }
-    } catch { /* try regex */ }
-    // Regex fallback for truncated JSON
-    const mHtml = stripped.match(/"content_html"\s*:\s*"([\s\S]+?)(?:(?<!\\)"\s*[,}]|(?<!\\)"\s*$)/);
-    if (mHtml?.[1]) {
-      const content = mHtml[1]
-        .replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
-      if (content.length > 20) {
-        const mTitle = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-        const mSub   = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-        const mKw    = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-        const mSlug  = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-        return {
-          content,
-          title:    mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-          subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
-          keywords: mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
-          slug:     mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
-        };
+    } catch { /* fall through to regex */ }
+
+    // --- Attempt 2: regex extraction (handles truncated JSON) ---
+    // Try content_html first, then content field
+    for (const field of ["content_html", "contentHtml", "content"]) {
+      const mHtml = jsonStr.match(new RegExp(`"${field}"\\s*:\\s*"([\\s\\S]+?)(?:(?<!\\\\)"\\s*[,}]|(?<!\\\\)"\\s*$)`));
+      if (mHtml?.[1]) {
+        const content = mHtml[1]
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, "\\")
+          .trim();
+        if (content.length > 20) {
+          const mTitle = jsonStr.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          const mSub   = jsonStr.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          const mKw    = jsonStr.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          const mSlug  = jsonStr.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+          return {
+            content,
+            title:    mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+            subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
+            keywords: mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
+            slug:     mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
+          };
+        }
       }
     }
-    return null; // unextractable
+
+    return null;
   }
 
-  const articles = await articleService.getArticles();
-  let fixed   = 0;
-  let skipped = 0;
-  let deleted = 0;
+  // Bypass the 30s in-memory cache — query the DB directly so we always see
+  // the live state, even if this endpoint is called multiple times in quick succession.
+  const { db: _db, articlesTable: _at } = await import("@workspace/db");
+  const { desc: _desc } = await import("drizzle-orm");
+  const allRows = await _db.select().from(_at).orderBy(_desc(_at.createdAt));
 
-  for (const article of articles) {
-    const raw = article.content ?? "";
-    // Only process articles whose content starts with a fence or a { brace
-    const looksRaw = raw.trimStart().startsWith("```") || raw.trimStart().startsWith("{");
+  let fixed       = 0;
+  let failedParse = 0;
+  let skipped     = 0;
+  const fixedSlugs: string[]  = [];
+  const failedSlugs: string[] = [];
+
+  for (const row of allRows) {
+    const raw = row.content ?? "";
+    const trimmed = raw.trim();
+
+    // Detection: starts with fence OR starts with bare {
+    const looksRaw = trimmed.startsWith("```") || trimmed.startsWith("{");
     if (!looksRaw) { skipped++; continue; }
 
-    const extracted = extractFromBlob(raw);
+    const jsonStr = stripFences(trimmed);
+    if (!jsonStr) { skipped++; continue; }
+
+    const extracted = extractFromJSON(jsonStr);
     if (!extracted) {
-      // Nothing extractable — delete the article to avoid publishing garbage
-      await articleService.deleteArticle(article.id);
-      deleted++;
+      // JSON unextractable — log slug and skip (do NOT delete automatically)
+      req.log.warn({ slug: row.slug, id: row.id }, "admin migrate-json: could not extract content — skipping");
+      failedSlugs.push(row.slug ?? row.id);
+      failedParse++;
       continue;
     }
 
-    await articleService.updateArticle(article.id, {
+    await articleService.updateArticle(row.id, {
       content: extracted.content,
       ...(extracted.title    && { title:    extracted.title }),
       ...(extracted.subtitle && { subtitle: extracted.subtitle }),
       ...(extracted.keywords && { keywords: extracted.keywords }),
-      ...(extracted.slug     && article.slug !== extracted.slug && { slug: extracted.slug }),
+      ...(extracted.slug     && row.slug !== extracted.slug && { slug: extracted.slug }),
     });
+    fixedSlugs.push(row.slug ?? row.id);
     fixed++;
   }
 
-  req.log.info({ fixed, deleted, skipped, total: articles.length }, "admin: migrate-json-content complete");
-  res.json({ fixed, deleted, skipped, total: articles.length });
+  // Count remaining broken articles (post-migration verification)
+  const afterRows = await _db.select({ content: _at.content }).from(_at);
+  const remainingBroken = afterRows.filter(r => {
+    const t = (r.content ?? "").trim();
+    return t.startsWith("```") || t.startsWith("{");
+  }).length;
+
+  req.log.info(
+    { fixed, failedParse, skipped, total: allRows.length, remainingBroken },
+    "admin: migrate-json-content complete"
+  );
+  res.json({
+    fixed,
+    fixedSlugs,
+    failed: failedParse,
+    failedSlugs,
+    skipped,
+    total: allRows.length,
+    remainingBroken,
+  });
 });
 
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
