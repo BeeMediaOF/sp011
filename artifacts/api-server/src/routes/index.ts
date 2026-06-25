@@ -25,6 +25,7 @@ import rssLogsRouter from "./rss-logs";
 import pushRouter from "./push";
 import sitemapNewsRouter from "./sitemap-news";
 import queueRouter from "./queue";
+import imageRouter from "./image";
 
 const router: IRouter = Router();
 
@@ -53,5 +54,6 @@ router.use("/admin/rss-logs", rssLogsRouter);
 router.use("/push", pushRouter);
 router.use(sitemapNewsRouter);
 router.use("/admin/queue", queueRouter);
+router.use(imageRouter);
 
 export default router;
