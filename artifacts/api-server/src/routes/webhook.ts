@@ -4,6 +4,7 @@ import { authMiddleware } from "../middlewares/auth.js";
 import { articleService } from "../lib/articleService.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { sendPushToAll } from "./push.js";
+import { logAudit, getClientIp } from "../lib/audit.js";
 
 const publishRateLimit = endpointRateLimit("/api/publish");
 
@@ -91,6 +92,16 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
       body: (article.subtitle || "").replace(/<[^>]*>/g, "").slice(0, 100),
       url: `/artigo/${article.slug || article.id}`,
     });
+    if (req.isWebhookKey) {
+      await logAudit({
+        action: "publish",
+        module: "webhook",
+        description: `Artigo publicado via API Key: "${article.title}"`,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers["user-agent"],
+        metadata: { source: "webhook_api_key", articleId: article.id, articleTitle: article.title, ip: getClientIp(req) },
+      });
+    }
     res.json({ ok: true, message: "Artigo publicado com sucesso", article });
     return;
   }
@@ -145,6 +156,17 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
     url: `/artigo/${article.slug || article.id}`,
   });
   const titleDerived = !title?.trim();
+
+  if (req.isWebhookKey) {
+    await logAudit({
+      action: "publish",
+      module: "webhook",
+      description: `Artigo criado e publicado via API Key: "${article.title}"`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+      metadata: { source: "webhook_api_key", articleId: article.id, articleTitle: article.title, ip: getClientIp(req) },
+    });
+  }
   res.status(201).json({
     ok: true,
     message: "Artigo criado e publicado com sucesso",
@@ -171,6 +193,16 @@ router.post("/:id", authMiddleware, async (req, res) => {
     body: (article.subtitle || "").replace(/<[^>]*>/g, "").slice(0, 100),
     url: `/artigo/${article.slug || article.id}`,
   });
+  if (req.isWebhookKey) {
+    await logAudit({
+      action: "publish",
+      module: "webhook",
+      description: `Artigo publicado via API Key: "${article.title}"`,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers["user-agent"],
+      metadata: { source: "webhook_api_key", articleId: article.id, articleTitle: article.title, ip: getClientIp(req) },
+    });
+  }
   res.json({ ok: true, message: "Artigo publicado com sucesso", article });
 });
 

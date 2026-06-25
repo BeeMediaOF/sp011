@@ -101,6 +101,7 @@ declare global {
       userId?: number;
       userRole?: string;
       userEmail?: string;
+      isWebhookKey?: boolean;
     }
   }
 }
@@ -136,8 +137,9 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     const expectedHmac = createHmac("sha256", SECRET).update(activeWebhookKey).digest();
     const tokenHmac    = createHmac("sha256", SECRET).update(token).digest();
     if (timingSafeEqual(expectedHmac, tokenHmac)) {
-      req.userId   = 0;
-      req.userRole = "admin";
+      req.userId        = undefined;
+      req.userRole      = "admin";
+      req.isWebhookKey  = true;
       next();
       return;
     }

@@ -21,6 +21,24 @@ function SevBadge({ severity }: { severity: string }) {
   );
 }
 
+function parseMetadata(raw: string | null): Record<string, unknown> | null {
+  if (!raw) return null;
+  try { return JSON.parse(raw) as Record<string, unknown>; } catch { return null; }
+}
+
+function WebhookBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+      style={{ backgroundColor: "#FFF7ED", color: "#C2410C" }}>
+      <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ display: "inline" }}>
+        <circle cx="4.5" cy="4.5" r="3.5" stroke="#C2410C" strokeWidth="1.5" />
+        <path d="M4.5 2.5v2.2l1.4 1.4" stroke="#C2410C" strokeWidth="1.1" strokeLinecap="round" />
+      </svg>
+      Webhook
+    </span>
+  );
+}
+
 function formatDate(d: string) {
   return new Date(d).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
@@ -142,16 +160,24 @@ export default function Logs() {
                     <tr><td colSpan={6} className="py-12 text-center text-slate-400">Carregando...</td></tr>
                   ) : actionLogs.length === 0 ? (
                     <tr><td colSpan={6} className="py-12 text-center text-slate-400">Nenhum log encontrado</td></tr>
-                  ) : actionLogs.map((l) => (
+                  ) : actionLogs.map((l) => {
+                    const meta = parseMetadata(l.metadata);
+                    const isWebhook = meta?.source === "webhook_api_key";
+                    return (
                     <tr key={l.id} className="border-b border-slate-50 hover:bg-slate-50/50">
-                      <td className="px-5 py-3 text-[12px] font-medium text-slate-700">{l.userEmail ?? "—"}</td>
+                      <td className="px-5 py-3 text-[12px] font-medium text-slate-700">
+                        <div className="flex items-center gap-2">
+                          {isWebhook ? <WebhookBadge /> : null}
+                          <span>{isWebhook ? "API Key" : (l.userEmail ?? "—")}</span>
+                        </div>
+                      </td>
                       <td className="px-4 py-3"><span className="text-[11px] font-mono bg-slate-100 px-2 py-0.5 rounded">{l.action}</span></td>
                       <td className="px-4 py-3 text-[12px] text-slate-500">{l.module}</td>
                       <td className="px-4 py-3 text-[12px] text-slate-600 max-w-[260px] truncate">{l.description}</td>
                       <td className="px-4 py-3 text-[11px] font-mono text-slate-400">{l.ipAddress ?? "—"}</td>
                       <td className="px-4 py-3 text-[11px] text-slate-400">{formatDate(l.createdAt)}</td>
                     </tr>
-                  ))}
+                  );})}
                 </tbody>
               </table>
             )}
