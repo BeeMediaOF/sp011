@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 
 interface Article {
   id: string;
@@ -35,6 +36,8 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
       ? featured.image
       : (featured.image as { src?: string })?.src ?? "";
 
+  const featuredSrcSet = buildSrcSet(imgSrc, HERO_WIDTHS);
+
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
@@ -59,17 +62,22 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
         {/* Layout: destaque (esq) + lista (dir) */}
         <div className="flex flex-col lg:flex-row gap-6">
 
-          {/* Destaque principal */}
+          {/* Destaque principal — aspect-ratio reserva espaço → CLS=0 */}
           <Link
             href={`/artigo/${featured.slug || featured.id}`}
             className="group block lg:w-[58%] shrink-0"
           >
-            <div className="relative overflow-hidden aspect-[16/9] bg-gray-100">
+            <div className="relative overflow-hidden bg-gray-100" style={{ aspectRatio: "16/9" }}>
               <img
-                src={imgSrc}
+                src={imgSrc || undefined}
+                srcSet={featuredSrcSet || undefined}
+                sizes={featuredSrcSet ? "(max-width: 1024px) 100vw, 58vw" : undefined}
                 alt={featured.title.replace(/<[^>]*>/g, "")}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                width={800}
+                height={450}
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 loading="lazy"
+                decoding="async"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
               <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -89,7 +97,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                 {featured.summary}
               </p>
               <div className="flex items-center gap-2 mt-2 text-[11px] text-gray-400">
-                <img src={bylineLogo} alt={bylineName} className="w-4 h-4 rounded-full object-cover shrink-0" />
+                <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0" loading="lazy" />
                 <span className="font-medium text-gray-600">{bylineName}</span>
                 <span className="w-1 h-1 rounded-full bg-gray-300" />
                 <span>{featured.time}</span>
@@ -97,25 +105,32 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
             </div>
           </Link>
 
-          {/* Lista lateral — 3 notícias */}
+          {/* Lista lateral */}
           <div className="flex-1 flex flex-col divide-y divide-gray-100">
             {sideItems.map((item) => {
               const src =
                 typeof item.image === "string"
                   ? item.image
                   : (item.image as { src?: string })?.src ?? "";
+              const srcset = buildSrcSet(src, THUMB_WIDTHS);
               return (
                 <Link
                   key={item.id}
                   href={`/artigo/${item.slug || item.id}`}
                   className="group flex gap-4 py-4 first:pt-0 last:pb-0 items-start"
                 >
-                  <div className="w-[96px] h-[68px] shrink-0 overflow-hidden bg-gray-100">
+                  {/* Dimensões explícitas → CLS=0 */}
+                  <div className="w-[96px] h-[68px] shrink-0 overflow-hidden bg-gray-100" style={{ position: "relative" }}>
                     <img
-                      src={src}
+                      src={src || undefined}
+                      srcSet={srcset || undefined}
+                      sizes={srcset ? "96px" : undefined}
                       alt={item.title.replace(/<[^>]*>/g, "")}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
+                      width={96}
+                      height={68}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
                       loading="lazy"
+                      decoding="async"
                     />
                   </div>
                   <div className="flex-1 min-w-0">

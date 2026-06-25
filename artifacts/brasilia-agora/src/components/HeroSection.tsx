@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useArticles } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
+import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import heroImg        from "../assets/images/hero.webp";
 import trafficImg     from "../assets/images/traffic.webp";
 import policeImg      from "../assets/images/police.webp";
@@ -85,14 +86,23 @@ function FeaturedCard({
   const bylineName = settings?.bylineName || settings?.siteName || "Redação";
   const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
 
+  // Gera srcset para imagens metroimg — browser escolhe a menor versão adequada
+  const srcset = buildSrcSet(item.img, HERO_WIDTHS);
+
   return (
     <Link
       href={`/artigo/${item.slug || item.id}`}
       className={`group block relative overflow-hidden bg-gray-100 ${className}`}
     >
       <img
-        src={item.img}
+        src={item.img || undefined}
+        srcSet={srcset || undefined}
+        sizes={srcset
+          ? "(max-width: 1024px) 100vw, 33vw"
+          : undefined}
         alt={item.title.replace(/<[^>]*>/g, "")}
+        width={800}
+        height={534}
         loading={priority ? "eager" : "lazy"}
         fetchPriority={priority ? "high" : "auto"}
         decoding={priority ? "sync" : "async"}
@@ -110,7 +120,7 @@ function FeaturedCard({
           dangerouslySetInnerHTML={{ __html: item.title }}
         />
         <div className="flex items-center gap-2 text-[11px] text-white/60">
-          <img src={bylineLogo} alt={bylineName} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
+          <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
           <span className="font-medium">{bylineName}</span>
           <span className="w-1 h-1 rounded-full bg-white/40" />
           <span>{item.time}</span>
@@ -146,14 +156,23 @@ function MobileCarousel({ items }: { items: FeaturedItem[] }) {
   }
 
   return (
-    <div className="relative overflow-hidden" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+    /*
+      Container com aspect-ratio fixo → reserva espaço antes de carregar.
+      No mobile o hero ocupa a viewport inteira, 16:9 é a proporção correta.
+    */
+    <div
+      className="relative overflow-hidden"
+      style={{ aspectRatio: "16/9" }}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       <div
-        className="flex transition-transform duration-500 ease-in-out"
+        className="flex h-full transition-transform duration-500 ease-in-out"
         style={{ transform: `translateX(-${active * 100}%)` }}
       >
         {items.map((item, idx) => (
-          <div key={item.id} className="w-full shrink-0">
-            <FeaturedCard item={item} priority={idx === 0} className="h-[320px]" />
+          <div key={item.id} className="w-full shrink-0 h-full">
+            <FeaturedCard item={item} priority={idx === 0} className="h-full" />
           </div>
         ))}
       </div>
@@ -182,6 +201,10 @@ function MobileCarousel({ items }: { items: FeaturedItem[] }) {
 // ─── Layout desktop ───────────────────────────────────────────────────────────
 function DesktopGrid({ items }: { items: FeaturedItem[] }) {
   return (
+    /*
+      Grid com altura fixa — reserva espaço antes das imagens carregarem.
+      h-[420px] garante CLS=0 nesse bloco.
+    */
     <div className="grid grid-cols-3 gap-3 h-[420px]">
       {items.map((item, idx) => (
         <FeaturedCard key={item.id} item={item} priority={idx === 0} className="h-full" />
@@ -194,37 +217,43 @@ function DesktopGrid({ items }: { items: FeaturedItem[] }) {
 function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
   return (
     <div className="flex gap-3 overflow-x-auto snap-x snap-mandatory no-scrollbar pb-1 -mx-4 px-4">
-      {items.map((item) => (
-        <a
-          key={item.id}
-          href={`/artigo/${item.slug || item.id}`}
-          className="group flex gap-2.5 items-start snap-start shrink-0 w-[72vw] max-w-[280px]"
-        >
-          <div className="w-[72px] h-[52px] shrink-0 overflow-hidden bg-gray-100 rounded-sm">
-            <img
-              src={item.img}
-              alt={item.chapeu}
-              width={72}
-              height={52}
-              loading="lazy"
-              decoding="async"
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <span
-              className="text-[11px] font-bold uppercase tracking-wider block mb-1"
-              style={{ color: item.chapeuColor }}
-            >
-              {item.chapeu}
-            </span>
-            <h3
-              className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
-              dangerouslySetInnerHTML={{ __html: item.title }}
-            />
-          </div>
-        </a>
-      ))}
+      {items.map((item) => {
+        const srcset = buildSrcSet(item.img, THUMB_WIDTHS);
+        return (
+          <a
+            key={item.id}
+            href={`/artigo/${item.slug || item.id}`}
+            className="group flex gap-2.5 items-start snap-start shrink-0 w-[72vw] max-w-[280px]"
+          >
+            {/* Container com dimensões explícitas → CLS=0 */}
+            <div className="w-[72px] h-[52px] shrink-0 overflow-hidden bg-gray-100 rounded-sm" style={{ position: "relative" }}>
+              <img
+                src={item.img || undefined}
+                srcSet={srcset || undefined}
+                sizes={srcset ? "72px" : undefined}
+                alt={item.chapeu}
+                width={72}
+                height={52}
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <span
+                className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+                style={{ color: item.chapeuColor }}
+              >
+                {item.chapeu}
+              </span>
+              <h3
+                className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
+                dangerouslySetInnerHTML={{ __html: item.title }}
+              />
+            </div>
+          </a>
+        );
+      })}
     </div>
   );
 }
@@ -234,7 +263,6 @@ export default function HeroSection() {
   const { articles, loading } = useArticles();
   const { settings } = useSite();
 
-  // Sort all published articles by publishedAt desc
   const sorted = [...articles].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );
@@ -281,32 +309,38 @@ export default function HeroSection() {
 
           {/* Desktop: 4-column grid */}
           <div className="hidden lg:grid lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
-            {secondary.map((item) => (
-              <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
-                <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100">
-                  <img
-                    src={item.img}
-                    alt={item.chapeu}
-                    width={100}
-                    height={72}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="text-[11px] font-bold uppercase tracking-wider block mb-1"
-                    style={{ color: item.chapeuColor }}
-                  >
-                    {item.chapeu}
-                  </span>
-                  <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
-                  />
-                </div>
-              </Link>
-            ))}
+            {secondary.map((item) => {
+              const srcset = buildSrcSet(item.img, THUMB_WIDTHS);
+              return (
+                <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
+                  {/* Dimensões explícitas → CLS=0 */}
+                  <div className="w-[100px] h-[72px] shrink-0 overflow-hidden bg-gray-100" style={{ position: "relative" }}>
+                    <img
+                      src={item.img || undefined}
+                      srcSet={srcset || undefined}
+                      sizes={srcset ? "100px" : undefined}
+                      alt={item.chapeu}
+                      width={100}
+                      height={72}
+                      loading="lazy"
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-wider block mb-1"
+                      style={{ color: item.chapeuColor }}
+                    >
+                      {item.chapeu}
+                    </span>
+                    <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
+                      dangerouslySetInnerHTML={{ __html: item.title }}
+                    />
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </>
       )}

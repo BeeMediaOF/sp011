@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { buildSrcSet, THUMB_WIDTHS } from "@/lib/newsImage";
 
 interface Article {
   id: string;
@@ -42,40 +43,50 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y divide-gray-100 md:divide-y-0">
-          {items.map((item, idx) => (
-            <Link
-              key={item.id}
-              href={`/artigo/${item.slug || item.id}`}
-              className="group flex items-start gap-4 py-4 md:py-3 md:border-b md:border-gray-100 hover:bg-gray-50/50 transition-colors px-2 -mx-2 rounded"
-            >
-              <span
-                className="text-[22px] font-black tabular-nums shrink-0 w-7 text-center leading-none mt-1"
-                style={{ color }}
+          {items.map((item, idx) => {
+            const src = imgSrc(item.image);
+            const srcset = buildSrcSet(src, THUMB_WIDTHS);
+            return (
+              <Link
+                key={item.id}
+                href={`/artigo/${item.slug || item.id}`}
+                className="group flex items-start gap-4 py-4 md:py-3 md:border-b md:border-gray-100 hover:bg-gray-50/50 transition-colors px-2 -mx-2 rounded"
               >
-                {idx + 1}
-              </span>
-              <div className="w-[80px] h-[58px] shrink-0 overflow-hidden bg-gray-100 rounded">
-                <img
-                  src={imgSrc(item.image)}
-                  alt={item.title.replace(/<[^>]*>/g, "")}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  loading="lazy"
-                />
-              </div>
-              <div className="flex-1 min-w-0">
                 <span
-                  className="text-[10px] font-bold uppercase tracking-wider block mb-0.5"
+                  className="text-[22px] font-black tabular-nums shrink-0 w-7 text-center leading-none mt-1"
                   style={{ color }}
                 >
-                  {item.chapeu}
+                  {idx + 1}
                 </span>
-                <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
-                />
-                <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
-              </div>
-            </Link>
-          ))}
+                {/* Dimensões explícitas → CLS=0 */}
+                <div className="w-[80px] h-[58px] shrink-0 overflow-hidden bg-gray-100 rounded" style={{ position: "relative" }}>
+                  <img
+                    src={src || undefined}
+                    srcSet={srcset || undefined}
+                    sizes={srcset ? "80px" : undefined}
+                    alt={item.title.replace(/<[^>]*>/g, "")}
+                    width={80}
+                    height={58}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span
+                    className="text-[10px] font-bold uppercase tracking-wider block mb-0.5"
+                    style={{ color }}
+                  >
+                    {item.chapeu}
+                  </span>
+                  <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
       </div>

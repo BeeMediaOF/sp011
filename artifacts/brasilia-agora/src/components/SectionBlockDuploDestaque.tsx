@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 
 interface Article {
   id: string;
@@ -46,73 +47,89 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
           </Link>
         </div>
 
-        {/* 2 destaques grandes */}
+        {/* 2 destaques grandes — aspect-ratio reserva espaço → CLS=0 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          {featured.map((art) => (
-            <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
-              <div className="relative overflow-hidden bg-gray-100 h-[380px]">
-                <img
-                  src={imgSrc(art.image)}
-                  alt={art.title}
-                  className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
-                  loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <span
-                    className="inline-block text-white text-[11px] font-bold px-3 py-1 uppercase tracking-wider mb-3"
-                    style={{ backgroundColor: color }}
-                  >
-                    {art.chapeu}
-                  </span>
-                  <h3
-                    className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
-                   
-                  >
-                    {art.title}
-                  </h3>
-                  <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.summary}</p>
-                  <div className="flex items-center gap-2 text-[11px] text-white/50">
-                    <span>{bylineName}</span>
-                    <span className="w-1 h-1 rounded-full bg-white/40" />
-                    <span>{art.time}</span>
+          {featured.map((art) => {
+            const src = imgSrc(art.image);
+            const srcset = buildSrcSet(src, HERO_WIDTHS);
+            return (
+              <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
+                <div className="relative overflow-hidden bg-gray-100" style={{ aspectRatio: "16/9" }}>
+                  <img
+                    src={src || undefined}
+                    srcSet={srcset || undefined}
+                    sizes={srcset ? "(max-width: 1024px) 100vw, 50vw" : undefined}
+                    alt={art.title}
+                    width={640}
+                    height={360}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-6">
+                    <span
+                      className="inline-block text-white text-[11px] font-bold px-3 py-1 uppercase tracking-wider mb-3"
+                      style={{ backgroundColor: color }}
+                    >
+                      {art.chapeu}
+                    </span>
+                    <h3 className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2">
+                      {art.title}
+                    </h3>
+                    <p className="text-white/70 text-[13px] line-clamp-2 mb-3">{art.summary}</p>
+                    <div className="flex items-center gap-2 text-[11px] text-white/50">
+                      <span>{bylineName}</span>
+                      <span className="w-1 h-1 rounded-full bg-white/40" />
+                      <span>{art.time}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
 
         {/* Faixa de 4 notícias menores */}
         {strip.length > 0 && (
           <div className="flex overflow-x-auto snap-x snap-mandatory gap-3 -mx-4 px-4 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:grid sm:grid-cols-2 sm:overflow-x-visible sm:snap-none sm:mx-0 sm:px-0 sm:pb-0 sm:gap-4 lg:grid-cols-4 border-t border-gray-200 pt-5">
-            {strip.map((art) => (
-              <Link
-                key={art.id}
-                href={`/artigo/${art.slug || art.id}`}
-                className="group flex gap-3 items-start snap-start shrink-0 w-[72vw] max-w-[260px] sm:w-auto sm:max-w-none sm:shrink-0"
-              >
-                <div className="w-[80px] h-[60px] shrink-0 overflow-hidden bg-gray-100">
-                  <img
-                    src={imgSrc(art.image)}
-                    alt={art.chapeu}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    loading="lazy"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span
-                    className="text-[10px] font-bold uppercase tracking-wider block mb-1"
-                    style={{ color }}
-                  >
-                    {art.chapeu}
-                  </span>
-                  <h4 className="font-serif text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
-                    {art.title}
-                  </h4>
-                </div>
-              </Link>
-            ))}
+            {strip.map((art) => {
+              const src = imgSrc(art.image);
+              const srcset = buildSrcSet(src, THUMB_WIDTHS);
+              return (
+                <Link
+                  key={art.id}
+                  href={`/artigo/${art.slug || art.id}`}
+                  className="group flex gap-3 items-start snap-start shrink-0 w-[72vw] max-w-[260px] sm:w-auto sm:max-w-none sm:shrink-0"
+                >
+                  {/* Dimensões fixas → CLS=0 */}
+                  <div className="w-[80px] h-[60px] shrink-0 overflow-hidden bg-gray-100" style={{ position: "relative" }}>
+                    <img
+                      src={src || undefined}
+                      srcSet={srcset || undefined}
+                      sizes={srcset ? "80px" : undefined}
+                      alt={art.chapeu}
+                      width={80}
+                      height={60}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className="text-[10px] font-bold uppercase tracking-wider block mb-1"
+                      style={{ color }}
+                    >
+                      {art.chapeu}
+                    </span>
+                    <h4 className="font-serif text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]">
+                      {art.title}
+                    </h4>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         )}
 

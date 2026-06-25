@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS } from "@/lib/newsImage";
 
 interface Article {
   id: string;
@@ -28,6 +29,9 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
   const secondary = rest.slice(0, 3);
   if (!hero) return null;
 
+  const heroSrc = imgSrc(hero.image);
+  const heroSrcSet = buildSrcSet(heroSrc, HERO_WIDTHS);
+
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
@@ -42,14 +46,19 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
           </Link>
         </div>
 
-        {/* Hero — full width with dark overlay */}
+        {/* Hero — aspect-ratio 21:9 reserva espaço → CLS=0 */}
         <Link href={`/artigo/${hero.slug || hero.id}`} className="group block relative overflow-hidden rounded-sm mb-6">
-          <div className="aspect-[21/9] bg-gray-200 overflow-hidden">
+          <div className="bg-gray-200 overflow-hidden" style={{ aspectRatio: "21/9", position: "relative" }}>
             <img
-              src={imgSrc(hero.image)}
+              src={heroSrc || undefined}
+              srcSet={heroSrcSet || undefined}
+              sizes={heroSrcSet ? "100vw" : undefined}
               alt={hero.title}
-              className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
+              width={1200}
+              height={514}
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-103 transition-transform duration-700"
               loading="lazy"
+              decoding="async"
             />
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
@@ -70,32 +79,41 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
           </div>
         </Link>
 
-        {/* Secondary articles */}
+        {/* Secondary articles — aspect-ratio 16:9 → CLS=0 */}
         {secondary.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {secondary.map((item) => (
-              <Link
-                key={item.id}
-                href={`/artigo/${item.slug || item.id}`}
-                className="group flex flex-col"
-              >
-                <div className="aspect-[16/9] overflow-hidden bg-gray-100 rounded-sm mb-3">
-                  <img
-                    src={imgSrc(item.image)}
-                    alt={item.title.replace(/<[^>]*>/g, "")}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
-                    loading="lazy"
+            {secondary.map((item) => {
+              const src = imgSrc(item.image);
+              const srcset = buildSrcSet(src, CARD_WIDTHS);
+              return (
+                <Link
+                  key={item.id}
+                  href={`/artigo/${item.slug || item.id}`}
+                  className="group flex flex-col"
+                >
+                  <div className="overflow-hidden bg-gray-100 rounded-sm mb-3" style={{ aspectRatio: "16/9", position: "relative" }}>
+                    <img
+                      src={src || undefined}
+                      srcSet={srcset || undefined}
+                      sizes={srcset ? "(max-width: 768px) 100vw, 33vw" : undefined}
+                      alt={item.title.replace(/<[^>]*>/g, "")}
+                      width={400}
+                      height={225}
+                      className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>
+                    {item.chapeu}
+                  </span>
+                  <h4 className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
+                    dangerouslySetInnerHTML={{ __html: item.title }}
                   />
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>
-                  {item.chapeu}
-                </span>
-                <h4 className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
-                />
-                <p className="text-[11px] text-gray-400 mt-1.5">{item.time}</p>
-              </Link>
-            ))}
+                  <p className="text-[11px] text-gray-400 mt-1.5">{item.time}</p>
+                </Link>
+              );
+            })}
           </div>
         )}
 

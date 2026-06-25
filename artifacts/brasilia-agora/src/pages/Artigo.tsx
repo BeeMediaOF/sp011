@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { BRAND } from "../brand";
+import { buildSrcSet, HERO_WIDTHS } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
 import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
@@ -603,14 +604,20 @@ export default function Artigo() {
                     </div>
                   </div>
 
-                  {/* Imagem principal */}
+                  {/* Imagem principal — LCP candidate: eager + fetchpriority + srcset */}
                   {article.imageUrl && (
-                    <figure className="w-full aspect-[16/9] mb-6 overflow-hidden bg-gray-100">
+                    <figure className="w-full mb-6 overflow-hidden bg-gray-100" style={{ aspectRatio: "16/9", position: "relative" }}>
                       <img
                         src={article.imageUrl}
-                        alt={article.title}
-                        className="w-full h-full object-cover"
+                        srcSet={buildSrcSet(article.imageUrl, HERO_WIDTHS) || undefined}
+                        sizes="(max-width: 1024px) 100vw, 800px"
+                        alt={article.title.replace(/<[^>]*>/g, "")}
+                        width={800}
+                        height={450}
+                        className="absolute inset-0 w-full h-full object-cover"
                         loading="eager"
+                        fetchPriority="high"
+                        decoding="sync"
                       />
                     </figure>
                   )}
