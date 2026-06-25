@@ -292,44 +292,48 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     logger.info({ articleId: item.articleId, attempt }, "Rewrite queue: article updated successfully");
 
   } catch (err) {
-    _failedTotal++;
     const msg = String(err);
-    logger.warn({ err, articleId: item.articleId, attempt }, "Rewrite queue: item failed");
-    addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Reescrita falhou (tentativa ${attempt}/${MAX_ATTEMPTS}): ${msg}` });
-    pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: msg });
-
     const isQuotaError = msg.includes("QUOTA_COOLDOWN") || msg.includes("QUOTA_EXHAUSTED");
 
     if (isQuotaError) {
       // Quota errors are TEMPORARY — re-queue at front WITHOUT consuming an attempt.
-      // The article will be retried once the cooldown lifts.
+      // Not counted as failure and NOT logged as error so the Log de Coleta stays clean.
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: quota cooldown — re-queuing silently");
       if (!_queue.some((q) => q.articleId === item.articleId)) {
-        _queue.unshift({ ...item, attempts: item.attempts ?? 0 }); // keep original attempt count
+        _queue.unshift({ ...item, attempts: item.attempts ?? 0 });
         logger.info(
           { articleId: item.articleId, attempt, queueLength: _queue.length },
           "Article returned to queue front — quota cooldown, attempt NOT consumed",
         );
       }
-    } else if (attempt < MAX_ATTEMPTS) {
-      // Real error (content/network): retry up to MAX_ATTEMPTS times, push to back
-      if (!_queue.some((q) => q.articleId === item.articleId)) {
-        _queue.push({ ...item, attempts: attempt });
-        logger.info(
-          { articleId: item.articleId, attempt, maxAttempts: MAX_ATTEMPTS },
-          "Article re-queued after content/network error",
-        );
-      }
     } else {
-      // Real error, max attempts reached: delete the article so it never shows as broken
-      try {
-        await articleService.deleteArticle(item.articleId);
-        logger.warn(
-          { articleId: item.articleId, attempt },
-          `Article deleted after ${MAX_ATTEMPTS} failed rewrite attempts`,
-        );
-        addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Artigo excluído após ${MAX_ATTEMPTS} tentativas de reescrita sem sucesso` });
-      } catch (delErr) {
-        logger.warn({ err: delErr, articleId: item.articleId }, "Failed to delete article after max attempts");
+      // Real error: count + log it
+      _failedTotal++;
+      logger.warn({ err, articleId: item.articleId, attempt }, "Rewrite queue: item failed");
+      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Reescrita falhou (tentativa ${attempt}/${MAX_ATTEMPTS}): ${msg}` });
+      pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: msg });
+
+      if (attempt < MAX_ATTEMPTS) {
+        // Retry up to MAX_ATTEMPTS times, push to back
+        if (!_queue.some((q) => q.articleId === item.articleId)) {
+          _queue.push({ ...item, attempts: attempt });
+          logger.info(
+            { articleId: item.articleId, attempt, maxAttempts: MAX_ATTEMPTS },
+            "Article re-queued after content/network error",
+          );
+        }
+      } else {
+        // Max attempts reached: delete the article so it never shows as broken
+        try {
+          await articleService.deleteArticle(item.articleId);
+          logger.warn(
+            { articleId: item.articleId, attempt },
+            `Article deleted after ${MAX_ATTEMPTS} failed rewrite attempts`,
+          );
+          addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: `Artigo excluído após ${MAX_ATTEMPTS} tentativas de reescrita sem sucesso` });
+        } catch (delErr) {
+          logger.warn({ err: delErr, articleId: item.articleId }, "Failed to delete article after max attempts");
+        }
       }
     }
   } finally {
