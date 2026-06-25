@@ -410,8 +410,13 @@ export default function AdsManager() {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   async function toggleActive(ad: Ad) {
-    try { await adminApi.updateAd(ad.id, { active: !ad.active }); await load(); }
-    catch (err) { alert((err as Error).message); }
+    const next = !ad.active;
+    setAds(prev => prev.map(a => a.id === ad.id ? { ...a, active: next } : a));
+    try { await adminApi.updateAd(ad.id, { active: next }); }
+    catch (err) {
+      setAds(prev => prev.map(a => a.id === ad.id ? { ...a, active: ad.active } : a));
+      alert((err as Error).message);
+    }
   }
 
   async function handleDelete(id: string) {
