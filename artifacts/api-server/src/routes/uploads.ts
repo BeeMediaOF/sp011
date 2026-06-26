@@ -1,15 +1,19 @@
 /**
- * Upload routes — backed by Replit Object Storage (GCS).
+ * Upload routes — backed by Supabase Storage (S3-compatible object store).
  *
  * Files are received via multipart (multer memoryStorage) and uploaded
- * directly to GCS via the Replit sidecar's presigned-URL endpoint.
- * The sidecar is available at http://127.0.0.1:1106 on any Replit deployment.
+ * directly to a Supabase Storage bucket via its REST API using the
+ * service-role key (server-side only, bypasses RLS).
  *
  * Serving: GET /api/uploads/:filename
- *   → generates a short-lived signed GET URL from the sidecar
- *   → fetches the file from GCS and streams it to the client
+ *   → fetches the object from Supabase Storage and streams it to the client
  *   → client receives Cache-Control: immutable (browser caches for 1 year)
- *   → falls back to local disk for files uploaded before GCS migration
+ *   → falls back to local disk when Supabase Storage is not configured (dev)
+ *
+ * Required env:
+ *   SUPABASE_URL                — e.g. https://<ref>.supabase.co
+ *   SUPABASE_SERVICE_ROLE_KEY   — service_role key (Settings → API)
+ *   SUPABASE_STORAGE_BUCKET     — bucket name (default: "uploads")
  */
 
 import { Router } from "express";
@@ -18,59 +22,65 @@ import { randomUUID } from "crypto";
 import { extname, join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { existsSync, mkdirSync } from "fs";
+import { Readable } from "stream";
 import { authMiddleware } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
 
+const isProd = process.env["NODE_ENV"] === "production";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Legacy local dir — only used as fallback for pre-migration files
+// Local dir — used as fallback when Supabase Storage is not configured (dev only).
 const LOCAL_UPLOADS_DIR = join(__dirname, "../../data/uploads");
 if (!existsSync(LOCAL_UPLOADS_DIR)) mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
 
-// ── GCS via Replit sidecar ─────────────────────────────────────────────────────
-const SIDECAR = "http://127.0.0.1:1106";
-const BUCKET = process.env["DEFAULT_OBJECT_STORAGE_BUCKET_ID"] ?? "";
-const GCS_PREFIX = "uploads"; // all uploads go to gs://<bucket>/uploads/<filename>
+// ── Supabase Storage (REST API) ────────────────────────────────────────────────
+const SUPABASE_URL = (process.env["SUPABASE_URL"] ?? "").replace(/\/+$/, "");
+const SERVICE_KEY = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+const BUCKET = process.env["SUPABASE_STORAGE_BUCKET"] ?? "uploads";
+const STORAGE_PREFIX = "uploads"; // objects stored at <bucket>/uploads/<filename>
 
-const gcsConfigured = !!BUCKET;
+const storageConfigured = !!(SUPABASE_URL && SERVICE_KEY);
 
-async function gcsSignedUrl(objectName: string, method: "PUT" | "GET", ttlSec = 900): Promise<string> {
-  const res = await fetch(`${SIDECAR}/object-storage/signed-object-url`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      bucket_name: BUCKET,
-      object_name: objectName,
-      method,
-      expires_at: new Date(Date.now() + ttlSec * 1_000).toISOString(),
-    }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (!res.ok) throw new Error(`Sidecar signed URL failed: ${res.status}`);
-  const body = await res.json() as { signed_url: string };
-  return body.signed_url;
+// In production we require object storage — silently writing to local disk would
+// scatter files across ephemeral instances and lose them on redeploy.
+if (isProd && !storageConfigured) {
+  logger.error(
+    "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas — uploads ficarão indisponíveis em produção. " +
+      "Configure o Supabase Storage para habilitar o envio de imagens/vídeos.",
+  );
 }
 
-async function gcsUpload(filename: string, buffer: Buffer, contentType: string): Promise<void> {
-  const objectName = `${GCS_PREFIX}/${filename}`;
-  const signedUrl = await gcsSignedUrl(objectName, "PUT", 900);
-  const res = await fetch(signedUrl, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
+function objectUrl(filename: string): string {
+  return `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${STORAGE_PREFIX}/${encodeURIComponent(filename)}`;
+}
+
+async function storageUpload(filename: string, buffer: Buffer, contentType: string): Promise<void> {
+  const res = await fetch(objectUrl(filename), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": contentType,
+      "x-upsert": "true",
+      "cache-control": "31536000",
+    },
     body: buffer,
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`GCS upload failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(`Supabase Storage upload failed: ${res.status} ${await res.text()}`);
 }
 
-async function gcsDownload(filename: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+async function storageDownload(
+  filename: string,
+): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; contentLength: string | null } | null> {
   try {
-    const objectName = `${GCS_PREFIX}/${filename}`;
-    const signedUrl = await gcsSignedUrl(objectName, "GET", 3_600);
-    const res = await fetch(signedUrl, { signal: AbortSignal.timeout(30_000) });
-    if (!res.ok) return null;
+    const res = await fetch(objectUrl(filename), {
+      headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (!res.ok || !res.body) return null;
     const contentType = res.headers.get("content-type") ?? "application/octet-stream";
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return { buffer, contentType };
+    const contentLength = res.headers.get("content-length");
+    return { stream: res.body, contentType, contentLength };
   } catch {
     return null;
   }
@@ -83,7 +93,7 @@ const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/ogg", "video/quic
 const IMAGE_MAX = 8 * 1024 * 1024;   // 8 MB
 const VIDEO_MAX = 100 * 1024 * 1024; // 100 MB
 
-// Use memory storage — files are uploaded to GCS immediately after multer parses them
+// Use memory storage — files are uploaded to Storage immediately after multer parses them
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: VIDEO_MAX },
@@ -130,17 +140,22 @@ router.post("/image", authMiddleware, upload.single("image"), async (req, res) =
     return;
   }
 
+  if (isProd && !storageConfigured) {
+    res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
+    return;
+  }
+
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (gcsConfigured) {
-      await gcsUpload(filename, req.file.buffer, req.file.mimetype);
-      logger.info({ filename, size: req.file.size, storage: "gcs" }, "Image uploaded to GCS");
+    if (storageConfigured) {
+      await storageUpload(filename, req.file.buffer, req.file.mimetype);
+      logger.info({ filename, size: req.file.size, storage: "supabase" }, "Image uploaded to Supabase Storage");
     } else {
-      // GCS not configured — fall back to local disk (dev only)
+      // Storage not configured — fall back to local disk (dev only)
       const { writeFileSync } = await import("fs");
       writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
-      logger.warn({ filename }, "GCS not configured — image saved to local disk");
+      logger.warn({ filename }, "Supabase Storage not configured — image saved to local disk");
     }
   } catch (err) {
     logger.error({ err, filename }, "Image upload failed");
@@ -169,16 +184,21 @@ router.post("/media", authMiddleware, upload.single("media"), async (req, res) =
     return;
   }
 
+  if (isProd && !storageConfigured) {
+    res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
+    return;
+  }
+
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (gcsConfigured) {
-      await gcsUpload(filename, req.file.buffer, req.file.mimetype);
-      logger.info({ filename, size: req.file.size, mediaType, storage: "gcs" }, "Media uploaded to GCS");
+    if (storageConfigured) {
+      await storageUpload(filename, req.file.buffer, req.file.mimetype);
+      logger.info({ filename, size: req.file.size, mediaType, storage: "supabase" }, "Media uploaded to Supabase Storage");
     } else {
       const { writeFileSync } = await import("fs");
       writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
-      logger.warn({ filename, mediaType }, "GCS not configured — media saved to local disk");
+      logger.warn({ filename, mediaType }, "Supabase Storage not configured — media saved to local disk");
     }
   } catch (err) {
     logger.error({ err, filename }, "Media upload failed");
@@ -192,26 +212,28 @@ router.post("/media", authMiddleware, upload.single("media"), async (req, res) =
 
 /**
  * GET /api/uploads/:filename
- * Serves files from GCS (primary) or local disk (legacy fallback).
+ * Serves files from Supabase Storage (primary) or local disk (fallback).
  * Browser cache: 1 year immutable (file URL never changes once uploaded).
  */
 router.get("/:filename", async (req, res) => {
   const filename = String(req.params["filename"] ?? "").replace(/[^a-zA-Z0-9._-]/g, "");
   if (!filename) { res.status(400).json({ error: "Filename inválido" }); return; }
 
-  // 1. Try GCS first
-  if (gcsConfigured) {
-    const result = await gcsDownload(filename);
+  // 1. Try Supabase Storage first — stream the object straight through.
+  if (storageConfigured) {
+    const result = await storageDownload(filename);
     if (result) {
       res.setHeader("Content-Type", result.contentType);
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-      res.setHeader("Content-Length", String(result.buffer.length));
-      res.send(result.buffer);
+      if (result.contentLength) res.setHeader("Content-Length", result.contentLength);
+      const nodeStream = Readable.fromWeb(result.stream as Parameters<typeof Readable.fromWeb>[0]);
+      nodeStream.on("error", () => { if (!res.headersSent) res.status(502).end(); else res.destroy(); });
+      nodeStream.pipe(res);
       return;
     }
   }
 
-  // 2. Fallback to local disk (pre-migration files)
+  // 2. Fallback to local disk
   const localPath = join(LOCAL_UPLOADS_DIR, filename);
   if (existsSync(localPath)) {
     res.setHeader("Cache-Control", "public, max-age=31536000, immutable");

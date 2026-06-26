@@ -14,6 +14,10 @@ if (!existsSync(_dir)) mkdirSync(_dir, { recursive: true });
 const _tempImages = new Map<string, { path: string; expires: number }>();
 
 export function getPublicBase(): string | null {
+  // Explicit public URL (production / VPS) takes precedence.
+  const appUrl = process.env["APP_URL"] ?? process.env["PUBLIC_URL"];
+  if (appUrl) return appUrl.replace(/\/+$/, "");
+  // Replit-assigned domains (legacy / Replit hosting fallback).
   const domains = process.env["REPLIT_DOMAINS"];
   if (domains) {
     const first = domains.split(",")[0]?.trim();
