@@ -103,12 +103,18 @@ export default function Header() {
   const [searchOpen, setSearch]   = useState(false);
   const [searchQuery, setSearchQ] = useState("");
 
+  const [, navigate] = useLocation();
+
+  function submitSearch(q: string) {
+    if (!q.trim()) return;
+    trackSearch(q.trim());
+    setSearch(false);
+    setSearchQ("");
+    navigate(`/arquivo?q=${encodeURIComponent(q.trim())}`);
+  }
+
   function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && searchQuery.trim()) {
-      trackSearch(searchQuery.trim());
-      setSearch(false);
-      setSearchQ("");
-    }
+    if (e.key === "Enter") submitSearch(searchQuery);
   }
 
   const style = settings?.headerStyle ?? "standard";
@@ -171,6 +177,9 @@ export default function Header() {
                     onKeyDown={handleSearchKey}
                     className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
                   />
+                  <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-gray-500 hover:text-gray-900 p-1">
+                    <Search size={14} />
+                  </button>
                   <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
                     <X size={14} />
                   </button>
@@ -258,6 +267,9 @@ export default function Header() {
                 onKeyDown={handleSearchKey}
                 className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
               />
+              <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-gray-500 hover:text-gray-900 p-1">
+                <Search size={16} />
+              </button>
               <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
                 <X size={16} />
               </button>
@@ -337,6 +349,13 @@ export default function Header() {
                   onKeyDown={handleSearchKey}
                   className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
                 />
+                <button
+                  onClick={() => submitSearch(searchQuery)}
+                  aria-label="Buscar"
+                  className="text-gray-500 hover:text-gray-900 p-1 transition-colors"
+                >
+                  <Search size={15} />
+                </button>
                 <button
                   onClick={() => { setSearch(false); setSearchQ(""); }}
                   aria-label="Fechar busca"

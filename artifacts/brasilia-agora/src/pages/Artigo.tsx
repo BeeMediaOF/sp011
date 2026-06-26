@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { BRAND } from "../brand";
 import { buildSrcSet, HERO_WIDTHS } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
-import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
+import { useAnalytics, useScrollDepth, trackLinkClick } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
@@ -222,7 +222,7 @@ export default function Artigo() {
         return <em key={i}>{part.slice(1, -1)}</em>;
       const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (link)
-        return <a key={i} href={link[2]} target="_blank" rel="noreferrer" className="text-[#0b3d91] underline hover:text-[#c8102e] transition-colors">{link[1]}</a>;
+        return <a key={i} href={link[2]} target="_blank" rel="noreferrer" className="text-[#0b3d91] underline hover:text-[#c8102e] transition-colors" onClick={() => trackLinkClick(link[2], article?.id)}>{link[1]}</a>;
       return part;
     });
   }
@@ -345,6 +345,12 @@ export default function Artigo() {
           className="article-body"
           style={{ "--chapeu": chapeuColor } as React.CSSProperties}
           dangerouslySetInnerHTML={{ __html: raw }}
+          onClick={(e) => {
+            const anchor = (e.target as HTMLElement).closest("a");
+            if (anchor?.href && !anchor.href.startsWith(window.location.origin)) {
+              trackLinkClick(anchor.href, article?.id);
+            }
+          }}
         />,
       ];
     }
@@ -673,6 +679,7 @@ export default function Artigo() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[#0b3d91] hover:underline font-medium"
+                            onClick={() => trackLinkClick(article.rssSourceUrl!, article.id)}
                           >
                             {article.rssSourceName}
                           </a>

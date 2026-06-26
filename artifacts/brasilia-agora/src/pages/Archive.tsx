@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -73,7 +73,9 @@ function ListCard({ article, color }: { article: Article; color: string }) {
 export default function Archive() {
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("");
+  const [location] = useLocation();
+  const initialQ = new URLSearchParams(location.split("?")[1] ?? "").get("q") ?? "";
+  const [filter, setFilter] = useState(initialQ);
   const [dateFilter, setDateFilter] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const { categories } = useCategories();
