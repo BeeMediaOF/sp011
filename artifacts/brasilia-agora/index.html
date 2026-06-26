@@ -3,72 +3,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>SBC Agora — Notícias de São Bernardo do Campo</title>
-    <meta name="description" content="SBC Agora — Jornalismo independente em São Bernardo do Campo. Cobertura de política, cidade, segurança, transporte, saúde, educação, cultura e esportes." />
+    <title>SBC Agora — Notícia. Agora. Sempre.</title>
+    <meta name="description" content="Informação com credibilidade sobre o Distrito Federal e o Brasil." />
     <meta name="robots" content="index, follow" />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="SBC Agora" />
-    <meta property="og:url" content="https://sbcagora.com.br" />
-    <meta property="og:title" content="SBC Agora — Notícias de São Bernardo do Campo" />
-    <meta property="og:description" content="Jornalismo independente em São Bernardo do Campo. Cobertura de política, cidade, segurança, transporte, saúde, educação, cultura e esportes." />
+    <meta property="og:url" content="https://brasilia-agora.com.br" />
+    <meta property="og:title" content="SBC Agora — Notícia. Agora. Sempre." />
+    <meta property="og:description" content="Informação com credibilidade sobre o Distrito Federal e o Brasil." />
     <meta property="og:image" content="/opengraph.jpg" />
 
     <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="SBC Agora — Notícias de São Bernardo do Campo" />
-    <meta name="twitter:description" content="Jornalismo independente em São Bernardo do Campo. Cobertura de política, cidade, segurança, transporte, saúde, educação, cultura e esportes." />
+    <meta name="twitter:title" content="SBC Agora — Notícia. Agora. Sempre." />
+    <meta name="twitter:description" content="Informação com credibilidade sobre o Distrito Federal e o Brasil." />
     <meta name="twitter:image" content="/opengraph.jpg" />
 
     <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
-    <link rel="sitemap" type="application/xml" title="Sitemap" href="/api/sitemap.xml" />
-    <link rel="sitemap" type="application/xml" title="Google News Sitemap" href="/api/sitemap-news.xml" />
-    <link rel="canonical" href="https://sbcagora.com.br" />
-
-    <!-- Preconnect / dns-prefetch para recursos críticos -->
-    <!-- Fontes Google -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- CDN de imagens — preconnect estabelece o socket antes do JS carregar -->
-    <link rel="dns-prefetch" href="https://i.metroimg.com" />
-    <link rel="dns-prefetch" href="https://images.metroimg.com" />
-
-    <!--
-      Fontes: carregamento NÃO-BLOQUEANTE via print trick.
-      O browser baixa a fonte em paralelo com o HTML, sem travar a renderização.
-      display=swap garante que o texto apareça imediatamente com a fonte de fallback.
-    -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap"
-    />
-    <link
-      rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap"
-      media="print"
-      onload="this.media='all'"
-    />
-    <noscript>
-      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Merriweather:wght@400;700;900&family=Inter:wght@400;500;600;700&display=swap" />
-    </noscript>
-
-    <!-- CSS crítico inline — garante que o texto apareça antes das fontes -->
-    <style>
-      *,*::before,*::after{box-sizing:border-box}
-      body{margin:0;font-family:'Inter',system-ui,-apple-system,sans-serif;background:#fff;color:#1a1a1a;-webkit-font-smoothing:antialiased}
-      #root{min-height:100vh}
-      .prose-editor .ProseMirror{outline:none}
-      /* Spinner de carregamento inicial (antes do React montar) */
-      #root:empty::after{
-        content:'';display:block;width:36px;height:36px;
-        border:4px solid #0B2A66;border-top-color:transparent;
-        border-radius:50%;animation:spin .7s linear infinite;
-        position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-      }
-      @keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>
