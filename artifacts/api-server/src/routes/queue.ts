@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
-import { getQueueStats, pauseQueue, resumeQueue, enqueueRewrite } from "../lib/rewriteQueue.js";
+import { getQueueStats, pauseQueue, resumeQueue, forceResume, enqueueRewrite } from "../lib/rewriteQueue.js";
 import { articleService } from "../lib/articleService.js";
 
 const router = Router();
@@ -22,6 +22,12 @@ router.post("/pause", (_req, res) => {
 router.post("/resume", (_req, res) => {
   resumeQueue();
   res.json({ ok: true, paused: false });
+});
+
+/** POST /api/admin/queue/force-resume — bypasses cooldown gate for one batch */
+router.post("/force-resume", (_req, res) => {
+  forceResume();
+  res.json({ ok: true, forced: true });
 });
 
 /** POST /api/admin/queue/process-drafts — enqueues all unprocessed drafts */

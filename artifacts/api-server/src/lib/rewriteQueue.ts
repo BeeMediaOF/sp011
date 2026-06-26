@@ -112,19 +112,19 @@ function isContentRenderable(content: string): boolean {
 
 // ── Timing constants ─────────────────────────────────────────────────────────
 // Gemini 2.5 Flash free tier: 10 RPM per key.
-// With N keys each getting 1 request per batch, interval must be > 6 s (60s / 10 RPM).
-// 7 s gives ~8.5 RPM per key — safely under the cap.
-const PROCESS_INTERVAL_MS = 7_000;
-// Within each batch, stagger requests by this many ms so all keys don't fire simultaneously.
-// 9 keys × 700 ms = 6.3 s spread — distributes load evenly across the interval.
-const STAGGER_MS = 700;
+// Interval of 10 s gives ~6 RPM per key — well under cap and avoids rate-limit storms.
+const PROCESS_INTERVAL_MS = 10_000;
+// Stagger start times within each batch to spread API calls.
+// 3 workers × 1000 ms = article[0] at t=0, article[1] at t=1s, article[2] at t=2s.
+const STAGGER_MS = 1_000;
 // Sweep for new unprocessed drafts every 5 minutes
 const SWEEP_INTERVAL_MS = 5 * 60_000;
 // Maximum content/network error retries before permanently dropping an article.
 // NOTE: quota errors do NOT consume this counter — they retry indefinitely.
 const MAX_ATTEMPTS = 3;
-// Maximum parallel workers = max number of configured Gemini keys (currently 9).
-const MAX_CONCURRENCY = 9;
+// Conservative concurrency: use at most 3 keys in parallel so all keys don't get
+// rate-limited simultaneously, causing an immediate 429 storm → global cooldown loop.
+const MAX_CONCURRENCY = 3;
 
 // ── History entry ─────────────────────────────────────────────────────────────
 export interface HistoryEntry {
@@ -143,6 +143,11 @@ let _failedTotal = 0;
 let _activeCount = 0; // number of articles currently being processed in parallel
 const _recentHistory: HistoryEntry[] = [];
 const HISTORY_MAX = 30;
+
+// ── Cooldown wake-up: schedule processBatch exactly when cooldown expires ─────
+let _cooldownWakeupHandle: ReturnType<typeof setTimeout> | null = null;
+// ── Force-bypass: admin can request one immediate batch attempt ───────────────
+let _forceNextBatch = false;
 
 export function enqueueRewrite(item: RewriteJobItem): void {
   if (_queue.some((q) => q.articleId === item.articleId)) return;
@@ -180,6 +185,24 @@ export function getQueueStats() {
 
 export function pauseQueue(): void  { _paused = true;  logger.info("Rewrite queue paused by admin"); }
 export function resumeQueue(): void { _paused = false; logger.info("Rewrite queue resumed by admin"); }
+
+/**
+ * Force the queue to attempt one immediate batch, bypassing the cooldown gate.
+ * Useful when the admin wants to manually unstick a queue that appears frozen.
+ * The underlying Gemini call still enforces its own quota — if quota is truly
+ * active the article will be silently re-queued, not logged as an error.
+ */
+export function forceResume(): void {
+  _paused = false;
+  _forceNextBatch = true;
+  // Cancel any pending wake-up so we don't double-fire
+  if (_cooldownWakeupHandle !== null) {
+    clearTimeout(_cooldownWakeupHandle);
+    _cooldownWakeupHandle = null;
+  }
+  void processBatch();
+  logger.info("Rewrite queue: admin forced immediate batch attempt");
+}
 
 function pushHistory(entry: HistoryEntry) {
   _recentHistory.unshift(entry);
@@ -346,16 +369,36 @@ async function processBatch(): Promise<void> {
   if (_paused || _queue.length === 0) return;
 
   const quota = getAIQuotaStatus();
-  if (quota.isOnCooldown) {
-    logger.debug(
-      { cooldownSecs: Math.ceil(quota.cooldownRemainingMs / 1_000) },
-      "Rewrite queue paused — quota cooldown",
-    );
-    return;
-  }
+
   if (quota.isQuotaExhausted) {
     logger.debug("Rewrite queue paused — daily quota exhausted");
     return;
+  }
+
+  if (quota.isOnCooldown && !_forceNextBatch) {
+    const remaining = quota.cooldownRemainingMs;
+    logger.debug(
+      { cooldownSecs: Math.ceil(remaining / 1_000) },
+      "Rewrite queue paused — quota cooldown; scheduling wake-up",
+    );
+    // Schedule a precise wake-up so the queue resumes the moment cooldown expires
+    // rather than waiting for an arbitrary 10 s interval tick.
+    if (_cooldownWakeupHandle === null) {
+      _cooldownWakeupHandle = setTimeout(() => {
+        _cooldownWakeupHandle = null;
+        logger.info("Rewrite queue: cooldown expired — waking up");
+        void processBatch();
+      }, remaining + 500); // +500 ms buffer
+    }
+    return;
+  }
+
+  // Clear the forced-batch flag regardless of outcome
+  _forceNextBatch = false;
+  // Cancel any stale wake-up timer (cooldown may have been bypassed)
+  if (_cooldownWakeupHandle !== null) {
+    clearTimeout(_cooldownWakeupHandle);
+    _cooldownWakeupHandle = null;
   }
 
   // Determine how many articles to process in parallel:

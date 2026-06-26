@@ -302,7 +302,7 @@ export default function RSSManager() {
 
   // ── Rewrite Queue (server-side) ──
   const [rwQueue, setRwQueue] = useState<{
-    pending: number; paused: boolean; processedTotal: number; failedTotal: number;
+    pending: number; paused: boolean; processedTotal: number; failedTotal: number; activeworkers: number;
     quota: { usedToday: number; dailyLimit: number; remaining: number; isOnCooldown: boolean; isExhausted: boolean; cooldownSecs: number };
   } | null>(null);
   const [queueLoading, setQueueLoading] = useState(false);
@@ -401,6 +401,14 @@ export default function RSSManager() {
     } catch { /* ignore */ } finally {
       setQueueLoading(false);
     }
+  }
+
+  async function forceResumeQueue() {
+    await fetch(`${BASE}api/admin/queue/force-resume`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}` },
+    });
+    await loadQueueStats();
   }
 
   async function toggleQueuePause() {
@@ -1363,7 +1371,20 @@ export default function RSSManager() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-[#0B2A66]">Fila de Reescrita IA</h3>
-                    <p className="text-[11px] text-slate-400">Gemini processa 1 artigo / 6s</p>
+                    <p className="text-[11px] text-slate-400">
+                      {rwQueue?.activeworkers
+                        ? <span className="text-green-600 font-semibold">● {rwQueue.activeworkers} reescrita{rwQueue.activeworkers !== 1 ? "s" : ""} em curso</span>
+                        : rwQueue?.quota.isOnCooldown
+                          ? <span className="text-amber-600">⏳ Aguardando {rwQueue.quota.cooldownSecs}s</span>
+                          : rwQueue?.quota.isExhausted
+                            ? <span className="text-red-600">🚫 Cota esgotada</span>
+                            : rwQueue?.paused
+                              ? <span className="text-amber-600">⏸ Pausada</span>
+                              : rwQueue?.pending
+                                ? <span className="text-blue-600">Processando…</span>
+                                : "Gemini · até 3 artigos em paralelo"
+                      }
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1381,23 +1402,36 @@ export default function RSSManager() {
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[11px] text-slate-500">Cota diária Gemini</span>
-                      <span className={`text-[11px] font-semibold ${rwQueue.quota.isExhausted || rwQueue.quota.isOnCooldown ? "text-red-600" : rwQueue.quota.remaining <= 20 ? "text-amber-600" : "text-green-600"}`}>
+                      <span className={`text-[11px] font-semibold ${rwQueue.quota.isExhausted ? "text-red-600" : rwQueue.quota.remaining <= 50 ? "text-amber-600" : "text-green-600"}`}>
                         {rwQueue.quota.usedToday} / {rwQueue.quota.dailyLimit}
                       </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all ${rwQueue.quota.isExhausted || rwQueue.quota.isOnCooldown ? "bg-red-500" : rwQueue.quota.remaining <= 20 ? "bg-amber-400" : "bg-green-500"}`}
+                        className={`h-full rounded-full transition-all ${rwQueue.quota.isExhausted ? "bg-red-500" : rwQueue.quota.remaining <= 50 ? "bg-amber-400" : "bg-green-500"}`}
                         style={{ width: `${Math.min(100, (rwQueue.quota.usedToday / rwQueue.quota.dailyLimit) * 100)}%` }}
                       />
                     </div>
-                    {rwQueue.quota.isOnCooldown && (
-                      <p className="text-[10px] text-amber-600 mt-1">⏳ Aguardando {rwQueue.quota.cooldownSecs}s — limite temporário da API</p>
-                    )}
                     {rwQueue.quota.isExhausted && (
                       <p className="text-[10px] text-red-600 mt-1">🚫 Cota diária esgotada — reseta à meia-noite</p>
                     )}
                   </div>
+
+                  {/* Cooldown banner with force-resume button */}
+                  {rwQueue.quota.isOnCooldown && !rwQueue.quota.isExhausted && (
+                    <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                      <p className="text-[11px] text-amber-700 font-medium">
+                        ⏳ Limite temporário Gemini — retomada em {rwQueue.quota.cooldownSecs}s
+                      </p>
+                      <button
+                        onClick={() => void forceResumeQueue()}
+                        className="ml-2 shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors"
+                        title="Tentar processar agora mesmo em cooldown"
+                      >
+                        Forçar
+                      </button>
+                    </div>
+                  )}
 
                   {/* Stats row */}
                   <div className="grid grid-cols-3 gap-2">
