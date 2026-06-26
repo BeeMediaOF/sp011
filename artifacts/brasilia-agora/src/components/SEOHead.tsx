@@ -69,6 +69,34 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       `);
     }
 
+    // ── Código personalizado do <head> ───────────────────────────────────────
+    if (settings.customHeadCode && !document.getElementById("custom-head-code")) {
+      try {
+        const range = document.createRange();
+        range.selectNode(document.head);
+        const frag = range.createContextualFragment(settings.customHeadCode);
+        const wrapper = document.createElement("div");
+        wrapper.id = "custom-head-code";
+        wrapper.style.display = "none";
+        document.head.appendChild(wrapper);
+        document.head.appendChild(frag);
+      } catch { /* snippet inválido — ignorar silenciosamente */ }
+    }
+
+    // ── Código personalizado do <body> ───────────────────────────────────────
+    if (settings.customBodyCode && !document.getElementById("custom-body-code")) {
+      try {
+        const range = document.createRange();
+        range.selectNode(document.body);
+        const frag = range.createContextualFragment(settings.customBodyCode);
+        const wrapper = document.createElement("div");
+        wrapper.id = "custom-body-code";
+        wrapper.style.display = "none";
+        document.body.prepend(wrapper);
+        document.body.prepend(frag);
+      } catch { /* snippet inválido — ignorar silenciosamente */ }
+    }
+
     // Title
     document.title = settings.siteName
       ? `${settings.siteName} — ${settings.tagline ?? "Notícias"}`

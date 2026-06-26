@@ -13,7 +13,7 @@ import {
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
   Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
-  Share2,
+  Share2, Code,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs";
@@ -992,6 +992,52 @@ export default function Settings() {
               {settings.ga4MeasurementId && (
                 <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl px-4 py-3 text-sm">
                   <CheckCircle size={15}/> GA4 ativo — {settings.ga4MeasurementId}
+                </div>
+              )}
+            </div>
+
+            {/* ── Código personalizado ── */}
+            <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
+              <SectionHeader icon={<Code size={15}/>} label="Código personalizado de rastreamento"/>
+              <p className="text-xs text-[#94A3B8]">
+                Cole aqui qualquer snippet de rastreamento completo (GTM, Hotjar, TikTok Pixel, etc.).
+                O código do <code className="font-mono bg-[#1e293b] px-1 rounded text-[#7dd3fc]">&lt;head&gt;</code> é
+                injetado no topo da página, e o do <code className="font-mono bg-[#1e293b] px-1 rounded text-[#7dd3fc]">&lt;body&gt;</code> logo após a abertura do body.
+              </p>
+
+              <Field label="Código do <head> (Google Tag Manager — passo 1)">
+                <textarea
+                  rows={7}
+                  value={settings.customHeadCode ?? ""}
+                  onChange={e => setField("customHeadCode", e.target.value)}
+                  spellCheck={false}
+                  className={INPUT + " font-mono text-[11px] leading-relaxed resize-y"}
+                  placeholder={"<!-- Cole aqui o snippet do <head> -->\n<script>(function(w,d,s,l,i){...})(window,document,'script','dataLayer','GTM-XXXXXX');</script>"}
+                />
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  GTM → Instruções de instalação → "Cole este código o mais alto possível no &lt;head&gt;"
+                </p>
+              </Field>
+
+              <Field label="Código do <body> (Google Tag Manager — passo 2)">
+                <textarea
+                  rows={5}
+                  value={settings.customBodyCode ?? ""}
+                  onChange={e => setField("customBodyCode", e.target.value)}
+                  spellCheck={false}
+                  className={INPUT + " font-mono text-[11px] leading-relaxed resize-y"}
+                  placeholder={"<!-- Cole aqui o snippet do <body> -->\n<noscript><iframe src=\"https://www.googletagmanager.com/ns.html?id=GTM-XXXXXX\" height=\"0\" width=\"0\" style=\"display:none;visibility:hidden\"></iframe></noscript>"}
+                />
+                <p className="text-[11px] text-[#94A3B8] mt-1">
+                  GTM → Instruções de instalação → "Cole imediatamente após a tag de abertura &lt;body&gt;"
+                </p>
+              </Field>
+
+              {(settings.customHeadCode || settings.customBodyCode) && (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
+                  <CheckCircle size={15}/>
+                  Código personalizado ativo —{" "}
+                  {[settings.customHeadCode && "head", settings.customBodyCode && "body"].filter(Boolean).join(" + ")}
                 </div>
               )}
             </div>

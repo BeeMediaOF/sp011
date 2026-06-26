@@ -52,6 +52,7 @@ export interface SiteSettings {
   showTickerBar?: boolean; showHeroStrip?: boolean;
   seoDescription?: string; seoKeywords?: string;
   facebookPixelId?: string; gtmId?: string; ga4MeasurementId?: string;
+  customHeadCode?: string; customBodyCode?: string;
   ogImageBase64?: string; faviconBase64?: string;
   homeBlocks?: HomeBlock[]; adminLogoBase64?: string; loginLogoBase64?: string;
   adminSidebarColor?: string; adminAccentColor?: string;

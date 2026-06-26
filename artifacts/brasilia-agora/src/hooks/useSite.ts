@@ -47,6 +47,8 @@ export interface SiteSettings {
   footerStyle?: "dark" | "light" | "minimal";
   headerBgColor?: string;
   footerBgColor?: string;
+  customHeadCode?: string;
+  customBodyCode?: string;
 }
 
 const STORAGE_KEY = "bee_site_v1";
