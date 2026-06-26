@@ -1,6 +1,48 @@
 import { useEffect } from "react";
 import { useSite } from "../hooks/useSite";
 
+// Properly executes HTML snippets that contain <script> tags.
+// createContextualFragment parses but does NOT run scripts — this does.
+function injectHtmlSnippet(
+  markerId: string,
+  html: string,
+  parent: HTMLElement,
+  position: "append" | "prepend"
+) {
+  if (document.getElementById(markerId)) return;
+  const marker = document.createElement("meta");
+  marker.id = markerId;
+  marker.setAttribute("data-injected", "1");
+  position === "append" ? parent.appendChild(marker) : parent.prepend(marker);
+
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+
+  const nodes = Array.from(tmp.childNodes);
+  const insert = (node: Node) =>
+    position === "append" ? parent.appendChild(node) : parent.prepend(node);
+
+  for (const node of nodes) {
+    if (node instanceof HTMLScriptElement) {
+      const s = document.createElement("script");
+      s.type = node.type || "text/javascript";
+      if (node.src) {
+        s.src = node.src;
+        s.async = node.async;
+      } else {
+        s.textContent = node.textContent;
+      }
+      Array.from(node.attributes).forEach((a) => {
+        if (!["src", "type", "async"].includes(a.name))
+          s.setAttribute(a.name, a.value);
+      });
+      insert(s);
+    } else {
+      insert(node.cloneNode(true));
+    }
+  }
+}
+
 function injectScript(id: string, html: string) {
   if (document.getElementById(id)) return;
   const el = document.createElement("script");
@@ -72,28 +114,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     // ── Código personalizado do <head> ───────────────────────────────────────
     if (settings.customHeadCode && !document.getElementById("custom-head-code")) {
       try {
-        const range = document.createRange();
-        range.selectNode(document.head);
-        const frag = range.createContextualFragment(settings.customHeadCode);
-        const wrapper = document.createElement("div");
-        wrapper.id = "custom-head-code";
-        wrapper.style.display = "none";
-        document.head.appendChild(wrapper);
-        document.head.appendChild(frag);
+        injectHtmlSnippet("custom-head-code", settings.customHeadCode, document.head, "append");
       } catch { /* snippet inválido — ignorar silenciosamente */ }
     }
 
     // ── Código personalizado do <body> ───────────────────────────────────────
     if (settings.customBodyCode && !document.getElementById("custom-body-code")) {
       try {
-        const range = document.createRange();
-        range.selectNode(document.body);
-        const frag = range.createContextualFragment(settings.customBodyCode);
-        const wrapper = document.createElement("div");
-        wrapper.id = "custom-body-code";
-        wrapper.style.display = "none";
-        document.body.prepend(wrapper);
-        document.body.prepend(frag);
+        injectHtmlSnippet("custom-body-code", settings.customBodyCode, document.body, "prepend");
       } catch { /* snippet inválido — ignorar silenciosamente */ }
     }
 
