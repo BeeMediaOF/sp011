@@ -110,21 +110,77 @@ function isContentRenderable(content: string): boolean {
   return extractFromRawAI(content) !== null;
 }
 
+// ── Perplexity fallback rewriter ──────────────────────────────────────────────
+// Called when Gemini is on quota cooldown so articles don't pile up in queue.
+
+interface PerplexityChoice {
+  message: { content: string };
+}
+interface PerplexityResponse {
+  choices: PerplexityChoice[];
+}
+
+async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI | null> {
+  const apiKey = process.env["PERPLEXITY_API_KEY"];
+  if (!apiKey) return null;
+
+  const systemPrompt = [
+    "Você é um editor de notícias brasileiro experiente do portal SBC Agora (Brasília).",
+    "Reescreva o artigo de forma original, profissional e envolvente, preservando todos os fatos.",
+    "Escreva APENAS em português do Brasil. Nunca use inglês.",
+    "Responda SOMENTE com um JSON válido (sem markdown fences) no formato:",
+    '{"title":"Título reescrito","subtitle":"Subtítulo curto","content_html":"<p>...</p>","keywords":"palavra1, palavra2","slug":"slug-do-artigo"}',
+  ].join("\n");
+
+  const creditLine = item.giveCredit
+    ? `\n\nFonte original: ${item.sourceName}. Mencione discretamente ao final.`
+    : "";
+
+  const userPrompt = `Artigo de ${item.sourceName}:\nTítulo: ${item.title}\n\n${item.text}${creditLine}`;
+
+  const resp = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "sonar",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user",   content: userPrompt },
+      ],
+      max_tokens: 2_000,
+      temperature: 0.6,
+    }),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`Perplexity ${resp.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = (await resp.json()) as PerplexityResponse;
+  const raw  = data.choices[0]?.message?.content ?? "";
+  return extractFromRawAI(raw);
+}
+
 // ── Timing constants ─────────────────────────────────────────────────────────
 // Gemini 2.5 Flash free tier: 10 RPM per key.
-// Interval of 10 s gives ~6 RPM per key — well under cap and avoids rate-limit storms.
+// Interval of 10 s gives 6 req/min per key — safely under the 10 RPM cap.
 const PROCESS_INTERVAL_MS = 10_000;
-// Stagger start times within each batch to spread API calls.
-// 3 workers × 1000 ms = article[0] at t=0, article[1] at t=1s, article[2] at t=2s.
-const STAGGER_MS = 1_000;
-// Sweep for new unprocessed drafts every 5 minutes
-const SWEEP_INTERVAL_MS = 5 * 60_000;
+// Stagger start times within each batch so the 6 keys spread across the 10 s window:
+// article[0] at t=0, article[1] at t=800 ms … article[5] at t=4 s.
+const STAGGER_MS = 800;
+// Sweep for pending drafts frequently so the queue is always full.
+// Every 90 s ensures a fresh batch is ready before the current one drains.
+const SWEEP_INTERVAL_MS = 90_000;
 // Maximum content/network error retries before permanently dropping an article.
 // NOTE: quota errors do NOT consume this counter — they retry indefinitely.
 const MAX_ATTEMPTS = 3;
-// Conservative concurrency: use at most 3 keys in parallel so all keys don't get
-// rate-limited simultaneously, causing an immediate 429 storm → global cooldown loop.
-const MAX_CONCURRENCY = 3;
+// Use 6 keys in parallel: 6 req / 10 s = 36 req/min total, ≤ 6 req/min per key
+// (well under the 10 RPM per-key cap). Leaves 3 keys as reserve if some are in cooldown.
+const MAX_CONCURRENCY = 6;
 
 // ── History entry ─────────────────────────────────────────────────────────────
 export interface HistoryEntry {
@@ -210,9 +266,17 @@ function pushHistory(entry: HistoryEntry) {
 }
 
 // ── Sweep: pick up drafts that haven't been rewritten yet ─────────────────────
+// How many drafts to load per sweep. High enough to keep the queue full between
+// 90-second sweeps even at maximum throughput (36 req/min × 1.5 min = 54 max).
+// 200 gives a comfortable buffer while staying memory-efficient.
+const SWEEP_BATCH = 200;
+
 async function sweepPendingDrafts(): Promise<void> {
   try {
-    const drafts = await articleService.getPendingRewrites(50);
+    // Only sweep when the queue is running low — avoids redundant DB reads.
+    if (_queue.length >= SWEEP_BATCH / 2) return;
+
+    const drafts = await articleService.getPendingRewrites(SWEEP_BATCH);
     if (drafts.length === 0) return;
 
     let added = 0;
@@ -319,15 +383,45 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     const isQuotaError = msg.includes("QUOTA_COOLDOWN") || msg.includes("QUOTA_EXHAUSTED");
 
     if (isQuotaError) {
-      // Quota errors are TEMPORARY — re-queue at front WITHOUT consuming an attempt.
-      // Not counted as failure and NOT logged as error so the Log de Coleta stays clean.
-      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: quota cooldown — re-queuing silently");
-      if (!_queue.some((q) => q.articleId === item.articleId)) {
-        _queue.unshift({ ...item, attempts: item.attempts ?? 0 });
-        logger.info(
-          { articleId: item.articleId, attempt, queueLength: _queue.length },
-          "Article returned to queue front — quota cooldown, attempt NOT consumed",
-        );
+      // Gemini quota exhausted — try Perplexity as an instant fallback so the
+      // article doesn't just pile up waiting for Gemini quota to recover.
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: Gemini quota — trying Perplexity fallback");
+      let perplexityOk = false;
+      try {
+        const pResult = await rewriteWithPerplexity(item);
+        if (pResult && isContentRenderable(pResult.content)) {
+          await articleService.updateArticle(item.articleId, {
+            ...(pResult.title    && { title:    pResult.title }),
+            ...(pResult.subtitle && { subtitle: pResult.subtitle }),
+            content:     pResult.content,
+            ...(pResult.keywords && { keywords: pResult.keywords }),
+            ...(pResult.slug     && { slug:     pResult.slug }),
+            aiRewritten: true,
+            status:      item.finalStatus,
+            ...(item.finalStatus === "published" && { publishedAt: new Date().toISOString() }),
+          });
+          _processedTotal++;
+          addLog({ type: "rewrite",  sourceName: item.sourceName, articleTitle: pResult.title || item.title });
+          if (item.finalStatus === "published") {
+            addLog({ type: "publish", sourceName: item.sourceName, articleTitle: pResult.title || item.title, message: "Publicado após reescrita (Perplexity)" });
+          }
+          pushHistory({ articleId: item.articleId, title: pResult.title || item.title, status: "ok", at: Date.now() });
+          logger.info({ articleId: item.articleId }, "Rewrite queue: article rewritten via Perplexity fallback ✓");
+          perplexityOk = true;
+        }
+      } catch (perplexityErr) {
+        logger.warn({ err: perplexityErr, articleId: item.articleId }, "Perplexity fallback failed — re-queuing for Gemini");
+      }
+
+      if (!perplexityOk) {
+        // Perplexity also unavailable — silently re-queue at front for Gemini retry.
+        if (!_queue.some((q) => q.articleId === item.articleId)) {
+          _queue.unshift({ ...item, attempts: item.attempts ?? 0 });
+          logger.info(
+            { articleId: item.articleId, attempt, queueLength: _queue.length },
+            "Article returned to queue front — quota cooldown, attempt NOT consumed",
+          );
+        }
       }
     } else {
       // Real error: count + log it
@@ -388,7 +482,7 @@ async function processBatch(): Promise<void> {
         _cooldownWakeupHandle = null;
         logger.info("Rewrite queue: cooldown expired — waking up");
         void processBatch();
-      }, remaining + 500); // +500 ms buffer
+      }, remaining + 5_000); // +5 s extra so the 60 s Gemini window is fully past
     }
     return;
   }
@@ -436,7 +530,13 @@ export function startRewriteWorker(): void {
   setTimeout(() => { void sweepPendingDrafts(); }, 30_000);
 
   logger.info(
-    { maxConcurrency: MAX_CONCURRENCY, maxAttempts: MAX_ATTEMPTS, intervalMs: PROCESS_INTERVAL_MS },
-    "Rewrite queue worker started — parallel mode (N articles per key)",
+    {
+      maxConcurrency:  MAX_CONCURRENCY,
+      maxAttempts:     MAX_ATTEMPTS,
+      intervalMs:      PROCESS_INTERVAL_MS,
+      sweepIntervalMs: SWEEP_INTERVAL_MS,
+      sweepBatch:      SWEEP_BATCH,
+    },
+    "Rewrite queue worker started — parallel mode",
   );
 }
