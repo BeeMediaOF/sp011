@@ -407,11 +407,18 @@ export default function Home() {
     : DEFAULT_BLOCKS;
 
   const [previewBlocks, setPreviewBlocks] = React.useState<HomeBlock[]>([]);
+  // Quando true, o preview passa a ser controlado AO VIVO pelo painel admin
+  // (via postMessage). A partir daí, refetch de /api/site não sobrescreve mais os
+  // blocos — evita o "preview um passo atrás" quando o servidor responde atrasado.
+  const previewLiveRef = React.useRef(false);
   const [dragIdx, setDragIdx] = React.useState<number | null>(null);
   const [dragOverIdx, setDragOverIdx] = React.useState<number | null>(null);
   const [selectedBlockId, setSelectedBlockId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    // Só semeia a partir do servidor enquanto o admin ainda não assumiu o controle
+    // ao vivo. Depois disso, o postMessage é a fonte da verdade.
+    if (previewLiveRef.current) return;
     setPreviewBlocks(baseBlocks.filter((b) => b.visible));
   }, [settings]);
 
@@ -427,6 +434,7 @@ export default function Home() {
       }
       // Instant preview: update a single block immediately without re-fetching settings
       if (e.data.type === "block:preview" && e.data.block) {
+        previewLiveRef.current = true;
         const updated = e.data.block as HomeBlock;
         setPreviewBlocks((prev) =>
           prev.map((b) => b.id === updated.id ? { ...b, ...updated } : b)
@@ -434,6 +442,7 @@ export default function Home() {
       }
       // Full blocks list update (reorder / visibility toggle)
       if (e.data.type === "blocks:update" && Array.isArray(e.data.blocks)) {
+        previewLiveRef.current = true;
         setPreviewBlocks(e.data.blocks as HomeBlock[]);
       }
       // Live color preview for header and footer
@@ -449,6 +458,10 @@ export default function Home() {
       }
     }
     window.addEventListener("message", onMessage);
+    // Avisa o painel admin que o preview está montado e com o listener pronto.
+    // O admin responde com o estado atual dos blocos (blocks:update), evitando que
+    // o (re)load do iframe mostre o estado antigo do servidor ("um passo atrás").
+    window.parent.postMessage({ type: "preview:ready" }, "*");
     return () => window.removeEventListener("message", onMessage);
   }, [isAdminPreview]);
 

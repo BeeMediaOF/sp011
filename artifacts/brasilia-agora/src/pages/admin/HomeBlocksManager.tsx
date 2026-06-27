@@ -776,6 +776,12 @@ export default function HomeBlocksManager() {
     function handleMessage(e: MessageEvent) {
       if (!e.data || typeof e.data !== "object") return;
       const { type, blockId, blockIds } = e.data as { type: string; blockId?: string; blockIds?: string[] };
+      // Preview (iframe) montou/remontou e está pronto: reenvia o estado ATUAL dos
+      // blocos ao vivo, para o preview não ficar "um passo atrás" mostrando o servidor.
+      if (type === "preview:ready") {
+        if (blocksRef.current.length) postAllBlocks(blocksRef.current);
+        return;
+      }
       if (type === "block:edit" && blockId) {
         setTab("blocks");
         const block = blocks.find((b) => b.id === blockId);
