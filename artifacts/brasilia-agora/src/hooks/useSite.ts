@@ -97,11 +97,11 @@ function takeBoot(key: string): Promise<unknown> | null {
   return p;
 }
 
-async function doFetch() {
+async function doFetch(force = false) {
   try {
-    let data = (await takeBoot("site")) as SiteSettings | null;
+    let data = force ? null : (await takeBoot("site")) as SiteSettings | null;
     if (!data) {
-      const r = await fetch("/api/site");
+      const r = await fetch("/api/site", force ? { cache: "no-store" } : undefined);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       data = await r.json() as SiteSettings;
     }
@@ -129,7 +129,7 @@ if (typeof window !== "undefined") {
     if (e.data?.type === "settings:refresh") {
       _cache = null;
       _cacheAt = 0;
-      _fetch = doFetch().catch(() => { _fetch = null; });
+      _fetch = doFetch(true).catch(() => { _fetch = null; });
     }
   });
 }
@@ -137,7 +137,7 @@ if (typeof window !== "undefined") {
 export function invalidateSiteCache() {
   _cache = null;
   _cacheAt = 0;
-  _fetch = doFetch().catch(() => { _fetch = null; });
+  _fetch = doFetch(true).catch(() => { _fetch = null; });
 }
 
 export function useSite() {

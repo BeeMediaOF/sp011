@@ -786,13 +786,13 @@ export default function HomeBlocksManager() {
         }
       }
       if (type === "block:reorder" && blockIds) {
-        setBlocks((prev) => {
-          const map = new Map(prev.map((b) => [b.id, b]));
-          const reordered = blockIds.map((id, i) => map.has(id) ? { ...map.get(id)!, order: i } : null).filter(Boolean) as HomeBlock[];
-          const rest = prev.filter((b) => !blockIds.includes(b.id));
-          return [...reordered, ...rest];
-        });
-        debounceSave(blocks);
+        const prev = blocksRef.current;
+        const map = new Map(prev.map((b) => [b.id, b]));
+        const reordered = blockIds.map((id, i) => map.has(id) ? { ...map.get(id)!, order: i } : null).filter(Boolean) as HomeBlock[];
+        const rest = prev.filter((b) => !blockIds.includes(b.id));
+        const next = [...reordered, ...rest];
+        setBlocks(next);
+        debounceSave(next);
       }
     }
     window.addEventListener("message", handleMessage);

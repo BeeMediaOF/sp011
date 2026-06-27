@@ -7,7 +7,7 @@ const router = Router();
 router.get("/site", (_req, res) => {
   const settings = store.getPublicSettings();
   const menuItems = store.getMenuItems().filter((m) => m.visible);
-  res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=60");
+  res.setHeader("Cache-Control", "public, max-age=5, stale-while-revalidate=15");
   res.json({ ...settings, menuItems });
 });
 

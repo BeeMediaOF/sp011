@@ -54,11 +54,28 @@ export default function Dashboard() {
   const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      adminApi.getArticles().then((r) => setArticles(r.articles)).catch(() => {}),
-      adminApi.getAnalyticsStats().then(setStats).catch(() => {}),
-      adminApi.getAds().then((r) => setAds(r.ads)).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    let active = true;
+    let inFlight = false;
+    const load = () => {
+      if (inFlight) return;
+      inFlight = true;
+      Promise.all([
+        adminApi.getArticles().then((r) => { if (active) setArticles(r.articles); }).catch(() => {}),
+        adminApi.getAnalyticsStats().then((s) => { if (active) setStats(s); }).catch(() => {}),
+        adminApi.getAds().then((r) => { if (active) setAds(r.ads); }).catch(() => {}),
+      ]).finally(() => { inFlight = false; if (active) setLoading(false); });
+    };
+    load();
+    const onFocus = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    const interval = setInterval(load, 60_000);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      clearInterval(interval);
+    };
   }, []);
 
   const published = articles.filter((a) => a.status === "published");
