@@ -822,7 +822,7 @@ export function extractRssImage(item: Parser.Item): string {
   if (it["media:content"]?.url)     return it["media:content"]!.url!;
   if (it["media:thumbnail"]?.$?.url) return it["media:thumbnail"]!.$!.url!;
   if (it.enclosure?.url)            return it.enclosure.url;
-  const html = item["content:encoded"] ?? item.content ?? item.summary ?? "";
+  const html = (item as { "content:encoded"?: string })["content:encoded"] ?? item.content ?? item.summary ?? "";
   if (html) {
     const $ = cheerio.load(html);
     const src = $("img[src]").filter((_i, el) => {
@@ -975,7 +975,7 @@ export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticl
   const results: FetchedArticle[] = [];
   await Promise.allSettled(items.map(async (item) => {
     const link    = item.link ?? "";
-    const rawHtml = item["content:encoded"] ?? item.content ?? item.summary ?? "";
+    const rawHtml = (item as { "content:encoded"?: string })["content:encoded"] ?? item.content ?? item.summary ?? "";
     const excerpt = stripHtml(rawHtml).slice(0, 300);
 
     // Always scrape article page for og:image + full text

@@ -36,11 +36,23 @@ function notifySubscribers() {
   if (_cache) _subscribers.forEach((cb) => cb(_cache!));
 }
 
+/** Consome a promessa de boot (prefetch inline no index.html) se disponível. */
+function takeBoot(key: string): Promise<unknown> | null {
+  if (typeof window === "undefined") return null;
+  const boot = (window as unknown as { __BOOT__?: Record<string, Promise<unknown> | null> }).__BOOT__;
+  const p = boot?.[key] ?? null;
+  if (boot && p) boot[key] = null; // consome uma única vez
+  return p;
+}
+
 async function doFetch() {
   try {
-    const r = await fetch("/api/articles");
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const data = await r.json() as { articles: Article[] };
+    let data = (await takeBoot("articles")) as { articles?: Article[] } | null;
+    if (!data) {
+      const r = await fetch("/api/articles");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      data = await r.json() as { articles: Article[] };
+    }
     _cache = data.articles ?? [];
     _cacheAt = Date.now();
     notifySubscribers();

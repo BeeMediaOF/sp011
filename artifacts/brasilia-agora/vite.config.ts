@@ -97,21 +97,34 @@ ${imageUrl ? `<img src="${esc(imageUrl)}" alt="${esc(title)}" style="max-width:1
  *    com Cache-Control por tipo de recurso.
  */
 function staticCachePlugin(): Plugin {
+  /* Headers de cache por path, usados tanto no dev quanto no preview (produção).
+     /assets/* e /fonts/*.woff2 têm hash/URL estável → imutável por 1 ano.
+     HTML → nunca cacheia (sempre busca o mais recente). */
+  function cacheMiddleware(
+    req: { url?: string },
+    res: { setHeader(k: string, v: string): void },
+    next: () => void,
+  ): void {
+    const url = req.url ?? "";
+    if (/^\/assets\//.test(url) || /\.(woff2?|ttf)(\?.*)?$/.test(url)) {
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    } else if (url === "/" || url.endsWith(".html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
+    next();
+  }
+
   return {
     name: "vite-static-cache",
 
     configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        const url = req.url ?? "";
-        if (/^\/assets\//.test(url)) {
-          res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-        } else if (url === "/" || url.endsWith(".html")) {
-          res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-          res.setHeader("Pragma", "no-cache");
-          res.setHeader("Expires", "0");
-        }
-        next();
-      });
+      server.middlewares.use(cacheMiddleware);
+    },
+
+    configurePreviewServer(server) {
+      server.middlewares.use(cacheMiddleware);
     },
 
     closeBundle() {
@@ -123,7 +136,9 @@ function staticCachePlugin(): Plugin {
         "/assets/*",
         "  Cache-Control: public, max-age=31536000, immutable",
         "",
-        "# Fontes woff/woff2",
+        "# Fontes woff/woff2 (auto-hospedadas em /fonts e na raiz)",
+        "/fonts/*",
+        "  Cache-Control: public, max-age=31536000, immutable",
         "/*.woff2",
         "  Cache-Control: public, max-age=31536000, immutable",
         "/*.woff",

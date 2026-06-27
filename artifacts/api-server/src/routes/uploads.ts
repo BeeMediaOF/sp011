@@ -23,8 +23,18 @@ import { extname, join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { existsSync, mkdirSync } from "fs";
 import { Readable } from "stream";
+import { readFileSync } from "fs";
 import { authMiddleware } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
+import {
+  cacheKey,
+  memGet,
+  resolveImage,
+  DEFAULT_Q,
+  MAX_WIDTH,
+  MAX_Q,
+  type ImageFormat,
+} from "../lib/imageTransform.js";
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -85,6 +95,46 @@ async function storageDownload(
     return null;
   }
 }
+
+/**
+ * Carrega o arquivo inteiro em memória (Supabase Storage → fallback disco local).
+ * Usado pelo caminho de transformação (sharp precisa do buffer completo).
+ */
+async function loadRawBuffer(
+  filename: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  if (storageConfigured) {
+    try {
+      const res = await fetch(objectUrl(filename), {
+        headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.ok) {
+        const contentType = res.headers.get("content-type") ?? "application/octet-stream";
+        return { buffer: Buffer.from(await res.arrayBuffer()), contentType };
+      }
+    } catch {
+      // cai para o disco local
+    }
+  }
+  const localPath = join(LOCAL_UPLOADS_DIR, filename);
+  if (existsSync(localPath)) {
+    const ext = extname(filename).toLowerCase();
+    const contentType =
+      ext === ".png" ? "image/png" :
+      ext === ".webp" ? "image/webp" :
+      ext === ".avif" ? "image/avif" :
+      ext === ".gif" ? "image/gif" :
+      (ext === ".jpg" || ext === ".jpeg") ? "image/jpeg" :
+      "application/octet-stream";
+    return { buffer: readFileSync(localPath), contentType };
+  }
+  return null;
+}
+
+// Formatos estáticos que valem a pena reprocessar para WebP/AVIF.
+// GIF (possivelmente animado) e vídeos são servidos crus.
+const TRANSFORMABLE = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 // ── File type / size constraints ──────────────────────────────────────────────
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"]);
@@ -214,10 +264,63 @@ router.post("/media", authMiddleware, upload.single("media"), async (req, res) =
  * GET /api/uploads/:filename
  * Serves files from Supabase Storage (primary) or local disk (fallback).
  * Browser cache: 1 year immutable (file URL never changes once uploaded).
+ *
+ * Query opcional de otimização (apenas para imagens estáticas):
+ *   w  — largura alvo em px (resize, máx 1600) — ATIVA a transformação
+ *   q  — qualidade 1-100 (padrão 82)
+ *   f  — formato: "webp" (padrão) | "avif"
+ * Sem `w`, o objeto é transmitido cru (comportamento original, retrocompatível).
+ * GIFs (possivelmente animados) e vídeos são sempre servidos crus.
  */
 router.get("/:filename", async (req, res) => {
   const filename = String(req.params["filename"] ?? "").replace(/[^a-zA-Z0-9._-]/g, "");
   if (!filename) { res.status(400).json({ error: "Filename inválido" }); return; }
+
+  // ── Caminho de transformação: redimensiona + converte para WebP/AVIF ──────────
+  const rawW = req.query["w"];
+  if (typeof rawW === "string" && rawW.trim() !== "") {
+    const w = Math.min(Math.max(parseInt(rawW, 10) || 0, 1), MAX_WIDTH);
+    const q = Math.min(
+      Math.max(parseInt(typeof req.query["q"] === "string" ? (req.query["q"] as string) : `${DEFAULT_Q}`, 10) || DEFAULT_Q, 1),
+      MAX_Q,
+    );
+    const fmt: ImageFormat = req.query["f"] === "avif" ? "avif" : "webp";
+    const mime = fmt === "avif" ? "image/avif" : "image/webp";
+
+    const key  = cacheKey(`upload:${filename}`, w, q, fmt);
+    const etag = `"${key.slice(0, 16)}"`;
+    if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
+
+    const memHit = memGet(key);
+    if (memHit) {
+      res.set("Content-Type", mime)
+        .set("Cache-Control", "public, max-age=31536000, immutable")
+        .set("ETag", etag).set("X-Image-Cache", "MEM").end(memHit);
+      return;
+    }
+
+    try {
+      const processed = await resolveImage(
+        key,
+        async () => {
+          const raw = await loadRawBuffer(filename);
+          if (!raw) throw new Error("not_found");
+          if (!TRANSFORMABLE.has(raw.contentType)) throw new Error(`skip:${raw.contentType}`);
+          return raw.buffer;
+        },
+        w, q, fmt,
+      );
+      res.set("Content-Type", mime)
+        .set("Cache-Control", "public, max-age=31536000, immutable")
+        .set("ETag", etag).set("X-Image-Cache", "MISS").end(processed);
+      return;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg === "not_found") { res.status(404).json({ error: "Arquivo não encontrado" }); return; }
+      // GIF animado / vídeo / falha no sharp → cai para o streaming cru abaixo.
+      req.log?.warn?.({ err, filename }, "uploads: transform pulado — servindo original");
+    }
+  }
 
   // 1. Try Supabase Storage first — stream the object straight through.
   if (storageConfigured) {

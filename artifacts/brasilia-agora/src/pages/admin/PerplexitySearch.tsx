@@ -91,7 +91,7 @@ export default function PerplexitySearch() {
   const [runResult, setRunResult]     = useState<Record<string, string>>({});
 
   // ── Form fields ──
-  const emptyForm = { name:"", query:"", category:"cidade", scheduleHours:6, maxResults:5, autoMode:"draft" as const, active:true };
+  const emptyForm = { name:"", query:"", category:"cidade", scheduleHours:6, maxResults:5, autoMode:"draft" as "none"|"draft"|"published", active:true };
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string|null>(null);

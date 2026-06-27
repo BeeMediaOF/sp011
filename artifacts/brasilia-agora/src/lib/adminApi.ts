@@ -82,7 +82,7 @@ export const adminApi = {
   // Columnists
   getColumnists: () => req<{ columnists: Columnist[] }>("GET", "/columnists"),
   getColumnist: (id: string) => req<{ columnist: Columnist }>("GET", `/columnists/${id}`),
-  createColumnist: (data: { name: string; bio: string; avatarBase64: string; active: boolean }) =>
+  createColumnist: (data: { name: string; specialty: ColumnistSpecialty; bio: string; avatarBase64: string; active: boolean }) =>
     req<{ columnist: Columnist }>("POST", "/columnists", data),
   updateColumnist: (id: string, data: Partial<Columnist>) => req<{ columnist: Columnist }>("PUT", `/columnists/${id}`, data),
   deleteColumnist: (id: string) => req<{ success: boolean }>("DELETE", `/columnists/${id}`),

@@ -16,6 +16,7 @@ import { useArticles } from "../hooks/useArticles";
 
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
+import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 
 /* Lazy: ColumnistsSection não é crítico para LCP — carregado sob demanda */
 const ColumnistsSection = lazy(() => import("../components/ColumnistsSection"));
@@ -94,7 +95,7 @@ function SectionBlockTrio({ title, color, href, articles }: { title: string; col
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {items.map((a) => (
             <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="group flex flex-col">
-              {a.image && <img src={a.image} alt={a.title} className="w-full aspect-[4/3] object-cover rounded-lg mb-3 group-hover:brightness-95 transition-all" />}
+              {a.image && <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined} sizes="(max-width: 768px) 100vw, 33vw" alt={a.title} width={480} height={360} loading="lazy" decoding="async" className="w-full aspect-[4/3] object-cover rounded-lg mb-3 group-hover:brightness-95 transition-all" />}
               <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>{a.chapeu}</span>
               <p className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:underline">{a.title}</p>
               <p className="text-[12px] text-gray-400 mt-1">{a.time}</p>
@@ -122,7 +123,7 @@ function SectionBlockCompact({ title, color, href, articles }: { title: string; 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
           {items.map((a) => (
             <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="flex gap-3 items-start group border-b border-gray-100 pb-3 last:border-0">
-              {a.image && <img src={a.image} alt={a.title} className="w-16 h-12 object-cover rounded shrink-0" />}
+              {a.image && <img src={a.image} srcSet={buildSrcSet(a.image, THUMB_WIDTHS) || undefined} sizes="64px" alt={a.title} width={64} height={48} loading="lazy" decoding="async" className="w-16 h-12 object-cover rounded shrink-0" />}
               <div className="min-w-0">
                 <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu}</span>
                 <p className="text-[13px] font-semibold text-[#1a1a1a] leading-tight group-hover:underline line-clamp-2 mt-0.5">{a.title}</p>
@@ -152,7 +153,7 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
         <div className="flex flex-col lg:flex-row gap-6">
           <Link href={`/artigo/${main.slug ?? main.id}`} className="flex-[3] relative group overflow-hidden rounded-xl">
             <div className="relative w-full aspect-[16/7] overflow-hidden rounded-xl">
-              {main.image && <img src={main.image} alt={main.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
+              {main.image && <img src={main.image} srcSet={buildSrcSet(main.image, CARD_WIDTHS) || undefined} sizes="(max-width: 1024px) 100vw, 66vw" alt={main.title} width={900} height={394} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent rounded-xl" />
               <div className="absolute bottom-0 left-0 right-0 p-6">
                 <span className="inline-block text-[10px] font-bold uppercase px-2 py-0.5 rounded mb-2 text-white" style={{ backgroundColor: color }}>{main.chapeu}</span>
@@ -165,7 +166,7 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
             <div className="flex-1 flex flex-col gap-3 justify-center">
               {rest.slice(0, 4).map((a) => (
                 <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="flex gap-3 items-start group border-b border-gray-100 pb-3 last:border-0">
-                  {a.image && <img src={a.image} alt={a.title} className="w-20 h-14 object-cover rounded shrink-0" />}
+                  {a.image && <img src={a.image} srcSet={buildSrcSet(a.image, THUMB_WIDTHS) || undefined} sizes="80px" alt={a.title} width={80} height={56} loading="lazy" decoding="async" className="w-20 h-14 object-cover rounded shrink-0" />}
                   <div>
                     <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu}</span>
                     <p className="text-[13px] font-semibold text-[#1a1a1a] leading-tight group-hover:underline line-clamp-2 mt-0.5">{a.title}</p>
@@ -202,7 +203,7 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
                 <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color }}>{a.chapeu} · {a.time}</span>
                 <p className="text-[14px] font-semibold text-[#1a1a1a] leading-snug group-hover:underline mt-0.5">{a.title}</p>
               </div>
-              {a.image && <img src={a.image} alt={a.title} className="w-20 h-14 object-cover rounded shrink-0" />}
+              {a.image && <img src={a.image} srcSet={buildSrcSet(a.image, THUMB_WIDTHS) || undefined} sizes="80px" alt={a.title} width={80} height={56} loading="lazy" decoding="async" className="w-20 h-14 object-cover rounded shrink-0" />}
             </Link>
           ))}
         </div>
@@ -536,7 +537,12 @@ export default function Home() {
           );
 
           if (!isAdminPreview) {
-            return <React.Fragment key={block.id}>{content}</React.Fragment>;
+            // Blocos abaixo da dobra (idx >= 3) ganham content-visibility:auto para
+            // baratear o render inicial. Os 3 primeiros (hero/destaques) renderizam
+            // imediatamente. Não aplicado no modo admin para não afetar drag/scroll.
+            return idx >= 3
+              ? <div key={block.id} className="cv-auto">{content}</div>
+              : <React.Fragment key={block.id}>{content}</React.Fragment>;
           }
 
           return (

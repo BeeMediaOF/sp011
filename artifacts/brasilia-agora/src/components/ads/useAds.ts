@@ -32,18 +32,53 @@ export interface AdItem {
   position: string;
 }
 
+// ─── Cache singleton compartilhado (evita N fetches: há ~6 AdBanner na home) ───
+const ADS_TTL = 60_000;
+let _cache: AdItem[] | null = null;
+let _cacheAt = 0;
+let _fetch: Promise<void> | null = null;
+const _subs = new Set<(a: AdItem[]) => void>();
+
+function takeBoot(key: string): Promise<unknown> | null {
+  if (typeof window === "undefined") return null;
+  const boot = (window as unknown as { __BOOT__?: Record<string, Promise<unknown> | null> }).__BOOT__;
+  const p = boot?.[key] ?? null;
+  if (boot && p) boot[key] = null;
+  return p;
+}
+
+async function doFetchAds() {
+  try {
+    let data = (await takeBoot("ads")) as { ads?: AdItem[] } | null;
+    if (!data) {
+      const r = await fetch("/api/ads");
+      data = r.ok ? ((await r.json()) as { ads?: AdItem[] }) : null;
+    }
+    _cache = data?.ads ?? [];
+    _cacheAt = Date.now();
+    _subs.forEach((cb) => cb(_cache!));
+  } catch {
+    if (!_cache) _cache = [];
+  } finally {
+    _fetch = null;
+  }
+}
+
 export function useAds() {
-  const [ads, setAds] = useState<AdItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [ads, setAds] = useState<AdItem[]>(_cache ?? []);
+  const [loading, setLoading] = useState(_cache === null);
 
   useEffect(() => {
-    fetch("/api/ads")
-      .then((r) => r.json())
-      .then((data) => {
-        setAds(data.ads ?? []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    const sub = (a: AdItem[]) => { setAds(a); setLoading(false); };
+    _subs.add(sub);
+
+    if (_cache) { setAds(_cache); setLoading(false); }
+
+    const stale = !_cache || Date.now() - _cacheAt > ADS_TTL;
+    if (!_fetch && stale) _fetch = doFetchAds();
+    if (_fetch) _fetch.then(() => { if (_cache) { setAds(_cache); setLoading(false); } });
+
+    return () => { _subs.delete(sub); };
   }, []);
 
   function getSlot(key: AdSlotKey): AdItem | null {

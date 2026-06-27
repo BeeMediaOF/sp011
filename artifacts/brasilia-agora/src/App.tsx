@@ -1,9 +1,7 @@
 import { Switch, Route, Router as WouterRouter, useParams } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
-import LGPDConsent from "@/components/LGPDConsent";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { lazy, Suspense, useState, useEffect } from "react";
@@ -32,6 +30,10 @@ const Contato          = lazy(() => import("@/pages/Contato"));
 const Privacidade      = lazy(() => import("@/pages/Privacidade"));
 const Termos           = lazy(() => import("@/pages/Termos"));
 const CategoryArchivePage = lazy(() => import("@/pages/CategoryArchivePage"));
+
+/* ─── Lazy — UI não-crítica para o primeiro paint (carrega após o conteúdo) ─── */
+const Toaster = lazy(() => import("@/components/ui/toaster").then((m) => ({ default: m.Toaster })));
+const LGPDConsent = lazy(() => import("@/components/LGPDConsent"));
 
 /* ─── Lazy — páginas admin (jamais carregadas por visitantes) ─── */
 const Login            = lazy(() => import("@/pages/admin/Login"));
@@ -226,9 +228,9 @@ function App() {
           <AnalyticsProvider />
           <SEOHead />
           <Router />
-          <LGPDConsent />
+          <Suspense fallback={null}><LGPDConsent /></Suspense>
         </WouterRouter>
-        <Toaster />
+        <Suspense fallback={null}><Toaster /></Suspense>
       </TooltipProvider>
     </QueryClientProvider>
   );

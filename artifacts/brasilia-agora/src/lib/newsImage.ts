@@ -44,7 +44,15 @@ const PROXY_HOSTS = new Set([
  */
 export function proxyUrl(src: string, w: number, q = 82): string {
   if (!src) return src;
-  if (src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return src;
+  if (src.startsWith("data:") || src.startsWith("blob:")) return src;
+
+  // Imagens enviadas pelo próprio portal: o endpoint /api/uploads aceita resize.
+  if (src.startsWith("/api/uploads/")) {
+    return `${src}?w=${w}&q=${q}&f=webp`;
+  }
+
+  // Demais paths locais (favicon, assets versionados) não passam pelo proxy.
+  if (src.startsWith("/")) return src;
 
   let hostname: string;
   try {
@@ -63,7 +71,15 @@ export function proxyUrl(src: string, w: number, q = 82): string {
  * Retorna "" se o domínio não for suportado (browser usa `src` diretamente).
  */
 export function buildSrcSet(src: string, widths: number[], q = 82): string {
-  if (!src || src.startsWith("data:") || src.startsWith("blob:") || src.startsWith("/")) return "";
+  if (!src || src.startsWith("data:") || src.startsWith("blob:")) return "";
+
+  // Imagens enviadas pelo portal passam pelo resize do /api/uploads.
+  if (src.startsWith("/api/uploads/")) {
+    return widths.map((w) => `${proxyUrl(src, w, q)} ${w}w`).join(", ");
+  }
+
+  // Demais paths locais não têm versões redimensionadas → sem srcset.
+  if (src.startsWith("/")) return "";
 
   let hostname: string;
   try {
