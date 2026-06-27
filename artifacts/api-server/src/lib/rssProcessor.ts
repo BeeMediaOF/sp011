@@ -556,12 +556,12 @@ export async function rewriteWithAI(
     // Use ALL available Gemini keys (env var + settings) with full rotation
     const keys = getGeminiKeys(settings);
     if (keys.length === 0) throw new Error("API key do Gemini não configurada. Adicione sua chave em aistudio.google.com e configure nas Configurações.");
-    const model = settings.rssAiModel || "gemini-2.0-flash";
+    const model = settings.rssAiModel || "gemini-2.5-flash";
     raw = await callGeminiWithRotation(keys, model, prompt);
   } else {
     // gemini_free: Replit AI Integrations (uses Replit credits)
     const ai    = getGeminiFree();
-    const model = settings.rssAiModel || "gemini-2.0-flash";
+    const model = settings.rssAiModel || "gemini-2.5-flash";
     raw = await withRetry(async () => {
       const resp = await ai.models.generateContent({
         model,

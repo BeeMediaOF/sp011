@@ -14,4 +14,5 @@
 - [Object Storage GCS — uploads](object-storage-uploads.md) — uploads migrados para GCS via sidecar HTTP (sem npm package); padrão de streaming e fallback para disco local
 - [Migração para Supabase](supabase-migration.md) — conexão direta é IPv6-only (usar Session Pooler IPv4); app prioriza SUPABASE_DATABASE_URL sobre DATABASE_URL nativo do Replit
 - [Hospedagem na VPS Hostinger](vps-hosting.md) — Supabase Storage p/ uploads (503 em prod sem env), APP_URL p/ social, frontend via `vite preview` p/ OG, build esbuild ignora erros tsc
+- [Modelo Gemini padrão (RSS)](gemini-model.md) — usar gemini-2.5-flash; gemini-2.0-flash dá 429 no tier grátis; gemini_direct é o modo da VPS
 - [PageSpeed Rodada 6 — CLS e Acessibilidade](pagespeed-r6.md) — TickerBar: RAF→CSS keyframes; AdBanner: aspectRatio no skeleton E container = CLS 0; contraste gray-600+ no fundo claro, gray-400+ no escuro
