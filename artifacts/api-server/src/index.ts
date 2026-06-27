@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
-import { initStore, seedDefaultRssSources } from "./lib/store.js";
+import { initStore, seedDefaultRssSources, startSettingsSync } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
@@ -30,6 +30,9 @@ app.listen(port, async (err) => {
 
   // Initialize store from PostgreSQL (migrates store.json data if needed)
   await initStore();
+  // Re-read editable settings from DB periodically so multiple processes
+  // (Replit + VPS sharing one database) stay in sync without a restart.
+  startSettingsSync();
   await seedDefaultRssSources();
   await seedAdminUser();
 

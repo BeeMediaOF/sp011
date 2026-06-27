@@ -231,8 +231,14 @@ interface LegacyStoreData {
   articles?: Article[];
 }
 
+/** Timestamp (ms) of the most recent local write per settings key.
+ *  Used by the cross-process re-hydration loop to avoid clobbering a write
+ *  whose async persist may still be in flight. */
+const _lastWriteAt: Record<string, number> = {};
+
 /** Async upsert a JSON blob into the settings table (fire and forget) */
 function persistSetting(key: string, value: unknown): void {
+  _lastWriteAt[key] = Date.now();
   const v = JSON.stringify(value);
   db.insert(settingsTable)
     .values({ key, value: v, updatedAt: new Date() })
@@ -318,6 +324,53 @@ export async function initStore(): Promise<void> {
   } catch (err) {
     logger.error({ err }, "store: failed to initialize from DB — using defaults");
   }
+}
+
+// ─── Cross-process settings sync ─────────────────────────────────────────────
+// Settings blobs live in per-process memory, hydrated only at boot. When the
+// same database is shared by multiple processes (e.g. Replit + VPS), an edit on
+// one process is invisible to the others until they restart. This loop re-reads
+// the editable config blobs from the DB periodically so all processes converge.
+// View counters are intentionally excluded (they are incremented in memory).
+
+const SYNCED_KEYS = new Set([
+  "site_settings", "menu_items", "columnists",
+  "contact_info", "social_config", "rss_prompts",
+]);
+
+let _syncTimer: ReturnType<typeof setInterval> | null = null;
+
+async function rehydrateSettings(graceMs: number): Promise<void> {
+  try {
+    const rows = await db.select().from(settingsTable);
+    const now = Date.now();
+    for (const row of rows) {
+      if (!SYNCED_KEYS.has(row.key)) continue;
+      // Skip keys written locally within the grace window so we never clobber a
+      // write whose async persist may still be in flight.
+      if (now - (_lastWriteAt[row.key] ?? 0) < graceMs) continue;
+      try {
+        const parsed = JSON.parse(row.value) as unknown;
+        switch (row.key) {
+          case "site_settings": _cache.settings    = parsed as SiteSettings; break;
+          case "menu_items":    _cache.menuItems    = parsed as MenuItem[];   break;
+          case "columnists":    _cache.columnists   = parsed as Columnist[];  break;
+          case "contact_info":  _cache.contactInfo  = parsed as ContactInfo;  break;
+          case "social_config": _cache.socialConfig = parsed as SocialConfig; break;
+          case "rss_prompts":   _cache.rssPrompts   = parsed as RssPrompts;   break;
+        }
+      } catch { /* ignore corrupt entries */ }
+    }
+  } catch (err) {
+    logger.error({ err }, "store: settings re-hydration failed");
+  }
+}
+
+/** Start the periodic settings re-hydration loop. Call once after initStore(). */
+export function startSettingsSync(intervalMs = 15000): void {
+  if (_syncTimer) return;
+  _syncTimer = setInterval(() => { void rehydrateSettings(intervalMs); }, intervalMs);
+  if (typeof _syncTimer.unref === "function") _syncTimer.unref();
 }
 
 async function migrateFromJsonFile(): Promise<void> {

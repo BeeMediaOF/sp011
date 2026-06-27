@@ -809,6 +809,13 @@ export default function HomeBlocksManager() {
     iframeRef.current?.contentWindow?.postMessage({ type: "style:preview", headerBgColor: hBg, footerBgColor: fBg }, "*");
   }
 
+  // Mantém a prévia ao vivo em TODA mutação de blocos (excluir, duplicar, mover,
+  // adicionar, reordenar, restaurar) sem refetch/remontagem do iframe.
+  useEffect(() => {
+    postAllBlocks(blocks);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocks]);
+
   // ── History (max 20 states) ──────────────────────────────────────────────────
   function pushHistory(next: HomeBlock[]) {
     setHistory((h) => {
@@ -838,8 +845,7 @@ export default function HomeBlocksManager() {
         invalidateSiteCache();
         setSaved(true);
         setSaveError(false);
-        // Refresh iframe via postMessage — no full remount
-        iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
+        // Preview já foi atualizado ao vivo via blocks:update — sem refetch (evita "recarregar" o preview)
         setTimeout(() => setSaved(false), 2000);
       } catch {
         setSaveError(true);
@@ -866,7 +872,9 @@ export default function HomeBlocksManager() {
       setFooterBgColor(preset.footerBgColor);
       pushHistory(ordered);
       invalidateSiteCache();
-      iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
+      // Preset altera layout de header/footer (não coberto por style:preview) —
+      // remonta o iframe uma vez (ação deliberada e rara).
+      setPreviewKey((k) => k + 1);
       setAppliedPreset(preset.id);
       setSaved(true);
       setTimeout(() => { setSaved(false); setAppliedPreset(null); }, 2500);
@@ -936,9 +944,9 @@ export default function HomeBlocksManager() {
     try {
       await adminApi.updateSettings({ homeBlocks: ordered });
       invalidateSiteCache();
+      postAllBlocks(ordered);
       setSaved(true);
       setSaveError(false);
-      setPreviewKey((k) => k + 1);
       setTimeout(() => setSaved(false), 2000);
     } catch {
       setSaveError(true);

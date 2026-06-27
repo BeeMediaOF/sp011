@@ -26,3 +26,31 @@ não era multi-instância PM2 (o guia já usa `instances:1`) nem o banco — era
 **Também:** no `HomeBlocksManager`, handlers que disparam `debounceSave(...)` devem passar
 o valor NOVO calculado (ex.: usar `blocksRef.current`/`next`), nunca o `blocks` do closure,
 senão salvam estado antigo (bug clássico em `block:reorder`).
+
+## Preview NÃO deve recarregar a cada edição
+
+O iframe de preview (`/?adminPreview=1`) é atualizado AO VIVO via postMessage
+`blocks:update`/`block:preview`/`style:preview`. NÃO mandar `settings:refresh` ao iframe
+em edições rotineiras: ele força `useSite` a refazer fetch → `settings` muda → `Home.tsx`
+`useEffect([settings])` reseta `previewBlocks` do servidor = re-render total (parece
+"recarregar a página"). Idem `setPreviewKey(k+1)` em saves frequentes (remonta o iframe).
+
+**Regra:** toda mutação de blocos deve empurrar `blocks:update` ao vivo. Centralizado num
+`useEffect(() => postAllBlocks(blocks), [blocks])` para cobrir excluir/duplicar/mover/
+adicionar/reordenar/restaurar de uma vez (antes vários handlers só chamavam `debounceSave`
+sem `postAllBlocks` e dependiam do `settings:refresh` removido). Reload/remontagem só é
+aceitável em ações deliberadas e raras que mudam LAYOUT de header/footer (presets,
+`saveHeaderFooter`) — `style:preview` só cobre cor de fundo, não o layout.
+
+## Sync entre Replit e VPS (mesmo banco Supabase)
+
+Settings (blobs `site_settings`, `menu_items`, etc.) vivem em memória POR PROCESSO
+(`_cache` em `store.ts`), hidratados do DB SÓ no boot (`initStore`) e nunca re-lidos.
+Replit e VPS compartilham o mesmo Supabase, mas cada processo serve da própria cópia em
+memória → editar num lado NÃO aparece no outro até reiniciar.
+
+**Fix:** `startSettingsSync()` em `store.ts` = `setInterval(15s)` que re-lê os blobs de
+config editáveis do DB para o `_cache`, PULANDO chaves escritas localmente nos últimos 15s
+(via `_lastWriteAt` setado em `persistSetting`) pra não sobrescrever um persist em voo.
+Contadores de view ficam de fora (são incrementados em memória). Consistência eventual
+(~15s). **Why:** sem isso, "mudei no Replit e na VPS não mudou".
