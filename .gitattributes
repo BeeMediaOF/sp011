@@ -1,0 +1,14 @@
+# Força LF nos arquivos de texto — evita quebra de build no Linux/Docker
+# (ex.: continuação de linha `\` em Dockerfile) ao editar no Windows.
+* text=auto eol=lf
+
+# Binários — nunca normalizar
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.webp binary
+*.avif binary
+*.ico  binary
+*.woff  binary
+*.woff2 binary
