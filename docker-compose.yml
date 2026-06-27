@@ -11,7 +11,11 @@ services:
       dockerfile: artifacts/api-server/Dockerfile
     restart: unless-stopped
     env_file:
-      - .env            # SUPABASE_*, SESSION_SECRET, GEMINI_API_KEY, VAPID_*, PORT=8080...
+      # Terminal: lê o .env do diretório do projeto.
+      # Docker Manager (UI): defina as variáveis na aba "Environment" do projeto.
+      # required:false evita erro de import quando o .env não está no clone.
+      - path: .env
+        required: false
     expose:
       - "8080"          # interno (somente o Caddy acessa)
 

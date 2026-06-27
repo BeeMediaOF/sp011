@@ -3,6 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+
+    <!-- Boot prefetch: dispara as APIs críticas da home JÁ no parse do HTML, em
+         paralelo ao download do bundle JS. Os hooks (useArticles/useSite/useAds)
+         consomem essas promessas em vez de só começar a buscar depois que o JS
+         executa — encurta a cadeia serial JS→API→render (melhora LCP e CLS). -->
+    <script>
+      (function () {
+        try {
+          var b = (window.__BOOT__ = {});
+          var j = function (u) {
+            return fetch(u, { credentials: "same-origin" })
+              .then(function (r) { return r.ok ? r.json() : null; })
+              .catch(function () { return null; });
+          };
+          b.articles = j("/api/articles");
+          b.site = j("/api/site");
+          b.ads = j("/api/ads");
+
+          /* Preload da imagem LCP (capa do 1º destaque) — só na home.
+             Dispara o download da imagem do hero EM PARALELO ao bundle JS, em vez
+             de esperar o React renderizar o <img> (~5-6s depois). Usa
+             imagesrcset/imagesizes IDÊNTICOS aos do HeroSection/FeaturedCard, então
+             o navegador baixa exatamente o mesmo recurso (zero download duplicado).
+             Os valores espelham HERO_WIDTHS, o sizes do FeaturedCard e PROXY_HOSTS
+             de src/lib/newsImage.ts — manter em sincronia se aqueles mudarem. */
+          var isHome = location.pathname === "/" || location.pathname === "";
+          if (isHome) {
+            var WIDTHS = [480, 768, 1024, 1280];
+            var SIZES = "(max-width: 1024px) 100vw, (max-width: 1280px) 33vw, 427px";
+            var HOSTS = {
+              "images.metroimg.com": 1, "i.metroimg.com": 1, "static.metroimg.com": 1,
+              "imagens.ebc.com.br": 1, "agenciabrasil.ebc.com.br": 1,
+              "media.investnews.com.br": 1, "www.cartacapital.com.br": 1,
+              "www.brasildefato.com.br": 1, "medias.revistaoeste.com": 1,
+              "uploads.finsidersbrasil.com.br": 1, "finsidersbrasil.com.br": 1,
+              "cdn.jornaldebrasilia.com.br": 1, "media-manager.noticiasaominuto.com.br": 1,
+              "img.uol.com.br": 1, "conteudo.imguol.com.br": 1, "imagem.band.uol.com.br": 1,
+              "upload.wikimedia.org": 1
+            };
+            b.articles.then(function (d) {
+              if (!d || !d.articles || !d.articles.length) return;
+              var arts = d.articles.slice().sort(function (a, c) {
+                return new Date(c.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+              });
+              var u = arts[0] && arts[0].imageUrl;
+              if (!u) return;
+              var srcset = null;
+              if (u.indexOf("/api/uploads/") === 0) {
+                srcset = WIDTHS.map(function (w) { return u + "?w=" + w + "&q=82&f=webp " + w + "w"; }).join(", ");
+              } else {
+                try {
+                  var h = new URL(u, location.href).hostname;
+                  if (HOSTS[h]) {
+                    srcset = WIDTHS.map(function (w) { return "/api/image?url=" + encodeURIComponent(u) + "&w=" + w + "&q=82 " + w + "w"; }).join(", ");
+                  }
+                } catch (e) {}
+              }
+              var l = document.createElement("link");
+              l.rel = "preload";
+              l.as = "image";
+              l.setAttribute("fetchpriority", "high");
+              if (srcset) {
+                l.setAttribute("imagesrcset", srcset);
+                l.setAttribute("imagesizes", SIZES);
+              } else {
+                l.href = u; /* host não-proxy → o <img> usa o src original */
+              }
+              document.head.appendChild(l);
+            });
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>SP011 — Notícia. Agora. Sempre.</title>
     <meta name="description" content="Informação com credibilidade sobre SP" />
     <meta name="robots" content="index, follow" />
@@ -22,9 +95,12 @@
     <meta name="twitter:image" content="/opengraph.jpg" />
 
     <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Fontes auto-hospedadas: preload das críticas (texto + manchetes acima da
+         dobra) para que cheguem cedo no caminho de renderização. Os @font-face
+         estão em src/index.css. -->
+    <link rel="preload" href="/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/merriweather-latin.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
