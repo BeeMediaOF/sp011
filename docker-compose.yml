@@ -1,0 +1,51 @@
+# Deploy do portal em Docker: API + frontend + Caddy (proxy reverso com HTTPS
+# automático via Let's Encrypt). Guia completo: README_DEPLOY_DOCKER.md
+#
+# Pré-requisitos: arquivo .env na raiz (segredos), domínio apontando para o IP
+# da VPS e portas 80/443 abertas.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: artifacts/api-server/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env            # SUPABASE_*, SESSION_SECRET, GEMINI_API_KEY, VAPID_*, PORT=8080...
+    expose:
+      - "8080"          # interno (somente o Caddy acessa)
+
+  web:
+    build:
+      context: .
+      dockerfile: artifacts/brasilia-agora/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      BASE_PATH: "/"
+      API_URL: "http://api:8080"   # usado pelo prerender de OG (server-to-server)
+    expose:
+      - "3000"
+    depends_on:
+      - api
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: "${SITE_DOMAIN:-sp011.com.br}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # certificados Let's Encrypt (persistente)
+      - caddy_config:/config
+    depends_on:
+      - web
+      - api
+
+volumes:
+  caddy_data:
+  caddy_config:

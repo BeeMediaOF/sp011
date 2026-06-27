@@ -1,0 +1,17 @@
+.git
+.gitignore
+**/node_modules
+node_modules
+.env
+.env.*
+**/dist
+dist
+**/*.log
+.agents
+.canvas
+.claude
+.vscode
+.replit
+.replitignore
+README_DEPLOY_HOSTINGER.md
+TECHNICAL_OVERVIEW.md
