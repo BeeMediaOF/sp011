@@ -40,7 +40,7 @@
 | Runtime | Node.js 24, TypeScript 5.9 |
 | Framework | Express 5 |
 | ORM | Drizzle ORM |
-| Banco | PostgreSQL (Replit managed) |
+| Banco | PostgreSQL (Supabase) |
 | Logger | Pino + pino-http (estruturado JSON) |
 | Auth | HMAC-SHA256 bearer token (scrypt para senhas) |
 | 2FA | TOTP via otplib v13 |
@@ -50,7 +50,7 @@
 | Push | Web Push VAPID (`web-push`) |
 | Social | Meta Graph API (Facebook/Instagram) |
 | Cron | `node-cron` |
-| Upload | `multer` → GCS sidecar HTTP / fallback disco |
+| Upload | `multer` → Supabase Storage (REST API) / fallback disco (dev) |
 | Build | esbuild (bundle CJS → `dist/index.mjs`) |
 
 ### Frontend (`artifacts/brasilia-agora`)
@@ -607,7 +607,7 @@ index.ts (boot)
 | Rate limiting | Por endpoint/IP, estado no PostgreSQL |
 | Helmet | Headers HTTP de segurança (CSP, HSTS, X-Frame, etc.) |
 | CORS | Configurado explicitamente |
-| Uploads | Validação de MIME type + tamanho; storage GCS ou disco local |
+| Uploads | Validação de MIME type + tamanho; Supabase Storage (REST) ou disco em dev |
 | Webhook | Chave rotacionável; autenticação obrigatória |
 | Logs | Auditoria de ações administrativas com usuário, IP e timestamp |
 
@@ -629,19 +629,27 @@ index.ts (boot)
 
 ## 13. Variáveis de Ambiente
 
+> Fonte de verdade: [`.env.example`](.env.example). O app lê `process.env` diretamente
+> (**sem dotenv**) — na VPS, injete o arquivo via `node --env-file=.env`.
+
 | Variável | Obrigatória | Descrição |
 |----------|------------|-----------|
-| `PORT` | ✅ | Porta do servidor (injetada pelo workflow) |
-| `DATABASE_URL` | ✅ | Connection string PostgreSQL |
-| `SESSION_SECRET` | ✅ prod | Segredo HMAC para tokens (64 bytes hex) |
-| `GEMINI_API_KEY` | — | Chave padrão Gemini (complementa as keys em settings) |
+| `SUPABASE_DATABASE_URL` | ✅ | Connection string do Postgres no Supabase (Session Pooler). Tem prioridade sobre `DATABASE_URL`. |
+| `DATABASE_URL` | — | Fallback da connection string, se `SUPABASE_DATABASE_URL` ausente |
+| `SESSION_SECRET` | ✅ prod | Segredo HMAC para tokens (o app não sobe sem, em produção) |
+| `PORT` | ✅ | Porta da API (8080) |
+| `NODE_ENV` | — | `production` na VPS |
+| `SUPABASE_URL` | ✅ prod | URL do projeto Supabase (uploads) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ prod | service_role key (uploads server-side); sem ela, uploads = 503 |
+| `SUPABASE_STORAGE_BUCKET` | — | Bucket de uploads (default `uploads`) |
+| `APP_URL` / `SITE_URL` | — | URL pública (links sociais, e-mails) |
+| `ALLOWED_ORIGINS` | — | Origens permitidas no CORS (separadas por vírgula) |
+| `GEMINI_API_KEY` | — | Chave Gemini direta (modo `gemini_direct`) |
 | `PERPLEXITY_API_KEY` | — | Chave da API Perplexity |
-| `DEFAULT_OBJECT_STORAGE_BUCKET_ID` | — | ID do bucket GCS para uploads |
-| `PRIVATE_OBJECT_DIR` | — | Diretório privado no object storage |
-| `PUBLIC_OBJECT_SEARCH_PATHS` | — | Paths públicos do object storage |
-| `ADMIN_DEFAULT_PASSWORD` | — | Senha do admin seed (se ausente: usa fallback fraco + aviso) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | — | Web Push |
+| `SMTP_HOST/PORT/USER/PASS/FROM` | — | Envio de e-mail |
+| `ADMIN_DEFAULT_EMAIL` / `ADMIN_DEFAULT_PASSWORD` | — | Seed do admin inicial |
 | `WEBHOOK_API_KEY` | — | Chave de webhook (complementa a key em settings) |
-| `PROXY_HOSTS` | — | Domínios permitidos no proxy de imagens (complementa ALLOWED_HOSTS) |
 
 ---
 

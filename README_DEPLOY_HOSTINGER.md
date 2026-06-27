@@ -1,139 +1,248 @@
-# Deploy na Hostinger — SBC Agora
+# Deploy na Hostinger (VPS) — Portal SBC / Brasília Agora
 
-Guia completo para publicar a plataforma SBC Agora na Hostinger.
+Guia para publicar o portal numa **VPS Hostinger** (Ubuntu) usando o banco e o storage no
+**Supabase**. Este guia está alinhado ao código real do projeto — siga os valores como estão.
+
+> **Banco já migrado:** os dados estão no projeto Supabase **SP011**
+> (`ref: yfmyufqfepzwjtzblths`, região `sa-east-1`). **Não** use o projeto antigo
+> "Brasília Agora" (us-east-2), cujo schema é diferente.
+
+---
+
+## Arquitetura na VPS
+
+```
+                 Internet (HTTPS :443)
+                        │
+                     [ Nginx ]
+            ┌───────────┴────────────┐
+            │ /                      │ /api
+            ▼                        ▼
+   Frontend (vite preview)     API (Express)
+     localhost:3000              localhost:8080
+            │                        │
+            │                        ├── Postgres → Supabase (Session Pooler, SP011)
+            │                        └── Uploads  → Supabase Storage (bucket "uploads")
+```
+
+- **API** (`@workspace/api-server`): Node/Express na porta **8080**.
+- **Frontend** (`@workspace/sbc-agora`): servido por **`vite preview`** na porta **3000**
+  (não como arquivos estáticos puros — o preview faz o *prerender* de Open Graph para o
+  preview de links no WhatsApp/Facebook).
+- **Nginx**: TLS + roteia `/ → 3000` e `/api → 8080`.
 
 ---
 
 ## Pré-requisitos
 
-- Plano Hostinger com suporte a Node.js (Business ou superior)
-- PostgreSQL provisionado (Hostinger VPS ou banco externo)
-- Acesso SSH ao servidor
-
----
-
-## 1. Configurar o Banco de Dados
-
-1. Acesse o painel Hostinger → **Databases**
-2. Crie um banco PostgreSQL
-3. Anote: `host`, `porta`, `database`, `usuário`, `senha`
-4. Monte a connection string:
-   ```
-   postgresql://usuario:senha@host:5432/nome_banco
-   ```
-
----
-
-## 2. Configurar o arquivo `.env`
-
-No servidor, crie o arquivo `.env` na raiz do projeto:
+- VPS Hostinger (KVM) com Ubuntu e acesso **SSH** (root ou sudo).
+- **Node.js 24** e **pnpm** instalados na VPS.
+- Um **domínio** apontando (registro A) para o IP da VPS.
+- Acesso ao painel do **Supabase** (projeto SP011): connection string, service_role key e Storage.
 
 ```bash
-cp .env.example .env
-nano .env
+# Node 24 + pnpm (na VPS)
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs nginx
+sudo npm install -g pnpm pm2
 ```
-
-Preencha **todos** os valores:
-
-```env
-DATABASE_URL=postgresql://usuario:senha@host:5432/sbcagora
-SESSION_SECRET=string-aleatoria-longa-e-unica-min-32-chars
-APP_URL=https://seudominio.com.br
-NODE_ENV=production
-CORS_ORIGIN=https://seudominio.com.br
-ADMIN_DEFAULT_EMAIL=admin@seudominio.com.br
-ADMIN_DEFAULT_PASSWORD=SenhaForteAqui123!
-LOG_LEVEL=warn
-PORT=5000
-PERPLEXITY_API_KEY=sua_chave_perplexity
-```
-
-> ⚠️ **NUNCA** commite o arquivo `.env` no repositório.
 
 ---
 
-## 3. Instalar Dependências
+## 1. Obter o código e instalar dependências
 
 ```bash
-# Na raiz do projeto
-npm install -g pnpm
+sudo mkdir -p /var/www && cd /var/www
+git clone <URL_DO_SEU_REPO> sbcagora
+cd /var/www/sbcagora
+
+# Instala TUDO (inclui devDependencies — o frontend usa o vite preview, que é devDependency).
+# NÃO rode "pnpm prune --prod": isso remove o vite e quebra o frontend.
 pnpm install --frozen-lockfile
 ```
 
 ---
 
-## 4. Rodar as Migrations
+## 2. Configurar as variáveis de ambiente (`.env`)
 
-Cria todas as tabelas do banco de dados:
+> ⚠️ **Importante:** este projeto **não usa dotenv**. O `.env` é injetado no processo via
+> `node --env-file=.env` (configurado no PM2, passo 6). Sem isso, o app não enxerga as variáveis.
 
 ```bash
-pnpm --filter @workspace/db run push
+cd /var/www/sbcagora
+cp .env.example .env
+nano .env
 ```
 
-Tabelas criadas:
-- `users` — usuários do painel administrativo
-- `audit_logs` — log de todas as ações
-- `security_logs` — log de eventos de segurança
+Preencha com base no [.env.example](.env.example). Pontos de atenção:
+
+| Variável | Valor |
+|----------|-------|
+| `SUPABASE_DATABASE_URL` | String do **Session Pooler** do SP011 (ver passo 3) |
+| `SUPABASE_URL` | `https://yfmyufqfepzwjtzblths.supabase.co` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Project Settings → API → `service_role` (secreta!) |
+| `SUPABASE_STORAGE_BUCKET` | `uploads` |
+| `SESSION_SECRET` | string aleatória longa — gere com `openssl rand -hex 32` |
+| `NODE_ENV` | `production` |
+| `PORT` | `8080` |
+| `APP_URL` / `SITE_URL` | `https://seudominio.com.br` |
+| `ALLOWED_ORIGINS` | `https://seudominio.com.br` |
+| `ADMIN_DEFAULT_EMAIL` / `ADMIN_DEFAULT_PASSWORD` | credenciais do 1º admin |
+| `GEMINI_API_KEY` | chave do Google AI Studio (ver passo 7.2) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | copie de [.replit](.replit) (push) |
+| `PERPLEXITY_API_KEY`, `SMTP_*` | opcionais |
+
+> O app prioriza `SUPABASE_DATABASE_URL`; `SESSION_SECRET` é **obrigatória** em produção
+> (o servidor não sobe sem ela).
 
 ---
 
-## 5. Criar o Primeiro Administrador
+## 3. Banco de dados (Supabase SP011)
 
-O sistema cria o administrador inicial **automaticamente** na primeira inicialização se o banco estiver vazio.
+1. No painel do Supabase → projeto **SP011** → **Connect** → **Session pooler**.
+2. Copie a string (formato abaixo) e coloque em `SUPABASE_DATABASE_URL`. Use o **Session
+   Pooler** (IPv4) — a conexão direta `db.<ref>.supabase.co` é só IPv6 e **falha** na Hostinger.
+   ```
+   postgresql://postgres.yfmyufqfepzwjtzblths:SENHA@aws-1-sa-east-1.pooler.supabase.com:5432/postgres
+   ```
+   > Se a senha tiver caracteres especiais, **codifique na URL** (`@`→`%40`, `#`→`%23`).
+3. O schema **já existe e está populado** (696 artigos, 69 fontes RSS, etc.). O comando abaixo
+   é idempotente — rode só para confirmar que o código e o banco estão em sincronia:
+   ```bash
+   pnpm --filter @workspace/db run push
+   ```
 
-As credenciais vêm das variáveis:
-- `ADMIN_DEFAULT_EMAIL`
-- `ADMIN_DEFAULT_PASSWORD`
+---
 
-> **Importante:** Troque a senha padrão imediatamente após o primeiro login em **Usuários > Alterar Senha**.
+## 4. Segurança do Supabase — fechar a Data API pública 🔴
 
-Para criar manualmente via SQL (alternativa):
+O linter do Supabase acusou **RLS desabilitado** em todas as 23 tabelas e **colunas sensíveis
+expostas** (`social_accounts.access_token`, `session_id`). Isso deixa a **Data API (PostgREST)**
+do Supabase aberta: qualquer um com a *anon key* poderia ler/gravar nas tabelas (inclusive
+`settings`, que guarda chaves de IA/VAPID/webhook).
 
+Este portal **não usa** o cliente Supabase/anon key (conecta direto no Postgres com o role
+`postgres`, que ignora RLS), então **habilitar RLS não quebra nada**. Escolha **uma** opção:
+
+**Opção A (recomendada) — habilitar RLS.** No Supabase → **SQL Editor**, rode:
 ```sql
--- Execute no psql ou pgAdmin
--- Substitua o hash abaixo pelo gerado com a função hashPassword do projeto
-INSERT INTO users (name, email, password_hash, role, status)
-VALUES ('Administrador', 'admin@seudominio.com.br', '<hash>', 'admin', 'active');
+ALTER TABLE public.users                     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_logs                ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.security_logs             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.role_permissions          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.contact_messages          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.articles                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ads                       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.analytics_events          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.login_attempts            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.settings                  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rss_sources               ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.perplexity_topics         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.rss_event_logs            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.endpoint_rate_limits      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.article_views             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.category_views            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.push_subscriptions        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.geo_stats                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_accounts           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_templates          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.social_publication_queue  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ad_daily_stats            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.behavior_events           ENABLE ROW LEVEL SECURITY;
 ```
+> Habilitar RLS **sem políticas** bloqueia o acesso anônimo via PostgREST — exatamente o que
+> queremos. Não crie políticas: o app não usa essa via.
+
+**Opção B — desligar a Data API.** Project Settings → API → **Data API** → desabilitar
+(o app não precisa dela). Doc: https://supabase.com/docs/guides/database/postgres/row-level-security
 
 ---
 
-## 6. Build e Start em Produção
+## 5. Storage de uploads (imagens/vídeos)
+
+As URLs `/api/uploads/...` são servidas pela API a partir do **Supabase Storage**.
+
+1. No Supabase → **Storage** → crie o bucket **`uploads`** (pode ser **privado** — o app usa a
+   `service_role` para ler/gravar).
+2. **Migre os arquivos antigos:** os uploads manuais que ficavam no Object Storage do Replit
+   precisam ser copiados para o bucket `uploads`, senão as mídias antigas retornam **404**.
+   (Imagens de fontes RSS são externas, servidas via `/api/image` por proxy, e **não** são afetadas.)
+
+> Em produção, sem `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` configuradas, qualquer upload
+> retorna **503** — não há fallback para disco.
+
+---
+
+## 6. Build e execução com PM2
 
 ```bash
-# Build da API
+cd /var/www/sbcagora
+
+# Build da API (esbuild → artifacts/api-server/dist/index.mjs)
 pnpm --filter @workspace/api-server run build
 
-# Build do frontend
-pnpm --filter @workspace/brasilia-agora run build
-
-# Iniciar o servidor
-pnpm --filter @workspace/api-server run start
+# Build do frontend — exige PORT e BASE_PATH no ambiente (validados pelo vite.config.ts).
+# Saída: artifacts/brasilia-agora/dist/public
+BASE_PATH=/ PORT=3000 API_URL=http://localhost:8080 \
+  pnpm --filter @workspace/sbc-agora run build
 ```
 
-Para manter o processo ativo, use **PM2**:
+Crie `ecosystem.config.cjs` na raiz do projeto:
+
+```js
+module.exports = {
+  apps: [
+    {
+      name: "sbcagora-api",
+      cwd: "/var/www/sbcagora/artifacts/api-server",
+      script: "node",
+      // --env-file injeta o .env (o app NÃO usa dotenv). Node 24 suporta --env-file.
+      args: "--env-file=/var/www/sbcagora/.env --enable-source-maps dist/index.mjs",
+      interpreter: "none",
+      instances: 1,
+      autorestart: true,
+      max_memory_restart: "512M",
+    },
+    {
+      name: "sbcagora-web",
+      cwd: "/var/www/sbcagora",
+      script: "pnpm",
+      args: "--filter @workspace/sbc-agora run serve",
+      interpreter: "none",
+      instances: 1,
+      autorestart: true,
+      // PORT/BASE_PATH/API_URL não são segredos — passados direto ao vite preview.
+      env: {
+        NODE_ENV: "production",
+        PORT: "3000",
+        BASE_PATH: "/",
+        API_URL: "http://localhost:8080",
+      },
+    },
+  ],
+};
+```
 
 ```bash
-npm install -g pm2
-
-# Iniciar
-pm2 start "pnpm --filter @workspace/api-server run start" --name "sbcagora-api"
-
-# Salvar para reiniciar com o servidor
+pm2 start ecosystem.config.cjs
 pm2 save
-pm2 startup
+pm2 startup        # siga a instrução que ele imprime (reinício automático com a VPS)
+pm2 logs           # verifique: API "Server listening" :8080 e o front no :3000
 ```
+
+> Use **1 instância** de cada (não use cluster/autoscale): o agendador RSS/social roda
+> em processo e duplicaria jobs com múltiplas instâncias.
 
 ---
 
-## 7. Configurar Nginx (Proxy Reverso)
+## 7. Nginx (proxy reverso + TLS)
+
+`/etc/nginx/sites-available/sbcagora`:
 
 ```nginx
 server {
     listen 80;
     server_name seudominio.com.br www.seudominio.com.br;
-
-    # Redirecionar HTTP → HTTPS
     return 301 https://$host$request_uri;
 }
 
@@ -144,70 +253,90 @@ server {
     ssl_certificate     /etc/letsencrypt/live/seudominio.com.br/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/seudominio.com.br/privkey.pem;
 
-    # Frontend (arquivos estáticos)
-    location / {
-        root /var/www/sbcagora/artifacts/brasilia-agora/dist;
-        try_files $uri $uri/ /index.html;
-    }
+    client_max_body_size 100M;   # uploads de vídeo até 100MB
 
-    # API Backend
+    # API
     location /api {
-        proxy_pass http://localhost:5000;
+        proxy_pass http://localhost:8080;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Frontend (vite preview)
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 ```
 
----
-
-## 8. SSL com Certbot
-
 ```bash
-apt install certbot python3-certbot-nginx
-certbot --nginx -d seudominio.com.br -d www.seudominio.com.br
+sudo ln -s /etc/nginx/sites-available/sbcagora /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### SSL com Certbot
+```bash
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d seudominio.com.br -d www.seudominio.com.br
 ```
 
 ---
 
-## 9. Validar Segurança Após o Deploy
+## 8. Pós-deploy
 
-Acesse **Painel Admin → Segurança → Checkup** e verifique:
+### 7.1 Primeiro admin
+O admin inicial é criado **automaticamente** no 1º boot, com `ADMIN_DEFAULT_EMAIL` /
+`ADMIN_DEFAULT_PASSWORD`. **(O banco já migrado pode já ter usuários** — nesse caso use os
+existentes.) Troque a senha após o primeiro login.
 
-- [ ] Score de segurança ≥ 80%
-- [ ] Banco de dados: Conectado
-- [ ] Nenhum evento crítico nos logs de segurança
-- [ ] HTTPS ativo no domínio
-- [ ] Senha padrão do admin foi trocada
-- [ ] `NODE_ENV=production` está definido
-- [ ] `SESSION_SECRET` é uma string longa e aleatória
+### 7.2 Provedor de IA (reescrita RSS)
+No painel **Admin → Configurações**, confirme o provedor de IA. Se vier do Replit como
+`gemini_free`, a IA **quebra** na VPS (depende do proxy do Replit). Use **`gemini_direct`**
+e configure `GEMINI_API_KEY` (chave gratuita em https://aistudio.google.com) — no `.env` ou nas Configurações.
 
----
-
-## 10. Checklist Final
-
-```
-[ ] .env configurado com valores reais
-[ ] DATABASE_URL apontando para o banco de produção
-[ ] Migrations rodadas (pnpm --filter @workspace/db run push)
-[ ] Admin seed criado e senha trocada
-[ ] PM2 configurado para reinício automático
-[ ] Nginx configurado como proxy reverso
-[ ] SSL/HTTPS ativo
-[ ] Backup automático configurado na Hostinger
-[ ] CORS_ORIGIN configurado com o domínio real
-[ ] Logs sendo gravados corretamente
-```
+### 7.3 Validação de segurança
+Admin → **Segurança → Checkup**:
+- [ ] Banco: Conectado · [ ] HTTPS ativo · [ ] `NODE_ENV=production`
+- [ ] Senha padrão do admin trocada · [ ] `SESSION_SECRET` longa e aleatória
 
 ---
 
-## Suporte
+## Checklist final
 
-Para dúvidas sobre a Hostinger:
-- Documentação: https://support.hostinger.com
-- Suporte: https://www.hostinger.com.br/suporte
+```
+[ ] .env preenchido (SUPABASE_DATABASE_URL = Session Pooler do SP011)
+[ ] SUPABASE_URL + SERVICE_ROLE_KEY + bucket "uploads" criados
+[ ] Arquivos de mídia antigos migrados do Replit p/ o bucket
+[ ] RLS habilitado (ou Data API desligada) no Supabase
+[ ] pnpm install (com devDeps) + build API + build front
+[ ] PM2 rodando 2 apps (api :8080, web :3000) + pm2 save/startup
+[ ] Nginx (/ → 3000, /api → 8080) + SSL ativo
+[ ] Provedor de IA = gemini_direct + GEMINI_API_KEY
+[ ] VAPID_* copiadas do .replit (push notifications)
+[ ] Senha do admin trocada
+```
+
+---
+
+## Troubleshooting
+
+| Sintoma | Causa provável |
+|---------|----------------|
+| Upload retorna **503** | `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` ausentes no `.env` |
+| Imagens antigas dão **404** | arquivos de mídia não migrados p/ o bucket `uploads` |
+| App não sobe: *"SESSION_SECRET not set"* | falta `SESSION_SECRET` (obrigatória em prod) |
+| App não enxerga variáveis | `--env-file=.env` ausente no comando do PM2 (não há dotenv) |
+| IA falha: *"AI_INTEGRATIONS_GEMINI_BASE_URL"* | provedor está em `gemini_free`; troque p/ `gemini_direct` |
+| Preview de link no WhatsApp sem imagem | frontend servido como estático; use `vite preview` (script `serve`) |
+| Erro de conexão ao banco na Hostinger | usou conexão direta (IPv6); use o **Session Pooler** |
+| Build do front falha (PORT/BASE_PATH) | exporte `BASE_PATH=/ PORT=3000` antes do `build` |
+
+## Suporte Hostinger
+- https://support.hostinger.com · https://www.hostinger.com.br/suporte

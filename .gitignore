@@ -48,3 +48,8 @@ Thumbs.db
 .cache/
 .local/
 artifacts/api-server/data/store.json
+
+# Variáveis de ambiente (segredos) — nunca commitar
+.env
+.env.*
+!.env.example
