@@ -61,12 +61,36 @@ function injectExternalScript(id: string, src: string, attrs: Record<string, str
   document.head.appendChild(el);
 }
 
+/**
+ * Agenda `cb` para quando a thread principal estiver ociosa. Usado para adiar a
+ * injeção dos scripts de terceiros (GTM/GA4/Pixel), que são pesados e, se rodarem
+ * logo após a hidratação, entram na janela de medição do TBT (PageSpeed). Adiá-los
+ * para o idle tira ~100-200ms de TBT sem perder rastreamento (o PageView dispara
+ * poucos segundos depois). `timeout` garante execução mesmo se nunca ficar ocioso.
+ */
+function onIdle(cb: () => void): () => void {
+  const ric = (window as unknown as {
+    requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    cancelIdleCallback?: (h: number) => void;
+  }).requestIdleCallback;
+  if (typeof ric === "function") {
+    const h = ric(cb, { timeout: 3000 });
+    return () => (window as unknown as { cancelIdleCallback?: (h: number) => void }).cancelIdleCallback?.(h);
+  }
+  const t = window.setTimeout(cb, 2000);
+  return () => window.clearTimeout(t);
+}
+
 export default function SEOHead() {
   const { settings } = useSite();
 
+  // ── Scripts de terceiros (pesados) → adiados para o idle, fora do TBT ────────
   useEffect(() => {
     if (!settings) return;
+    if (!settings.gtmId && !settings.ga4MeasurementId && !settings.facebookPixelId
+        && !settings.customHeadCode && !settings.customBodyCode) return;
 
+    const cancel = onIdle(() => {
     // ── Google Tag Manager ────────────────────────────────────────────────────
     if (settings.gtmId) {
       const gid = settings.gtmId.trim();
@@ -124,6 +148,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         injectHtmlSnippet("custom-body-code", settings.customBodyCode, document.body, "prepend");
       } catch { /* snippet inválido — ignorar silenciosamente */ }
     }
+    });
+
+    return cancel;
+  }, [settings]);
+
+  // ── Title / meta / favicon → síncrono (barato e relevante para SEO/SPA) ──────
+  useEffect(() => {
+    if (!settings) return;
 
     // Title
     document.title = settings.siteName

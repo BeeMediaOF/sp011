@@ -77,8 +77,16 @@ app.listen(port, async (err) => {
         .map((r) => r.imageUrl)
         .filter((u): u is string => Boolean(u));
 
-      const warmed = await warmImageCache(urls, [480, 768]);
-      logger.info({ total: urls.length, warmed }, "Image cache warmed on startup");
+      // Cards (todos): larguras de thumbnail. Hero/LCP (apenas os mais recentes —
+      // o destaque é sempre um dos primeiros): larguras grandes (1024/1280), para
+      // que a imagem do LCP já saia pré-codificada do cache e não pague fetch+encode
+      // dentro do caminho crítico do Largest Contentful Paint.
+      const warmedCards = await warmImageCache(urls, [480, 768]);
+      const warmedHero = await warmImageCache(urls.slice(0, 8), [1024, 1280]);
+      logger.info(
+        { total: urls.length, warmedCards, warmedHero },
+        "Image cache warmed on startup",
+      );
     } catch (warmErr) {
       logger.warn({ err: warmErr }, "Image cache warming failed (non-fatal)");
     }
