@@ -28,6 +28,10 @@ export default function Footer() {
   const { settings } = useSite();
   const style = settings?.footerStyle ?? "dark";
   const bgColor = settings?.footerBgColor;
+  // Logo configurada no painel tem prioridade; as imagens do bundle (variante
+  // negativa p/ fundo escuro, colorida p/ fundo claro) ficam só como fallback.
+  const logoSrc      = settings?.logoBase64 || logoImg;
+  const logoColorSrc = settings?.logoBase64 || logoColorImg;
 
   // ── Minimal ────────────────────────────────────────────────────────────────
   if (style === "minimal") {
@@ -62,7 +66,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              <img src={logoColorImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
+              <img src={logoColorSrc} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
               <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">
                 Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
               </p>
@@ -139,7 +143,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            <img src={logoImg} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
+            <img src={logoSrc} alt={BRAND.name} className="h-10 w-auto object-contain mb-2" />
             <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">
               Informação com credibilidade e compromisso com a verdade sobre o Distrito Federal.
             </p>

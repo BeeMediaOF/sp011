@@ -98,6 +98,9 @@ function TickerBar() {
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
   const { settings }            = useSite();
+  // Logo configurada no painel (Configurações → logo) tem prioridade; a imagem
+  // empacotada no bundle é só fallback quando nenhuma logo foi enviada.
+  const logoSrc = settings?.logoBase64 || logoImg;
   const [location]              = useLocation();
   const [menuOpen, setMenu]       = useState(false);
   const [searchOpen, setSearch]   = useState(false);
@@ -145,7 +148,7 @@ export default function Header() {
 
             <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
               <img
-                src={logoImg}
+                src={logoSrc}
                 alt={settings?.siteName ?? BRAND.name}
                 style={{ height: settings?.logoSize ? settings.logoSize * 0.65 : 30 }}
                 className="w-auto object-contain block"
@@ -228,7 +231,7 @@ export default function Header() {
 
             <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
               <img
-                src={logoImg}
+                src={logoSrc}
                 alt={settings?.siteName ?? BRAND.name}
                 style={{ height: settings?.logoSize ?? 48 }}
                 className="w-auto object-contain block"
