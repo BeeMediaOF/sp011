@@ -21,6 +21,59 @@ import {
   articleViewsTable,
 } from "@workspace/db";
 import { logger } from "./logger.js";
+import {
+  encryptSecret,
+  decryptSecret,
+  isEncrypted,
+  encryptionAvailable,
+} from "./crypto.js";
+
+// ─── Secret fields encrypted-at-rest in the settings table ────────────────────
+// Top-level string fields per settings key that hold credentials. The
+// `geminiApiKeys` array is handled separately (array of secrets).
+const SECRET_FIELDS: Record<string, string[]> = {
+  site_settings: [
+    "rssAiApiKey", "diffbotApiKey", "geminiApiKey",
+    "openaiApiKey", "youtubeApiKey", "webhookApiKey",
+  ],
+  social_config: ["pageAccessToken"],
+};
+
+/** Apply `fn` (encrypt/decrypt) to every secret field of a settings blob. Returns a new object. */
+function transformSecrets(key: string, obj: unknown, fn: (s: string) => string): unknown {
+  if (!obj || typeof obj !== "object") return obj;
+  const fields = SECRET_FIELDS[key];
+  if (!fields) return obj;
+  const out: Record<string, unknown> = { ...(obj as Record<string, unknown>) };
+  for (const f of fields) {
+    const v = out[f];
+    if (typeof v === "string" && v.length > 0) out[f] = fn(v);
+  }
+  if (key === "site_settings" && Array.isArray(out["geminiApiKeys"])) {
+    out["geminiApiKeys"] = (out["geminiApiKeys"] as unknown[]).map((k) =>
+      typeof k === "string" && k.length > 0 ? fn(k) : k,
+    );
+  }
+  return out;
+}
+
+const encryptForStorage  = (key: string, obj: unknown): unknown => transformSecrets(key, obj, encryptSecret);
+const decryptFromStorage = (key: string, obj: unknown): unknown => transformSecrets(key, obj, decryptSecret);
+
+/** True if any secret field for this key is present in plaintext (needs migration). */
+function hasPlaintextSecret(key: string, obj: Record<string, unknown>): boolean {
+  const fields = SECRET_FIELDS[key] ?? [];
+  for (const f of fields) {
+    const v = obj[f];
+    if (typeof v === "string" && v.length > 0 && !isEncrypted(v)) return true;
+  }
+  if (key === "site_settings" && Array.isArray(obj["geminiApiKeys"])) {
+    if ((obj["geminiApiKeys"] as unknown[]).some(
+      (k) => typeof k === "string" && k.length > 0 && !isEncrypted(k),
+    )) return true;
+  }
+  return false;
+}
 
 // ─── Types (kept identical to original interface) ─────────────────────────────
 
@@ -239,11 +292,37 @@ const _lastWriteAt: Record<string, number> = {};
 /** Async upsert a JSON blob into the settings table (fire and forget) */
 function persistSetting(key: string, value: unknown): void {
   _lastWriteAt[key] = Date.now();
-  const v = JSON.stringify(value);
+  // Encrypt credential fields before they touch the database.
+  const v = JSON.stringify(encryptForStorage(key, value));
   db.insert(settingsTable)
     .values({ key, value: v, updatedAt: new Date() })
     .onConflictDoUpdate({ target: settingsTable.key, set: { value: v, updatedAt: new Date() } })
     .catch((err: unknown) => logger.error({ err }, `store: failed to persist setting "${key}"`));
+}
+
+/**
+ * One-time migration: re-persist settings blobs that still contain plaintext
+ * secrets so they are written back encrypted. Idempotent — does nothing once all
+ * secrets are encrypted, and is skipped entirely when no encryption key is set.
+ */
+async function encryptExistingSecrets(): Promise<void> {
+  if (!encryptionAvailable()) return;
+  try {
+    const rows = await db.select().from(settingsTable);
+    for (const row of rows) {
+      if (row.key !== "site_settings" && row.key !== "social_config") continue;
+      let parsed: Record<string, unknown>;
+      try { parsed = JSON.parse(row.value) as Record<string, unknown>; } catch { continue; }
+      if (!hasPlaintextSecret(row.key, parsed)) continue;
+      // The in-memory cache already holds the decrypted values; re-persisting
+      // routes them through encryptForStorage().
+      if (row.key === "site_settings") persistSetting("site_settings", _cache.settings);
+      else                              persistSetting("social_config", _cache.socialConfig);
+      logger.info({ key: row.key }, "store: migrated plaintext secrets to encrypted-at-rest");
+    }
+  } catch (err) {
+    logger.warn({ err }, "store: secret encryption migration failed (non-fatal)");
+  }
 }
 
 function slugify(text: string): string {
@@ -260,7 +339,7 @@ export async function initStore(): Promise<void> {
     const rows = await db.select().from(settingsTable);
     for (const row of rows) {
       try {
-        const parsed = JSON.parse(row.value) as unknown;
+        const parsed = decryptFromStorage(row.key, JSON.parse(row.value) as unknown);
         switch (row.key) {
           case "site_settings":  _cache.settings       = parsed as SiteSettings;  break;
           case "menu_items":     _cache.menuItems       = parsed as MenuItem[];    break;
@@ -317,6 +396,9 @@ export async function initStore(): Promise<void> {
     // 5. Migrate from store.json if DB is empty (first run)
     await migrateFromJsonFile();
 
+    // 6. Encrypt any secrets still stored in plaintext (one-time, idempotent)
+    await encryptExistingSecrets();
+
     logger.info({
       rssSources: _cache.rssSources.length,
       perplexityTopics: _cache.perplexityTopics.length,
@@ -350,7 +432,7 @@ async function rehydrateSettings(graceMs: number): Promise<void> {
       // write whose async persist may still be in flight.
       if (now - (_lastWriteAt[row.key] ?? 0) < graceMs) continue;
       try {
-        const parsed = JSON.parse(row.value) as unknown;
+        const parsed = decryptFromStorage(row.key, JSON.parse(row.value) as unknown);
         switch (row.key) {
           case "site_settings": _cache.settings    = parsed as SiteSettings; break;
           case "menu_items":    _cache.menuItems    = parsed as MenuItem[];   break;
@@ -500,7 +582,8 @@ export const store = {
     delete out["geminiApiKeys"];
     delete out["openaiApiKey"];
     delete out["youtubeApiKey"];
-    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"> & {
+    delete out["webhookApiKey"];
+    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"|"webhookApiKey"> & {
       hasRssAiKey: boolean; hasDiffbotKey: boolean; hasGeminiKey: boolean;
       hasOpenaiKey: boolean; hasYoutubeKey: boolean;
     };

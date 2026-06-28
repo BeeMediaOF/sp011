@@ -374,7 +374,18 @@ async function callGeminiWithRotation(keys: string[], model: string, prompt: str
         );
         continue; // try the next key
       }
-      throw err; // non-quota error: propagate immediately
+      if (isKeyAuthError(msg)) {
+        // Dead key: invalid, leaked, forbidden or wrong format (e.g. an OAuth token
+        // pasted as an API key). Park it on a long cooldown so rotation skips it and
+        // keeps using the healthy keys, instead of aborting the whole batch.
+        _keyCooldowns.set(key, Date.now() + DEAD_KEY_COOLDOWN_MS);
+        logger.warn(
+          { keyHint: `...${key.slice(-4)}`, remaining: keys.length - tried.size },
+          "Gemini key invalid/leaked — parking key and rotating to next",
+        );
+        continue; // try the next key
+      }
+      throw err; // genuine non-quota, non-auth error: propagate immediately
     }
   }
 
@@ -384,12 +395,16 @@ async function callGeminiWithRotation(keys: string[], model: string, prompt: str
   const cooldownTimes = keys.map((k) => _keyCooldowns.get(k) ?? 0);
   const minCooldown = Math.min(...cooldownTimes);
   const waitSecs = Math.max(0, Math.ceil((minCooldown - now) / 1_000));
-  // Add 8s buffer to ensure the minute window fully resets before retrying
-  const globalCooldownMs = waitSecs > 0 ? waitSecs * 1_000 + 8_000 : 70_000;
+  // Add 8s buffer to ensure the minute window fully resets before retrying.
+  // Cap the GLOBAL pause: even if a key is parked for hours (dead key), the queue
+  // must recheck soon so it self-heals the moment the admin fixes/replaces a key —
+  // and so the Perplexity fallback keeps articles flowing in the meantime.
+  const rawCooldownMs = waitSecs > 0 ? waitSecs * 1_000 + 8_000 : 70_000;
+  const globalCooldownMs = Math.min(rawCooldownMs, MAX_GLOBAL_COOLDOWN_MS);
   _quota.cooldownUntil = now + globalCooldownMs;
-  const waitDisplay = waitSecs > 0 ? waitSecs + 8 : 70;
+  const waitDisplay = Math.ceil(globalCooldownMs / 1_000);
   throw new Error(
-    `QUOTA_COOLDOWN:Todas as ${keys.length} API key(s) do Gemini atingiram o limite. Aguardando ${waitDisplay}s.`,
+    `QUOTA_COOLDOWN:Todas as ${keys.length} API key(s) do Gemini estão indisponíveis (cota ou chave inválida). Aguardando ${waitDisplay}s.`,
   );
 }
 
@@ -426,6 +441,28 @@ function parseCooldownMs(errMsg: string): number {
   const m = errMsg.match(/(?:retryDelay|retry[\s-]*after|retry\s+in)[^\d]*(\d+(?:\.\d+)?)\s*s/i);
   if (m) return Math.ceil(parseFloat(m[1]!) * 1_000) + 8_000; // +8s buffer for minute window reset
   return 70_000; // Default: 70s (safe margin for free-tier RPM reset)
+}
+
+/** How long to park a key that is invalid/leaked/forbidden so rotation skips it. */
+const DEAD_KEY_COOLDOWN_MS = 30 * 60 * 1000; // 30 min
+/** Hard cap on the global queue pause when every key is unavailable. */
+const MAX_GLOBAL_COOLDOWN_MS = 5 * 60 * 1000; // 5 min
+
+/**
+ * True for errors that mean THIS key is unusable (invalid, leaked, forbidden, or an
+ * OAuth/ephemeral token pasted where an API key is expected) — as opposed to a
+ * transient quota/rate-limit error that the same key recovers from.
+ */
+export function isKeyAuthError(msg: string): boolean {
+  return (
+    msg.includes("API key not valid") ||
+    msg.includes("API_KEY_INVALID") ||
+    msg.includes("reported as leaked") ||
+    msg.includes("PERMISSION_DENIED") ||
+    msg.includes("invalid authentication") ||
+    msg.includes("Expected OAuth") ||
+    /\b40[13]\b/.test(msg) // 401 Unauthorized / 403 Forbidden
+  );
 }
 
 /**

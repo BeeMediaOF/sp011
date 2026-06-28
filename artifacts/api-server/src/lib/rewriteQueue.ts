@@ -18,6 +18,7 @@ import {
   getAvailableKeyCount,
   addLog,
   registerRewriteQueue,
+  isKeyAuthError,
   type RewriteJobItem,
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
@@ -200,6 +201,22 @@ let _activeCount = 0; // number of articles currently being processed in paralle
 const _recentHistory: HistoryEntry[] = [];
 const HISTORY_MAX = 30;
 
+// ── Throttled "all providers down" panel notification ─────────────────────────
+let _lastProvidersDownLogAt = 0;
+const PROVIDERS_DOWN_LOG_INTERVAL_MS = 5 * 60 * 1000; // at most one panel log / 5 min
+
+/** Write a single, clear, throttled warning to the panel log when both AI providers are unavailable. */
+function notifyProvidersDown(isKeyProblem: boolean): void {
+  const now = Date.now();
+  if (now - _lastProvidersDownLogAt < PROVIDERS_DOWN_LOG_INTERVAL_MS) return;
+  _lastProvidersDownLogAt = now;
+  const message = isKeyProblem
+    ? "Todas as chaves Gemini estão indisponíveis (inválidas, vazadas ou sem cota) e o fallback Perplexity falhou. Os artigos ficam aguardando na fila. Verifique as chaves em Configurações de IA."
+    : "Gemini sem cota no momento e o fallback Perplexity falhou. Os artigos ficam aguardando na fila e serão reescritos assim que a cota voltar.";
+  addLog({ type: "error", sourceName: "Sistema", articleTitle: "Reescrita de IA pausada", message });
+  logger.warn({ isKeyProblem }, "Rewrite queue: both AI providers unavailable — articles held in queue");
+}
+
 // ── Cooldown wake-up: schedule processBatch exactly when cooldown expires ─────
 let _cooldownWakeupHandle: ReturnType<typeof setTimeout> | null = null;
 // ── Force-bypass: admin can request one immediate batch attempt ───────────────
@@ -381,11 +398,19 @@ async function processItem(item: RewriteJobItem): Promise<void> {
   } catch (err) {
     const msg = String(err);
     const isQuotaError = msg.includes("QUOTA_COOLDOWN") || msg.includes("QUOTA_EXHAUSTED");
+    // Provider/config failures (no key, invalid/leaked key, 401/403) are NOT the
+    // article's fault — they must never cause the article to be deleted. Treat them
+    // like a quota error: try Perplexity, otherwise keep the draft queued until the
+    // admin fixes the keys.
+    const isProviderError =
+      isQuotaError ||
+      msg.includes("não configurada") ||
+      isKeyAuthError(msg);
 
-    if (isQuotaError) {
-      // Gemini quota exhausted — try Perplexity as an instant fallback so the
-      // article doesn't just pile up waiting for Gemini quota to recover.
-      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: Gemini quota — trying Perplexity fallback");
+    if (isProviderError) {
+      // Gemini unavailable (quota or bad key) — try Perplexity as an instant fallback
+      // so the article doesn't just pile up waiting for Gemini to recover.
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: Gemini unavailable — trying Perplexity fallback");
       let perplexityOk = false;
       try {
         const pResult = await rewriteWithPerplexity(item);
@@ -414,14 +439,19 @@ async function processItem(item: RewriteJobItem): Promise<void> {
       }
 
       if (!perplexityOk) {
-        // Perplexity also unavailable — silently re-queue at front for Gemini retry.
+        // Both providers unavailable — re-queue at front (attempt NOT consumed, never deleted).
         if (!_queue.some((q) => q.articleId === item.articleId)) {
           _queue.unshift({ ...item, attempts: item.attempts ?? 0 });
           logger.info(
             { articleId: item.articleId, attempt, queueLength: _queue.length },
-            "Article returned to queue front — quota cooldown, attempt NOT consumed",
+            "Article returned to queue front — provider unavailable, attempt NOT consumed",
           );
         }
+        // Surface a clear, throttled warning in the admin panel log so the cause is
+        // obvious (no working Gemini key AND Perplexity unavailable). Throttled so a
+        // full queue doesn't flood the log every few seconds.
+        const isKeyProblem = !isQuotaError; // invalid/leaked/missing key (not just quota)
+        notifyProvidersDown(isKeyProblem);
       }
     } else {
       // Real error: count + log it
