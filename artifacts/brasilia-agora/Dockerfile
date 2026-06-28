@@ -19,6 +19,9 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV BASE_PATH=/
 ENV API_URL=http://api:8080
+# Fuso do Brasil para que as datas formatadas no SSR (servidor) batam com o
+# cliente (pt-BR) e não gerem mismatch de hidratação.
+ENV TZ=America/Sao_Paulo
 RUN npm install -g pnpm@10.15.1
 WORKDIR /app
 COPY --from=build /app /app

@@ -140,6 +140,23 @@ export function invalidateSiteCache() {
   _fetch = doFetch(true).catch(() => { _fetch = null; });
 }
 
+/** Semeia o cache de settings sincronamente (SSR + hidratação). Ver seedArticles. */
+export function seedSite(data: SiteSettings): void {
+  _cache = data;
+  _cacheAt = Date.now();
+  notifySubscribers();
+}
+
+/**
+ * Rebusca /api/site completo após a hidratação. O SSR semeia uma versão "magra"
+ * das settings (sem os base64 de logo/favicon/og, para não inchar o HTML); esta
+ * função traz a versão completa em background, sem blanquear o cache atual
+ * (doFetch só substitui _cache em caso de sucesso) → logos/analytics aparecem.
+ */
+export function refreshSite(): void {
+  if (!_fetch) _fetch = doFetch(true).catch(() => { _fetch = null; });
+}
+
 export function useSite() {
   const [settings, setSettings] = useState<SiteSettings | null>(_cache);
   const [loading, setLoading] = useState(_cache === null);

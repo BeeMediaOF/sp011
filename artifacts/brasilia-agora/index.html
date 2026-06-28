@@ -11,6 +11,9 @@
     <script>
       (function () {
         try {
+          // Home com SSR já injeta os dados (__SSR_DATA__) e o hero no HTML —
+          // dispensa o prefetch e o preload de LCP deste boot.
+          if (window.__SSR_DATA__) return;
           var b = (window.__BOOT__ = {});
           var j = function (u) {
             return fetch(u, { credentials: "same-origin" })
@@ -104,6 +107,6 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module" src="/src/entry-client.tsx"></script>
   </body>
 </html>

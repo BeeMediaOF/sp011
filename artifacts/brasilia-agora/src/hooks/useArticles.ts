@@ -67,6 +67,17 @@ export function invalidateArticlesCache() {
   _fetch = doFetch().catch(() => { _fetch = null; });
 }
 
+/**
+ * Semeia o cache sincronamente (SSR no servidor; e no cliente antes de hidratar,
+ * a partir de window.__SSR_DATA__). Mantém o 1º render do cliente igual ao do
+ * servidor → sem mismatch de hidratação.
+ */
+export function seedArticles(articles: Article[]): void {
+  _cache = articles;
+  _cacheAt = Date.now();
+  notifySubscribers();
+}
+
 export function useArticles() {
   const [articles, setArticles] = useState<Article[]>(_cache ?? []);
   const [loading, setLoading]   = useState(_cache === null);

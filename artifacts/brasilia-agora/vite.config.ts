@@ -6,6 +6,7 @@ import path from "path";
 import fs from "node:fs";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { pathToFileURL } from "node:url";
 
 const rawPort = process.env.PORT;
 
@@ -248,11 +249,109 @@ function socialOgPlugin(apiBase: string): Plugin {
   };
 }
 
+/**
+ * ssrHomePlugin — SSR da home (apenas `/`) no servidor de preview (produção).
+ * Renderiza o App no servidor (usando o bundle dist/server/entry-server.js gerado
+ * por `vite build --ssr`), injeta o HTML no #root do template buildado e serializa
+ * os dados em window.__SSR_DATA__. Assim o hero já vem pintado no HTML (LCP cedo)
+ * e o cliente hidrata sem refazer o trabalho. Demais rotas → next() (SPA client).
+ * Só em preview (produção); o dev (`vite`) segue client-only.
+ */
+function ssrHomePlugin(apiBase: string): Plugin {
+  const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
+  const ssrEntry = path.resolve(import.meta.dirname, "dist/server/entry-server.js");
+  let template: string | null = null;
+  let renderFn: ((url: string, data: unknown) => string) | null = null;
+
+  async function fetchJson(u: string): Promise<unknown> {
+    try {
+      const r = await fetch(u);
+      return r.ok ? await r.json() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleHome(
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ): Promise<void> {
+    const pathOnly = (req.url ?? "").split("?")[0];
+    if (req.method !== "GET" || (pathOnly !== "/" && pathOnly !== "/index.html")) {
+      next();
+      return;
+    }
+    try {
+      if (!renderFn) {
+        const mod = (await import(pathToFileURL(ssrEntry).href)) as {
+          render: (url: string, data: unknown) => string;
+        };
+        renderFn = mod.render;
+      }
+      if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
+
+      const [a, s, d] = (await Promise.all([
+        fetchJson(`${apiBase}/api/articles`),
+        fetchJson(`${apiBase}/api/site`),
+        fetchJson(`${apiBase}/api/ads`),
+      ])) as [{ articles?: unknown[] } | null, unknown, { ads?: unknown[] } | null];
+
+      /* CRÍTICO: o __SSR_DATA__ vai inline no HTML. Os campos base64 das settings
+         (logo/favicon/og em base64) podem somar centenas de KB que NÃO comprimem
+         com gzip → inchaço do documento e FCP/LCP altos. Removemos esses campos
+         (o cliente rebusca /api/site completo após hidratar — ver entry-client) e
+         o `keywords` dos artigos (não usado na home). O Header usa logo importado
+         estático, então o render do servidor não depende desses base64. */
+      const HEAVY_SITE = ["logoBase64", "faviconBase64", "ogImageBase64", "bylineLogoBase64", "adminLogoBase64"];
+      const rawSite = (s && typeof s === "object") ? (s as Record<string, unknown>) : null;
+      let site: Record<string, unknown> | null = rawSite;
+      if (rawSite) {
+        site = { ...rawSite };
+        for (const k of HEAVY_SITE) delete site[k];
+      }
+      /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
+         para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
+         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
+         recentes — cobrem todas as seções sem perda visível. */
+      const rawArticles = (a && Array.isArray(a.articles)) ? (a.articles as Array<Record<string, unknown>>) : [];
+      const articles = rawArticles
+        .map((art) => { const copy = { ...art }; delete copy["keywords"]; return copy; })
+        .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime())
+        .slice(0, 100);
+
+      const data = { articles, site, ads: d?.ads ?? [] };
+
+      const appHtml = renderFn("/", data);
+      const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
+      const html = template
+        .replace("<head>", `<head>\n    <script>window.__SSR_DATA__=${serialized}</script>`)
+        .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.end(html);
+    } catch {
+      next(); // qualquer falha → cai para o index.html cru (SPA client-only)
+    }
+  }
+
+  return {
+    name: "ssr-home",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleHome(req, res, next);
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     staticCachePlugin(),
     socialOgPlugin(process.env.API_URL ?? "http://localhost:8080"),
+    ssrHomePlugin(process.env.API_URL ?? "http://localhost:8080"),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),

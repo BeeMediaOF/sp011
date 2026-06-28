@@ -123,7 +123,7 @@ function FeaturedCard({
           <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
           <span className="font-medium">{bylineName}</span>
           <span className="w-1 h-1 rounded-full bg-white/40" />
-          <span>{item.time}</span>
+          <span suppressHydrationWarning>{item.time}</span>
         </div>
       </div>
     </Link>

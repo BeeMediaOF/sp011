@@ -64,6 +64,13 @@ async function doFetchAds() {
   }
 }
 
+/** Semeia o cache de anúncios sincronamente (SSR + hidratação). Ver seedArticles. */
+export function seedAds(ads: AdItem[]): void {
+  _cache = ads;
+  _cacheAt = Date.now();
+  _subs.forEach((cb) => cb(_cache!));
+}
+
 export function useAds() {
   const [ads, setAds] = useState<AdItem[]>(_cache ?? []);
   const [loading, setLoading] = useState(_cache === null);

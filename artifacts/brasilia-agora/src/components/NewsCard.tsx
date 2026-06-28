@@ -34,7 +34,7 @@ export default function NewsCard({ id, slug, title, summary, image, chapeu, chap
         <img
           src={image || undefined}
           srcSet={srcset || undefined}
-          sizes={srcset ? "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" : undefined}
+          sizes={srcset ? "(max-width: 640px) 78vw, (max-width: 1024px) 50vw, 33vw" : undefined}
           alt={title.replace(/<[^>]*>/g, "")}
           width={480}
           height={270}
