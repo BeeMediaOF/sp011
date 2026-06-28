@@ -263,6 +263,14 @@ function ssrHomePlugin(apiBase: string): Plugin {
   let template: string | null = null;
   let renderFn: ((url: string, data: unknown) => string) | null = null;
 
+  /* Cache em memória do HTML já renderizado. Sem ele, CADA request a `/` paga
+     3 fetches de API + renderToString + serialize como TTFB — o que infla FCP e
+     LCP em TODA medição (PageSpeed recarrega a home várias vezes). A home não é
+     personalizada (mesmos articles/site/ads para todos), então servir um HTML
+     com até ~30s de idade é seguro e derruba o TTFB para ~0 nos hits seguintes. */
+  const HTML_TTL_MS = 30_000;
+  let htmlCache: { html: string; at: number } | null = null;
+
   async function fetchJson(u: string): Promise<unknown> {
     try {
       const r = await fetch(u);
@@ -280,6 +288,14 @@ function ssrHomePlugin(apiBase: string): Plugin {
     const pathOnly = (req.url ?? "").split("?")[0];
     if (req.method !== "GET" || (pathOnly !== "/" && pathOnly !== "/index.html")) {
       next();
+      return;
+    }
+    // Hit do cache TTL → responde na hora, sem fetch/render (TTFB ~0).
+    const now = Date.now();
+    if (htmlCache && now - htmlCache.at < HTML_TTL_MS) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
+      res.end(htmlCache.html);
       return;
     }
     try {
@@ -328,8 +344,11 @@ function ssrHomePlugin(apiBase: string): Plugin {
         .replace("<head>", `<head>\n    <script>window.__SSR_DATA__=${serialized}</script>`)
         .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
 
+      htmlCache = { html, at: now };
       res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      // bfcache-friendly (sem no-store) + cache curto: repeat-nav instantâneo e
+      // restauração back/forward. Conteúdo público, staleness de ~30s aceitável.
+      res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
       res.end(html);
     } catch {
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
