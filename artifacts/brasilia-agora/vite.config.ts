@@ -403,6 +403,20 @@ export default defineConfig({
     cssCodeSplit: true,
     chunkSizeWarningLimit: 600,
     rollupOptions: {
+      /* Silencia ruído inofensivo do build do SPA:
+         - "use client": diretiva que só tem efeito em RSC/Next; aqui o Vite a
+           ignora e o Rollup emite MODULE_LEVEL_DIRECTIVE para cada componente
+           shadcn/Radix que a contém (tooltip, select, dropdown-menu, etc.).
+         - O aviso secundário "Error when using sourcemap for reporting an error"
+           é a tentativa (falha) do Rollup de mapear a localização do aviso acima.
+         Demais avisos continuam sendo exibidos normalmente. */
+      onwarn(warning, warn) {
+        if (warning.code === "MODULE_LEVEL_DIRECTIVE") return;
+        if (warning.code === "SOURCEMAP_ERROR") return;
+        const msg = typeof warning.message === "string" ? warning.message : "";
+        if (msg.includes("Error when using sourcemap") || msg.includes("use client")) return;
+        warn(warning);
+      },
       output: {
         /* Separa vendors pesados em chunks dedicados — o browser faz cache deles
            separadamente e só re-baixa quando a versão mudar. */
