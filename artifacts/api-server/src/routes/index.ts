@@ -31,6 +31,10 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use("/uploads", uploadsRouter);
+// socialRouter ANTES do adminRouter: a rota pública GET /admin/social/image/:token
+// (consumida por <img> do preview e pelos servidores da Meta, sem token) precisa
+// ser alcançada antes do authMiddleware global do adminRouter, que senão devolve 401.
+router.use("/admin/social", socialRouter);
 router.use("/admin", adminRouter);
 router.use("/publish", webhookRouter);
 router.use("/ads", adsRouter);
@@ -43,7 +47,6 @@ router.use(sitemapRouter);
 router.use(ampRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/admin/rss", rssRouter);
-router.use("/admin/social", socialRouter);
 router.use("/admin/perplexity", perplexityRouter);
 router.use("/admin/users", usersRouter);
 router.use("/admin/logs", logsRouter);
