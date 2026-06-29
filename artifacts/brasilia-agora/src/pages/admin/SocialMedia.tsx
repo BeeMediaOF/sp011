@@ -134,14 +134,40 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
 
 // ─── Presets de fábrica (marca SBC Agora) ──────────────────────────────────────
 
-type PresetKind = "feed-photo" | "story-quote";
+type PresetKind = "feed-photo" | "story-quote" | "sport-card";
 
 const PRESETS: { kind: PresetKind; label: string }[] = [
+  { kind: "sport-card",  label: "Esporte · Card (logo + faixa)" },
   { kind: "feed-photo",  label: "Feed · Foto + faixa" },
   { kind: "story-quote", label: "Story · Citação" },
 ];
 
 function makePreset(kind: PresetKind): SocialTemplate {
+  if (kind === "sport-card") {
+    const H = 1350;
+    return {
+      id: "", name: "Esporte — Card", type: "feed", width: 1080, height: H, backgroundColor: "#0d0d0d",
+      elements: [
+        // foto do artigo (fundo)
+        { ...makeElement("image", H), x: 0, y: 0, width: 1080, height: 1350, objectFit: "cover", zIndex: 1 },
+        // degradê escuro embaixo (legibilidade)
+        { ...makeElement("gradient", H), x: 0, y: 690, width: 1080, height: 660, zIndex: 2, fill: "gradient",
+          gradient: { type: "linear", angle: 180, stops: [{ color: "rgba(0,0,0,0)", pos: 0 }, { color: "rgba(0,0,0,0.55)", pos: 35 }, { color: "rgba(0,0,0,0.95)", pos: 100 }] } },
+        // logo (upload) no canto inferior esquerdo
+        { ...makeElement("logo", H), x: 60, y: 1085, width: 145, height: 145, objectFit: "contain", zIndex: 6, content: "" },
+        // divisor vertical
+        { ...makeElement("text", H), x: 228, y: 1092, width: 5, height: 138, backgroundColor: "#ffffff", padding: 0, content: "", zIndex: 6 },
+        // kicker (categoria, verde)
+        { ...makeElement("category", H), x: 258, y: 1086, width: 770, height: 46, fontSize: 32, fontFamily: "Oswald", fontWeight: "bold", color: "#9EFF00", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "{{CATEGORY}}", zIndex: 6 },
+        // título
+        { ...makeElement("title", H), x: 258, y: 1138, width: 780, height: 150, fontSize: 42, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", zIndex: 6 },
+        // pílula da URL (borda arredondada)
+        { ...makeElement("text", H), x: 150, y: 1292, width: 780, height: 52, fontSize: 24, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", borderWidth: 3, borderColor: "#ffffff", borderRadius: 30, textAlign: "center", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "WWW.SEUSITE.COM.BR", zIndex: 6 },
+        // bandeira/selo (upload) no canto superior direito
+        { ...makeElement("logo", H), x: 878, y: 80, width: 140, height: 95, objectFit: "contain", zIndex: 6, content: "" },
+      ],
+    };
+  }
   if (kind === "story-quote") {
     const H = 1920;
     return {
@@ -1328,15 +1354,23 @@ export default function SocialMedia() {
                             ))}
                           </div>
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
-                          <div className="flex items-center gap-1.5">
-                            <input type="color" value={selectedEl.color}
-                              onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
-                              className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
-                            <input type="text" value={selectedEl.color}
-                              onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
-                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
+                            <div className="flex items-center gap-1.5">
+                              <input type="color" value={selectedEl.color}
+                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                              <input type="text" value={selectedEl.color}
+                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Espaç. letras</label>
+                            <input type="number" step={0.5} value={selectedEl.letterSpacing ?? 0}
+                              onChange={(e) => updateElement(selectedEl.id, { letterSpacing: Number(e.target.value) })}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                           </div>
                         </div>
                       </>
@@ -1389,6 +1423,28 @@ export default function SocialMedia() {
                         </select>
                       </div>
                     )}
+
+                    {/* Borda (contorno) — útil p/ pílulas de URL e molduras */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Borda (px)</label>
+                        <input type="number" min={0} value={selectedEl.borderWidth ?? 0}
+                          onChange={(e) => updateElement(selectedEl.id, { borderWidth: Number(e.target.value) })}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor da borda</label>
+                        <div className="flex items-center gap-1.5">
+                          <input type="color" value={selectedEl.borderColor || "#ffffff"}
+                            onChange={(e) => updateElement(selectedEl.id, { borderColor: e.target.value })}
+                            className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                          <input type="text" value={selectedEl.borderColor ?? ""}
+                            onChange={(e) => updateElement(selectedEl.id, { borderColor: e.target.value })}
+                            placeholder="#ffffff"
+                            className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                        </div>
+                      </div>
+                    </div>
 
                     {/* Numeric props */}
                     <div className="grid grid-cols-2 gap-2">

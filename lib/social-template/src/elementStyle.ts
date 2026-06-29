@@ -35,6 +35,9 @@ export function elementBoxStyle(el: TemplateElement): StyleObject {
   } else if (hasBackground(el.backgroundColor)) {
     s["background"] = el.backgroundColor;
   }
+  if (el.borderWidth && el.borderWidth > 0) {
+    s["border"] = `${el.borderWidth}px solid ${el.borderColor || "#ffffff"}`;
+  }
   return s;
 }
 
@@ -55,6 +58,7 @@ export function textInnerStyle(el: TemplateElement): StyleObject {
     color: el.color || "#ffffff",
     textAlign: el.textAlign,
     lineHeight: 1.3,
+    letterSpacing: `${el.letterSpacing ?? 0}px`,
     wordBreak: "break-word",
     whiteSpace: "pre-wrap",
     overflow: "hidden",

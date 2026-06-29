@@ -48,6 +48,11 @@ export interface TemplateElement {
   /** Preenchimento do fundo da caixa: sólido (backgroundColor) ou degradê. */
   fill?: Fill;
   gradient?: Gradient;
+  /** Borda/contorno da caixa (ex.: pílula de URL). 0 = sem borda. */
+  borderWidth?: number;
+  borderColor?: string;
+  /** Espaçamento entre letras em px (caixa-alta fica melhor com +1/+2). */
+  letterSpacing?: number;
 }
 
 export interface SocialTemplate {
