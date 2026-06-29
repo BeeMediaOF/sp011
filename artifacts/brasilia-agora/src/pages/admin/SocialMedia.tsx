@@ -12,6 +12,7 @@ import {
   type TemplateElement,
   type ArticleData,
   type ElementType,
+  type Gradient,
   elementBoxStyle,
   textInnerStyle,
   imageInnerStyle,
@@ -21,6 +22,10 @@ import {
   GOOGLE_FONTS_HREF,
   DEFAULT_CAPTION_TEMPLATE,
   resolveCaption,
+  gradientToCss,
+  backgroundCss,
+  defaultGradient,
+  GRADIENT_PRESETS,
 } from "@workspace/social-template";
 import type { CSSProperties } from "react";
 
@@ -49,6 +54,7 @@ interface SocialTemplate {
   width: number;
   height: number;
   backgroundColor: string;
+  backgroundGradient?: Gradient;
   elements: TemplateElement[];
 }
 
@@ -98,9 +104,10 @@ const STORY_SAFE_BOTTOM = 250;
 const ELEMENT_TYPE_LABELS: Record<string, string> = {
   title: "Título", category: "Categoria", image: "Imagem de fundo",
   logo: "Logo", cta: "Call to action", text: "Texto livre", overlay: "Máscara (overlay)",
+  gradient: "Degradê",
 };
 
-const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "title", "category", "logo", "cta", "text"];
+const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "gradient", "title", "category", "logo", "cta", "text"];
 
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
   const overrides: Partial<Record<ElementType, Partial<TemplateElement>>> = {
@@ -108,6 +115,7 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
     category: { x: 40, y: 540, width: 300,  height: 60,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: ACCENT, content: "{{category}}", textAlign: "center", verticalAlign: "middle" },
     image:    { x: 0,  y: 0,   width: 1080, height: 800, fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "#333333", content: "", objectFit: "cover" },
     overlay:  { x: 0,  y: 0,   width: 1080, height: canvasH, fontSize: 0, fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "fill", zIndex: 5 },
+    gradient: { x: 0,  y: Math.round(canvasH * 0.55), width: 1080, height: Math.round(canvasH * 0.45), fontSize: 0, fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", fill: "gradient", gradient: defaultGradient(), zIndex: 3 },
     logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain", zIndex: 6 },
     cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →", textAlign: "center", verticalAlign: "middle" },
     text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: "sbcagora.com.br" },
@@ -222,6 +230,95 @@ function bestSnapTriple(pos: number, size: number, targets: number[]): { line: n
     }
   }
   return { line: best.line, delta: best.delta };
+}
+
+// ─── Cor (hex + alfa ↔ rgba) e controles de degradê ────────────────────────────
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map((x) => Math.max(0, Math.min(255, x)).toString(16).padStart(2, "0")).join("");
+}
+
+/** Decompõe uma cor CSS (rgba/hex/transparent) em hex (#rrggbb) + alfa (0–1). */
+function parseColor(c: string): { hex: string; alpha: number } {
+  if (!c || c === "transparent") return { hex: "#000000", alpha: 0 };
+  const m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/i);
+  if (m) return { hex: rgbToHex(+m[1]!, +m[2]!, +m[3]!), alpha: m[4] !== undefined ? parseFloat(m[4]) : 1 };
+  if (c[0] === "#") {
+    if (c.length === 4) return { hex: "#" + c.slice(1).split("").map((x) => x + x).join(""), alpha: 1 };
+    if (c.length === 9) return { hex: c.slice(0, 7), alpha: parseInt(c.slice(7, 9), 16) / 255 };
+    return { hex: c, alpha: 1 };
+  }
+  return { hex: "#000000", alpha: 1 };
+}
+
+function toRgba(hex: string, alpha: number): string {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${Number(alpha.toFixed(2))})`;
+}
+
+/** Editor de degradê reutilizável (fundo do canvas e de elementos). */
+function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: Gradient) => void }) {
+  const setStop = (i: number, patch: Partial<{ color: string; pos: number }>) =>
+    onChange({ ...value, stops: value.stops.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) });
+
+  return (
+    <div className="space-y-2">
+      <select value=""
+        onChange={(e) => { const p = GRADIENT_PRESETS[Number(e.target.value)]; if (p) onChange(JSON.parse(JSON.stringify(p.gradient))); e.target.value = ""; }}
+        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-slate-50">
+        <option value="">★ Degradês prontos…</option>
+        {GRADIENT_PRESETS.map((p, i) => <option key={p.name} value={i}>{p.name}</option>)}
+      </select>
+
+      <div style={{ height: 28, borderRadius: 6, border: "1px solid #e2e8f0", background: gradientToCss(value) }} />
+
+      <div className="grid grid-cols-2 gap-2">
+        <select value={value.type}
+          onChange={(e) => onChange({ ...value, type: e.target.value as "linear" | "radial" })}
+          className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
+          <option value="linear">Linear</option>
+          <option value="radial">Radial</option>
+        </select>
+        {value.type === "linear" && (
+          <div className="flex items-center gap-1">
+            <input type="number" min={0} max={360} value={value.angle}
+              onChange={(e) => onChange({ ...value, angle: Number(e.target.value) })}
+              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" title="Ângulo (graus)" />
+            <span className="text-[10px] text-slate-400">°</span>
+          </div>
+        )}
+      </div>
+
+      {value.stops.map((s, i) => {
+        const { hex, alpha } = parseColor(s.color);
+        return (
+          <div key={i} className="flex items-center gap-1.5">
+            <input type="color" value={hex}
+              onChange={(e) => setStop(i, { color: toRgba(e.target.value, alpha) })}
+              className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+            <input type="range" min={0} max={1} step={0.05} value={alpha}
+              onChange={(e) => setStop(i, { color: toRgba(hex, Number(e.target.value)) })}
+              className="flex-1" title={`Opacidade ${Math.round(alpha * 100)}%`} />
+            <input type="number" min={0} max={100} value={s.pos}
+              onChange={(e) => setStop(i, { pos: Number(e.target.value) })}
+              className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" title="Posição %" />
+            {value.stops.length > 2 && (
+              <button onClick={() => onChange({ ...value, stops: value.stops.filter((_, idx) => idx !== i) })}
+                className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-red-500 shrink-0">
+                <X size={11} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+
+      <button onClick={() => onChange({ ...value, stops: [...value.stops, { color: "rgba(0,0,0,1)", pos: 100 }] })}
+        className="flex items-center gap-1 text-[11px] font-medium text-[#0B2A66] hover:underline">
+        <Plus size={11} /> Adicionar parada
+      </button>
+    </div>
+  );
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -793,6 +890,7 @@ export default function SocialMedia() {
 
   /** Conteúdo interno de um elemento no canvas (imagem real ou texto resolvido). */
   function renderElInner(el: TemplateElement) {
+    if (el.type === "gradient") return null; // a própria caixa mostra o degradê
     if (isImageType(el.type)) {
       const src = el.type === "image" ? (canvasArticle.imageUrl || el.content) : el.content;
       if (src) return <img src={src} alt="" style={imageInnerStyle(el) as CSSProperties} />;
@@ -996,6 +1094,7 @@ export default function SocialMedia() {
                   <input type="text" value={currentTemplate.backgroundColor}
                     onChange={(e) => setCurrentTemplate((p) => p ? { ...p, backgroundColor: e.target.value } : p)}
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                  <span className="text-[10px] text-slate-400 leading-tight">degradê?<br/>use camada "Degradê"</span>
                 </div>
                 <div className="border-t border-slate-100 pt-2 space-y-1">
                   {[...currentTemplate.elements].sort((a, b) => b.zIndex - a.zIndex).map((el) => (
@@ -1062,7 +1161,7 @@ export default function SocialMedia() {
                     position: "absolute", top: 0, left: 0,
                     width: currentTemplate.width, height: currentTemplate.height,
                     transform: `scale(${SCALE})`, transformOrigin: "top left",
-                    background: currentTemplate.backgroundColor,
+                    background: backgroundCss(currentTemplate.backgroundColor, currentTemplate.backgroundGradient),
                   }}>
                     {[...currentTemplate.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => (
                       <div key={el.id}
@@ -1142,6 +1241,7 @@ export default function SocialMedia() {
                     </div>
 
                     {/* Content */}
+                    {selectedEl.type !== "gradient" && (
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
                         {isImageType(selectedEl.type) ? "Imagem (URL ou upload)" : "Conteúdo"}
@@ -1171,9 +1271,10 @@ export default function SocialMedia() {
                         <p className="text-[10px] text-slate-400 mt-0.5">Variáveis: {"{{title}} {{subtitle}} {{category}} {{date}} {{author}}"}</p>
                       )}
                     </div>
+                    )}
 
-                    {/* Text props */}
-                    {!isImageType(selectedEl.type) && (
+                    {/* Tipografia — apenas tipos de texto */}
+                    {!isImageType(selectedEl.type) && selectedEl.type !== "gradient" && (
                       <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1227,31 +1328,54 @@ export default function SocialMedia() {
                             ))}
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
-                            <div className="flex items-center gap-1.5">
-                              <input type="color" value={selectedEl.color}
-                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
-                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
-                              <input type="text" value={selectedEl.color}
-                                onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
-                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor de fundo</label>
-                            <div className="flex items-center gap-1.5">
-                              <input type="color" value={selectedEl.backgroundColor || "#000000"}
-                                onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
-                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
-                              <input type="text" value={selectedEl.backgroundColor}
-                                onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
-                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
-                            </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
+                          <div className="flex items-center gap-1.5">
+                            <input type="color" value={selectedEl.color}
+                              onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                              className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                            <input type="text" value={selectedEl.color}
+                              onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
+                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                           </div>
                         </div>
                       </>
+                    )}
+
+                    {/* Preenchimento do fundo — sólido ou degradê (todo elemento de caixa) */}
+                    {!isImageType(selectedEl.type) && (
+                      <div>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Preenchimento (fundo)</label>
+                        <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-2">
+                          {(["solid", "gradient"] as const).map((f) => (
+                            <button key={f}
+                              onClick={() => updateElement(selectedEl.id, f === "gradient"
+                                ? { fill: "gradient", gradient: selectedEl.gradient ?? defaultGradient() }
+                                : { fill: "solid" })}
+                              className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
+                                (selectedEl.fill ?? "solid") === f ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
+                              }`}>
+                              {f === "solid" ? "Sólido" : "Degradê"}
+                            </button>
+                          ))}
+                        </div>
+                        {(selectedEl.fill ?? "solid") === "gradient" ? (
+                          <GradientControls
+                            value={selectedEl.gradient ?? defaultGradient()}
+                            onChange={(g) => updateElement(selectedEl.id, { fill: "gradient", gradient: g })}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <input type="color" value={selectedEl.backgroundColor || "#000000"}
+                              onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
+                              className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                            <input type="text" value={selectedEl.backgroundColor}
+                              onChange={(e) => updateElement(selectedEl.id, { backgroundColor: e.target.value })}
+                              className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]"
+                              placeholder="transparent" />
+                          </div>
+                        )}
+                      </div>
                     )}
 
                     {/* objectFit */}

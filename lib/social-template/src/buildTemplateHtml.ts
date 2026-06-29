@@ -8,6 +8,7 @@ import {
   textInnerStyle,
 } from "./elementStyle";
 import { fontLinksHtml, GOOGLE_FONTS_HREF } from "./fonts";
+import { backgroundCss } from "./gradient";
 
 export interface BuildHtmlOptions {
   /** Stylesheet de fontes (default: Google Fonts). */
@@ -65,6 +66,7 @@ export function buildTemplateHtml(
   const body = elements.map((el) => renderElement(el, article)).join("\n");
   const fonts = fontLinksHtml(opts.fontsHref ?? GOOGLE_FONTS_HREF);
   const base = opts.baseHref ? `<base href="${escapeAttr(opts.baseHref)}">` : "";
+  const canvasBg = backgroundCss(template.backgroundColor, template.backgroundGradient);
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -79,7 +81,7 @@ img{display:block}
 </style>
 </head>
 <body>
-<div style="position:relative;overflow:hidden;width:${template.width}px;height:${template.height}px;background:${escapeAttr(template.backgroundColor)}">
+<div style="position:relative;overflow:hidden;width:${template.width}px;height:${template.height}px;background:${escapeAttr(canvasBg)}">
 ${body}
 </div>
 </body>

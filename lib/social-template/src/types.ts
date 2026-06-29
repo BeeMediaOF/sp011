@@ -7,6 +7,8 @@
  * é o que garante o WYSIWYG: o que você desenha é exatamente o que é postado.
  */
 
+import type { Gradient } from "./gradient";
+
 export type ElementType =
   | "title"
   | "category"
@@ -14,11 +16,13 @@ export type ElementType =
   | "logo"
   | "cta"
   | "text"
-  | "overlay";
+  | "overlay"
+  | "gradient";
 
 export type TextAlign = "left" | "center" | "right";
 export type VerticalAlign = "top" | "middle" | "bottom";
 export type ObjectFit = "cover" | "contain" | "fill";
+export type Fill = "solid" | "gradient";
 
 export interface TemplateElement {
   id: string;
@@ -41,12 +45,17 @@ export interface TemplateElement {
   objectFit?: ObjectFit;
   /** Alinhamento vertical do texto dentro da caixa. Default "top" (legado). */
   verticalAlign?: VerticalAlign;
+  /** Preenchimento do fundo da caixa: sólido (backgroundColor) ou degradê. */
+  fill?: Fill;
+  gradient?: Gradient;
 }
 
 export interface SocialTemplate {
   width: number;
   height: number;
   backgroundColor: string;
+  /** Degradê de fundo do canvas (opcional; tem prioridade sobre backgroundColor). */
+  backgroundGradient?: Gradient;
   elements: TemplateElement[];
 }
 

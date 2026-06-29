@@ -1,4 +1,5 @@
 import type { TemplateElement } from "./types";
+import { gradientToCss } from "./gradient";
 
 /** Objeto de estilo CSS agnóstico de framework (compatível com React.CSSProperties). */
 export type StyleObject = Record<string, string | number>;
@@ -29,7 +30,11 @@ export function elementBoxStyle(el: TemplateElement): StyleObject {
     overflow: "hidden",
     boxSizing: "border-box",
   };
-  if (hasBackground(el.backgroundColor)) s["background"] = el.backgroundColor;
+  if (el.fill === "gradient" && el.gradient && el.gradient.stops.length >= 2) {
+    s["background"] = gradientToCss(el.gradient);
+  } else if (hasBackground(el.backgroundColor)) {
+    s["background"] = el.backgroundColor;
+  }
   return s;
 }
 
