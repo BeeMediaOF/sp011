@@ -152,6 +152,8 @@ export interface SocialConfig {
   autoPublishFeed?: boolean; autoPublishStory?: boolean; autoPublishFacebook?: boolean;
   templateShowLogo?: boolean; templateShowCategory?: boolean;
   templateGradientFrom?: string; templateGradientTo?: string; lastPublishedAt?: string;
+  /** Template de legenda padrão p/ posts (placeholders resolvidos por artigo). */
+  captionTemplate?: string;
 }
 
 export type PerplexityAutoMode = "none" | "draft" | "published";

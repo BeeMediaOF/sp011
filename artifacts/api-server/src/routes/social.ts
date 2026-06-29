@@ -9,8 +9,8 @@ import {
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { store } from "../lib/store.js";
 import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
-import { generateArt } from "../lib/social/imageGenerator.js";
-import type { TemplateElement, SocialTemplate, ArticleData } from "../lib/social/imageGenerator.js";
+import { renderArt } from "../lib/social/renderTemplate.js";
+import type { TemplateElement, SocialTemplate, ArticleData } from "@workspace/social-template";
 
 const router = Router();
 
@@ -221,13 +221,13 @@ router.get("/templates/:id", async (req, res) => {
 });
 
 router.post("/templates", async (req, res) => {
-  const b = req.body as Partial<SocialTemplate> & { name?: string };
+  const b = req.body as Partial<SocialTemplate> & { name?: string; type?: string };
   const [row] = await db.insert(socialTemplatesTable).values({
     id:              randomUUID(),
     name:            b.name ?? "Novo Template",
-    type:            "feed",
+    type:            b.type === "story" ? "story" : "feed",
     width:           b.width  ?? 1080,
-    height:          b.height ?? 1350,
+    height:          b.height ?? (b.type === "story" ? 1920 : 1350),
     backgroundColor: b.backgroundColor ?? "#1a1a1a",
     elements:        (b.elements ?? []) as unknown as Record<string, unknown>[],
   }).returning();
@@ -253,28 +253,47 @@ router.delete("/templates/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
-// Preview generation for a template + article combo
+// Preview generation for a template + article combo.
+// Aceita um `template` inline (ainda não salvo) OU usa o template salvo por :id.
 router.post("/templates/:id/preview", async (req, res) => {
-  const b = req.body as { articleId?: string };
-  const [tmpl] = await db.select().from(socialTemplatesTable).where(eq(socialTemplatesTable.id, req.params["id"]!)).limit(1);
-  if (!tmpl) { res.status(404).json({ error: "Template não encontrado" }); return; }
+  const b = req.body as { articleId?: string; template?: Partial<SocialTemplate> };
 
-  let article: ArticleData = { title: "Título de exemplo", category: "Geral" };
+  let tmpl: { width: number; height: number; backgroundColor: string; elements: TemplateElement[] };
+  if (b.template && Array.isArray(b.template.elements)) {
+    tmpl = {
+      width: b.template.width ?? 1080,
+      height: b.template.height ?? 1350,
+      backgroundColor: b.template.backgroundColor ?? "#1a1a1a",
+      elements: b.template.elements as TemplateElement[],
+    };
+  } else {
+    const [row] = await db.select().from(socialTemplatesTable).where(eq(socialTemplatesTable.id, req.params["id"]!)).limit(1);
+    if (!row) { res.status(404).json({ error: "Template não encontrado" }); return; }
+    tmpl = {
+      width: row.width,
+      height: row.height,
+      backgroundColor: row.backgroundColor,
+      elements: (row.elements as unknown[]) as TemplateElement[],
+    };
+  }
+
+  let article: ArticleData = { title: "Título de exemplo para visualização do template", category: "Geral" };
   if (b.articleId) {
     const [a] = await db.select().from(articlesTable).where(eq(articlesTable.id, b.articleId)).limit(1);
-    if (a) article = { title: a.title, category: a.category, imageUrl: a.imageUrl || undefined };
+    if (a) {
+      article = {
+        title: a.title,
+        category: a.category,
+        subtitle: a.subtitle || undefined,
+        author: a.author || undefined,
+        imageUrl: a.imageUrl || undefined,
+        publishedAt: a.publishedAt ? a.publishedAt.toISOString() : undefined,
+      };
+    }
   }
 
   try {
-    const buf = await generateArt(
-      {
-        width: tmpl.width,
-        height: tmpl.height,
-        backgroundColor: tmpl.backgroundColor,
-        elements: (tmpl.elements as unknown[]) as TemplateElement[],
-      },
-      article,
-    );
+    const buf = await renderArt(tmpl, article, { baseHref: getPublicBase() ?? undefined });
     const { token } = saveTempImage(buf);
     const base = getPublicBase() ?? "";
     res.json({ url: `${base}/api/admin/social/image/${token}` });

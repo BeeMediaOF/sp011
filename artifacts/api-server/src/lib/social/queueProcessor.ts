@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 import { db } from "@workspace/db";
 import { socialPublicationQueueTable, socialAccountsTable, socialTemplatesTable, articlesTable } from "@workspace/db";
 import { eq, and, lte, inArray } from "drizzle-orm";
-import { generateArt } from "./imageGenerator.js";
+import { renderArt, type TemplateElement } from "./renderTemplate.js";
 import { logger } from "../logger.js";
 
 const _dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "data", "social-temp");
@@ -122,18 +122,22 @@ async function publishItem(queueId: string): Promise<void> {
         .limit(1);
 
       if (template) {
-        const imgBuf = await generateArt(
+        const imgBuf = await renderArt(
           {
             width: template.width,
             height: template.height,
             backgroundColor: template.backgroundColor,
-            elements: (template.elements as unknown[]) as import("./imageGenerator.js").TemplateElement[],
+            elements: (template.elements as unknown[]) as TemplateElement[],
           },
           {
             title: article.title,
             category: article.category,
+            subtitle: article.subtitle || undefined,
+            author: article.author || undefined,
             imageUrl: article.imageUrl || undefined,
+            publishedAt: article.publishedAt?.toISOString?.() ?? undefined,
           },
+          { baseHref: getPublicBase() ?? undefined },
         );
         const { token } = saveTempImage(imgBuf);
         imageToken = token;

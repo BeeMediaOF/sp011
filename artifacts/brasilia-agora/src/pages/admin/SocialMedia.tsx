@@ -5,8 +5,24 @@ import {
   Play, RefreshCw, ChevronDown, ChevronUp, Image as ImageIcon, Type,
   AlignLeft, AlignCenter, AlignRight, Layers, Save,
   Instagram, Facebook, Clock, Send, Link2, TestTube2, ToggleLeft, ToggleRight,
+  Upload, Eye, Copy, Sparkles, ArrowUpToLine, ArrowDownToLine, FoldVertical,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
+import {
+  type TemplateElement,
+  type ArticleData,
+  type ElementType,
+  elementBoxStyle,
+  textInnerStyle,
+  imageInnerStyle,
+  resolveContent,
+  isImageType,
+  FONT_FAMILIES,
+  GOOGLE_FONTS_HREF,
+  DEFAULT_CAPTION_TEMPLATE,
+  resolveCaption,
+} from "@workspace/social-template";
+import type { CSSProperties } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,24 +40,7 @@ interface SocialAccount {
   createdAt: string;
 }
 
-export interface TemplateElement {
-  id: string;
-  type: "title" | "category" | "image" | "logo" | "cta" | "text";
-  x: number; y: number;
-  width: number; height: number;
-  fontSize: number;
-  fontFamily: string;
-  fontWeight: string;
-  color: string;
-  backgroundColor: string;
-  textAlign: "left" | "center" | "right";
-  padding: number;
-  borderRadius: number;
-  opacity: number;
-  zIndex: number;
-  content: string;
-  objectFit?: "cover" | "contain" | "fill";
-}
+export type { TemplateElement };
 
 interface SocialTemplate {
   id: string;
@@ -71,7 +70,15 @@ interface QueueItem {
   createdAt: string;
 }
 
-interface ArticleOption { id: string; title: string; category: string; imageUrl?: string; }
+interface ArticleOption {
+  id: string;
+  title: string;
+  category: string;
+  imageUrl?: string;
+  subtitle?: string;
+  author?: string;
+  publishedAt?: string;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -83,19 +90,26 @@ const PREVIEW_W = 360;
 const ACTUAL_W  = 1080;
 const SCALE = PREVIEW_W / ACTUAL_W;
 
-const FONT_FAMILIES = ["Inter", "Georgia", "Arial", "Merriweather", "Roboto", "Oswald"];
+/** Margem segura do feed e zonas de UI do story (em px no tamanho real). */
+const FEED_SAFE_MARGIN = 60;
+const STORY_SAFE_TOP = 250;
+const STORY_SAFE_BOTTOM = 250;
+
 const ELEMENT_TYPE_LABELS: Record<string, string> = {
   title: "Título", category: "Categoria", image: "Imagem de fundo",
-  logo: "Logo", cta: "Call to action", text: "Texto livre",
+  logo: "Logo", cta: "Call to action", text: "Texto livre", overlay: "Máscara (overlay)",
 };
 
-function makeElement(type: TemplateElement["type"]): TemplateElement {
-  const overrides: Record<string, Partial<TemplateElement>> = {
-    title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}" },
-    category: { x: 40, y: 540, width: 300,  height: 60,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: ACCENT, content: "{{category}}" },
+const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "title", "category", "logo", "cta", "text"];
+
+function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
+  const overrides: Partial<Record<ElementType, Partial<TemplateElement>>> = {
+    title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}", verticalAlign: "top" },
+    category: { x: 40, y: 540, width: 300,  height: 60,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: ACCENT, content: "{{category}}", textAlign: "center", verticalAlign: "middle" },
     image:    { x: 0,  y: 0,   width: 1080, height: 800, fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "#333333", content: "", objectFit: "cover" },
-    logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain" },
-    cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →" },
+    overlay:  { x: 0,  y: 0,   width: 1080, height: canvasH, fontSize: 0, fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "fill", zIndex: 5 },
+    logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain", zIndex: 6 },
+    cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →", textAlign: "center", verticalAlign: "middle" },
     text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: "sbcagora.com.br" },
   };
   return {
@@ -110,9 +124,104 @@ function makeElement(type: TemplateElement["type"]): TemplateElement {
   };
 }
 
+// ─── Presets de fábrica (marca SBC Agora) ──────────────────────────────────────
+
+type PresetKind = "feed-photo" | "story-quote";
+
+const PRESETS: { kind: PresetKind; label: string }[] = [
+  { kind: "feed-photo",  label: "Feed · Foto + faixa" },
+  { kind: "story-quote", label: "Story · Citação" },
+];
+
+function makePreset(kind: PresetKind): SocialTemplate {
+  if (kind === "story-quote") {
+    const H = 1920;
+    return {
+      id: "", name: "Story — Citação", type: "story", width: 1080, height: H, backgroundColor: "#0B2A66",
+      elements: [
+        { ...makeElement("category", H), x: 80, y: 360, width: 360, height: 70, fontSize: 30, content: "{{category}}", zIndex: 2 },
+        { ...makeElement("title", H),    x: 80, y: 470, width: 920, height: 760, fontSize: 86, fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", zIndex: 3 },
+        { ...makeElement("text", H),     x: 80, y: 1770, width: 920, height: 60, fontSize: 30, color: "#cbd5e1", content: "sbcagora.com.br", zIndex: 4 },
+      ],
+    };
+  }
+  // feed-photo
+  const H = 1350;
+  return {
+    id: "", name: "Feed — Foto + Faixa", type: "feed", width: 1080, height: H, backgroundColor: "#0B2A66",
+    elements: [
+      { ...makeElement("image", H),    x: 0,  y: 0,   width: 1080, height: 1350, objectFit: "cover", zIndex: 1 },
+      { ...makeElement("text", H),     x: 0,  y: 760, width: 1080, height: 590, backgroundColor: "#0B2A66", opacity: 0.82, content: "", zIndex: 2 },
+      { ...makeElement("category", H), x: 60, y: 840, width: 320, height: 64, fontSize: 28, content: "{{category}}", zIndex: 3 },
+      { ...makeElement("title", H),    x: 60, y: 930, width: 960, height: 300, fontSize: 66, fontWeight: "bold", fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", zIndex: 4 },
+      { ...makeElement("text", H),     x: 60, y: 1270, width: 960, height: 50, fontSize: 26, color: "#cbd5e1", content: "@sbcagora · sbcagora.com.br", zIndex: 5 },
+    ],
+  };
+}
+
 function fmtDate(iso?: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// ─── Canvas: interação (mover/redimensionar) + snapping ────────────────────────
+
+type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "move";
+
+interface Interaction {
+  id: string;
+  handle: Handle;
+  startX: number;
+  startY: number;
+  orig: { x: number; y: number; width: number; height: number };
+}
+
+const RESIZE_HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
+const SNAP = 12;      // limiar de encaixe em px reais
+const MIN_SIZE = 20;
+
+/** Artigo de amostra usado no canvas quando nenhum artigo real é selecionado. */
+const SAMPLE_ARTICLE: ArticleData = {
+  title: "Prefeitura anuncia novo plano de mobilidade para a região central",
+  subtitle: "Medida promete reduzir o tempo de deslocamento no horário de pico",
+  category: "Cidade",
+  author: "Redação",
+  imageUrl: "",
+};
+
+/** Aplica o arrasto de uma alça à caixa original, mantendo tamanho mínimo. */
+function applyHandle(orig: Interaction["orig"], handle: Handle, dx: number, dy: number) {
+  let { x, y, width, height } = orig;
+  if (handle === "move") return { x: x + dx, y: y + dy, width, height };
+  if (handle.includes("e")) width = Math.max(MIN_SIZE, orig.width + dx);
+  if (handle.includes("s")) height = Math.max(MIN_SIZE, orig.height + dy);
+  if (handle.includes("w")) { width = Math.max(MIN_SIZE, orig.width - dx); x = orig.x + (orig.width - width); }
+  if (handle.includes("n")) { height = Math.max(MIN_SIZE, orig.height - dy); y = orig.y + (orig.height - height); }
+  return { x, y, width, height };
+}
+
+/** Encaixa um valor na linha-alvo mais próxima dentro do limiar SNAP. */
+function snapTo(value: number, targets: number[]): { value: number; line: number | null } {
+  let best: { value: number; line: number | null; dist: number } = { value, line: null, dist: SNAP };
+  for (const t of targets) {
+    const d = Math.abs(value - t);
+    if (d <= best.dist) best = { value: t, line: t, dist: d };
+  }
+  return { value: best.value, line: best.line };
+}
+
+/** Ao MOVER: tenta encaixar borda inicial/centro/borda final na grade de alvos. */
+function bestSnapTriple(pos: number, size: number, targets: number[]): { line: number | null; delta: number } {
+  const candidates = [pos, pos + size / 2, pos + size];
+  let best: { line: number | null; delta: number; dist: number } = { line: null, delta: 0, dist: SNAP };
+  for (const c of candidates) {
+    const s = snapTo(c, targets);
+    if (s.line != null) {
+      const d = Math.abs(c - s.line);
+      if (d <= best.dist) best = { line: s.line, delta: s.line - c, dist: d };
+    }
+  }
+  return { line: best.line, delta: best.delta };
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -258,9 +367,22 @@ export default function SocialMedia() {
   const [selectedElId,    setSelectedElId]    = useState<string | null>(null);
   const [templateSaving,  setTemplateSaving]  = useState(false);
   const [templateSaved,   setTemplateSaved]   = useState(false);
-  const [dragging, setDragging] = useState<{
-    id: string; startX: number; startY: number; origX: number; origY: number;
-  } | null>(null);
+
+  // Artigo real p/ preview WYSIWYG dentro do canvas
+  const [editorArticles,   setEditorArticles]   = useState<ArticleOption[]>([]);
+  const [previewArticleId, setPreviewArticleId] = useState<string>("");
+
+  // Preview "real" (render server-side via Playwright)
+  const [previewUrl,     setPreviewUrl]     = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError,   setPreviewError]   = useState<string | null>(null);
+
+  // Upload de imagem em andamento (id do elemento sendo enviado)
+  const [uploadingElId, setUploadingElId] = useState<string | null>(null);
+
+  // Interação no canvas (mover/redimensionar) + guias de alinhamento
+  const [interaction, setInteraction] = useState<Interaction | null>(null);
+  const [guides,      setGuides]      = useState<{ v: number[]; h: number[] }>({ v: [], h: [] });
 
   // ── Queue ─────────────────────────────────────────────────────────────────
   const [queue,          setQueue]          = useState<QueueItem[]>([]);
@@ -270,6 +392,7 @@ export default function SocialMedia() {
   const [articles,       setArticles]       = useState<ArticleOption[]>([]);
   const [processing,     setProcessing]     = useState(false);
   const [articleSearch,  setArticleSearch]  = useState("");
+  const [captionTemplate, setCaptionTemplate] = useState<string>(DEFAULT_CAPTION_TEMPLATE);
   const [queueForm, setQueueForm] = useState({
     articleId: "",
     accountIds: [] as string[],
@@ -299,31 +422,115 @@ export default function SocialMedia() {
     } finally { setQueueLoading(false); }
   }, [queueFilter]);
 
-  useEffect(() => { void fetchAccounts(); void fetchTemplates(); }, [fetchAccounts, fetchTemplates]);
+  const fetchEditorArticles = useCallback(async () => {
+    try {
+      const data = (await fetch("/api/articles?limit=200&status=published").then((r) => r.json())) as
+        | { articles?: ArticleOption[] }
+        | ArticleOption[];
+      const list = Array.isArray(data) ? data : (data.articles ?? []);
+      setEditorArticles(list as ArticleOption[]);
+    } catch { setEditorArticles([]); }
+  }, []);
+
+  const fetchSocialConfig = useCallback(async () => {
+    try {
+      const cfg = (await apiFetch("/config")) as { captionTemplate?: string };
+      if (cfg && typeof cfg.captionTemplate === "string" && cfg.captionTemplate.trim()) {
+        setCaptionTemplate(cfg.captionTemplate);
+      }
+    } catch { /* mantém o default */ }
+  }, []);
+
+  useEffect(() => { void fetchAccounts(); void fetchTemplates(); void fetchSocialConfig(); }, [fetchAccounts, fetchTemplates, fetchSocialConfig]);
+  useEffect(() => { if (tab === "templates" && editorArticles.length === 0) void fetchEditorArticles(); }, [tab, editorArticles.length, fetchEditorArticles]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [tab, fetchQueue]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [queueFilter]);
 
-  // ── Drag ──────────────────────────────────────────────────────────────────
+  // Carrega as fontes do editor (mesmas usadas no render server-side) p/ WYSIWYG.
+  useEffect(() => {
+    const id = "social-editor-fonts";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id; link.rel = "stylesheet"; link.href = GOOGLE_FONTS_HREF;
+    document.head.appendChild(link);
+  }, []);
+
+  // ── Canvas: mover / redimensionar com snapping ─────────────────────────────
+
+  const tplRef = useRef<SocialTemplate | null>(null);
+  tplRef.current = currentTemplate;
 
   useEffect(() => {
-    if (!dragging) return;
+    if (!interaction) return;
     const onMove = (e: MouseEvent) => {
-      const dx = (e.clientX - dragging.startX) / SCALE;
-      const dy = (e.clientY - dragging.startY) / SCALE;
+      const tpl = tplRef.current;
+      if (!tpl) return;
+      const dx = (e.clientX - interaction.startX) / SCALE;
+      const dy = (e.clientY - interaction.startY) / SCALE;
+      const box = applyHandle(interaction.orig, interaction.handle, dx, dy);
+      const W = tpl.width, H = tpl.height;
+      const others = tpl.elements.filter((el) => el.id !== interaction.id);
+      const xT = [0, W / 2, W, ...others.flatMap((el) => [el.x, el.x + el.width / 2, el.x + el.width])];
+      const yT = [0, H / 2, H, ...others.flatMap((el) => [el.y, el.y + el.height / 2, el.y + el.height])];
+      const gv: number[] = [], gh: number[] = [];
+
+      if (interaction.handle === "move") {
+        const sx = bestSnapTriple(box.x, box.width, xT);
+        if (sx.line != null) { box.x += sx.delta; gv.push(sx.line); }
+        const sy = bestSnapTriple(box.y, box.height, yT);
+        if (sy.line != null) { box.y += sy.delta; gh.push(sy.line); }
+      } else {
+        if (interaction.handle.includes("e")) { const s = snapTo(box.x + box.width, xT); if (s.line != null) { box.width = s.value - box.x; gv.push(s.line); } }
+        if (interaction.handle.includes("w")) { const s = snapTo(box.x, xT); if (s.line != null) { box.width += box.x - s.value; box.x = s.value; gv.push(s.line); } }
+        if (interaction.handle.includes("s")) { const s = snapTo(box.y + box.height, yT); if (s.line != null) { box.height = s.value - box.y; gh.push(s.line); } }
+        if (interaction.handle.includes("n")) { const s = snapTo(box.y, yT); if (s.line != null) { box.height += box.y - s.value; box.y = s.value; gh.push(s.line); } }
+        box.width = Math.max(MIN_SIZE, box.width); box.height = Math.max(MIN_SIZE, box.height);
+      }
+
+      const nx = Math.round(box.x), ny = Math.round(box.y), nw = Math.round(box.width), nh = Math.round(box.height);
       setCurrentTemplate((prev) => prev ? {
         ...prev,
         elements: prev.elements.map((el) =>
-          el.id === dragging.id
-            ? { ...el, x: Math.round(dragging.origX + dx), y: Math.round(dragging.origY + dy) }
-            : el,
+          el.id === interaction.id ? { ...el, x: nx, y: ny, width: nw, height: nh } : el,
         ),
       } : prev);
+      setGuides({ v: gv, h: gh });
     };
-    const onUp = () => setDragging(null);
+    const onUp = () => { setInteraction(null); setGuides({ v: [], h: [] }); };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [dragging]);
+  }, [interaction]);
+
+  // ── Canvas: teclado (nudge com setas, Delete remove) ───────────────────────
+
+  useEffect(() => {
+    if (!selectedElId) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.preventDefault();
+        setCurrentTemplate((prev) => prev ? { ...prev, elements: prev.elements.filter((el) => el.id !== selectedElId) } : prev);
+        setSelectedElId(null);
+        return;
+      }
+      const step = e.shiftKey ? 10 : 1;
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowLeft") dx = -step;
+      else if (e.key === "ArrowRight") dx = step;
+      else if (e.key === "ArrowUp") dy = -step;
+      else if (e.key === "ArrowDown") dy = step;
+      else return;
+      e.preventDefault();
+      setCurrentTemplate((prev) => prev ? {
+        ...prev,
+        elements: prev.elements.map((el) => el.id === selectedElId ? { ...el, x: el.x + dx, y: el.y + dy } : el),
+      } : prev);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedElId]);
 
   // ── Account ops ───────────────────────────────────────────────────────────
 
@@ -402,8 +609,8 @@ export default function SocialMedia() {
     await fetchTemplates();
   }
 
-  function addElement(type: TemplateElement["type"]) {
-    const el = makeElement(type);
+  function addElement(type: ElementType) {
+    const el = makeElement(type, currentTemplate?.height ?? 1350);
     setCurrentTemplate((prev) => prev ? { ...prev, elements: [...prev.elements, el] } : prev);
     setSelectedElId(el.id);
   }
@@ -433,6 +640,73 @@ export default function SocialMedia() {
       }
       return { ...prev, elements: sorted };
     });
+  }
+
+  async function duplicateTemplate() {
+    if (!currentTemplate) return;
+    setTemplateSaving(true);
+    try {
+      const saved = (await apiFetch("/templates", {
+        method: "POST",
+        body: JSON.stringify({
+          name: `${currentTemplate.name} (cópia)`,
+          type: currentTemplate.type,
+          width: currentTemplate.width,
+          height: currentTemplate.height,
+          backgroundColor: currentTemplate.backgroundColor,
+          elements: currentTemplate.elements,
+        }),
+      })) as SocialTemplate;
+      await fetchTemplates();
+      setCurrentTemplate({ ...currentTemplate, id: saved.id, name: `${currentTemplate.name} (cópia)` });
+      setSelectedElId(null);
+    } finally { setTemplateSaving(false); }
+  }
+
+  function applyPreset(kind: PresetKind) {
+    setCurrentTemplate(makePreset(kind));
+    setSelectedElId(null);
+  }
+
+  async function uploadImage(elId: string, file: File) {
+    setUploadingElId(elId);
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const token = localStorage.getItem("admin_token");
+      const res = await fetch("/api/uploads/image", {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) updateElement(elId, { content: data.url });
+      else window.alert(data.error ?? "Falha no upload da imagem");
+    } catch (e) {
+      window.alert((e as Error).message);
+    } finally { setUploadingElId(null); }
+  }
+
+  async function runPreview() {
+    if (!currentTemplate) return;
+    setPreviewLoading(true); setPreviewError(null); setPreviewUrl(null);
+    try {
+      const id = currentTemplate.id || "inline";
+      const body = {
+        articleId: previewArticleId || undefined,
+        template: {
+          width: currentTemplate.width,
+          height: currentTemplate.height,
+          backgroundColor: currentTemplate.backgroundColor,
+          elements: currentTemplate.elements,
+        },
+      };
+      const r = (await apiFetch(`/templates/${id}/preview`, { method: "POST", body: JSON.stringify(body) })) as { url?: string; error?: string };
+      if (r.url) setPreviewUrl(r.url);
+      else setPreviewError(r.error ?? "Falha ao gerar o preview");
+    } catch (e) {
+      setPreviewError((e as Error).message);
+    } finally { setPreviewLoading(false); }
   }
 
   // ── Queue ops ─────────────────────────────────────────────────────────────
@@ -470,10 +744,67 @@ export default function SocialMedia() {
     finally { setProcessing(false); }
   }
 
+  function captionFor(a: ArticleOption | undefined): string {
+    if (!a) return "";
+    return resolveCaption(captionTemplate, {
+      title: a.title,
+      category: a.category,
+      subtitle: a.subtitle,
+      author: a.author,
+      publishedAt: a.publishedAt,
+      site: "sbcagora.com.br",
+    }, ["sbcagora", "noticias"]);
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const selectedEl = currentTemplate?.elements.find((e) => e.id === selectedElId) ?? null;
   const previewH   = currentTemplate ? Math.round(currentTemplate.height * SCALE) : 450;
+
+  // Artigo (real ou amostra) usado para resolver os placeholders no canvas.
+  const selectedPreviewArticle = editorArticles.find((a) => a.id === previewArticleId);
+  const canvasArticle: ArticleData = selectedPreviewArticle
+    ? {
+        title: selectedPreviewArticle.title,
+        category: selectedPreviewArticle.category,
+        subtitle: selectedPreviewArticle.subtitle,
+        author: selectedPreviewArticle.author,
+        imageUrl: selectedPreviewArticle.imageUrl,
+        publishedAt: selectedPreviewArticle.publishedAt,
+      }
+    : SAMPLE_ARTICLE;
+
+  const HANDLE_CURSOR: Record<Handle, string> = {
+    nw: "nwse-resize", n: "ns-resize", ne: "nesw-resize", e: "ew-resize",
+    se: "nwse-resize", s: "ns-resize", sw: "nesw-resize", w: "ew-resize", move: "grab",
+  };
+
+  function startInteraction(e: React.MouseEvent, el: TemplateElement, handle: Handle) {
+    e.preventDefault(); e.stopPropagation();
+    setSelectedElId(el.id);
+    setInteraction({ id: el.id, handle, startX: e.clientX, startY: e.clientY, orig: { x: el.x, y: el.y, width: el.width, height: el.height } });
+  }
+
+  function handlePoint(el: TemplateElement, h: Handle): { cx: number; cy: number } {
+    const cx = h.includes("w") ? el.x : h.includes("e") ? el.x + el.width : el.x + el.width / 2;
+    const cy = h.includes("n") ? el.y : h.includes("s") ? el.y + el.height : el.y + el.height / 2;
+    return { cx, cy };
+  }
+
+  /** Conteúdo interno de um elemento no canvas (imagem real ou texto resolvido). */
+  function renderElInner(el: TemplateElement) {
+    if (isImageType(el.type)) {
+      const src = el.type === "image" ? (canvasArticle.imageUrl || el.content) : el.content;
+      if (src) return <img src={src} alt="" style={imageInnerStyle(el) as CSSProperties} />;
+      return (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: "rgba(255,255,255,0.55)", fontSize: 26, background: "rgba(255,255,255,0.05)" }}>
+          <ImageIcon size={30} /> {ELEMENT_TYPE_LABELS[el.type]}
+        </div>
+      );
+    }
+    const text = resolveContent(el.content, canvasArticle);
+    return <div style={textInnerStyle(el) as CSSProperties}>{text || ELEMENT_TYPE_LABELS[el.type]}</div>;
+  }
 
   const tabBtn = (t: typeof tab, label: string, icon: React.ReactNode) => (
     <button
@@ -594,6 +925,15 @@ export default function SocialMedia() {
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: "#9333EA" }}>
               <Plus size={13} /> Story
             </button>
+            <select
+              value=""
+              onChange={(e) => { if (e.target.value) applyPreset(e.target.value as PresetKind); e.target.value = ""; }}
+              className="text-xs border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-slate-50 text-slate-700"
+              title="Criar a partir de um modelo pronto"
+            >
+              <option value="">★ Modelos prontos…</option>
+              {PRESETS.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}
+            </select>
             {currentTemplate && (
               <div className="flex items-center gap-2 ml-auto flex-wrap">
                 <input value={currentTemplate.name}
@@ -609,6 +949,10 @@ export default function SocialMedia() {
                   <option value="feed">Feed (1080×1350)</option>
                   <option value="story">Story (1080×1920)</option>
                 </select>
+                <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title="Duplicar template"
+                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors disabled:opacity-50">
+                  <Copy size={14} />
+                </button>
                 {currentTemplate.id && (
                   <button onClick={() => { void deleteTemplate(currentTemplate.id); }}
                     className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
@@ -637,7 +981,7 @@ export default function SocialMedia() {
               <div className="bg-white rounded-2xl p-4 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Camadas</p>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {(["image","title","category","logo","cta","text"] as const).map((type) => (
+                  {ELEMENT_TYPES.map((type) => (
                     <button key={type} onClick={() => addElement(type)}
                       className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors">
                       <Plus size={11} /> {ELEMENT_TYPE_LABELS[type]}
@@ -685,60 +1029,92 @@ export default function SocialMedia() {
                 </div>
               </div>
 
-              {/* CENTER — Canvas preview */}
+              {/* CENTER — Canvas preview (WYSIWYG: mesmo CSS do render server-side) */}
               <div className="bg-white rounded-2xl p-4 flex flex-col items-center" style={{ boxShadow: CARD_SHADOW }}>
-                <p className="text-xs text-slate-400 mb-3 self-start">
-                  Preview {currentTemplate.width}×{currentTemplate.height}px · escala 1:{Math.round(1/SCALE)}
-                </p>
+                <div className="w-full flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-xs text-slate-400">
+                    {currentTemplate.width}×{currentTemplate.height}px · 1:{Math.round(1 / SCALE)}
+                  </span>
+                  <select
+                    value={previewArticleId}
+                    onChange={(e) => setPreviewArticleId(e.target.value)}
+                    className="ml-auto text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-slate-50 max-w-[180px]"
+                    title="Pré-visualizar com um artigo real"
+                  >
+                    <option value="">Artigo de amostra</option>
+                    {editorArticles.map((a) => <option key={a.id} value={a.id}>{a.title.slice(0, 40)}</option>)}
+                  </select>
+                  <button onClick={() => { void runPreview(); }} disabled={previewLoading}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
+                    style={{ background: PRIMARY }} title="Renderiza no servidor (Playwright) — exatamente como será postado">
+                    {previewLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
+                    Preview real
+                  </button>
+                </div>
+
+                {/* Container externo (escala visual) → interno em tamanho real 1080×N */}
                 <div
-                  className="relative shrink-0 overflow-hidden select-none"
-                  style={{
-                    width: PREVIEW_W, height: previewH,
-                    background: currentTemplate.backgroundColor,
-                    cursor: dragging ? "grabbing" : "default",
-                  }}
-                  onClick={() => setSelectedElId(null)}
+                  className="relative shrink-0 overflow-hidden select-none border border-slate-200"
+                  style={{ width: PREVIEW_W, height: previewH, background: "#0f172a" }}
+                  onMouseDown={() => setSelectedElId(null)}
                 >
-                  {[...currentTemplate.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => {
-                    const isImg = el.type === "image" || el.type === "logo";
-                    return (
+                  <div style={{
+                    position: "absolute", top: 0, left: 0,
+                    width: currentTemplate.width, height: currentTemplate.height,
+                    transform: `scale(${SCALE})`, transformOrigin: "top left",
+                    background: currentTemplate.backgroundColor,
+                  }}>
+                    {[...currentTemplate.elements].sort((a, b) => a.zIndex - b.zIndex).map((el) => (
                       <div key={el.id}
-                        onMouseDown={(e) => {
-                          e.preventDefault(); e.stopPropagation();
-                          setSelectedElId(el.id);
-                          setDragging({ id: el.id, startX: e.clientX, startY: e.clientY, origX: el.x, origY: el.y });
-                        }}
+                        onMouseDown={(e) => startInteraction(e, el, "move")}
                         style={{
-                          position: "absolute",
-                          left: Math.round(el.x * SCALE), top: Math.round(el.y * SCALE),
-                          width: Math.round(el.width * SCALE), height: Math.round(el.height * SCALE),
-                          backgroundColor: el.backgroundColor || (isImg ? "#444" : "transparent"),
-                          borderRadius: el.borderRadius * SCALE,
-                          opacity: el.opacity, cursor: "grab",
-                          outline: selectedElId === el.id ? "2px solid #2563EB" : "none",
-                          outlineOffset: 1, overflow: "hidden", boxSizing: "border-box",
+                          ...(elementBoxStyle(el) as CSSProperties),
+                          cursor: "grab",
+                          outline: selectedElId === el.id ? `${Math.round(2 / SCALE)}px solid #2563EB` : "none",
                         }}
                       >
-                        {isImg ? (
-                          <div className="w-full h-full flex items-center justify-center text-white/50 text-[10px] gap-1">
-                            <ImageIcon size={12} />
-                            {el.type === "image" ? "Imagem do artigo" : "Logo"}
-                          </div>
-                        ) : (
-                          <div style={{
-                            padding: el.padding * SCALE,
-                            fontSize: Math.max(8, el.fontSize * SCALE),
-                            fontFamily: el.fontFamily, fontWeight: el.fontWeight,
-                            color: el.color || "#fff", textAlign: el.textAlign,
-                            lineHeight: 1.3, wordBreak: "break-word", overflow: "hidden",
-                          }}>
-                            {el.content || <span style={{ opacity: 0.4 }}>{ELEMENT_TYPE_LABELS[el.type]}</span>}
-                          </div>
-                        )}
+                        {renderElInner(el)}
                       </div>
-                    );
-                  })}
+                    ))}
+
+                    {/* Safe-area (não exportada) */}
+                    {currentTemplate.type === "feed" ? (
+                      <div style={{ position: "absolute", left: FEED_SAFE_MARGIN, top: FEED_SAFE_MARGIN, width: currentTemplate.width - 2 * FEED_SAFE_MARGIN, height: currentTemplate.height - 2 * FEED_SAFE_MARGIN, border: `${Math.round(1 / SCALE)}px dashed rgba(255,255,255,0.25)`, zIndex: 9000, pointerEvents: "none" }} />
+                    ) : (
+                      <>
+                        <div style={{ position: "absolute", left: 0, top: 0, width: currentTemplate.width, height: STORY_SAFE_TOP, background: "rgba(244,63,94,0.06)", borderBottom: `${Math.round(1 / SCALE)}px dashed rgba(255,255,255,0.25)`, zIndex: 9000, pointerEvents: "none" }} />
+                        <div style={{ position: "absolute", left: 0, bottom: 0, width: currentTemplate.width, height: STORY_SAFE_BOTTOM, background: "rgba(244,63,94,0.06)", borderTop: `${Math.round(1 / SCALE)}px dashed rgba(255,255,255,0.25)`, zIndex: 9000, pointerEvents: "none" }} />
+                      </>
+                    )}
+
+                    {/* Guias de alinhamento (snapping) */}
+                    {guides.v.map((x, i) => (
+                      <div key={`gv${i}`} style={{ position: "absolute", left: x, top: 0, width: Math.max(1, Math.round(1 / SCALE)), height: currentTemplate.height, background: "#ec4899", zIndex: 9500, pointerEvents: "none" }} />
+                    ))}
+                    {guides.h.map((y, i) => (
+                      <div key={`gh${i}`} style={{ position: "absolute", top: y, left: 0, height: Math.max(1, Math.round(1 / SCALE)), width: currentTemplate.width, background: "#ec4899", zIndex: 9500, pointerEvents: "none" }} />
+                    ))}
+
+                    {/* Alças de redimensionar do elemento selecionado */}
+                    {selectedEl && RESIZE_HANDLES.map((h) => {
+                      const { cx, cy } = handlePoint(selectedEl, h);
+                      const size = Math.round(11 / SCALE);
+                      return (
+                        <div key={h}
+                          onMouseDown={(e) => startInteraction(e, selectedEl, h)}
+                          style={{
+                            position: "absolute", left: cx - size / 2, top: cy - size / 2,
+                            width: size, height: size, background: "#ffffff",
+                            border: `${Math.max(1, Math.round(2 / SCALE))}px solid #2563EB`,
+                            borderRadius: Math.round(2 / SCALE), zIndex: 10000, cursor: HANDLE_CURSOR[h],
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
+
+                {previewError && <p className="text-[11px] text-red-500 mt-2 self-start">{previewError}</p>}
               </div>
 
               {/* RIGHT — Properties */}
@@ -768,24 +1144,36 @@ export default function SocialMedia() {
                     {/* Content */}
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                        {selectedEl.type === "image" || selectedEl.type === "logo" ? "URL da imagem" : "Conteúdo"}
+                        {isImageType(selectedEl.type) ? "Imagem (URL ou upload)" : "Conteúdo"}
                       </label>
-                      <textarea rows={2} value={selectedEl.content}
-                        onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
-                        className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] resize-none"
-                        placeholder={
-                          selectedEl.type === "title"    ? "{{title}}" :
-                          selectedEl.type === "category" ? "{{category}}" :
-                          selectedEl.type === "image"    ? "URL de fallback" :
-                          selectedEl.type === "logo"     ? "https://…/logo.png" : "Texto…"
-                        } />
-                      {(selectedEl.type === "title" || selectedEl.type === "category") && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">Use {"{{title}}"} e {"{{category}}"} para dados do artigo</p>
+                      {isImageType(selectedEl.type) ? (
+                        <div className="flex items-center gap-1.5">
+                          <input type="text" value={selectedEl.content}
+                            onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
+                            className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]"
+                            placeholder={selectedEl.type === "image" ? "URL de fallback (usa a imagem do artigo)" : selectedEl.type === "overlay" ? "PNG transparente (máscara do Canva)" : "https://…/logo.png"} />
+                          <label className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] cursor-pointer shrink-0" title="Enviar imagem">
+                            <input type="file" accept="image/png,image/jpeg,image/webp" hidden
+                              onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(selectedEl.id, f); e.target.value = ""; }} />
+                            {uploadingElId === selectedEl.id ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                          </label>
+                        </div>
+                      ) : (
+                        <textarea rows={2} value={selectedEl.content}
+                          onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] resize-none"
+                          placeholder={selectedEl.type === "title" ? "{{title}}" : selectedEl.type === "category" ? "{{category}}" : "Texto…"} />
+                      )}
+                      {selectedEl.type === "overlay" && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">Moldura/arte em PNG transparente. Use z-index alto para ficar sobre a foto.</p>
+                      )}
+                      {!isImageType(selectedEl.type) && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">Variáveis: {"{{title}} {{subtitle}} {{category}} {{date}} {{author}}"}</p>
                       )}
                     </div>
 
                     {/* Text props */}
-                    {selectedEl.type !== "image" && selectedEl.type !== "logo" && (
+                    {!isImageType(selectedEl.type) && (
                       <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -826,6 +1214,19 @@ export default function SocialMedia() {
                             </div>
                           </div>
                         </div>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Alinhamento vertical</label>
+                          <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                            {([["top", ArrowUpToLine], ["middle", FoldVertical], ["bottom", ArrowDownToLine]] as const).map(([v, Icon]) => (
+                              <button key={v} onClick={() => updateElement(selectedEl.id, { verticalAlign: v })}
+                                className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${
+                                  (selectedEl.verticalAlign ?? "top") === v ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
+                                }`}>
+                                <Icon size={11} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
                             <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
@@ -854,7 +1255,7 @@ export default function SocialMedia() {
                     )}
 
                     {/* objectFit */}
-                    {(selectedEl.type === "image" || selectedEl.type === "logo") && (
+                    {isImageType(selectedEl.type) && (
                       <div>
                         <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Ajuste de imagem</label>
                         <select value={selectedEl.objectFit ?? "cover"}
@@ -1038,7 +1439,7 @@ export default function SocialMedia() {
                       <button
                         key={a.id}
                         type="button"
-                        onClick={() => setQueueForm((f) => ({ ...f, articleId: a.id }))}
+                        onClick={() => setQueueForm((f) => ({ ...f, articleId: a.id, caption: f.caption.trim() ? f.caption : captionFor(a) }))}
                         className={`w-full text-left px-3 py-2.5 flex items-start gap-2 border-b border-slate-100 last:border-0 hover:bg-white transition-colors ${queueForm.articleId === a.id ? "bg-blue-50 border-l-2 border-l-[#0B2A66]" : ""}`}
                       >
                         {a.imageUrl && (
@@ -1141,6 +1542,26 @@ export default function SocialMedia() {
               <button onClick={() => setShowQueueModal(false)}
                 className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════ MODAL — Preview real (render server-side) ═══════════════ */}
+      {previewUrl && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={() => setPreviewUrl(null)}>
+          <div className="relative max-h-[92vh] max-w-[92vw] flex flex-col items-center gap-3" onClick={(e) => e.stopPropagation()}>
+            <img src={previewUrl} alt="Preview"
+              className="rounded-xl shadow-2xl max-h-[82vh] w-auto object-contain bg-white" />
+            <div className="flex items-center gap-2">
+              <a href={previewUrl} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-100 transition-colors">
+                <Eye size={13} /> Abrir em nova aba
+              </a>
+              <button onClick={() => setPreviewUrl(null)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-100 transition-colors">
+                <X size={13} /> Fechar
               </button>
             </div>
           </div>
