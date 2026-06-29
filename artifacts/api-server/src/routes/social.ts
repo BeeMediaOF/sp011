@@ -295,8 +295,9 @@ router.post("/templates/:id/preview", async (req, res) => {
   try {
     const buf = await renderArt(tmpl, article, { baseHref: getPublicBase() ?? undefined });
     const { token } = saveTempImage(buf);
-    const base = getPublicBase() ?? "";
-    res.json({ url: `${base}/api/admin/social/image/${token}` });
+    // URL relativa: o preview é consumido pelo navegador do admin (mesma origem),
+    // não pela Meta. Usar APP_URL aqui quebraria o preview ao testar fora de prod.
+    res.json({ url: `/api/admin/social/image/${token}` });
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
