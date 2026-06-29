@@ -313,7 +313,7 @@ function PredefinedBlock({ block, getArticles }: {
   getArticles: (cat: string) => SectionArticle[];
 }) {
   // Special fixed blocks (no category makes sense)
-  if (block.id === "hero")       return <HeroSection />;
+  if (block.id === "hero")       return <HeroSection variant={block.layout} />;
   if (block.id === "mais-lidas") return <MostRead />;
   if (block.id === "colunistas") return <Suspense fallback={null}><ColumnistsSection limit={4} /></Suspense>;
   if (block.id === "ultimas")    return <DestaquesListaBadge />;

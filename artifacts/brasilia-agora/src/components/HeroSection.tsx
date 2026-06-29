@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useArticles } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
-import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import heroImg        from "../assets/images/hero.webp";
 import trafficImg     from "../assets/images/traffic.webp";
 import policeImg      from "../assets/images/police.webp";
@@ -213,6 +213,113 @@ function DesktopGrid({ items }: { items: FeaturedItem[] }) {
   );
 }
 
+// ─── Card de overlay compacto (tiles do mosaico / manchete) ───────────────────
+function SmallOverlayCard({ item, priority = false }: { item: SecondaryItem; priority?: boolean }) {
+  const srcset = buildSrcSet(item.img, CARD_WIDTHS);
+  return (
+    <Link
+      href={`/artigo/${item.slug || item.id}`}
+      className="group block relative overflow-hidden bg-gray-100 h-full"
+    >
+      <img
+        src={item.img || undefined}
+        srcSet={srcset || undefined}
+        sizes={srcset ? "(max-width: 1280px) 25vw, 320px" : undefined}
+        alt={item.title.replace(/<[^>]*>/g, "")}
+        width={400}
+        height={260}
+        loading={priority ? "eager" : "lazy"}
+        decoding="async"
+        className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <span
+          className="inline-block text-white text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider mb-1.5"
+          style={{ backgroundColor: item.chapeuColor }}
+        >
+          {item.chapeu}
+        </span>
+        <h3
+          className="font-['Merriweather',serif] font-bold text-white leading-tight text-[13px] line-clamp-2"
+          dangerouslySetInnerHTML={{ __html: item.title }}
+        />
+      </div>
+    </Link>
+  );
+}
+
+// ─── Variante: 1 destaque grande + lista lateral ──────────────────────────────
+function HeroSplit({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
+  if (!big) return null;
+  return (
+    <div className="grid grid-cols-3 gap-4 h-[420px]">
+      <FeaturedCard item={big} priority className="col-span-2 h-full" />
+      <div className="flex flex-col justify-between overflow-hidden">
+        {items.slice(0, 5).map((item) => {
+          const srcset = buildSrcSet(item.img, THUMB_WIDTHS);
+          return (
+            <Link key={item.id} href={`/artigo/${item.slug || item.id}`} className="group flex gap-3 items-start">
+              <div className="w-[96px] h-[64px] shrink-0 overflow-hidden bg-gray-100" style={{ position: "relative" }}>
+                <img
+                  src={item.img || undefined}
+                  srcSet={srcset || undefined}
+                  sizes={srcset ? "96px" : undefined}
+                  alt={item.chapeu}
+                  width={96}
+                  height={64}
+                  loading="lazy"
+                  decoding="async"
+                  className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5" style={{ color: item.chapeuColor }}>
+                  {item.chapeu}
+                </span>
+                <h3
+                  className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2 text-[#1a1a1a]"
+                  dangerouslySetInnerHTML={{ __html: item.title }}
+                />
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Variante: mosaico (1 grande + 4 tiles) ───────────────────────────────────
+function HeroMosaic({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
+  if (!big) return null;
+  return (
+    <div className="grid grid-cols-2 gap-3 h-[420px]">
+      <FeaturedCard item={big} priority className="h-full" />
+      <div className="grid grid-cols-2 grid-rows-2 gap-3">
+        {items.slice(0, 4).map((item) => (
+          <SmallOverlayCard key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Variante: manchete full-width + 4 chamadas ───────────────────────────────
+function HeroManchete({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
+  if (!big) return null;
+  return (
+    <div className="flex flex-col gap-4">
+      <FeaturedCard item={big} priority className="h-[360px]" />
+      <div className="grid grid-cols-4 gap-4 h-[150px]">
+        {items.slice(0, 4).map((item) => (
+          <SmallOverlayCard key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Mobile horizontal carousel for secondary items ───────────────────────────
 function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
   return (
@@ -259,9 +366,14 @@ function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
 }
 
 // ─── HeroSection principal ────────────────────────────────────────────────────
-export default function HeroSection() {
+export type HeroVariant = "grid" | "featured" | "mosaico" | "manchete";
+
+export default function HeroSection({ variant }: { variant?: string } = {}) {
   const { articles, loading } = useArticles();
   const { settings } = useSite();
+  const layout: HeroVariant =
+    variant === "featured" || variant === "mosaico" || variant === "manchete" ? variant : "grid";
+  const isGrid = layout === "grid";
 
   const sorted = [...articles].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
@@ -316,17 +428,23 @@ export default function HeroSection() {
       </div>
 
       <div className="hidden lg:block mb-5">
-        {featured.length > 0 && <DesktopGrid items={featured} />}
+        {layout === "featured"  && <HeroSplit    big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
+        {layout === "mosaico"   && <HeroMosaic   big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
+        {layout === "manchete"  && <HeroManchete big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
+        {isGrid && featured.length > 0 && <DesktopGrid items={featured} />}
       </div>
 
+      {/* Mobile: carrossel horizontal de secundárias (todas as variantes) */}
       {(settings?.showHeroStrip ?? true) && secondary.length > 0 && (
-        <>
-          {/* Mobile: horizontal snap carousel */}
-          <div className="lg:hidden border-t border-gray-200 pt-5">
-            <SecondaryCarousel items={secondary} />
-          </div>
+        <div className="lg:hidden border-t border-gray-200 pt-5">
+          <SecondaryCarousel items={secondary} />
+        </div>
+      )}
 
-          {/* Desktop: 4-column grid */}
+      {/* Desktop: tira de 4 — só no layout "grid"; nas outras variantes as
+          secundárias já entram no próprio bloco principal (evita repetição). */}
+      {isGrid && (settings?.showHeroStrip ?? true) && secondary.length > 0 && (
+        <>
           <div className="hidden lg:grid lg:grid-cols-4 gap-4 border-t border-gray-200 pt-5">
             {secondary.map((item) => {
               const srcset = buildSrcSet(item.img, THUMB_WIDTHS);

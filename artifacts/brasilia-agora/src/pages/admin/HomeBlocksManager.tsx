@@ -75,6 +75,14 @@ const FORMATS_BY_TYPE: Record<string, { value: string; label: string }[]> = {
   list:        [{ value: "list_compact", label: "Compacta" }, { value: "ranking_horizontal", label: "Ranking" }],
 };
 
+// ─── Estilos do Hero (bloco fixo de destaques) ────────────────────────────────
+const HERO_FORMATS: { value: string; label: string }[] = [
+  { value: "grid",     label: "3 cards + tira" },
+  { value: "featured", label: "1 grande + lista" },
+  { value: "mosaico",  label: "Mosaico (1 + 4)" },
+  { value: "manchete", label: "Manchete full" },
+];
+
 // ─── Sources ──────────────────────────────────────────────────────────────────
 const SOURCES: { value: SourceType; label: string }[] = [
   { value: "automatic_by_category", label: "Automático por categoria" },
@@ -478,6 +486,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
   onApply: () => void; onDuplicate: () => void; onDelete: () => void; onCancel: () => void;
 }) {
   const isSpecial = new Set(["hero", "mais-lidas", "colunistas", "ultimas"]).has(block.id);
+  const isHero = block.id === "hero";
   const formats = FORMATS_BY_TYPE[form.blockType] ?? FORMATS_BY_TYPE.content!;
   const INPUT = "w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors";
 
@@ -496,28 +505,39 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
           className={INPUT} placeholder="Nome exibido na home" />
       </PanelSection>
 
-      {/* Tipo + Formato */}
-      <div className="grid grid-cols-2 gap-2">
-        <PanelSection label="Tipo">
-          <select value={form.blockType} onChange={(e) => { onChange("blockType", e.target.value as BlockType); onChange("format", FORMATS_BY_TYPE[e.target.value]?.[0]?.value ?? "grid"); }}
-            className={INPUT}>
-            <option value="content">Conteúdo</option>
-            <option value="advertising">Propaganda</option>
-            <option value="image">Imagem</option>
-            <option value="carousel">Carrossel</option>
-            <option value="list">Lista</option>
-            <option value="video">Vídeo</option>
-            <option value="newsletter">Newsletter</option>
-            <option value="html">HTML Livre</option>
-          </select>
-        </PanelSection>
-        <PanelSection label="Formato">
+      {/* Hero: estilo dedicado (bloco fixo de destaques) */}
+      {isHero ? (
+        <PanelSection label="Estilo do Hero" icon={Layers}>
           <select value={form.format} onChange={(e) => { onChange("format", e.target.value); onChange("layout", e.target.value as LayoutId); }}
             className={INPUT}>
-            {formats.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+            {HERO_FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Define como as notícias de capa são organizadas no topo da home.</p>
         </PanelSection>
-      </div>
+      ) : (
+        /* Tipo + Formato */
+        <div className="grid grid-cols-2 gap-2">
+          <PanelSection label="Tipo">
+            <select value={form.blockType} onChange={(e) => { onChange("blockType", e.target.value as BlockType); onChange("format", FORMATS_BY_TYPE[e.target.value]?.[0]?.value ?? "grid"); }}
+              className={INPUT}>
+              <option value="content">Conteúdo</option>
+              <option value="advertising">Propaganda</option>
+              <option value="image">Imagem</option>
+              <option value="carousel">Carrossel</option>
+              <option value="list">Lista</option>
+              <option value="video">Vídeo</option>
+              <option value="newsletter">Newsletter</option>
+              <option value="html">HTML Livre</option>
+            </select>
+          </PanelSection>
+          <PanelSection label="Formato">
+            <select value={form.format} onChange={(e) => { onChange("format", e.target.value); onChange("layout", e.target.value as LayoutId); }}
+              className={INPUT}>
+              {formats.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+            </select>
+          </PanelSection>
+        </div>
+      )}
 
       {/* Propaganda: link rápido para gerenciar anúncios */}
       {form.blockType === "advertising" && (
@@ -722,6 +742,12 @@ export default function HomeBlocksManager() {
   const [footerStyle, setFooterStyle]   = useState<FooterStyle>("dark");
   const [headerBgColor, setHeaderBgColor] = useState("#ffffff");
   const [footerBgColor, setFooterBgColor] = useState("#000000");
+  const [menuTextColor, setMenuTextColor]     = useState("#6b7280");
+  const [menuActiveColor, setMenuActiveColor] = useState("#c8102e");
+  const [menuFontSize, setMenuFontSize]       = useState(13);
+  const [menuFontWeight, setMenuFontWeight]   = useState(700);
+  const [showTickerBar, setShowTickerBar]     = useState(true);
+  const [showHeroStrip, setShowHeroStrip]     = useState(true);
   const [logoBase64, setLogoBase64]     = useState<string | null>(null);
   const [logoPreview, setLogoPreview]   = useState<string | null>(null);
   const [logoSize, setLogoSize]         = useState(48);
@@ -764,6 +790,12 @@ export default function HomeBlocksManager() {
         setFooterStyle(r.settings.footerStyle ?? "dark");
         setHeaderBgColor(r.settings.headerBgColor ?? "#ffffff");
         setFooterBgColor(r.settings.footerBgColor ?? "#000000");
+        setMenuTextColor(r.settings.menuTextColor ?? "#6b7280");
+        setMenuActiveColor(r.settings.menuActiveColor ?? "#c8102e");
+        setMenuFontSize(r.settings.menuFontSize ?? 13);
+        setMenuFontWeight(r.settings.menuFontWeight ?? 700);
+        setShowTickerBar(r.settings.showTickerBar ?? true);
+        setShowHeroStrip(r.settings.showHeroStrip ?? true);
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
         if (r.settings.logoSize)   setLogoSize(r.settings.logoSize);
       })
@@ -960,6 +992,23 @@ export default function HomeBlocksManager() {
     } finally { setSaving(false); }
   }
 
+  // Salva um pedaço arbitrário das settings (estilo de menu, toggles) e pede ao
+  // preview (iframe) para rebuscar /api/site — o Header/Hero remontam in-place,
+  // sem recarregar o iframe inteiro.
+  async function saveSettingsPatch(patch: Parameters<typeof adminApi.updateSettings>[0]) {
+    setSaving(true);
+    try {
+      await adminApi.updateSettings(patch);
+      invalidateSiteCache();
+      iframeRef.current?.contentWindow?.postMessage({ type: "settings:refresh" }, "*");
+      setSaved(true); setSaveError(false);
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 4000);
+    } finally { setSaving(false); }
+  }
+
   async function saveHeaderFooter(hs: HeaderStyle, fs: FooterStyle, hBg?: string, fBg?: string) {
     setSaving(true);
     try {
@@ -1058,6 +1107,10 @@ export default function HomeBlocksManager() {
   // Live debounced form change (uses refs to avoid stale-closure bugs)
   function handleFormChange<K extends keyof BlockForm>(key: K, val: BlockForm[K]) {
     const nextForm = { ...editFormRef.current, [key]: val };
+    // Mantém o ref em sincronia AGORA (não só no useEffect) para que chamadas
+    // sequenciais no mesmo evento — ex.: onChange("format") + onChange("layout")
+    // do seletor de formato — não leiam um estado antigo e se sobrescrevam.
+    editFormRef.current = nextForm;
     setEditForm(nextForm);
     // ── Instant preview: push block state to iframe immediately (no debounce) ──
     const previewId = editingIdRef.current;
@@ -1553,6 +1606,85 @@ export default function HomeBlocksManager() {
                     </button>
                   </div>
                 </div>
+
+                {/* ── Estilo do menu ── */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5"><Type size={12} /> Estilo do menu</p>
+                  <p className="text-[11px] text-[#94A3B8] -mt-1">Tamanho, peso e cor do item ativo valem para todos os estilos de cabeçalho. A <b>cor do texto</b> aplica-se aos estilos de fundo claro (Padrão e Compacto); no Centralizado o texto fica branco sobre a barra escura.</p>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Cor do texto</p>
+                      <div className="flex gap-2">
+                        <input type="color" value={menuTextColor} onChange={(e) => setMenuTextColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
+                        <input type="text" value={menuTextColor} onChange={(e) => setMenuTextColor(e.target.value)}
+                          className="flex-1 min-w-0 border border-[#E2E8F0] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Cor do item ativo</p>
+                      <div className="flex gap-2">
+                        <input type="color" value={menuActiveColor} onChange={(e) => setMenuActiveColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
+                        <input type="text" value={menuActiveColor} onChange={(e) => setMenuActiveColor(e.target.value)}
+                          className="flex-1 min-w-0 border border-[#E2E8F0] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-medium text-[#64748B]">Tamanho da fonte</p>
+                      <span className="text-xs font-bold text-[#0B2A66]">{menuFontSize}px</span>
+                    </div>
+                    <input type="range" min={11} max={18} step={1} value={menuFontSize}
+                      onChange={(e) => setMenuFontSize(Number(e.target.value))} className="w-full accent-[#0B2A66]" />
+                  </div>
+
+                  <div>
+                    <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Peso da fonte</p>
+                    <select value={menuFontWeight} onChange={(e) => setMenuFontWeight(Number(e.target.value))}
+                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20">
+                      <option value={400}>Normal</option>
+                      <option value={500}>Médio</option>
+                      <option value={600}>Seminegrito</option>
+                      <option value={700}>Negrito</option>
+                      <option value={800}>Extra-negrito</option>
+                    </select>
+                  </div>
+
+                  {/* Mini prévia */}
+                  <div className="rounded-xl border border-[#E2E8F0] bg-white px-3 py-2.5 flex items-center gap-3 flex-wrap" style={{ backgroundColor: headerBgColor }}>
+                    <span style={{ color: menuActiveColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}>HOME</span>
+                    <span style={{ color: menuTextColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}>POLÍTICA</span>
+                    <span style={{ color: menuTextColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}>ECONOMIA</span>
+                  </div>
+
+                  <button onClick={() => saveSettingsPatch({ menuTextColor, menuActiveColor, menuFontSize, menuFontWeight })} disabled={saving}
+                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                    <Save size={13} /> Salvar estilo do menu
+                  </button>
+                </div>
+
+                {/* ── Barra de cotação e strip de destaques ── */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-2.5">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5"><CircleDollarSign size={12} /> Barra abaixo do cabeçalho</p>
+                  <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#0F172A]">Barra de cotações</p>
+                      <p className="text-[11px] text-[#64748B] mt-0.5">Faixa rolante de moedas e cripto (USD · EUR · BTC…)</p>
+                    </div>
+                    <Toggle checked={showTickerBar} onChange={() => { const v = !showTickerBar; setShowTickerBar(v); saveSettingsPatch({ showTickerBar: v }); }} />
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#0F172A]">Strip de destaques</p>
+                      <p className="text-[11px] text-[#64748B] mt-0.5">Tira de 4 notícias secundárias abaixo do Hero</p>
+                    </div>
+                    <Toggle checked={showHeroStrip} onChange={() => { const v = !showHeroStrip; setShowHeroStrip(v); saveSettingsPatch({ showHeroStrip: v }); }} />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1602,22 +1734,47 @@ export default function HomeBlocksManager() {
 
             {/* ── SETTINGS tab ── */}
             {tab === "settings" && (
-              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                <p className="text-[12px] text-[#64748B]">Configurações gerais da página inicial.</p>
-                {[
-                  { label: "Cache automático",        desc: "Limpar cache a cada 5 minutos",           enabled: true  },
-                  { label: "Atualização em tempo real",desc: "Blocos recarregam com novos artigos",     enabled: false },
-                  { label: "SEO personalizado",        desc: "Título e descrição customizados",         enabled: true  },
-                  { label: "Modo manutenção",          desc: "Exibir página de manutenção",             enabled: false },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
-                    <div>
-                      <p className="text-[13px] font-semibold text-[#0F172A]">{item.label}</p>
-                      <p className="text-[11px] text-[#64748B] mt-0.5">{item.desc}</p>
-                    </div>
-                    <Toggle checked={item.enabled} onChange={() => {}} />
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3 flex items-start gap-2.5">
+                  <Info size={14} className="text-[#2563EB] mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-[#1e40af] leading-relaxed">
+                    Aparência da home: abas <b>Estilos</b>, <b>Cabeçalho</b> e <b>Rodapé</b>.
+                    A barra de cotações e o strip de destaques ficam na aba <b>Cabeçalho</b>.
+                    Os atalhos abaixo levam às telas onde cada ajuste é salvo.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Atalhos</p>
+                  <div className="space-y-2">
+                    {[
+                      { href: "/admin/configuracoes", Icon: Settings,      label: "SEO, analytics & integrações", desc: "Descrição, GA4, Pixel, GTM, favicon" },
+                      { href: "/admin/menu",          Icon: AlignJustify,  label: "Menu & navegação",             desc: "Itens, ordem e visibilidade do menu" },
+                      { href: "/admin/analytics",     Icon: BarChart3,     label: "Estatísticas de acesso",       desc: "Visitas, páginas e dispositivos" },
+                    ].map(({ href, Icon: ItemIcon, label, desc }) => (
+                      <a key={href} href={href} className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-[#E2E8F0] hover:border-[#0B2A66] transition-colors group">
+                        <span className="w-8 h-8 rounded-lg bg-[#F8FAFC] flex items-center justify-center shrink-0"><ItemIcon size={15} className="text-[#64748B]" /></span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-semibold text-[#0F172A] group-hover:text-[#0B2A66]">{label}</p>
+                          <p className="text-[10px] text-[#94A3B8] truncate">{desc}</p>
+                        </div>
+                        <ChevronRight size={14} className="text-[#CBD5E1] group-hover:text-[#0B2A66] shrink-0" />
+                      </a>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Ações</p>
+                  <button onClick={() => { if (!confirm("Restaurar blocos padrão? Isso removerá blocos personalizados.")) return; setBlocks(DEFAULT_BLOCKS); pushHistory(DEFAULT_BLOCKS); debounceSave(DEFAULT_BLOCKS); setTab("blocks"); }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-medium text-[#64748B] border border-[#E2E8F0] rounded-xl hover:text-[#0B2A66] hover:bg-[#F8FAFC] transition-colors">
+                    <RotateCcw size={13} /> Restaurar blocos padrão
+                  </button>
+                  <a href="/" target="_blank" rel="noopener noreferrer"
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-medium text-[#64748B] border border-[#E2E8F0] rounded-xl hover:text-[#0B2A66] hover:bg-[#F8FAFC] transition-colors">
+                    <ExternalLink size={13} /> Abrir site
+                  </a>
+                </div>
               </div>
             )}
           </div>

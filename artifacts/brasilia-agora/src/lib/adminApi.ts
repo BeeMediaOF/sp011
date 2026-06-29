@@ -298,6 +298,10 @@ export interface SiteSettings {
   footerStyle?: "dark" | "light" | "minimal";
   headerBgColor?: string;
   footerBgColor?: string;
+  menuTextColor?: string;
+  menuActiveColor?: string;
+  menuFontSize?: number;
+  menuFontWeight?: number;
   siteUrl?: string;
 }
 

@@ -103,6 +103,11 @@ export interface SiteSettings {
   siteName: string; tagline: string; logoBase64?: string; logoSize?: number;
   mobileEnabled: boolean; desktopEnabled: boolean;
   showTickerBar?: boolean; showHeroStrip?: boolean;
+  headerStyle?: "standard" | "compact" | "centered";
+  footerStyle?: "dark" | "light" | "minimal";
+  headerBgColor?: string; footerBgColor?: string;
+  menuTextColor?: string; menuActiveColor?: string;
+  menuFontSize?: number; menuFontWeight?: number;
   seoDescription?: string; seoKeywords?: string;
   facebookPixelId?: string; gtmId?: string; ga4MeasurementId?: string;
   customHeadCode?: string; customBodyCode?: string;

@@ -133,6 +133,19 @@ export default function Header() {
   const bgColor = settings?.headerBgColor ?? "#ffffff";
   const bgStyle = { backgroundColor: bgColor };
 
+  // ── Estilo do menu (configurável no painel) ────────────────────────────────
+  // Aplicado aos estilos "standard" e "compact" (fundo claro). O "centered" usa
+  // uma barra escura própria e mantém seu esquema de cores.
+  const menuTextColor   = settings?.menuTextColor   ?? "#6b7280"; // gray-500
+  const menuActiveColor = settings?.menuActiveColor ?? "#c8102e";
+  const menuFontSize    = settings?.menuFontSize    ?? 13;
+  const menuFontWeight  = settings?.menuFontWeight  ?? 700;
+  const navItemStyle = (path: string): React.CSSProperties => ({
+    color: isActive(path) ? menuActiveColor : menuTextColor,
+    fontSize: menuFontSize,
+    fontWeight: menuFontWeight,
+  });
+
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
@@ -160,7 +173,8 @@ export default function Header() {
                 <Link
                   key={path}
                   href={path}
-                  className={`text-[12px] font-bold px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
+                  style={navItemStyle(path)}
+                  className="px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100"
                 >
                   {label}
                 </Link>
@@ -212,6 +226,7 @@ export default function Header() {
             </div>
           )}
         </header>
+        {settings?.showTickerBar !== false && <TickerBar />}
       </div>
     );
   }
@@ -253,7 +268,15 @@ export default function Header() {
                 <Link
                   key={path}
                   href={path}
-                  className={`text-[12px] font-bold px-4 py-2 whitespace-nowrap transition-colors text-white/80 hover:text-white hover:bg-white/10 ${isActive(path) ? "text-white border-b-2 border-[#c8102e]" : ""}`}
+                  style={{
+                    // Barra escura própria: mantemos texto claro/legível e usamos a
+                    // cor do item ativo, tamanho e peso configurados no painel.
+                    fontSize: menuFontSize,
+                    fontWeight: menuFontWeight,
+                    color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
+                    borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
+                  }}
+                  className="px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10"
                 >
                   {label}
                 </Link>
@@ -329,7 +352,8 @@ export default function Header() {
               <Link
                 key={path}
                 href={path}
-                className={`text-[13px] font-bold px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:text-gray-900 hover:bg-gray-100 text-center ml-[4px] mr-[4px] ${isActive(path) ? "text-[#c8102e]" : "text-gray-500"}`}
+                style={navItemStyle(path)}
+                className="px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]"
               >
                 {label}
               </Link>

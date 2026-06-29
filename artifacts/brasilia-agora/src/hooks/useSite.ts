@@ -47,6 +47,11 @@ export interface SiteSettings {
   footerStyle?: "dark" | "light" | "minimal";
   headerBgColor?: string;
   footerBgColor?: string;
+  /** Estilo do menu principal (cor do texto, cor do item ativo, tamanho e peso da fonte). */
+  menuTextColor?: string;
+  menuActiveColor?: string;
+  menuFontSize?: number;
+  menuFontWeight?: number;
   customHeadCode?: string;
   customBodyCode?: string;
 }
