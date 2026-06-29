@@ -95,6 +95,19 @@ export async function renderArt(
       await Promise.all(
         imgs.map((img) => (img.complete ? Promise.resolve() : img.decode().catch(() => undefined))),
       );
+      // Auto-ajuste: encolhe a fonte dos textos marcados até caberem na caixa
+      // (após as fontes carregarem, para medir com a métrica real).
+      const getCS = (globalThis as unknown as { getComputedStyle: (n: any) => { fontSize: string } }).getComputedStyle;
+      const nodes: any[] = Array.from(doc.querySelectorAll('[data-fit="1"]'));
+      for (const el of nodes) {
+        let size = parseFloat(getCS(el).fontSize);
+        const min = Math.max(12, Math.round(size * 0.5));
+        let guard = 400;
+        while (size > min && guard-- > 0 && (el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth)) {
+          size -= 1;
+          el.style.fontSize = size + "px";
+        }
+      }
     });
     const buf = await page.screenshot({
       type: "jpeg",

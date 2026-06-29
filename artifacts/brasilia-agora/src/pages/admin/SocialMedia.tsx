@@ -26,8 +26,11 @@ import {
   backgroundCss,
   defaultGradient,
   GRADIENT_PRESETS,
+  parseHighlight,
+  DEFAULT_ACCENT,
 } from "@workspace/social-template";
 import type { CSSProperties } from "react";
+import { useLayoutEffect } from "react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +114,7 @@ const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "gradient", "title", "
 
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
   const overrides: Partial<Record<ElementType, Partial<TemplateElement>>> = {
-    title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}", verticalAlign: "top" },
+    title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}", verticalAlign: "top", autoFit: true },
     category: { x: 40, y: 540, width: 300,  height: 60,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: ACCENT, content: "{{category}}", textAlign: "center", verticalAlign: "middle" },
     image:    { x: 0,  y: 0,   width: 1080, height: 800, fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "#333333", content: "", objectFit: "cover" },
     overlay:  { x: 0,  y: 0,   width: 1080, height: canvasH, fontSize: 0, fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "fill", zIndex: 5 },
@@ -159,10 +162,10 @@ function makePreset(kind: PresetKind): SocialTemplate {
         { ...makeElement("text", H), x: 228, y: 1092, width: 5, height: 138, backgroundColor: "#ffffff", padding: 0, content: "", zIndex: 6 },
         // kicker (categoria, verde)
         { ...makeElement("category", H), x: 258, y: 1086, width: 770, height: 46, fontSize: 32, fontFamily: "Oswald", fontWeight: "bold", color: "#9EFF00", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "{{CATEGORY}}", zIndex: 6 },
-        // título
-        { ...makeElement("title", H), x: 258, y: 1138, width: 780, height: 150, fontSize: 42, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", zIndex: 6 },
-        // pílula da URL (borda arredondada)
-        { ...makeElement("text", H), x: 150, y: 1292, width: 780, height: 52, fontSize: 24, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", borderWidth: 3, borderColor: "#ffffff", borderRadius: 30, textAlign: "center", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "WWW.SEUSITE.COM.BR", zIndex: 6 },
+        // título (auto-ajusta p/ nunca cortar; *destaque* em verde)
+        { ...makeElement("title", H), x: 258, y: 1138, width: 780, height: 150, fontSize: 42, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", autoFit: true, accentColor: "#9EFF00", zIndex: 6 },
+        // pílula da URL (borda arredondada; nome do site destacado)
+        { ...makeElement("text", H), x: 150, y: 1292, width: 780, height: 52, fontSize: 24, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", borderWidth: 3, borderColor: "#ffffff", borderRadius: 30, textAlign: "center", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "WWW.*SEUSITE*.COM.BR", accentColor: "#9EFF00", zIndex: 6 },
         // bandeira/selo (upload) no canto superior direito
         { ...makeElement("logo", H), x: 878, y: 80, width: 140, height: 95, objectFit: "contain", zIndex: 6, content: "" },
       ],
@@ -174,7 +177,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
       id: "", name: "Story — Citação", type: "story", width: 1080, height: H, backgroundColor: "#0B2A66",
       elements: [
         { ...makeElement("category", H), x: 80, y: 360, width: 360, height: 70, fontSize: 30, content: "{{category}}", zIndex: 2 },
-        { ...makeElement("title", H),    x: 80, y: 470, width: 920, height: 760, fontSize: 86, fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", zIndex: 3 },
+        { ...makeElement("title", H),    x: 80, y: 470, width: 920, height: 760, fontSize: 86, fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", autoFit: true, zIndex: 3 },
         { ...makeElement("text", H),     x: 80, y: 1770, width: 920, height: 60, fontSize: 30, color: "#cbd5e1", content: "sbcagora.com.br", zIndex: 4 },
       ],
     };
@@ -187,7 +190,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
       { ...makeElement("image", H),    x: 0,  y: 0,   width: 1080, height: 1350, objectFit: "cover", zIndex: 1 },
       { ...makeElement("text", H),     x: 0,  y: 760, width: 1080, height: 590, backgroundColor: "#0B2A66", opacity: 0.82, content: "", zIndex: 2 },
       { ...makeElement("category", H), x: 60, y: 840, width: 320, height: 64, fontSize: 28, content: "{{category}}", zIndex: 3 },
-      { ...makeElement("title", H),    x: 60, y: 930, width: 960, height: 300, fontSize: 66, fontWeight: "bold", fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", zIndex: 4 },
+      { ...makeElement("title", H),    x: 60, y: 930, width: 960, height: 300, fontSize: 66, fontWeight: "bold", fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", autoFit: true, zIndex: 4 },
       { ...makeElement("text", H),     x: 60, y: 1270, width: 960, height: 50, fontSize: 26, color: "#cbd5e1", content: "@sbcagora · sbcagora.com.br", zIndex: 5 },
     ],
   };
@@ -343,6 +346,45 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
         className="flex items-center gap-1 text-[11px] font-medium text-[#0B2A66] hover:underline">
         <Plus size={11} /> Adicionar parada
       </button>
+    </div>
+  );
+}
+
+/** Texto do canvas com destaque inline (*…*) e auto-ajuste de fonte (se autoFit). */
+function AutoFitText({ el, text }: { el: TemplateElement; text: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [, bump] = useState(0);
+
+  // Re-ajusta quando as fontes do Google terminam de carregar (métrica muda).
+  useEffect(() => {
+    let alive = true;
+    const fonts = (document as unknown as { fonts?: { ready?: Promise<unknown> } }).fonts;
+    fonts?.ready?.then(() => { if (alive) bump((x) => x + 1); });
+    return () => { alive = false; };
+  }, []);
+
+  useLayoutEffect(() => {
+    const node = ref.current;
+    if (!node || !el.autoFit) return;
+    const max = el.fontSize;
+    const min = Math.max(12, Math.round(max * 0.5));
+    let size = max;
+    node.style.fontSize = size + "px";
+    let guard = 400;
+    while (size > min && guard-- > 0 && (node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth)) {
+      size -= 1;
+      node.style.fontSize = size + "px";
+    }
+  });
+
+  const accent = el.accentColor || DEFAULT_ACCENT;
+  return (
+    <div ref={ref} style={textInnerStyle(el) as CSSProperties}>
+      <div style={{ width: "100%" }}>
+        {parseHighlight(text).map((s, i) =>
+          s.accent ? <span key={i} style={{ color: accent }}>{s.text}</span> : <span key={i}>{s.text}</span>,
+        )}
+      </div>
     </div>
   );
 }
@@ -926,8 +968,8 @@ export default function SocialMedia() {
         </div>
       );
     }
-    const text = resolveContent(el.content, canvasArticle);
-    return <div style={textInnerStyle(el) as CSSProperties}>{text || ELEMENT_TYPE_LABELS[el.type]}</div>;
+    const text = resolveContent(el.content, canvasArticle) || ELEMENT_TYPE_LABELS[el.type];
+    return <AutoFitText el={el} text={text} />;
   }
 
   const tabBtn = (t: typeof tab, label: string, icon: React.ReactNode) => (
@@ -1373,6 +1415,30 @@ export default function SocialMedia() {
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                           </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor de destaque</label>
+                            <div className="flex items-center gap-1.5">
+                              <input type="color" value={selectedEl.accentColor || DEFAULT_ACCENT}
+                                onChange={(e) => updateElement(selectedEl.id, { accentColor: e.target.value })}
+                                className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
+                              <input type="text" value={selectedEl.accentColor ?? ""}
+                                onChange={(e) => updateElement(selectedEl.id, { accentColor: e.target.value })}
+                                placeholder={DEFAULT_ACCENT}
+                                className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Auto-ajustar</label>
+                            <button onClick={() => updateElement(selectedEl.id, { autoFit: !selectedEl.autoFit })}
+                              className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                                selectedEl.autoFit ? "bg-[#0B2A66] text-white" : "border border-slate-200 text-slate-500 hover:bg-slate-50"
+                              }`}>
+                              {selectedEl.autoFit ? "Ligado (não corta)" : "Desligado"}
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400 -mt-1">Destaque um trecho com *asteriscos* (ex.: WWW.*SEUSITE*.COM.BR). "Auto-ajustar" reduz a fonte p/ caber sem cortar.</p>
                       </>
                     )}
 

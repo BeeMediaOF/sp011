@@ -9,6 +9,7 @@ import {
 } from "./elementStyle";
 import { fontLinksHtml, GOOGLE_FONTS_HREF } from "./fonts";
 import { backgroundCss } from "./gradient";
+import { parseHighlight, DEFAULT_ACCENT } from "./highlight";
 
 export interface BuildHtmlOptions {
   /** Stylesheet de fontes (default: Google Fonts). */
@@ -48,7 +49,15 @@ function renderElement(el: TemplateElement, article: ArticleData): string {
   }
 
   const text = resolveContent(el.content || "", article);
-  const inner = `<div style="${styleToCss(textInnerStyle(el))}">${escapeHtml(text)}</div>`;
+  const accent = el.accentColor || DEFAULT_ACCENT;
+  const innerHtml = parseHighlight(text)
+    .map((s) => (s.accent ? `<span style="color:${escapeAttr(accent)}">${escapeHtml(s.text)}</span>` : escapeHtml(s.text)))
+    .join("");
+  const fitAttr = el.autoFit ? ` data-fit="1"` : "";
+  // O conteúdo (texto + spans de destaque) fica num ÚNICO filho: a coluna flex
+  // (alinhamento vertical) deve ter um só item, senão os trechos inline iriam
+  // empilhar verticalmente.
+  const inner = `<div style="${styleToCss(textInnerStyle(el))}"${fitAttr}><div style="width:100%">${innerHtml}</div></div>`;
   return `<div style="${box}">${inner}</div>`;
 }
 

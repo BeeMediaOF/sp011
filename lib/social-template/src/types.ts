@@ -53,6 +53,10 @@ export interface TemplateElement {
   borderColor?: string;
   /** Espaçamento entre letras em px (caixa-alta fica melhor com +1/+2). */
   letterSpacing?: number;
+  /** Encolhe a fonte automaticamente para o texto caber na caixa (sem cortar). */
+  autoFit?: boolean;
+  /** Cor dos trechos marcados com *asteriscos* (destaque inline). */
+  accentColor?: string;
 }
 
 export interface SocialTemplate {
