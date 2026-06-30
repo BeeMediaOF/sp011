@@ -108,7 +108,7 @@ export interface SiteSettings {
   headerBgColor?: string; footerBgColor?: string;
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
-  headerPaddingX?: number;
+  headerPaddingX?: number; headerMarginTop?: number;
   seoDescription?: string; seoKeywords?: string;
   facebookPixelId?: string; gtmId?: string; ga4MeasurementId?: string;
   customHeadCode?: string; customBodyCode?: string;

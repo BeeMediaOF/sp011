@@ -54,6 +54,8 @@ export interface SiteSettings {
   menuFontWeight?: number;
   /** Margem lateral interna do cabeçalho, em px (padrão 16). */
   headerPaddingX?: number;
+  /** Margem acima do cabeçalho, em px (padrão 0). */
+  headerMarginTop?: number;
   customHeadCode?: string;
   customBodyCode?: string;
 }

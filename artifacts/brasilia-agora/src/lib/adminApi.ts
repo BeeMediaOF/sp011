@@ -303,6 +303,7 @@ export interface SiteSettings {
   menuFontSize?: number;
   menuFontWeight?: number;
   headerPaddingX?: number;
+  headerMarginTop?: number;
   siteUrl?: string;
 }
 

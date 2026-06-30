@@ -221,12 +221,15 @@ export default function Header() {
   // Evita que o conteúdo (logo, menu, ícones) fique colado nas bordas do site.
   const headerPadX = settings?.headerPaddingX ?? 16;
   const padStyle: React.CSSProperties = { paddingLeft: headerPadX, paddingRight: headerPadX };
+  // Margem acima do cabeçalho (afasta-o do topo do site). Aplicada no wrapper.
+  const headerMarginTop = settings?.headerMarginTop ?? 0;
+  const wrapStyle: React.CSSProperties = { marginTop: headerMarginTop };
   const siteName = settings?.siteName ?? BRAND.name;
 
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
-      <div>
+      <div style={wrapStyle}>
         <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
           <div className="max-w-[1280px] mx-auto h-11 flex items-center gap-2" style={padStyle}>
             <button
@@ -297,7 +300,7 @@ export default function Header() {
   // ── Centered style ─────────────────────────────────────────────────────────
   if (style === "centered") {
     return (
-      <div>
+      <div style={wrapStyle}>
         <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
           <div className="max-w-[1280px] mx-auto py-3 flex items-center justify-center relative" style={padStyle}>
             <button
@@ -376,7 +379,7 @@ export default function Header() {
 
   // ── Standard style (default) ───────────────────────────────────────────────
   return (
-    <div>
+    <div style={wrapStyle}>
       <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
         <div className="max-w-[1280px] mx-auto py-2 flex items-center gap-3" style={padStyle}>
 
