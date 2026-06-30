@@ -33,7 +33,9 @@ export type ShapeKind =
   | "polygon"
   | "star"
   | "line"
-  | "arrow";
+  | "arrow"
+  | "chevron"
+  | "corners";
 
 /** Estilo do traço (borda) de figuras e caixas. */
 export type StrokeStyle = "solid" | "dashed" | "dotted";

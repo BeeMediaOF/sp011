@@ -8,7 +8,7 @@ import {
   Upload, Eye, Copy, Sparkles, ArrowUpToLine, ArrowDownToLine, FoldVertical,
   Italic, Underline, Strikethrough, RotateCw, Undo2, Redo2,
   Square, Circle, Triangle, Star, Minus, ArrowRight, Hexagon,
-  ChevronsUp, ChevronsDown, Lock, Unlock,
+  ChevronsUp, ChevronsDown, Lock, Unlock, ChevronRight, Frame,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import {
@@ -131,6 +131,8 @@ const SHAPE_KINDS: { kind: ShapeKind; label: string; Icon: typeof Square }[] = [
   { kind: "star", label: "Estrela", Icon: Star },
   { kind: "line", label: "Linha", Icon: Minus },
   { kind: "arrow", label: "Seta", Icon: ArrowRight },
+  { kind: "chevron", label: "Chevron", Icon: ChevronRight },
+  { kind: "corners", label: "Cantos", Icon: Frame },
 ];
 
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
@@ -159,15 +161,110 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
 
 // ─── Presets de fábrica (marca SBC Agora) ──────────────────────────────────────
 
-type PresetKind = "feed-photo" | "story-quote" | "sport-card";
+type PresetKind =
+  | "feed-photo" | "story-quote" | "sport-card"
+  | "sp011" | "bee-sports" | "brasilia-hoje" | "frame-dark";
 
 const PRESETS: { kind: PresetKind; label: string }[] = [
+  { kind: "sp011",         label: "SP011 · Foto + barra vermelha" },
+  { kind: "bee-sports",    label: "BeeSports · Esporte (chevron)" },
+  { kind: "brasilia-hoje", label: "Brasília Hoje · Foto emoldurada" },
+  { kind: "frame-dark",    label: "Notícia · Foto emoldurada (escuro)" },
   { kind: "sport-card",  label: "Esporte · Card (logo + faixa)" },
   { kind: "feed-photo",  label: "Feed · Foto + faixa" },
   { kind: "story-quote", label: "Story · Citação" },
 ];
 
 function makePreset(kind: PresetKind): SocialTemplate {
+  // ── SP011 — foto emoldurada (tracejado) + barra/rodapé vermelhos ──
+  if (kind === "sp011") {
+    const H = 1350;
+    const RED = "#E2001A";
+    return {
+      id: "", name: "SP011 — Foto + barra", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
+      elements: [
+        // barra vermelha superior
+        { ...makeElement("shape", H), x: 0, y: 0, width: 1080, height: 16, shapeKind: "rect", backgroundColor: RED, borderRadius: 0, borderWidth: 0, zIndex: 7 },
+        // foto do artigo (topo, com margem)
+        { ...makeElement("image", H), x: 70, y: 92, width: 940, height: 815, objectFit: "cover", zIndex: 1 },
+        // moldura tracejada em volta da foto
+        { ...makeElement("shape", H), x: 56, y: 78, width: 968, height: 843, shapeKind: "rect", backgroundColor: "transparent", borderColor: "#9aa0a6", borderWidth: 2, strokeStyle: "dashed", borderRadius: 0, zIndex: 4 },
+        // logo (upload) inferior esquerdo
+        { ...makeElement("logo", H), x: 70, y: 950, width: 250, height: 150, objectFit: "contain", zIndex: 6, content: "" },
+        // título inferior direito (escuro)
+        { ...makeElement("title", H), x: 350, y: 950, width: 670, height: 150, fontSize: 40, fontFamily: "Archivo", fontWeight: "bold", color: "#111111", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: "{{title}}", autoFit: true, lineHeight: 1.12, zIndex: 6 },
+        // rodapé vermelho
+        { ...makeElement("shape", H), x: 0, y: 1284, width: 1080, height: 66, shapeKind: "rect", backgroundColor: RED, borderRadius: 0, borderWidth: 0, zIndex: 7 },
+        // URL no rodapé (branco, centralizado)
+        { ...makeElement("text", H), x: 0, y: 1284, width: 1080, height: 66, fontSize: 28, fontFamily: "Archivo", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "center", verticalAlign: "middle", padding: 0, content: "www.SP011.com.br", zIndex: 8 },
+      ],
+    };
+  }
+  // ── BeeSports — esporte: foto cheia + scrim + chevron de marca ──
+  if (kind === "bee-sports") {
+    const H = 1350;
+    const GREEN = "#2EE6A0";
+    return {
+      id: "", name: "BeeSports — Esporte", type: "feed", width: 1080, height: H, backgroundColor: "#0d0d0d",
+      elements: [
+        // foto de fundo (full-bleed)
+        { ...makeElement("image", H), x: 0, y: 0, width: 1080, height: H, objectFit: "cover", zIndex: 1 },
+        // barra superior em degradê (vermelho → roxo)
+        { ...makeElement("shape", H), x: 0, y: 0, width: 1080, height: 12, shapeKind: "rect", fill: "gradient",
+          gradient: { type: "linear", angle: 90, stops: [{ color: "#FF2D55", pos: 0 }, { color: "#7B2FF7", pos: 100 }] }, borderWidth: 0, borderRadius: 0, zIndex: 8 },
+        // scrim escuro embaixo (legibilidade)
+        { ...makeElement("gradient", H), x: 0, y: 760, width: 1080, height: 590, zIndex: 2, fill: "gradient", gradient: easedScrim(180, 0.94) },
+        // chevrons verdes (acento de marca), inferior direito
+        { ...makeElement("shape", H), x: 845, y: 985, width: 95, height: 165, shapeKind: "chevron", backgroundColor: GREEN, borderWidth: 30, zIndex: 5 },
+        { ...makeElement("shape", H), x: 948, y: 985, width: 95, height: 165, shapeKind: "chevron", backgroundColor: GREEN, borderWidth: 30, zIndex: 5 },
+        // logo (upload) superior esquerdo
+        { ...makeElement("logo", H), x: 60, y: 70, width: 230, height: 95, objectFit: "contain", zIndex: 6, content: "" },
+        // kicker (categoria) verde, maiúsculas
+        { ...makeElement("category", H), x: 60, y: 1010, width: 740, height: 46, fontSize: 30, fontFamily: "Oswald", fontWeight: "bold", color: GREEN, backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 2, textTransform: "uppercase", content: "{{category}}", zIndex: 6 },
+        // título branco bold
+        { ...makeElement("title", H), x: 60, y: 1062, width: 760, height: 178, fontSize: 56, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", autoFit: true, accentColor: GREEN, lineHeight: 1.05, zIndex: 6 },
+        // rodapé: "acesse nosso portal" + site (destaque verde)
+        { ...makeElement("text", H), x: 60, y: 1292, width: 960, height: 40, fontSize: 22, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 1, textTransform: "uppercase", content: "ACESSE NOSSO PORTAL  *beesports.bet*", accentColor: GREEN, zIndex: 6 },
+      ],
+    };
+  }
+  // ── Brasília Hoje — foto emoldurada (cantos) + logo/título (fundo claro) ──
+  if (kind === "brasilia-hoje") {
+    const H = 1350;
+    const NAVY = "#0A2A8C";
+    return {
+      id: "", name: "Brasília Hoje — Foto emoldurada", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
+      elements: [
+        // foto do artigo (topo, com margem)
+        { ...makeElement("image", H), x: 70, y: 92, width: 940, height: 850, objectFit: "cover", zIndex: 1 },
+        // moldura de cantos (registro) azul-marinho
+        { ...makeElement("shape", H), x: 54, y: 76, width: 972, height: 882, shapeKind: "corners", backgroundColor: "transparent", borderColor: NAVY, borderWidth: 4, zIndex: 4 },
+        // aba/acento laranja no topo
+        { ...makeElement("shape", H), x: 70, y: 62, width: 92, height: 34, shapeKind: "rect", backgroundColor: "#F5A623", borderRadius: 6, borderWidth: 0, zIndex: 5 },
+        // logo (upload) inferior esquerdo
+        { ...makeElement("logo", H), x: 70, y: 1055, width: 210, height: 185, objectFit: "contain", zIndex: 6, content: "" },
+        // título inferior direito (navy)
+        { ...makeElement("title", H), x: 310, y: 1052, width: 710, height: 150, fontSize: 40, fontFamily: "Archivo", fontWeight: "bold", color: NAVY, backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: "{{title}}", autoFit: true, lineHeight: 1.1, zIndex: 6 },
+        // URL
+        { ...makeElement("text", H), x: 310, y: 1212, width: 710, height: 40, fontSize: 22, fontFamily: "Archivo", fontWeight: "normal", color: "#555555", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: "acesse: *www.brasiliahoje.com.br*", accentColor: NAVY, zIndex: 6 },
+      ],
+    };
+  }
+  // ── Notícia — foto emoldurada (cantos brancos) + título grande (fundo escuro) ──
+  if (kind === "frame-dark") {
+    const H = 1350;
+    return {
+      id: "", name: "Notícia — Foto emoldurada (escuro)", type: "feed", width: 1080, height: H, backgroundColor: "#0a0a0a",
+      elements: [
+        // foto do artigo (centralizada, com margem)
+        { ...makeElement("image", H), x: 95, y: 120, width: 890, height: 760, objectFit: "cover", zIndex: 1 },
+        // moldura de cantos branca
+        { ...makeElement("shape", H), x: 79, y: 104, width: 922, height: 792, shapeKind: "corners", backgroundColor: "transparent", borderColor: "#ffffff", borderWidth: 4, zIndex: 4 },
+        // título inferior (branco, grande)
+        { ...makeElement("title", H), x: 70, y: 930, width: 940, height: 320, fontSize: 58, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", verticalAlign: "top", padding: 0, content: "{{title}}", autoFit: true, accentColor: "#2EE6A0", lineHeight: 1.06, zIndex: 5 },
+      ],
+    };
+  }
   if (kind === "sport-card") {
     const H = 1350;
     return {

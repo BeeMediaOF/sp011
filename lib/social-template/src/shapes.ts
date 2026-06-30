@@ -76,6 +76,35 @@ export function shapeSvg(el: TemplateElement): string {
     );
   }
 
+  // ── Chevron (">"): traço grosso apontando p/ a direita (rotação orienta) ──
+  if (kind === "chevron") {
+    const sw = el.borderWidth && el.borderWidth > 0 ? el.borderWidth : Math.max(4, Math.round(w * 0.3));
+    const col = isSolid(el.backgroundColor) ? el.backgroundColor : el.borderColor || "#2EE6A0";
+    const p = sw / 2;
+    const dash = dashAttrs(el.strokeStyle, sw);
+    return `${open}<polyline points="${p.toFixed(2)},${p.toFixed(2)} ${(w - p).toFixed(2)},${(h / 2).toFixed(2)} ${p.toFixed(2)},${(h - p).toFixed(2)}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${dash}/></svg>`;
+  }
+
+  // ── Cantos de registro (4 colchetes em L): moldura de foto sem fechar o quadro ──
+  if (kind === "corners") {
+    const col = el.borderColor || (isSolid(el.backgroundColor) ? el.backgroundColor : "") || "#ffffff";
+    const sw = el.borderWidth && el.borderWidth > 0 ? el.borderWidth : Math.max(2, Math.round(Math.min(w, h) * 0.012));
+    const arm = Math.max(sw * 3, Math.min(w, h) * 0.16);
+    const i = sw / 2;
+    const x0 = i, y0 = i, x1 = w - i, y1 = h - i;
+    const a = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`;
+    const common = `fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="square"`;
+    const dash = dashAttrs(el.strokeStyle, sw);
+    return (
+      `${open}` +
+      `<polyline points="${a(x0, y0 + arm)} ${a(x0, y0)} ${a(x0 + arm, y0)}" ${common}${dash}/>` +
+      `<polyline points="${a(x1 - arm, y0)} ${a(x1, y0)} ${a(x1, y0 + arm)}" ${common}${dash}/>` +
+      `<polyline points="${a(x1, y1 - arm)} ${a(x1, y1)} ${a(x1 - arm, y1)}" ${common}${dash}/>` +
+      `<polyline points="${a(x0 + arm, y1)} ${a(x0, y1)} ${a(x0, y1 - arm)}" ${common}${dash}/>` +
+      `</svg>`
+    );
+  }
+
   // ── Figuras preenchidas (retângulo, elipse, triângulo, polígono, estrela) ──
   const useGradient = el.fill === "gradient" && el.gradient && el.gradient.stops.length >= 2;
   const gid = `gsh-${(el.id || "x").replace(/[^a-zA-Z0-9_-]/g, "")}`;
