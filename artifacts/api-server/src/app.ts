@@ -15,8 +15,38 @@ if (!process.env["ADMIN_DEFAULT_PASSWORD"]) {
 // SESSION_SECRET check is handled in auth.ts (throws in production if missing)
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
+/** Normaliza um valor (URL ou origem) para "protocolo//host", ou null se inválido. */
+function toOrigin(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return null;
+  try {
+    const u = new URL(v.includes("://") ? v : `https://${v}`);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Dada uma origem, retorna as variantes apex E www (mesmo protocolo/porta). */
+function withWwwVariants(origin: string): string[] {
+  try {
+    const u = new URL(origin);
+    const bare = u.host.replace(/^www\./, "");
+    return [`${u.protocol}//${bare}`, `${u.protocol}//www.${bare}`];
+  } catch {
+    return [origin];
+  }
+}
+
 const rawOrigins = process.env["ALLOWED_ORIGINS"] ?? "";
 const explicitOrigins = rawOrigins.split(",").map((s) => s.trim()).filter(Boolean);
+
+// Deriva a origem do domínio público (APP_URL/SITE_URL) para que um esquecimento
+// no ALLOWED_ORIGINS não derrube o frontend/login. Apex e www são incluídos
+// automaticamente (ex.: definir https://sp011.com.br já libera www.sp011.com.br).
+const publicUrlOrigins = [process.env["APP_URL"], process.env["SITE_URL"]]
+  .map((v) => toOrigin(v ?? ""))
+  .filter((v): v is string => !!v);
 
 // Automatically include Replit-assigned domains (comma-separated in REPLIT_DOMAINS)
 const replitDomains = (process.env["REPLIT_DOMAINS"] ?? "")
@@ -25,7 +55,11 @@ const replitDomains = (process.env["REPLIT_DOMAINS"] ?? "")
   .filter(Boolean)
   .flatMap((d) => [`https://${d}`, `http://${d}`]);
 
-const allowedOrigins = [...new Set([...explicitOrigins, ...replitDomains])];
+const allowedOrigins = [
+  ...new Set(
+    [...explicitOrigins, ...publicUrlOrigins, ...replitDomains].flatMap((o) => withWwwVariants(o)),
+  ),
+];
 
 let corsOrigin: cors.CorsOptions["origin"];
 
