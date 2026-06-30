@@ -41,6 +41,7 @@ router.get("/", async (_req, res) => {
       id: a.id,
       slug: a.slug || a.id,
       title: a.title,
+      socialTitle: a.socialTitle,
       subtitle: a.subtitle,
       category: a.category,
       tag: a.tag,

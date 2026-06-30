@@ -282,7 +282,8 @@ router.post("/templates/:id/preview", async (req, res) => {
     const [a] = await db.select().from(articlesTable).where(eq(articlesTable.id, b.articleId)).limit(1);
     if (a) {
       article = {
-        title: a.title,
+        // Preview usa o mesmo título compacto da publicação real (WYSIWYG).
+        title: a.socialTitle || a.title,
         category: a.category,
         subtitle: a.subtitle || undefined,
         author: a.author || undefined,

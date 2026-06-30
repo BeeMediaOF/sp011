@@ -19,12 +19,15 @@ import {
   resolveContent,
   isImageType,
   FONT_FAMILIES,
+  fontStack,
   GOOGLE_FONTS_HREF,
   DEFAULT_CAPTION_TEMPLATE,
   resolveCaption,
   gradientToCss,
   backgroundCss,
   defaultGradient,
+  easedScrim,
+  smoothGradient,
   GRADIENT_PRESETS,
   parseHighlight,
   DEFAULT_ACCENT,
@@ -82,6 +85,7 @@ interface QueueItem {
 interface ArticleOption {
   id: string;
   title: string;
+  socialTitle?: string;
   category: string;
   imageUrl?: string;
   subtitle?: string;
@@ -153,9 +157,10 @@ function makePreset(kind: PresetKind): SocialTemplate {
       elements: [
         // foto do artigo (fundo)
         { ...makeElement("image", H), x: 0, y: 0, width: 1080, height: 1350, objectFit: "cover", zIndex: 1 },
-        // degradê escuro embaixo (legibilidade)
-        { ...makeElement("gradient", H), x: 0, y: 690, width: 1080, height: 660, zIndex: 2, fill: "gradient",
-          gradient: { type: "linear", angle: 180, stops: [{ color: "rgba(0,0,0,0)", pos: 0 }, { color: "rgba(0,0,0,0.55)", pos: 35 }, { color: "rgba(0,0,0,0.95)", pos: 100 }] } },
+        // degradê escuro embaixo (legibilidade) — curva suave (smoothstep),
+        // transparente no topo e escuro embaixo, sem faixa/linha visível.
+        { ...makeElement("gradient", H), x: 0, y: 620, width: 1080, height: 730, zIndex: 2, fill: "gradient",
+          gradient: easedScrim(180, 0.96) },
         // logo (upload) no canto inferior esquerdo
         { ...makeElement("logo", H), x: 60, y: 1085, width: 145, height: 145, objectFit: "contain", zIndex: 6, content: "" },
         // divisor vertical
@@ -330,7 +335,7 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
               onChange={(e) => setStop(i, { color: toRgba(hex, Number(e.target.value)) })}
               className="flex-1" title={`Opacidade ${Math.round(alpha * 100)}%`} />
             <input type="number" min={0} max={100} value={s.pos}
-              onChange={(e) => setStop(i, { pos: Number(e.target.value) })}
+              onChange={(e) => setStop(i, { pos: Math.max(0, Math.min(100, Number(e.target.value))) })}
               className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" title="Posição %" />
             {value.stops.length > 2 && (
               <button onClick={() => onChange({ ...value, stops: value.stops.filter((_, idx) => idx !== i) })}
@@ -342,10 +347,17 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
         );
       })}
 
-      <button onClick={() => onChange({ ...value, stops: [...value.stops, { color: "rgba(0,0,0,1)", pos: 100 }] })}
-        className="flex items-center gap-1 text-[11px] font-medium text-[#0B2A66] hover:underline">
-        <Plus size={11} /> Adicionar parada
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => onChange({ ...value, stops: [...value.stops, { color: "rgba(0,0,0,1)", pos: 100 }] })}
+          className="flex items-center gap-1 text-[11px] font-medium text-[#0B2A66] hover:underline">
+          <Plus size={11} /> Adicionar parada
+        </button>
+        <button onClick={() => onChange(smoothGradient(value))}
+          title="Reamostra as paradas numa curva suave (sem faixa/linha visível)"
+          className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#0B2A66] hover:underline">
+          <Sparkles size={11} /> Suavizar
+        </button>
+      </div>
     </div>
   );
 }
@@ -930,7 +942,8 @@ export default function SocialMedia() {
   const selectedPreviewArticle = editorArticles.find((a) => a.id === previewArticleId);
   const canvasArticle: ArticleData = selectedPreviewArticle
     ? {
-        title: selectedPreviewArticle.title,
+        // Canvas usa o título compacto da IA (igual ao render server-side) p/ WYSIWYG.
+        title: selectedPreviewArticle.socialTitle || selectedPreviewArticle.title,
         category: selectedPreviewArticle.category,
         subtitle: selectedPreviewArticle.subtitle,
         author: selectedPreviewArticle.author,
@@ -1350,7 +1363,7 @@ export default function SocialMedia() {
                             <select value={selectedEl.fontFamily}
                               onChange={(e) => updateElement(selectedEl.id, { fontFamily: e.target.value })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
-                              {FONT_FAMILIES.map((f) => <option key={f} value={f}>{f}</option>)}
+                              {FONT_FAMILIES.map((f) => <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>{f}</option>)}
                             </select>
                           </div>
                           <div>

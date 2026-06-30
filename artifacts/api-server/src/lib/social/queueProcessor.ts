@@ -130,7 +130,8 @@ async function publishItem(queueId: string): Promise<void> {
             elements: (template.elements as unknown[]) as TemplateElement[],
           },
           {
-            title: article.title,
+            // Imagem usa o título compacto da IA (se houver); o blog mantém o longo.
+            title: article.socialTitle || article.title,
             category: article.category,
             subtitle: article.subtitle || undefined,
             author: article.author || undefined,

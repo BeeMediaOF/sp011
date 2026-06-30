@@ -1,5 +1,6 @@
 import type { TemplateElement } from "./types";
 import { gradientToCss } from "./gradient";
+import { fontStack } from "./fonts";
 
 /** Objeto de estilo CSS agnóstico de framework (compatível com React.CSSProperties). */
 export type StyleObject = Record<string, string | number>;
@@ -53,7 +54,7 @@ export function textInnerStyle(el: TemplateElement): StyleObject {
     flexDirection: "column",
     justifyContent: va === "middle" ? "center" : va === "bottom" ? "flex-end" : "flex-start",
     fontSize: `${el.fontSize}px`,
-    fontFamily: `'${el.fontFamily || "Inter"}', sans-serif`,
+    fontFamily: fontStack(el.fontFamily),
     fontWeight: fontWeightCss(el.fontWeight),
     color: el.color || "#ffffff",
     textAlign: el.textAlign,

@@ -5,6 +5,7 @@ import { initStore, seedDefaultRssSources, startSettingsSync } from "./lib/store
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
+import { ensureSchema } from "./lib/ensureSchema.js";
 import { db, articlesTable } from "@workspace/db";
 import { desc, isNotNull } from "drizzle-orm";
 import { warmImageCache } from "./routes/image.js";
@@ -27,6 +28,10 @@ app.listen(port, async (err) => {
     process.exit(1);
   }
   logger.info({ port }, "Server listening");
+
+  // Garante colunas novas/opcionais ANTES de qualquer SELECT em articles
+  // (o schema do Drizzle já referencia social_title).
+  await ensureSchema();
 
   // Initialize store from PostgreSQL (migrates store.json data if needed)
   await initStore();

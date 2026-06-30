@@ -22,6 +22,7 @@ import {
   type RewriteJobItem,
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
+import { sanitizeHighlightMarkers } from "@workspace/social-template";
 
 // ── Content quality guard & JSON recovery ────────────────────────────────────
 
@@ -29,6 +30,7 @@ interface ExtractedAI {
   content: string;
   title?: string;
   subtitle?: string;
+  socialTitle?: string;
   keywords?: string;
   slug?: string;
 }
@@ -71,10 +73,11 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
     if (content.length > 20) {
       return {
         content,
-        title:    ((parsed["title"]    as string | undefined) ?? "").trim() || undefined,
-        subtitle: ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
-        keywords: ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
-        slug:     ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
+        title:       ((parsed["title"]    as string | undefined) ?? "").trim() || undefined,
+        subtitle:    ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
+        socialTitle: sanitizeHighlightMarkers(((parsed["social_title"] as string | undefined) ?? "").trim()) || undefined,
+        keywords:    ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
+        slug:        ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
       };
     }
   } catch { /* fall through to regex */ }
@@ -85,16 +88,18 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
     const content = mHtml[1]
       .replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
     if (content.length > 20) {
-      const mTitle = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-      const mSub   = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-      const mKw    = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-      const mSlug  = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mTitle  = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSub    = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSocial = stripped.match(/"social_title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mKw     = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSlug   = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       return {
         content,
-        title:    mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-        subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
-        keywords: mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
-        slug:     mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
+        title:       mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+        subtitle:    mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
+        socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.replace(/\\"/g, '"').trim() || "") || undefined,
+        keywords:    mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
+        slug:        mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
       };
     }
   }
@@ -130,7 +135,8 @@ async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI 
     "Reescreva o artigo de forma original, profissional e envolvente, preservando todos os fatos.",
     "Escreva APENAS em português do Brasil. Nunca use inglês.",
     "Responda SOMENTE com um JSON válido (sem markdown fences) no formato:",
-    '{"title":"Título reescrito","subtitle":"Subtítulo curto","content_html":"<p>...</p>","keywords":"palavra1, palavra2","slug":"slug-do-artigo"}',
+    '{"title":"Título reescrito","subtitle":"Subtítulo curto","social_title":"TÍTULO CURTO COM *DESTAQUE* NO TRECHO PRINCIPAL","content_html":"<p>...</p>","keywords":"palavra1, palavra2","slug":"slug-do-artigo"}',
+    "O social_title é uma versão CURTA e direta do título (máx 60 caracteres, 4 a 8 palavras) para uma arte de rede social. Envolva com asteriscos (*assim*) apenas o trecho de maior impacto da manchete (nome, resultado, prazo, valor ou consequência), em qualquer posição. Nunca destaque a manchete inteira nem palavras genéricas.",
   ].join("\n");
 
   const creditLine = item.giveCredit
@@ -344,11 +350,12 @@ async function processItem(item: RewriteJobItem): Promise<void> {
      * doesn't match mid-string. We re-apply the full extraction here with a proper
      * trim() before the fence-strip so we always catch the right content.
      */
-    let finalContent  = result.content;
-    let finalTitle    = result.title;
-    let finalSubtitle = result.subtitle;
-    let finalKeywords = result.keywords;
-    let finalSlug     = result.slug;
+    let finalContent     = result.content;
+    let finalTitle       = result.title;
+    let finalSubtitle    = result.subtitle;
+    let finalSocialTitle = result.socialTitle;
+    let finalKeywords    = result.keywords;
+    let finalSlug        = result.slug;
 
     const contentLooksRaw =
       result.content.trimStart().startsWith("{") ||
@@ -357,11 +364,12 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     if (contentLooksRaw) {
       const recovered = extractFromRawAI(result.content);
       if (recovered) {
-        finalContent  = recovered.content;
-        finalTitle    = recovered.title    ?? result.title;
-        finalSubtitle = recovered.subtitle ?? result.subtitle;
-        finalKeywords = recovered.keywords ?? result.keywords;
-        finalSlug     = recovered.slug     ?? result.slug;
+        finalContent     = recovered.content;
+        finalTitle       = recovered.title       ?? result.title;
+        finalSubtitle    = recovered.subtitle    ?? result.subtitle;
+        finalSocialTitle = recovered.socialTitle ?? result.socialTitle;
+        finalKeywords    = recovered.keywords    ?? result.keywords;
+        finalSlug        = recovered.slug        ?? result.slug;
         logger.info({ articleId: item.articleId }, "Rewrite queue: recovered content from raw JSON blob");
       }
     }
@@ -377,8 +385,9 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     }
 
     await articleService.updateArticle(item.articleId, {
-      ...(finalTitle    && { title:    finalTitle }),
-      ...(finalSubtitle && { subtitle: finalSubtitle }),
+      ...(finalTitle       && { title:       finalTitle }),
+      ...(finalSubtitle    && { subtitle:    finalSubtitle }),
+      ...(finalSocialTitle && { socialTitle: finalSocialTitle }),
       content:     finalContent,
       ...(finalKeywords && { keywords: finalKeywords }),
       ...(finalSlug     && { slug:     finalSlug }),
@@ -416,8 +425,9 @@ async function processItem(item: RewriteJobItem): Promise<void> {
         const pResult = await rewriteWithPerplexity(item);
         if (pResult && isContentRenderable(pResult.content)) {
           await articleService.updateArticle(item.articleId, {
-            ...(pResult.title    && { title:    pResult.title }),
-            ...(pResult.subtitle && { subtitle: pResult.subtitle }),
+            ...(pResult.title       && { title:       pResult.title }),
+            ...(pResult.subtitle    && { subtitle:    pResult.subtitle }),
+            ...(pResult.socialTitle && { socialTitle: pResult.socialTitle }),
             content:     pResult.content,
             ...(pResult.keywords && { keywords: pResult.keywords }),
             ...(pResult.slug     && { slug:     pResult.slug }),

@@ -6,6 +6,12 @@ export const articleOriginEnum  = pgEnum("article_origin",  ["manual", "rss", "p
 export const articlesTable = pgTable("articles", {
   id:            text("id").primaryKey(),
   title:         text("title").notNull(),
+  /**
+   * Título curto/compacto reescrito pela IA, usado APENAS nas artes sociais
+   * (imagem do Instagram/Facebook). O blog continua usando `title`. Pode conter
+   * marcação de destaque inline (*trecho*). Nulo → cai de volta para `title`.
+   */
+  socialTitle:   text("social_title"),
   subtitle:      text("subtitle").notNull().default(""),
   content:       text("content").notNull().default(""),
   category:      text("category").notNull().default("geral"),

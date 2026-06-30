@@ -10,6 +10,7 @@ import { store, type RssSource, type RssAutoMode } from "./store.js";
 import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
 import { db, rssEventLogsTable } from "@workspace/db";
+import { sanitizeHighlightMarkers } from "@workspace/social-template";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,12 @@ Conteúdo da fonte:
 
 **SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título, introduza o texto e contenha palavras-chave semânticas relacionadas. Ele será o primeiro <h2> dentro do content_html.
 
+**TÍTULO PARA IMAGEM (social_title):** Crie uma versão CURTA, direta e impactante do título, pensada para aparecer em destaque numa arte de rede social (máximo 60 caracteres, idealmente de 4 a 8 palavras). Use o fato principal e as entidades mais fortes (nomes, clubes, resultados, prazos, valores). NÃO use reticências e NUNCA corte uma palavra no meio. Este campo é usado SOMENTE na imagem; o blog continua com o título longo.
+- Envolva com asteriscos (*assim*) APENAS o trecho de maior força da manchete, ou seja, o principal gancho: o nome, acontecimento, resultado, prazo, valor ou consequência mais relevante.
+- A posição do destaque depende do conteúdo (pode ser no início, no meio ou no fim) e NÃO deve seguir uma regra fixa.
+- Destaque um único trecho curto; nunca destaque a manchete inteira nem palavras genéricas (preposições, "para", "com", "após", artigos).
+- Exemplos: "SANTOS RENOVA COM *MIGUELITO ATÉ 2029*", "*NEYMAR VOLTA AOS TREINOS* ANTES DO CLÁSSICO", "BRASIL TEM *DESFALQUE IMPORTANTE* NA ESTREIA".
+
 **CONTEÚDO (content_html):**
 - Comece com o subtítulo como primeiro <h2>
 - Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto, respondendo às perguntas: quem, o quê, quando, onde, por quê e como
@@ -143,6 +150,7 @@ Após o conteúdo principal, inclua uma seção com o título <h2>Perguntas Freq
 {
   "title": "...",
   "subtitle": "...",
+  "social_title": "TÍTULO CURTO COM *DESTAQUE* NO TRECHO PRINCIPAL",
   "content_html": "<h2>...</h2><p>...</p>...<h2>Perguntas Frequentes</h2><h3>...?</h3><p>...</p>",
   "slug": "titulo-seo-kebab-case",
   "keywords": "palavra1, palavra2, palavra3, palavra4, palavra5, palavra6, palavra7, palavra8"
@@ -202,6 +210,8 @@ export interface RewriteResult {
   slug: string;
   title?: string;
   subtitle?: string;
+  /** Título curto p/ a arte social (pode conter *destaque*). */
+  socialTitle?: string;
 }
 
 /** Trim slug to at most 5 meaningful words and 55 chars, cutting at a word boundary */
@@ -235,15 +245,16 @@ function parseRewriteResult(raw: string): RewriteResult {
   if (stripped.startsWith("{")) {
     try {
       const parsed = JSON.parse(stripped) as {
-        title?: string; subtitle?: string;
+        title?: string; subtitle?: string; social_title?: string;
         content_html?: string; slug?: string; keywords?: string;
       };
-      const content  = (parsed.content_html ?? "").trim();
-      const keywords = (parsed.keywords ?? "").trim();
-      const slug     = trimSlug(parsed.slug ?? "");
-      const title    = (parsed.title ?? "").trim();
-      const subtitle = (parsed.subtitle ?? "").trim();
-      if (content) return { content, keywords, slug, title, subtitle };
+      const content     = (parsed.content_html ?? "").trim();
+      const keywords    = (parsed.keywords ?? "").trim();
+      const slug        = trimSlug(parsed.slug ?? "");
+      const title       = (parsed.title ?? "").trim();
+      const subtitle    = (parsed.subtitle ?? "").trim();
+      const socialTitle = sanitizeHighlightMarkers((parsed.social_title ?? "").trim()) || undefined;
+      if (content) return { content, keywords, slug, title, subtitle, socialTitle };
     } catch { /* try regex fallback below */ }
 
     // Regex fallback for truncated / malformed JSON
@@ -252,12 +263,14 @@ function parseRewriteResult(raw: string): RewriteResult {
       const content  = mHtml[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\").trim();
       const mTitle   = stripped.match(/"title"\s*:\s*"([^"]+)"/);
       const mSub     = stripped.match(/"subtitle"\s*:\s*"([^"]+)"/);
+      const mSocial  = stripped.match(/"social_title"\s*:\s*"([^"]+)"/);
       const mSlug    = stripped.match(/"slug"\s*:\s*"([^"]+)"/);
       const mKw      = stripped.match(/"keywords"\s*:\s*"([^"]+)"/);
       return {
         content,
         title:    mTitle?.[1]?.trim() ?? "",
         subtitle: mSub?.[1]?.trim() ?? "",
+        socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.trim() ?? "") || undefined,
         slug:     trimSlug(mSlug?.[1] ?? ""),
         keywords: mKw?.[1]?.trim() ?? "",
       };
@@ -1054,8 +1067,9 @@ export async function autoProcessArticle(
   let keywords        = "";
   let slug            = "";
   let aiRewriteSuccess = false;
-  let aiTitle:    string | undefined;
-  let aiSubtitle: string | undefined;
+  let aiTitle:       string | undefined;
+  let aiSubtitle:    string | undefined;
+  let aiSocialTitle: string | undefined;
   let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   // ── Ghost-publication guard ────────────────────────────────────────────────
@@ -1113,8 +1127,9 @@ export async function autoProcessArticle(
       content          = result.content || art.fullText; // fallback to original if AI returns empty
       keywords         = result.keywords;
       slug             = result.slug;
-      aiTitle          = result.title    || undefined;
-      aiSubtitle       = result.subtitle || undefined;
+      aiTitle          = result.title       || undefined;
+      aiSubtitle       = result.subtitle    || undefined;
+      aiSocialTitle    = result.socialTitle || undefined;
       aiRewriteSuccess = true;
       addLog({ type: "rewrite", sourceName, articleTitle: aiTitle ?? art.title });
     } catch (err) {
@@ -1145,6 +1160,7 @@ export async function autoProcessArticle(
 
   await articleService.createArticle({
     title:         aiTitle    ?? art.title,
+    socialTitle:   aiSocialTitle,
     subtitle:      aiSubtitle ?? art.excerpt.slice(0, 160),
     content:       finalContent,
     category,

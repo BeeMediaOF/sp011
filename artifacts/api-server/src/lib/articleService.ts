@@ -18,6 +18,8 @@ function slugify(text: string): string {
 export interface Article {
   id: string;
   title: string;
+  /** Título curto p/ artes sociais (só imagem; pode ter *destaque*). */
+  socialTitle?: string;
   subtitle: string;
   content: string;
   category: string;
@@ -43,6 +45,7 @@ function rowToArticle(row: ArticleRow): Article {
   return {
     id:            row.id,
     title:         row.title,
+    socialTitle:   row.socialTitle ?? undefined,
     subtitle:      row.subtitle,
     content:       row.content,
     category:      row.category,
@@ -173,6 +176,7 @@ export const articleService = {
       .values({
         id,
         title:         data.title,
+        socialTitle:   data.socialTitle ?? null,
         subtitle:      data.subtitle ?? "",
         content:       data.content ?? "",
         category:      data.category ?? "geral",
@@ -207,6 +211,7 @@ export const articleService = {
       .update(articlesTable)
       .set({
         ...(data.title         !== undefined && { title:         data.title }),
+        ...(data.socialTitle   !== undefined && { socialTitle:   data.socialTitle }),
         ...(data.subtitle      !== undefined && { subtitle:      data.subtitle }),
         ...(data.content       !== undefined && { content:       data.content }),
         ...(data.category      !== undefined && { category:      data.category }),
