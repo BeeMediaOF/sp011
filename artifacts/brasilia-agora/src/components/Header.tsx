@@ -95,6 +95,77 @@ function TickerBar() {
   );
 }
 
+// ─── Drawer de navegação mobile ───────────────────────────────────────────────
+// Painel deslizante com backdrop, trava de scroll e fechar no ESC. Usado pelos
+// três estilos de cabeçalho para garantir uma experiência consistente no celular.
+interface MobileNavProps {
+  open: boolean;
+  onClose: () => void;
+  navItems: { label: string; path: string }[];
+  isActive: (path: string) => boolean;
+  activeColor: string;
+  logoSrc: string;
+  siteName: string;
+}
+
+function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, siteName }: MobileNavProps) {
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  return (
+    <div className="lg:hidden" aria-hidden={!open}>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-200 ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      />
+      {/* Painel deslizante */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Menu de navegação"
+        className={`fixed top-0 left-0 z-50 h-full w-[84%] max-w-[330px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
+      >
+        <div className="flex items-center justify-between gap-2 px-4 h-14 border-b border-gray-200 shrink-0">
+          <img src={logoSrc} alt={siteName} className="h-7 w-auto object-contain" />
+          <button onClick={onClose} aria-label="Fechar menu" className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
+            <X size={22} />
+          </button>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-3">
+          <ul className="flex flex-col gap-0.5">
+            {navItems.map(({ label, path }) => {
+              const active = isActive(path);
+              return (
+                <li key={path}>
+                  <Link
+                    href={path}
+                    onClick={onClose}
+                    className="flex items-center gap-3 py-3 px-3 rounded-xl text-[15px] font-semibold transition-colors hover:bg-gray-50 active:bg-gray-100"
+                    style={{ color: active ? activeColor : "#374151" }}
+                  >
+                    <span className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: active ? activeColor : "#e5e7eb" }} />
+                    {label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
+    </div>
+  );
+}
+
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
   const { settings }            = useSite();
@@ -146,12 +217,18 @@ export default function Header() {
     fontWeight: menuFontWeight,
   });
 
+  // ── Margem lateral interna do cabeçalho (configurável no painel) ───────────
+  // Evita que o conteúdo (logo, menu, ícones) fique colado nas bordas do site.
+  const headerPadX = settings?.headerPaddingX ?? 16;
+  const padStyle: React.CSSProperties = { paddingLeft: headerPadX, paddingRight: headerPadX };
+  const siteName = settings?.siteName ?? BRAND.name;
+
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
       <div>
         <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-          <div className="max-w-[1280px] mx-auto px-4 h-11 flex items-center gap-2">
+          <div className="max-w-[1280px] mx-auto h-11 flex items-center gap-2" style={padStyle}>
             <button
               onClick={() => setMenu(v => !v)}
               className="text-gray-500 hover:text-gray-900 transition-colors p-1 shrink-0 rounded lg:hidden"
@@ -209,24 +286,10 @@ export default function Header() {
             </div>
           </div>
 
-          {menuOpen && (
-            <div className="lg:hidden bg-white border-t border-gray-200">
-              <ul className="max-w-[1280px] mx-auto px-4 py-2 flex flex-col gap-0.5">
-                {navItems.map(({ label, path }) => (
-                  <li key={path}>
-                    <Link href={path} onClick={() => setMenu(false)}
-                      className={`flex items-center gap-3 py-2 px-2 rounded text-[13px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
-                    >
-                      <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
+        <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
+          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoSrc} siteName={siteName} />
       </div>
     );
   }
@@ -236,9 +299,10 @@ export default function Header() {
     return (
       <div>
         <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-          <div className="max-w-[1280px] mx-auto px-4 py-3 flex items-center justify-center relative">
+          <div className="max-w-[1280px] mx-auto py-3 flex items-center justify-center relative" style={padStyle}>
             <button
               onClick={() => setMenu(v => !v)}
+              aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
               className="absolute left-4 text-gray-500 hover:text-gray-900 p-1.5 rounded lg:hidden"
             >
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -263,7 +327,7 @@ export default function Header() {
           </div>
 
           <div className="hidden lg:block border-t border-gray-100 bg-[#1a2448]">
-            <nav className="max-w-[1280px] mx-auto px-4 flex items-center justify-center gap-1">
+            <nav className="max-w-[1280px] mx-auto flex items-center justify-center gap-1" style={padStyle}>
               {navItems.map(({ label, path }) => (
                 <Link
                   key={path}
@@ -302,24 +366,10 @@ export default function Header() {
             </div>
           )}
 
-          {menuOpen && (
-            <div className="lg:hidden bg-white border-t border-gray-200">
-              <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
-                {navItems.map(({ label, path }) => (
-                  <li key={path}>
-                    <Link href={path} onClick={() => setMenu(false)}
-                      className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"}`}
-                    >
-                      <span className="w-1 h-4 rounded-full shrink-0" style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }} />
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
+        <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
+          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoSrc} siteName={siteName} />
       </div>
     );
   }
@@ -328,11 +378,11 @@ export default function Header() {
   return (
     <div>
       <header className="shadow-sm border-b border-gray-200" style={bgStyle}>
-        <div className="max-w-[1280px] mx-auto px-4 py-2 flex items-center gap-3">
+        <div className="max-w-[1280px] mx-auto py-2 flex items-center gap-3" style={padStyle}>
 
           <button
             onClick={() => setMenu(v => !v)}
-            className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded"
+            className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded lg:hidden"
             aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -340,7 +390,7 @@ export default function Header() {
 
           <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
             <img
-              src={logoImg}
+              src={logoSrc}
               alt={settings?.siteName ?? BRAND.name}
               style={{ height: settings?.logoSize ?? 48 }}
               className="w-auto object-contain block"
@@ -403,31 +453,10 @@ export default function Header() {
           </div>
         </div>
 
-        {menuOpen && (
-          <div className="lg:hidden bg-white border-t border-gray-200">
-            <ul className="max-w-[1280px] mx-auto px-4 py-3 flex flex-col gap-0.5">
-              {navItems.map(({ label, path }) => (
-                <li key={path}>
-                  <Link
-                    href={path}
-                    onClick={() => setMenu(false)}
-                    className={`flex items-center gap-3 py-2.5 px-2 rounded text-[14px] font-bold transition-colors ${
-                      isActive(path) ? "text-[#c8102e]" : "text-gray-600 hover:text-gray-900"
-                    }`}
-                  >
-                    <span
-                      className="w-1 h-4 rounded-full shrink-0"
-                      style={{ backgroundColor: isActive(path) ? "#c8102e" : "#d1d5db" }}
-                    />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </header>
       {settings?.showTickerBar !== false && <TickerBar />}
+      <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
+        isActive={isActive} activeColor={menuActiveColor} logoSrc={logoSrc} siteName={siteName} />
     </div>
   );
 }

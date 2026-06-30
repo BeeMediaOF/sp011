@@ -746,6 +746,7 @@ export default function HomeBlocksManager() {
   const [menuActiveColor, setMenuActiveColor] = useState("#c8102e");
   const [menuFontSize, setMenuFontSize]       = useState(13);
   const [menuFontWeight, setMenuFontWeight]   = useState(700);
+  const [headerPaddingX, setHeaderPaddingX]   = useState(16);
   const [showTickerBar, setShowTickerBar]     = useState(true);
   const [showHeroStrip, setShowHeroStrip]     = useState(true);
   const [logoBase64, setLogoBase64]     = useState<string | null>(null);
@@ -794,6 +795,7 @@ export default function HomeBlocksManager() {
         setMenuActiveColor(r.settings.menuActiveColor ?? "#c8102e");
         setMenuFontSize(r.settings.menuFontSize ?? 13);
         setMenuFontWeight(r.settings.menuFontWeight ?? 700);
+        setHeaderPaddingX(r.settings.headerPaddingX ?? 16);
         setShowTickerBar(r.settings.showTickerBar ?? true);
         setShowHeroStrip(r.settings.showHeroStrip ?? true);
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
@@ -1664,6 +1666,27 @@ export default function HomeBlocksManager() {
                   <button onClick={() => saveSettingsPatch({ menuTextColor, menuActiveColor, menuFontSize, menuFontWeight })} disabled={saving}
                     className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
                     <Save size={13} /> Salvar estilo do menu
+                  </button>
+                </div>
+
+                {/* ── Margem lateral do cabeçalho ── */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5"><Type size={12} /> Margem lateral do cabeçalho</p>
+                  <p className="text-[11px] text-[#94A3B8] -mt-1">Espaçamento interno nas laterais (logo, menu e ícones). Aumente para o conteúdo não ficar colado nas bordas do site.</p>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-medium text-[#64748B]">Espaçamento</p>
+                      <span className="text-xs font-bold text-[#0B2A66]">{headerPaddingX}px</span>
+                    </div>
+                    <input type="range" min={8} max={64} step={2} value={headerPaddingX}
+                      onChange={(e) => setHeaderPaddingX(Number(e.target.value))}
+                      onMouseUp={() => saveSettingsPatch({ headerPaddingX })}
+                      onTouchEnd={() => saveSettingsPatch({ headerPaddingX })}
+                      className="w-full accent-[#0B2A66]" />
+                  </div>
+                  <button onClick={() => saveSettingsPatch({ headerPaddingX })} disabled={saving}
+                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                    <Save size={13} /> Salvar margem
                   </button>
                 </div>
 

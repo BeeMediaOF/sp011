@@ -52,6 +52,8 @@ export interface SiteSettings {
   menuActiveColor?: string;
   menuFontSize?: number;
   menuFontWeight?: number;
+  /** Margem lateral interna do cabeçalho, em px (padrão 16). */
+  headerPaddingX?: number;
   customHeadCode?: string;
   customBodyCode?: string;
 }

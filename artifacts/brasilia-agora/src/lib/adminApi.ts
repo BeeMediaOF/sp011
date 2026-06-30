@@ -302,6 +302,7 @@ export interface SiteSettings {
   menuActiveColor?: string;
   menuFontSize?: number;
   menuFontWeight?: number;
+  headerPaddingX?: number;
   siteUrl?: string;
 }
 

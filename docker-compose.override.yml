@@ -1,0 +1,14 @@
+# Override APENAS para teste local no Docker Desktop.
+# O docker compose mescla este arquivo automaticamente sobre o docker-compose.yml.
+#
+# Objetivo: acessar o frontend direto em http://localhost:3000 (sem Caddy/HTTPS,
+# que exige domínio real). Suba somente api + web:
+#
+#   docker compose up --build api web
+#
+# Para o deploy de produção (com Caddy/HTTPS) NÃO use este arquivo:
+#   docker compose -f docker-compose.yml up --build -d
+services:
+  web:
+    ports:
+      - "3000:3000"   # publica a porta do vite preview no host
