@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./gradient";
+export * from "./shapes";
 export * from "./highlight";
 export * from "./fonts";
 export * from "./resolveContent";

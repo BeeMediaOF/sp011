@@ -10,6 +10,7 @@ import {
 import { fontLinksHtml, GOOGLE_FONTS_HREF } from "./fonts";
 import { backgroundCss } from "./gradient";
 import { parseHighlight, DEFAULT_ACCENT } from "./highlight";
+import { shapeSvg } from "./shapes";
 
 export interface BuildHtmlOptions {
   /** Stylesheet de fontes (default: Google Fonts). */
@@ -37,6 +38,10 @@ function escapeAttr(text: string): string {
 
 function renderElement(el: TemplateElement, article: ArticleData): string {
   const box = styleToCss(elementBoxStyle(el));
+
+  if (el.type === "shape") {
+    return `<div style="${box}">${shapeSvg(el)}</div>`;
+  }
 
   if (isImageType(el.type)) {
     // image → imagem do artigo (fallback: content). logo/overlay → URL em content.

@@ -6,6 +6,9 @@ import {
   AlignLeft, AlignCenter, AlignRight, Layers, Save,
   Instagram, Facebook, Clock, Send, Link2, TestTube2, ToggleLeft, ToggleRight,
   Upload, Eye, Copy, Sparkles, ArrowUpToLine, ArrowDownToLine, FoldVertical,
+  Italic, Underline, Strikethrough, RotateCw, Undo2, Redo2,
+  Square, Circle, Triangle, Star, Minus, ArrowRight, Hexagon,
+  ChevronsUp, ChevronsDown, Lock, Unlock,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import {
@@ -13,11 +16,14 @@ import {
   type ArticleData,
   type ElementType,
   type Gradient,
+  type ShapeKind,
+  type StrokeStyle,
   elementBoxStyle,
   textInnerStyle,
   imageInnerStyle,
   resolveContent,
   isImageType,
+  shapeSvg,
   FONT_FAMILIES,
   fontStack,
   GOOGLE_FONTS_HREF,
@@ -111,10 +117,21 @@ const STORY_SAFE_BOTTOM = 250;
 const ELEMENT_TYPE_LABELS: Record<string, string> = {
   title: "Título", category: "Categoria", image: "Imagem de fundo",
   logo: "Logo", cta: "Call to action", text: "Texto livre", overlay: "Máscara (overlay)",
-  gradient: "Degradê",
+  gradient: "Degradê", shape: "Forma",
 };
 
-const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "gradient", "title", "category", "logo", "cta", "text"];
+const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "gradient", "shape", "title", "category", "logo", "cta", "text"];
+
+/** Figuras disponíveis no seletor de forma (ícone + rótulo). */
+const SHAPE_KINDS: { kind: ShapeKind; label: string; Icon: typeof Square }[] = [
+  { kind: "rect", label: "Retângulo", Icon: Square },
+  { kind: "ellipse", label: "Elipse", Icon: Circle },
+  { kind: "triangle", label: "Triângulo", Icon: Triangle },
+  { kind: "polygon", label: "Polígono", Icon: Hexagon },
+  { kind: "star", label: "Estrela", Icon: Star },
+  { kind: "line", label: "Linha", Icon: Minus },
+  { kind: "arrow", label: "Seta", Icon: ArrowRight },
+];
 
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
   const overrides: Partial<Record<ElementType, Partial<TemplateElement>>> = {
@@ -126,6 +143,7 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
     logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain", zIndex: 6 },
     cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →", textAlign: "center", verticalAlign: "middle" },
     text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: "sbcagora.com.br" },
+    shape:    { x: 100, y: 400, width: 320, height: 320, fontSize: 0, fontWeight: "normal", color: "", backgroundColor: PRIMARY, content: "", shapeKind: "rect", fill: "solid", borderWidth: 0, borderColor: "#ffffff", strokeStyle: "solid", sides: 6, points: 5, zIndex: 4 },
   };
   return {
     id: crypto.randomUUID(),
@@ -208,7 +226,7 @@ function fmtDate(iso?: string | null): string {
 
 // ─── Canvas: interação (mover/redimensionar) + snapping ────────────────────────
 
-type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "move";
+type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "move" | "rotate";
 
 interface Interaction {
   id: string;
@@ -216,6 +234,7 @@ interface Interaction {
   startX: number;
   startY: number;
   orig: { x: number; y: number; width: number; height: number };
+  origRotation: number;
 }
 
 const RESIZE_HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
@@ -637,47 +656,168 @@ export default function SocialMedia() {
   const tplRef = useRef<SocialTemplate | null>(null);
   tplRef.current = currentTemplate;
 
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  // Trava de proporção (largura↔altura) — estado só do editor, não persiste.
+  const [aspectLock, setAspectLock] = useState(false);
+
+  // ── Histórico (desfazer/refazer) ───────────────────────────────────────────
+  const historyRef = useRef<{ past: SocialTemplate[]; future: SocialTemplate[] }>({ past: [], future: [] });
+  const burstRef = useRef<number | null>(null);     // coalesce de edições em rajada
+  const dragSnapRef = useRef<SocialTemplate | null>(null); // snapshot pré-arrasto
+  const [, setHistVer] = useState(0);               // força re-render dos botões
+  const cloneTpl = (t: SocialTemplate): SocialTemplate => JSON.parse(JSON.stringify(t));
+
+  const commitSnapshot = useCallback((snap: SocialTemplate) => {
+    const h = historyRef.current;
+    h.past.push(snap);
+    if (h.past.length > 60) h.past.shift();
+    h.future = [];
+    setHistVer((v) => v + 1);
+  }, []);
+
+  /** Registra o estado atual (pré-mudança) no histórico. `coalesce` agrupa rajadas. */
+  const pushHistory = useCallback((coalesce = false) => {
+    const cur = tplRef.current;
+    if (!cur) return;
+    if (coalesce) {
+      if (burstRef.current != null) {
+        window.clearTimeout(burstRef.current);
+        burstRef.current = window.setTimeout(() => { burstRef.current = null; }, 500);
+        return;
+      }
+      burstRef.current = window.setTimeout(() => { burstRef.current = null; }, 500);
+    }
+    commitSnapshot(cloneTpl(cur));
+  }, [commitSnapshot]);
+
+  const resetHistory = useCallback(() => {
+    historyRef.current = { past: [], future: [] };
+    setHistVer((v) => v + 1);
+  }, []);
+
+  const undo = useCallback(() => {
+    const h = historyRef.current; const cur = tplRef.current;
+    const prev = h.past.pop();
+    if (!prev) return;
+    if (cur) h.future.push(cloneTpl(cur));
+    setCurrentTemplate(prev);
+    setHistVer((v) => v + 1);
+  }, []);
+
+  const redo = useCallback(() => {
+    const h = historyRef.current; const cur = tplRef.current;
+    const next = h.future.pop();
+    if (!next) return;
+    if (cur) h.past.push(cloneTpl(cur));
+    setCurrentTemplate(next);
+    setHistVer((v) => v + 1);
+  }, []);
+
   useEffect(() => {
     if (!interaction) return;
     const onMove = (e: MouseEvent) => {
       const tpl = tplRef.current;
       if (!tpl) return;
-      const dx = (e.clientX - interaction.startX) / SCALE;
-      const dy = (e.clientY - interaction.startY) / SCALE;
-      const box = applyHandle(interaction.orig, interaction.handle, dx, dy);
+      // Primeiro movimento real do arrasto → registra o estado pré-arrasto.
+      if (dragSnapRef.current) { commitSnapshot(dragSnapRef.current); dragSnapRef.current = null; }
+
+      // ── Rotação (alça dedicada): ângulo do centro do elemento até o cursor ──
+      if (interaction.handle === "rotate") {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const cxC = rect.left + (interaction.orig.x + interaction.orig.width / 2) * SCALE;
+        const cyC = rect.top + (interaction.orig.y + interaction.orig.height / 2) * SCALE;
+        let deg = (Math.atan2(e.clientY - cyC, e.clientX - cxC) * 180) / Math.PI + 90;
+        if (e.shiftKey) deg = Math.round(deg / 15) * 15;
+        deg = Math.round(((deg % 360) + 360) % 360);
+        setCurrentTemplate((prev) => prev ? {
+          ...prev, elements: prev.elements.map((el) => el.id === interaction.id ? { ...el, rotation: deg } : el),
+        } : prev);
+        setGuides({ v: [], h: [] });
+        return;
+      }
+
+      const dxs = (e.clientX - interaction.startX) / SCALE;
+      const dys = (e.clientY - interaction.startY) / SCALE;
+      const rot = interaction.origRotation || 0;
       const W = tpl.width, H = tpl.height;
       const others = tpl.elements.filter((el) => el.id !== interaction.id);
       const xT = [0, W / 2, W, ...others.flatMap((el) => [el.x, el.x + el.width / 2, el.x + el.width])];
       const yT = [0, H / 2, H, ...others.flatMap((el) => [el.y, el.y + el.height / 2, el.y + el.height])];
       const gv: number[] = [], gh: number[] = [];
 
+      // ── Mover (translação; snapping só quando não rotacionado) ──
       if (interaction.handle === "move") {
-        const sx = bestSnapTriple(box.x, box.width, xT);
-        if (sx.line != null) { box.x += sx.delta; gv.push(sx.line); }
-        const sy = bestSnapTriple(box.y, box.height, yT);
-        if (sy.line != null) { box.y += sy.delta; gh.push(sy.line); }
-      } else {
+        const box = { x: interaction.orig.x + dxs, y: interaction.orig.y + dys, width: interaction.orig.width, height: interaction.orig.height };
+        if (rot === 0) {
+          const sx = bestSnapTriple(box.x, box.width, xT);
+          if (sx.line != null) { box.x += sx.delta; gv.push(sx.line); }
+          const sy = bestSnapTriple(box.y, box.height, yT);
+          if (sy.line != null) { box.y += sy.delta; gh.push(sy.line); }
+        }
+        const nx = Math.round(box.x), ny = Math.round(box.y);
+        setCurrentTemplate((prev) => prev ? {
+          ...prev, elements: prev.elements.map((el) => el.id === interaction.id ? { ...el, x: nx, y: ny } : el),
+        } : prev);
+        setGuides({ v: gv, h: gh });
+        return;
+      }
+
+      // ── Redimensionar ──
+      if (rot === 0) {
+        // Comportamento padrão: borda oposta fixa + snapping.
+        const box = applyHandle(interaction.orig, interaction.handle, dxs, dys);
         if (interaction.handle.includes("e")) { const s = snapTo(box.x + box.width, xT); if (s.line != null) { box.width = s.value - box.x; gv.push(s.line); } }
         if (interaction.handle.includes("w")) { const s = snapTo(box.x, xT); if (s.line != null) { box.width += box.x - s.value; box.x = s.value; gv.push(s.line); } }
         if (interaction.handle.includes("s")) { const s = snapTo(box.y + box.height, yT); if (s.line != null) { box.height = s.value - box.y; gh.push(s.line); } }
         if (interaction.handle.includes("n")) { const s = snapTo(box.y, yT); if (s.line != null) { box.height += box.y - s.value; box.y = s.value; gh.push(s.line); } }
         box.width = Math.max(MIN_SIZE, box.width); box.height = Math.max(MIN_SIZE, box.height);
+        const nx = Math.round(box.x), ny = Math.round(box.y), nw = Math.round(box.width), nh = Math.round(box.height);
+        setCurrentTemplate((prev) => prev ? {
+          ...prev, elements: prev.elements.map((el) => el.id === interaction.id ? { ...el, x: nx, y: ny, width: nw, height: nh } : el),
+        } : prev);
+        setGuides({ v: gv, h: gh });
+      } else {
+        // Rotacionado: redimensiona nos eixos LOCAIS (delta contra-rotacionado),
+        // mantendo o CENTRO fixo (transform-origin: center). Snapping suspenso.
+        const th = (-rot * Math.PI) / 180;
+        const cos = Math.cos(th), sin = Math.sin(th);
+        const lx = dxs * cos - dys * sin;
+        const ly = dxs * sin + dys * cos;
+        const box0 = applyHandle({ x: 0, y: 0, width: interaction.orig.width, height: interaction.orig.height }, interaction.handle, lx, ly);
+        const cx = interaction.orig.x + interaction.orig.width / 2;
+        const cy = interaction.orig.y + interaction.orig.height / 2;
+        const nw = Math.max(MIN_SIZE, Math.round(box0.width));
+        const nh = Math.max(MIN_SIZE, Math.round(box0.height));
+        const nx = Math.round(cx - nw / 2), ny = Math.round(cy - nh / 2);
+        setCurrentTemplate((prev) => prev ? {
+          ...prev, elements: prev.elements.map((el) => el.id === interaction.id ? { ...el, x: nx, y: ny, width: nw, height: nh } : el),
+        } : prev);
+        setGuides({ v: [], h: [] });
       }
-
-      const nx = Math.round(box.x), ny = Math.round(box.y), nw = Math.round(box.width), nh = Math.round(box.height);
-      setCurrentTemplate((prev) => prev ? {
-        ...prev,
-        elements: prev.elements.map((el) =>
-          el.id === interaction.id ? { ...el, x: nx, y: ny, width: nw, height: nh } : el,
-        ),
-      } : prev);
-      setGuides({ v: gv, h: gh });
     };
-    const onUp = () => { setInteraction(null); setGuides({ v: [], h: [] }); };
+    const onUp = () => { setInteraction(null); setGuides({ v: [], h: [] }); dragSnapRef.current = null; };
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
-  }, [interaction]);
+  }, [interaction, commitSnapshot]);
+
+  // ── Atalhos globais: desfazer/refazer/duplicar ─────────────────────────────
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      const k = e.key.toLowerCase();
+      if (k === "z" && !typing) { e.preventDefault(); if (e.shiftKey) redo(); else undo(); }
+      else if (k === "y" && !typing) { e.preventDefault(); redo(); }
+      else if (k === "d" && !typing && selectedElId) { e.preventDefault(); duplicateElement(selectedElId); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [undo, redo, selectedElId]);
 
   // ── Canvas: teclado (nudge com setas, Delete remove) ───────────────────────
 
@@ -688,6 +828,7 @@ export default function SocialMedia() {
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();
+        pushHistory(false);
         setCurrentTemplate((prev) => prev ? { ...prev, elements: prev.elements.filter((el) => el.id !== selectedElId) } : prev);
         setSelectedElId(null);
         return;
@@ -700,6 +841,7 @@ export default function SocialMedia() {
       else if (e.key === "ArrowDown") dy = step;
       else return;
       e.preventDefault();
+      pushHistory(true);
       setCurrentTemplate((prev) => prev ? {
         ...prev,
         elements: prev.elements.map((el) => el.id === selectedElId ? { ...el, x: el.x + dx, y: el.y + dy } : el),
@@ -707,7 +849,7 @@ export default function SocialMedia() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedElId]);
+  }, [selectedElId, pushHistory]);
 
   // ── Account ops ───────────────────────────────────────────────────────────
 
@@ -755,12 +897,14 @@ export default function SocialMedia() {
       backgroundColor: "#1a1a1a", elements: [],
     });
     setSelectedElId(null);
+    resetHistory();
   }
 
   async function loadTemplate(id: string) {
     const t = (await apiFetch(`/templates/${id}`)) as SocialTemplate;
     setCurrentTemplate({ ...t, elements: (t.elements ?? []) as TemplateElement[] });
     setSelectedElId(null);
+    resetHistory();
   }
 
   async function saveTemplate() {
@@ -787,23 +931,27 @@ export default function SocialMedia() {
   }
 
   function addElement(type: ElementType) {
+    pushHistory(false);
     const el = makeElement(type, currentTemplate?.height ?? 1350);
     setCurrentTemplate((prev) => prev ? { ...prev, elements: [...prev.elements, el] } : prev);
     setSelectedElId(el.id);
   }
 
   function updateElement(id: string, patch: Partial<TemplateElement>) {
+    pushHistory(true);
     setCurrentTemplate((prev) => prev ? {
       ...prev, elements: prev.elements.map((el) => el.id === id ? { ...el, ...patch } : el),
     } : prev);
   }
 
   function removeElement(id: string) {
+    pushHistory(false);
     setCurrentTemplate((prev) => prev ? { ...prev, elements: prev.elements.filter((el) => el.id !== id) } : prev);
     if (selectedElId === id) setSelectedElId(null);
   }
 
   function moveElementZ(id: string, dir: "up" | "down") {
+    pushHistory(false);
     setCurrentTemplate((prev) => {
       if (!prev) return prev;
       const sorted = [...prev.elements].sort((a, b) => a.zIndex - b.zIndex);
@@ -816,6 +964,50 @@ export default function SocialMedia() {
         sorted[idx] = { ...b, zIndex: a.zIndex }; sorted[idx - 1] = { ...a, zIndex: b.zIndex };
       }
       return { ...prev, elements: sorted };
+    });
+  }
+
+  /** Manda o elemento para o topo (frente) ou para o fundo (atrás) de todos. */
+  function bringElementZ(id: string, where: "front" | "back") {
+    pushHistory(false);
+    setCurrentTemplate((prev) => {
+      if (!prev) return prev;
+      const zs = prev.elements.map((e) => e.zIndex);
+      const maxZ = Math.max(0, ...zs), minZ = Math.min(0, ...zs);
+      return { ...prev, elements: prev.elements.map((el) => el.id === id ? { ...el, zIndex: where === "front" ? maxZ + 1 : minZ - 1 } : el) };
+    });
+  }
+
+  /** Duplica o elemento selecionado (Ctrl+D), deslocado e no topo da pilha. */
+  function duplicateElement(id: string) {
+    const cur = tplRef.current;
+    const el = cur?.elements.find((e) => e.id === id);
+    if (!cur || !el) return;
+    pushHistory(false);
+    const maxZ = Math.max(0, ...cur.elements.map((e) => e.zIndex));
+    const copy: TemplateElement = { ...JSON.parse(JSON.stringify(el)), id: crypto.randomUUID(), x: el.x + 20, y: el.y + 20, zIndex: maxZ + 1 };
+    setCurrentTemplate((prev) => prev ? { ...prev, elements: [...prev.elements, copy] } : prev);
+    setSelectedElId(copy.id);
+  }
+
+  type AlignDir = "left" | "hcenter" | "right" | "top" | "vcenter" | "bottom";
+  /** Alinha o elemento às bordas/centro da página (canvas). */
+  function alignToPage(id: string, dir: AlignDir) {
+    pushHistory(false);
+    setCurrentTemplate((prev) => {
+      if (!prev) return prev;
+      return { ...prev, elements: prev.elements.map((el) => {
+        if (el.id !== id) return el;
+        switch (dir) {
+          case "left":    return { ...el, x: 0 };
+          case "hcenter": return { ...el, x: Math.round((prev.width - el.width) / 2) };
+          case "right":   return { ...el, x: prev.width - el.width };
+          case "top":     return { ...el, y: 0 };
+          case "vcenter": return { ...el, y: Math.round((prev.height - el.height) / 2) };
+          case "bottom":  return { ...el, y: prev.height - el.height };
+          default:        return el;
+        }
+      }) };
     });
   }
 
@@ -837,10 +1029,12 @@ export default function SocialMedia() {
       await fetchTemplates();
       setCurrentTemplate({ ...currentTemplate, id: saved.id, name: `${currentTemplate.name} (cópia)` });
       setSelectedElId(null);
+      resetHistory();
     } finally { setTemplateSaving(false); }
   }
 
   function applyPreset(kind: PresetKind) {
+    pushHistory(false);
     setCurrentTemplate(makePreset(kind));
     setSelectedElId(null);
   }
@@ -937,6 +1131,8 @@ export default function SocialMedia() {
 
   const selectedEl = currentTemplate?.elements.find((e) => e.id === selectedElId) ?? null;
   const previewH   = currentTemplate ? Math.round(currentTemplate.height * SCALE) : 450;
+  const canUndo    = historyRef.current.past.length > 0;
+  const canRedo    = historyRef.current.future.length > 0;
 
   // Artigo (real ou amostra) usado para resolver os placeholders no canvas.
   const selectedPreviewArticle = editorArticles.find((a) => a.id === previewArticleId);
@@ -954,24 +1150,23 @@ export default function SocialMedia() {
 
   const HANDLE_CURSOR: Record<Handle, string> = {
     nw: "nwse-resize", n: "ns-resize", ne: "nesw-resize", e: "ew-resize",
-    se: "nwse-resize", s: "ns-resize", sw: "nesw-resize", w: "ew-resize", move: "grab",
+    se: "nwse-resize", s: "ns-resize", sw: "nesw-resize", w: "ew-resize", move: "grab", rotate: "grab",
   };
 
   function startInteraction(e: React.MouseEvent, el: TemplateElement, handle: Handle) {
     e.preventDefault(); e.stopPropagation();
     setSelectedElId(el.id);
-    setInteraction({ id: el.id, handle, startX: e.clientX, startY: e.clientY, orig: { x: el.x, y: el.y, width: el.width, height: el.height } });
-  }
-
-  function handlePoint(el: TemplateElement, h: Handle): { cx: number; cy: number } {
-    const cx = h.includes("w") ? el.x : h.includes("e") ? el.x + el.width : el.x + el.width / 2;
-    const cy = h.includes("n") ? el.y : h.includes("s") ? el.y + el.height : el.y + el.height / 2;
-    return { cx, cy };
+    dragSnapRef.current = tplRef.current ? cloneTpl(tplRef.current) : null;
+    setInteraction({ id: el.id, handle, startX: e.clientX, startY: e.clientY, orig: { x: el.x, y: el.y, width: el.width, height: el.height }, origRotation: el.rotation || 0 });
   }
 
   /** Conteúdo interno de um elemento no canvas (imagem real ou texto resolvido). */
   function renderElInner(el: TemplateElement) {
     if (el.type === "gradient") return null; // a própria caixa mostra o degradê
+    if (el.type === "shape") {
+      // Mesmo SVG do render server-side → WYSIWYG das figuras.
+      return <div style={{ width: "100%", height: "100%" }} dangerouslySetInnerHTML={{ __html: shapeSvg(el) }} />;
+    }
     if (isImageType(el.type)) {
       const src = el.type === "image" ? (canvasArticle.imageUrl || el.content) : el.content;
       if (src) return <img src={src} alt="" style={imageInnerStyle(el) as CSSProperties} />;
@@ -1115,6 +1310,16 @@ export default function SocialMedia() {
             </select>
             {currentTemplate && (
               <div className="flex items-center gap-2 ml-auto flex-wrap">
+                <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden">
+                  <button onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)"
+                    className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-[#0B2A66] hover:bg-[#EEF2FF] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+                    <Undo2 size={14} />
+                  </button>
+                  <button onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Shift+Z)"
+                    className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-[#0B2A66] hover:bg-[#EEF2FF] disabled:opacity-30 disabled:hover:bg-transparent transition-colors border-l border-slate-200">
+                    <Redo2 size={14} />
+                  </button>
+                </div>
                 <input value={currentTemplate.name}
                   onChange={(e) => setCurrentTemplate((p) => p ? { ...p, name: e.target.value } : p)}
                   className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] min-w-[160px]"
@@ -1234,6 +1439,7 @@ export default function SocialMedia() {
 
                 {/* Container externo (escala visual) → interno em tamanho real 1080×N */}
                 <div
+                  ref={canvasRef}
                   className="relative shrink-0 overflow-hidden select-none border border-slate-200"
                   style={{ width: PREVIEW_W, height: previewH, background: "#0f172a" }}
                   onMouseDown={() => setSelectedElId(null)}
@@ -1275,22 +1481,43 @@ export default function SocialMedia() {
                       <div key={`gh${i}`} style={{ position: "absolute", top: y, left: 0, height: Math.max(1, Math.round(1 / SCALE)), width: currentTemplate.width, background: "#ec4899", zIndex: 9500, pointerEvents: "none" }} />
                     ))}
 
-                    {/* Alças de redimensionar do elemento selecionado */}
-                    {selectedEl && RESIZE_HANDLES.map((h) => {
-                      const { cx, cy } = handlePoint(selectedEl, h);
+                    {/* Alças (redimensionar + rotação) num wrapper que acompanha a
+                        rotação do elemento, para ficarem sempre alinhadas. */}
+                    {selectedEl && (() => {
                       const size = Math.round(11 / SCALE);
+                      const bw = Math.max(1, Math.round(2 / SCALE));
+                      const stem = Math.max(1, Math.round(1 / SCALE));
+                      const rotSize = Math.round(13 / SCALE);
+                      const rotOffset = Math.round(30 / SCALE);
                       return (
-                        <div key={h}
-                          onMouseDown={(e) => startInteraction(e, selectedEl, h)}
-                          style={{
-                            position: "absolute", left: cx - size / 2, top: cy - size / 2,
-                            width: size, height: size, background: "#ffffff",
-                            border: `${Math.max(1, Math.round(2 / SCALE))}px solid #2563EB`,
-                            borderRadius: Math.round(2 / SCALE), zIndex: 10000, cursor: HANDLE_CURSOR[h],
-                          }}
-                        />
+                        <div style={{
+                          position: "absolute", left: selectedEl.x, top: selectedEl.y,
+                          width: selectedEl.width, height: selectedEl.height,
+                          transform: selectedEl.rotation ? `rotate(${selectedEl.rotation}deg)` : undefined,
+                          transformOrigin: "center", zIndex: 10000, pointerEvents: "none",
+                        }}>
+                          {/* haste + alça de rotação */}
+                          <div style={{ position: "absolute", left: selectedEl.width / 2 - stem / 2, top: -rotOffset, width: stem, height: rotOffset, background: "#2563EB" }} />
+                          <div onMouseDown={(e) => startInteraction(e, selectedEl, "rotate")} title="Girar"
+                            style={{ position: "absolute", left: selectedEl.width / 2 - rotSize / 2, top: -rotOffset - rotSize / 2, width: rotSize, height: rotSize, background: "#ffffff", border: `${bw}px solid #2563EB`, borderRadius: "50%", cursor: "grab", pointerEvents: "auto" }} />
+                          {/* 8 alças de redimensionar */}
+                          {RESIZE_HANDLES.map((h) => {
+                            const lx = h.includes("w") ? 0 : h.includes("e") ? selectedEl.width : selectedEl.width / 2;
+                            const ly = h.includes("n") ? 0 : h.includes("s") ? selectedEl.height : selectedEl.height / 2;
+                            return (
+                              <div key={h} onMouseDown={(e) => startInteraction(e, selectedEl, h)}
+                                style={{
+                                  position: "absolute", left: lx - size / 2, top: ly - size / 2,
+                                  width: size, height: size, background: "#ffffff",
+                                  border: `${bw}px solid #2563EB`, borderRadius: Math.round(2 / SCALE),
+                                  cursor: HANDLE_CURSOR[h], pointerEvents: "auto",
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
                       );
-                    })}
+                    })()}
                   </div>
                 </div>
 
@@ -1307,22 +1534,77 @@ export default function SocialMedia() {
                   <>
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{ELEMENT_TYPE_LABELS[selectedEl.type]}</p>
 
-                    {/* Position & Size */}
+                    {/* Posição */}
                     <div className="grid grid-cols-2 gap-2">
-                      {(["x","y","width","height"] as const).map((prop) => (
+                      {(["x","y"] as const).map((prop) => (
                         <div key={prop}>
-                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                            {prop === "x" ? "X" : prop === "y" ? "Y" : prop === "width" ? "Largura" : "Altura"}
-                          </label>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{prop.toUpperCase()}</label>
                           <input type="number" value={selectedEl[prop]}
                             onChange={(e) => updateElement(selectedEl.id, { [prop]: Number(e.target.value) })}
                             className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                         </div>
                       ))}
                     </div>
+                    {/* Tamanho + trava de proporção */}
+                    <div className="flex items-end gap-1.5">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Largura</label>
+                        <input type="number" value={selectedEl.width}
+                          onChange={(e) => {
+                            const v = Math.max(1, Number(e.target.value));
+                            if (aspectLock && selectedEl.width > 0) updateElement(selectedEl.id, { width: v, height: Math.max(1, Math.round((v * selectedEl.height) / selectedEl.width)) });
+                            else updateElement(selectedEl.id, { width: v });
+                          }}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                      </div>
+                      <button onClick={() => setAspectLock((v) => !v)} title={aspectLock ? "Proporção travada" : "Travar proporção"}
+                        className={`w-8 h-[30px] flex items-center justify-center rounded-lg border transition-colors shrink-0 ${aspectLock ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-slate-200 text-slate-400 hover:text-[#0B2A66]"}`}>
+                        {aspectLock ? <Lock size={12} /> : <Unlock size={12} />}
+                      </button>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Altura</label>
+                        <input type="number" value={selectedEl.height}
+                          onChange={(e) => {
+                            const v = Math.max(1, Number(e.target.value));
+                            if (aspectLock && selectedEl.height > 0) updateElement(selectedEl.id, { height: v, width: Math.max(1, Math.round((v * selectedEl.width) / selectedEl.height)) });
+                            else updateElement(selectedEl.id, { height: v });
+                          }}
+                          className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                      </div>
+                    </div>
+                    {/* Rotação */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0 flex items-center gap-1"><RotateCw size={11} /> Rotação</label>
+                      <input type="range" min={0} max={360} value={selectedEl.rotation ?? 0}
+                        onChange={(e) => updateElement(selectedEl.id, { rotation: Number(e.target.value) })}
+                        className="flex-1" />
+                      <input type="number" value={selectedEl.rotation ?? 0}
+                        onChange={(e) => updateElement(selectedEl.id, { rotation: (((Number(e.target.value) % 360) + 360) % 360) })}
+                        className="w-14 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" />
+                    </div>
+                    {/* Organizar: alinhar à página + ordem + duplicar */}
+                    <div>
+                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Organizar</label>
+                      <div className="flex items-center gap-1 mb-1.5">
+                        {([["left", AlignLeft], ["hcenter", AlignCenter], ["right", AlignRight], ["top", ArrowUpToLine], ["vcenter", FoldVertical], ["bottom", ArrowDownToLine]] as const).map(([d, Icon]) => (
+                          <button key={d} onClick={() => alignToPage(selectedEl.id, d)} title="Alinhar à página"
+                            className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors">
+                            <Icon size={12} />
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => bringElementZ(selectedEl.id, "front")} title="Trazer para frente"
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsUp size={12} /> Frente</button>
+                        <button onClick={() => bringElementZ(selectedEl.id, "back")} title="Enviar para o fundo"
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsDown size={12} /> Fundo</button>
+                        <button onClick={() => duplicateElement(selectedEl.id)} title="Duplicar (Ctrl+D)"
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><Copy size={12} /> Duplicar</button>
+                      </div>
+                    </div>
 
                     {/* Content */}
-                    {selectedEl.type !== "gradient" && (
+                    {selectedEl.type !== "gradient" && selectedEl.type !== "shape" && (
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
                         {isImageType(selectedEl.type) ? "Imagem (URL ou upload)" : "Conteúdo"}
@@ -1354,8 +1636,50 @@ export default function SocialMedia() {
                     </div>
                     )}
 
+                    {/* Forma (figura) — seletor de figura, traço e nº de lados/pontas */}
+                    {selectedEl.type === "shape" && (
+                      <>
+                        <div>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Figura</label>
+                          <div className="grid grid-cols-4 gap-1">
+                            {SHAPE_KINDS.map(({ kind, label, Icon }) => (
+                              <button key={kind} onClick={() => updateElement(selectedEl.id, { shapeKind: kind })} title={label}
+                                className={`h-8 flex items-center justify-center rounded-lg border transition-colors ${(selectedEl.shapeKind ?? "rect") === kind ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66]"}`}>
+                                <Icon size={14} />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Traço</label>
+                            <select value={selectedEl.strokeStyle ?? "solid"}
+                              onChange={(e) => updateElement(selectedEl.id, { strokeStyle: e.target.value as StrokeStyle })}
+                              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
+                              <option value="solid">Sólido</option>
+                              <option value="dashed">Tracejado</option>
+                              <option value="dotted">Pontilhado</option>
+                            </select>
+                          </div>
+                          {(selectedEl.shapeKind === "polygon" || selectedEl.shapeKind === "star") && (
+                            <div>
+                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{selectedEl.shapeKind === "star" ? "Pontas" : "Lados"}</label>
+                              <input type="number" min={3} max={12}
+                                value={selectedEl.shapeKind === "star" ? (selectedEl.points ?? 5) : (selectedEl.sides ?? 6)}
+                                onChange={(e) => {
+                                  const n = Math.max(3, Math.min(12, Number(e.target.value)));
+                                  updateElement(selectedEl.id, selectedEl.shapeKind === "star" ? { points: n } : { sides: n });
+                                }}
+                                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-400 -mt-1">Linha/seta: a espessura e a cor vêm de “Borda” (abaixo). Demais figuras usam Preenchimento + Borda.</p>
+                      </>
+                    )}
+
                     {/* Tipografia — apenas tipos de texto */}
-                    {!isImageType(selectedEl.type) && selectedEl.type !== "gradient" && (
+                    {!isImageType(selectedEl.type) && selectedEl.type !== "gradient" && selectedEl.type !== "shape" && (
                       <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
@@ -1427,6 +1751,27 @@ export default function SocialMedia() {
                               onChange={(e) => updateElement(selectedEl.id, { letterSpacing: Number(e.target.value) })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                           </div>
+                        </div>
+                        {/* Entrelinha (line-height) */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0">Entrelinha</label>
+                          <input type="range" min={0.8} max={2} step={0.01} value={selectedEl.lineHeight ?? 1.3}
+                            onChange={(e) => updateElement(selectedEl.id, { lineHeight: Number(e.target.value) })}
+                            className="flex-1" />
+                          <input type="number" min={0.8} max={2} step={0.01} value={selectedEl.lineHeight ?? 1.3}
+                            onChange={(e) => updateElement(selectedEl.id, { lineHeight: Number(e.target.value) })}
+                            className="w-14 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" />
+                        </div>
+                        {/* Estilos inline: itálico / sublinhado / tachado / maiúsculas */}
+                        <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                          <button onClick={() => updateElement(selectedEl.id, { fontStyle: selectedEl.fontStyle === "italic" ? "normal" : "italic" })}
+                            title="Itálico" className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${selectedEl.fontStyle === "italic" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Italic size={12} /></button>
+                          <button onClick={() => updateElement(selectedEl.id, { textDecoration: selectedEl.textDecoration === "underline" ? "none" : "underline" })}
+                            title="Sublinhado" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "underline" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Underline size={12} /></button>
+                          <button onClick={() => updateElement(selectedEl.id, { textDecoration: selectedEl.textDecoration === "line-through" ? "none" : "line-through" })}
+                            title="Tachado" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "line-through" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Strikethrough size={12} /></button>
+                          <button onClick={() => updateElement(selectedEl.id, { textTransform: selectedEl.textTransform === "uppercase" ? "none" : "uppercase" })}
+                            title="Maiúsculas" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 text-[11px] font-bold transition-colors ${selectedEl.textTransform === "uppercase" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}>AA</button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>

@@ -17,12 +17,31 @@ export type ElementType =
   | "cta"
   | "text"
   | "overlay"
-  | "gradient";
+  | "gradient"
+  | "shape";
 
 export type TextAlign = "left" | "center" | "right";
 export type VerticalAlign = "top" | "middle" | "bottom";
 export type ObjectFit = "cover" | "contain" | "fill";
 export type Fill = "solid" | "gradient";
+
+/** Tipo geométrico de uma figura (elemento `shape`). */
+export type ShapeKind =
+  | "rect"
+  | "ellipse"
+  | "triangle"
+  | "polygon"
+  | "star"
+  | "line"
+  | "arrow";
+
+/** Estilo do traço (borda) de figuras e caixas. */
+export type StrokeStyle = "solid" | "dashed" | "dotted";
+
+/** Estilos inline de texto (independentes do peso). */
+export type FontStyle = "normal" | "italic";
+export type TextDecoration = "none" | "underline" | "line-through";
+export type TextTransform = "none" | "uppercase";
 
 export interface TemplateElement {
   id: string;
@@ -53,10 +72,26 @@ export interface TemplateElement {
   borderColor?: string;
   /** Espaçamento entre letras em px (caixa-alta fica melhor com +1/+2). */
   letterSpacing?: number;
+  /** Entrelinha (line-height) como múltiplo do tamanho da fonte. Default 1.3. */
+  lineHeight?: number;
+  /** Rotação do elemento em graus (transform: rotate). Default 0. */
+  rotation?: number;
+  /** Estilos inline de texto (independentes de fontWeight). */
+  fontStyle?: FontStyle;
+  textDecoration?: TextDecoration;
+  textTransform?: TextTransform;
   /** Encolhe a fonte automaticamente para o texto caber na caixa (sem cortar). */
   autoFit?: boolean;
   /** Cor dos trechos marcados com *asteriscos* (destaque inline). */
   accentColor?: string;
+  /** Tipo geométrico da figura (apenas type === "shape"). */
+  shapeKind?: ShapeKind;
+  /** Nº de lados de um polígono (apenas shapeKind === "polygon"). */
+  sides?: number;
+  /** Nº de pontas de uma estrela (apenas shapeKind === "star"). */
+  points?: number;
+  /** Estilo do traço/contorno: sólido, tracejado ou pontilhado. */
+  strokeStyle?: StrokeStyle;
 }
 
 export interface SocialTemplate {

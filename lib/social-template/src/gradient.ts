@@ -76,6 +76,40 @@ export function backgroundCss(solid: string, gradient?: Gradient): string {
   return gradient && gradient.stops.length >= 2 ? gradientToCss(gradient) : solid;
 }
 
+/**
+ * Converte o mesmo modelo `Gradient` em uma definição SVG (`<linearGradient>`
+ * ou `<radialGradient>`) com o `id` informado, para preencher figuras (`shape`)
+ * via `fill="url(#id)"`. O ângulo linear é mapeado para o vetor x1/y1→x2/y2
+ * em `gradientUnits="objectBoundingBox"`, espelhando a convenção do CSS
+ * (0° = de baixo p/ cima, 180° = de cima p/ baixo).
+ */
+export function gradientToSvg(g: Gradient, id: string): string {
+  const stops = [...g.stops]
+    .map((s) => ({ ...parseRgba(s.color), pos: clamp(s.pos, 0, 100) }))
+    .sort((a, b) => a.pos - b.pos)
+    .map(
+      (s) =>
+        `<stop offset="${s.pos}%" stop-color="rgb(${Math.round(s.r)},${Math.round(s.g)},${Math.round(
+          s.b,
+        )})" stop-opacity="${Number(s.a.toFixed(3))}"/>`,
+    )
+    .join("");
+
+  if (g.type === "radial") {
+    return `<radialGradient id="${id}" cx="50%" cy="50%" r="65%">${stops}</radialGradient>`;
+  }
+  // CSS: 0° aponta p/ cima e cresce no sentido horário. Vetor unitário do
+  // gradiente em coordenadas de tela (y p/ baixo): dx=sin(a), dy=-cos(a).
+  const a = (g.angle * Math.PI) / 180;
+  const dx = Math.sin(a);
+  const dy = -Math.cos(a);
+  const x1 = (0.5 - dx / 2).toFixed(4);
+  const y1 = (0.5 - dy / 2).toFixed(4);
+  const x2 = (0.5 + dx / 2).toFixed(4);
+  const y2 = (0.5 + dy / 2).toFixed(4);
+  return `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">${stops}</linearGradient>`;
+}
+
 // ── Geradores de curva suave ──────────────────────────────────────────────────
 
 /**

@@ -19,6 +19,9 @@ export function hasBackground(bg: string | undefined): boolean {
  * o mesmo CSS serve para o preview e para o screenshot do Playwright.
  */
 export function elementBoxStyle(el: TemplateElement): StyleObject {
+  // Figuras (shape) desenham fundo/contorno no próprio SVG; a caixa não deve
+  // pintar background/border (e não pode cortar o traço de linha/seta).
+  const isShape = el.type === "shape";
   const s: StyleObject = {
     position: "absolute",
     left: `${el.x}px`,
@@ -28,9 +31,15 @@ export function elementBoxStyle(el: TemplateElement): StyleObject {
     opacity: el.opacity,
     zIndex: el.zIndex,
     borderRadius: `${el.borderRadius}px`,
-    overflow: "hidden",
+    overflow: isShape ? "visible" : "hidden",
     boxSizing: "border-box",
   };
+  // Rotação compartilhada (editor e Playwright giram igual).
+  if (el.rotation) {
+    s["transform"] = `rotate(${el.rotation}deg)`;
+    s["transformOrigin"] = "center";
+  }
+  if (isShape) return s;
   if (el.fill === "gradient" && el.gradient && el.gradient.stops.length >= 2) {
     s["background"] = gradientToCss(el.gradient);
   } else if (hasBackground(el.backgroundColor)) {
@@ -56,9 +65,12 @@ export function textInnerStyle(el: TemplateElement): StyleObject {
     fontSize: `${el.fontSize}px`,
     fontFamily: fontStack(el.fontFamily),
     fontWeight: fontWeightCss(el.fontWeight),
+    fontStyle: el.fontStyle ?? "normal",
+    textDecoration: el.textDecoration ?? "none",
+    textTransform: el.textTransform ?? "none",
     color: el.color || "#ffffff",
     textAlign: el.textAlign,
-    lineHeight: 1.3,
+    lineHeight: el.lineHeight ?? 1.3,
     letterSpacing: `${el.letterSpacing ?? 0}px`,
     wordBreak: "break-word",
     whiteSpace: "pre-wrap",
