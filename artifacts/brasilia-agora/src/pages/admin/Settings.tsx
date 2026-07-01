@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BRAND } from "../../brand";
 import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission } from "../../lib/adminApi";
+import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission, type RetentionOptions } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { useToast } from "@/hooks/use-toast";
@@ -13,10 +13,10 @@ import {
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
   Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
-  Share2, Code,
+  Share2, Code, Trash2, CalendarClock,
 } from "lucide-react";
 
-type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs";
+type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs" | "exclusao";
 
 const TABS: { id: SettingsTab; label: string }[] = [
   { id: "informacoes", label: "Informações do Site" },
@@ -28,6 +28,7 @@ const TABS: { id: SettingsTab; label: string }[] = [
   { id: "seguranca",   label: "Segurança" },
   { id: "permissoes",  label: "Permissões" },
   { id: "logs",        label: "Logs" },
+  { id: "exclusao",    label: "Exclusão de artigos" },
 ];
 
 /* ── Logs helpers ─────────────────────────────────────────────────────── */
@@ -110,7 +111,7 @@ const CONTACT_GROUPS: {
 
 function getTabFromUrl(): SettingsTab {
   const p = new URLSearchParams(window.location.search).get("tab");
-  const valid: SettingsTab[] = ["informacoes","logo","aparencia","contato","conexoes","webhook","seguranca","permissoes","logs"];
+  const valid: SettingsTab[] = ["informacoes","logo","aparencia","contato","conexoes","webhook","seguranca","permissoes","logs","exclusao"];
   return (valid.includes(p as SettingsTab) ? p : "informacoes") as SettingsTab;
 }
 
@@ -319,6 +320,85 @@ export default function Settings() {
       setPermSaving(null);
     }
   }
+
+  /* ── article retention state ── */
+  const [retPreview, setRetPreview] = useState<{ count: number; total: number; cutoff: string } | null>(null);
+  const [retLoading, setRetLoading] = useState(false);
+  const [retRunning, setRetRunning] = useState(false);
+  const [retConfirm, setRetConfirm] = useState(false);
+  const [retCats,    setRetCats]    = useState<{ value: string; label: string; count: number }[]>([]);
+
+  /** Monta a regra de retenção a partir do estado atual das configurações. */
+  const retentionOpts = useCallback((): RetentionOptions => ({
+    days:              settings.articleRetentionDays  ?? 180,
+    scope:             settings.articleRetentionScope ?? "all",
+    protectCategories: settings.articleRetentionProtectCategories ?? [],
+    onlyAutomated:     settings.articleRetentionOnlyAutomated ?? false,
+    minViews:          settings.articleRetentionMinViews ?? 0,
+    keepRecent:        settings.articleRetentionKeepRecent ?? 0,
+    maxPerRun:         settings.articleRetentionMaxPerRun ?? 0,
+  }), [settings]);
+
+  const loadRetentionPreview = useCallback(async () => {
+    setRetLoading(true);
+    try {
+      const p = await adminApi.getArticleRetentionPreview(retentionOpts());
+      setRetPreview({ count: p.count, total: p.total, cutoff: p.cutoff });
+    } catch {
+      setRetPreview(null);
+    } finally {
+      setRetLoading(false);
+    }
+  }, [retentionOpts]);
+
+  async function runRetentionNow() {
+    if (!retConfirm) { setRetConfirm(true); void loadRetentionPreview(); return; }
+    setRetConfirm(false); setRetRunning(true);
+    try {
+      const { deleted } = await adminApi.runArticleRetention(retentionOpts());
+      setField("articleRetentionLastRunAt", new Date().toISOString());
+      setField("articleRetentionLastCount", deleted);
+      toast({ title: `${deleted} artigo(s) excluído(s)`, description: "Banco de dados otimizado.", duration: 3000 });
+      await loadRetentionPreview();
+    } catch (e) {
+      toast({ title: "Erro ao excluir artigos", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setRetRunning(false);
+    }
+  }
+
+  function toggleProtectCategory(value: string) {
+    const cur = settings.articleRetentionProtectCategories ?? [];
+    const next = cur.includes(value) ? cur.filter(c => c !== value) : [...cur, value];
+    setField("articleRetentionProtectCategories", next);
+  }
+
+  /* ── retention: recalcula a prévia (debounced) sempre que a regra muda ── */
+  useEffect(() => {
+    if (activeTab !== "exclusao") return;
+    const t = setTimeout(() => { void loadRetentionPreview(); }, 400);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    activeTab,
+    settings.articleRetentionDays,
+    settings.articleRetentionScope,
+    settings.articleRetentionMinViews,
+    settings.articleRetentionKeepRecent,
+    settings.articleRetentionMaxPerRun,
+    settings.articleRetentionOnlyAutomated,
+    settings.articleRetentionProtectCategories,
+  ]);
+
+  /* ── retention: carrega a lista de categorias ao abrir a aba ── */
+  useEffect(() => {
+    if (activeTab !== "exclusao" || retCats.length > 0) return;
+    fetch("/api/categories")
+      .then(r => r.json())
+      .then((d: { categories?: { value: string; label: string; count: number }[] }) => setRetCats(d.categories ?? []))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   /* ── load data ── */
   useEffect(() => {
@@ -1712,6 +1792,251 @@ export default function Settings() {
                   <span>Todas as alterações são salvas imediatamente e registradas nos logs de auditoria.</span>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* ── EXCLUSÃO DE ARTIGOS ──────────────────────────────── */}
+        {activeTab === "exclusao" && (() => {
+          const days      = settings.articleRetentionDays  ?? 180;
+          const scope     = settings.articleRetentionScope ?? "all";
+          const enabled   = settings.articleRetentionEnabled ?? false;
+          const onlyAuto  = settings.articleRetentionOnlyAutomated ?? false;
+          const minViews  = settings.articleRetentionMinViews  ?? 0;
+          const keepRecent = settings.articleRetentionKeepRecent ?? 0;
+          const maxPerRun = settings.articleRetentionMaxPerRun ?? 0;
+          const protectedCats = settings.articleRetentionProtectCategories ?? [];
+          const DAY_PRESETS = [30, 60, 90, 180, 365];
+          const SCOPE_OPTS = [
+            { id: "all",       label: "Todos os artigos",   desc: "Publicados e rascunhos" },
+            { id: "published", label: "Somente publicados", desc: "Mantém os rascunhos" },
+            { id: "draft",     label: "Somente rascunhos",  desc: "Mantém os publicados" },
+          ] as const;
+          const cutoffLabel = retPreview
+            ? new Date(retPreview.cutoff).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
+            : null;
+
+          return (
+            <div className="max-w-2xl space-y-5">
+              {/* Explicação */}
+              <div className="bg-[#0B2A66] rounded-2xl p-6 text-white relative overflow-hidden">
+                <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10"><Database size={96} /></div>
+                <div className="flex items-center gap-3 mb-2">
+                  <Trash2 size={22} className="text-blue-200" />
+                  <h2 className="text-lg font-bold">Exclusão automática de artigos</h2>
+                </div>
+                <p className="text-sm text-blue-200 leading-relaxed max-w-lg">
+                  Remove notícias antigas para otimizar o banco de dados. A limpeza roda automaticamente
+                  uma vez por dia quando ativada — ou você pode executá-la manualmente a qualquer momento.
+                </p>
+              </div>
+
+              {/* Configuração da regra */}
+              <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
+                <SectionHeader icon={<CalendarClock size={15}/>} label="Regra de retenção"/>
+
+                {/* Toggle */}
+                <button
+                  onClick={() => setField("articleRetentionEnabled", !enabled)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                    enabled
+                      ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                      : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                  }`}>
+                  <Trash2 size={18}/>
+                  <div className="flex-1 text-left">
+                    <p className="text-[13px] font-semibold">Exclusão automática diária</p>
+                    <p className="text-[11px] opacity-70">Apaga sozinho os artigos mais antigos que o limite abaixo</p>
+                  </div>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${enabled ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                    {enabled ? "Ativada" : "Desativada"}
+                  </span>
+                </button>
+
+                {/* Dias */}
+                <Field label="Excluir artigos com mais de">
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    {DAY_PRESETS.map(d => (
+                      <button key={d}
+                        onClick={() => setField("articleRetentionDays", d)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors ${
+                          days === d ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"
+                        }`}>
+                        {d} dias
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={1} max={3650} value={days}
+                      onChange={e => setField("articleRetentionDays", Math.max(1, Math.min(3650, Number(e.target.value) || 1)))}
+                      className={INPUT + " max-w-[140px]"}/>
+                    <span className="text-sm text-[#64748B]">dias</span>
+                  </div>
+                </Field>
+
+                {/* Escopo */}
+                <Field label="Quais artigos podem ser excluídos">
+                  <div className="grid gap-2">
+                    {SCOPE_OPTS.map(o => (
+                      <button key={o.id}
+                        onClick={() => setField("articleRetentionScope", o.id)}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                          scope === o.id ? "border-[#0B2A66] bg-[#0B2A66]/5" : "border-[#E2E8F0] hover:border-[#CBD5E1]"
+                        }`}>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${scope === o.id ? "border-[#0B2A66]" : "border-[#CBD5E1]"}`}>
+                          {scope === o.id && <div className="w-2 h-2 rounded-full bg-[#0B2A66]"/>}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-semibold text-[#0F172A]">{o.label}</p>
+                          <p className="text-[11px] text-[#94A3B8]">{o.desc}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </Field>
+              </div>
+
+              {/* Proteções — o que nunca excluir */}
+              <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
+                <SectionHeader icon={<Shield size={15}/>} label="Proteções (o que preservar)"/>
+                <p className="text-xs text-[#94A3B8] -mt-2">
+                  Regras adicionais que blindam certos artigos da exclusão, mesmo que já tenham passado do limite de dias.
+                </p>
+
+                {/* Só conteúdo automático */}
+                <button
+                  onClick={() => setField("articleRetentionOnlyAutomated", !onlyAuto)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                    onlyAuto ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]" : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                  }`}>
+                  <Sparkles size={18}/>
+                  <div className="flex-1 text-left">
+                    <p className="text-[13px] font-semibold">Só excluir conteúdo automático</p>
+                    <p className="text-[11px] opacity-70">Preserva matérias da redação; remove apenas o que veio de RSS/IA</p>
+                  </div>
+                  <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${onlyAuto ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                    {onlyAuto ? "Ativado" : "Desativado"}
+                  </span>
+                </button>
+
+                {/* Preservar mais lidos */}
+                <Field label="Preservar artigos com muitas visualizações" hint={minViews > 0 ? `≥ ${minViews} views` : "desativado"}>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={0} value={minViews}
+                      onChange={e => setField("articleRetentionMinViews", Math.max(0, Math.floor(Number(e.target.value)) || 0))}
+                      className={INPUT + " max-w-[160px]"}/>
+                    <span className="text-sm text-[#64748B]">visualizações (0 = desativado)</span>
+                  </div>
+                </Field>
+
+                {/* Sempre manter os N mais recentes */}
+                <Field label="Sempre manter os artigos mais recentes" hint={keepRecent > 0 ? `últimos ${keepRecent}` : "desativado"}>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={0} value={keepRecent}
+                      onChange={e => setField("articleRetentionKeepRecent", Math.max(0, Math.floor(Number(e.target.value)) || 0))}
+                      className={INPUT + " max-w-[160px]"}/>
+                    <span className="text-sm text-[#64748B]">artigos (rede de segurança; 0 = desativado)</span>
+                  </div>
+                </Field>
+
+                {/* Teto por execução */}
+                <Field label="Máximo de exclusões por execução" hint={maxPerRun > 0 ? `até ${maxPerRun}/vez` : "ilimitado"}>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min={0} value={maxPerRun}
+                      onChange={e => setField("articleRetentionMaxPerRun", Math.max(0, Math.floor(Number(e.target.value)) || 0))}
+                      className={INPUT + " max-w-[160px]"}/>
+                    <span className="text-sm text-[#64748B]">artigos (remove os mais antigos primeiro; 0 = ilimitado)</span>
+                  </div>
+                </Field>
+
+                {/* Categorias protegidas */}
+                <Field label="Categorias que nunca são excluídas">
+                  {retCats.length === 0 ? (
+                    <p className="text-xs text-[#94A3B8] italic">Nenhuma categoria encontrada.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {retCats.map(c => {
+                        const on = protectedCats.includes(c.value);
+                        return (
+                          <button key={c.value} onClick={() => toggleProtectCategory(c.value)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                              on ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC]"
+                            }`}>
+                            {on && <Lock size={11}/>}
+                            {c.label}
+                            <span className={`text-[10px] ${on ? "text-blue-200" : "text-[#94A3B8]"}`}>({c.count})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {protectedCats.length > 0 && (
+                    <p className="text-[11px] text-green-600 mt-2">
+                      {protectedCats.length} categoria(s) protegida(s) — artigos nelas nunca serão excluídos.
+                    </p>
+                  )}
+                </Field>
+
+                <SaveBar saving={savingSettings} onSave={saveSettings} label="Salvar regra"/>
+              </div>
+
+              {/* Prévia + limpeza manual */}
+              <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
+                <div className="flex items-center justify-between">
+                  <SectionHeader icon={<Database size={15}/>} label="Prévia e limpeza manual"/>
+                  <button onClick={() => void loadRetentionPreview()} disabled={retLoading}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border border-[#E2E8F0] text-[#64748B] hover:bg-[#F8FAFC] disabled:opacity-50 transition-colors">
+                    <RefreshCw size={12} className={retLoading ? "animate-spin" : ""}/> Recalcular
+                  </button>
+                </div>
+
+                {retLoading && !retPreview ? (
+                  <div className="text-center py-6 text-sm text-[#94A3B8]">Calculando…</div>
+                ) : retPreview ? (
+                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-4">
+                    <p className="text-3xl font-bold text-[#E71D36]">{retPreview.count}</p>
+                    <p className="text-sm text-[#64748B] mt-1">
+                      de <strong className="text-[#0F172A]">{retPreview.total}</strong> artigos seriam excluídos
+                      {cutoffLabel && <> — mais antigos que <strong className="text-[#0F172A]">{cutoffLabel}</strong></>}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-sm text-[#94A3B8]">Não foi possível carregar a prévia.</div>
+                )}
+
+                {retConfirm ? (
+                  <div className="border border-red-200 bg-red-50 rounded-xl p-4 space-y-3">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle size={16} className="text-red-600 shrink-0 mt-0.5"/>
+                      <p className="text-xs text-red-700">
+                        <strong>Ação irreversível.</strong> {retPreview ? `${retPreview.count} artigo(s)` : "Os artigos selecionados"} serão apagados permanentemente do banco de dados.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => setRetConfirm(false)}
+                        className="flex-1 border border-gray-200 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-100 transition-colors">
+                        Cancelar
+                      </button>
+                      <button onClick={() => void runRetentionNow()} disabled={retRunning}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-700 disabled:opacity-60 transition-colors">
+                        {retRunning ? <RefreshCw size={14} className="animate-spin"/> : <Trash2 size={14}/>}
+                        {retRunning ? "Excluindo…" : "Confirmar exclusão"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => void runRetentionNow()} disabled={retRunning || (retPreview?.count ?? 0) === 0}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition-colors">
+                    <Trash2 size={15}/> Executar limpeza agora
+                  </button>
+                )}
+
+                {settings.articleRetentionLastRunAt && (
+                  <p className="text-[11px] text-[#94A3B8] text-center">
+                    Última limpeza: {fmtDate(settings.articleRetentionLastRunAt)} — {settings.articleRetentionLastCount ?? 0} artigo(s) excluído(s)
+                  </p>
+                )}
+              </div>
             </div>
           );
         })()}

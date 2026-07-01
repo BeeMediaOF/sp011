@@ -120,6 +120,17 @@ export interface SiteSettings {
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;
+  // ── Retenção automática de artigos (limpeza do banco) ──
+  articleRetentionEnabled?: boolean;                    // liga/desliga a exclusão automática diária
+  articleRetentionDays?: number;                        // idade máxima em dias (ex.: 180)
+  articleRetentionScope?: "all" | "published" | "draft";// quais artigos podem ser excluídos
+  articleRetentionProtectCategories?: string[];         // categorias que nunca são excluídas
+  articleRetentionOnlyAutomated?: boolean;              // só excluir conteúdo importado (rss/perplexity)
+  articleRetentionMinViews?: number;                    // preservar artigos com views ≥ N (0 = off)
+  articleRetentionKeepRecent?: number;                 // sempre manter os N mais recentes (0 = off)
+  articleRetentionMaxPerRun?: number;                  // teto de exclusões por execução (0 = ilimitado)
+  articleRetentionLastRunAt?: string;                   // último ciclo de limpeza (ISO)
+  articleRetentionLastCount?: number;                   // nº excluído no último ciclo
 }
 
 export type ColumnistSpecialty =

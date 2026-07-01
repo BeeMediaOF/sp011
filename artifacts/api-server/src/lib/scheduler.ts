@@ -143,6 +143,36 @@ async function runLogRetention(): Promise<void> {
   }
 }
 
+// ─── Article retention (daily cleanup) ───────────────────────────────────────
+// Exclui automaticamente notícias antigas para manter o banco enxuto. Só roda
+// quando o admin habilita em Configurações → Exclusão de artigos.
+
+async function runArticleRetention(): Promise<void> {
+  try {
+    const s = store.getSettings();
+    if (!s.articleRetentionEnabled) return;
+
+    const opts = {
+      days:  s.articleRetentionDays  ?? 180,
+      scope: s.articleRetentionScope ?? "all",
+      protectCategories: s.articleRetentionProtectCategories ?? [],
+      onlyAutomated:     s.articleRetentionOnlyAutomated ?? false,
+      minViews:          s.articleRetentionMinViews ?? 0,
+      keepRecent:        s.articleRetentionKeepRecent ?? 0,
+      maxPerRun:         s.articleRetentionMaxPerRun ?? 0,
+    } as const;
+    const deleted = await articleService.purgeOlderThan(opts);
+
+    store.updateSettings({
+      articleRetentionLastRunAt: new Date().toISOString(),
+      articleRetentionLastCount: deleted,
+    });
+    logger.info({ deleted, days: opts.days, scope: opts.scope }, "Article retention: cleanup complete");
+  } catch (err) {
+    logger.warn({ err }, "Article retention: cleanup failed");
+  }
+}
+
 const LOG_RETENTION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 export function startScheduler(): void {
@@ -160,6 +190,12 @@ export function startScheduler(): void {
     void runLogRetention();
     setInterval(() => { void runLogRetention(); }, LOG_RETENTION_INTERVAL_MS);
   }, 2 * 60_000);
+
+  // Article retention: run once per day (first run after 3 minutes)
+  setTimeout(() => {
+    void runArticleRetention();
+    setInterval(() => { void runArticleRetention(); }, LOG_RETENTION_INTERVAL_MS);
+  }, 3 * 60_000);
 
   logger.info("RSS scheduler started (checking every 20 min)");
 }

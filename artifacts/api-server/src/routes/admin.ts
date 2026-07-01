@@ -5,7 +5,7 @@ import { writeFileSync } from "fs";
 import { resolve } from "path";
 import { db, usersTable, adsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
-  authMiddleware, generateToken, generateTempToken, verifyTempToken,
+  authMiddleware, requireAdmin, generateToken, generateTempToken, verifyTempToken,
   verifyPassword, checkRateLimit, resetRateLimit,
 } from "../middlewares/auth.js";
 import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, generateURI as otpGenerateURI } from "otplib";
@@ -13,7 +13,7 @@ import QRCode from "qrcode";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
-import { articleService } from "../lib/articleService.js";
+import { articleService, type RetentionOptions } from "../lib/articleService.js";
 import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot, getAIQuotaStatus } from "../lib/rssProcessor.js";
 import { YoutubeTranscript } from "youtube-transcript";
 
@@ -588,6 +588,70 @@ router.post("/articles/delete-invalid", authMiddleware, async (req, res) => {
 
   req.log.info({ deleted, total: articles.length }, "admin: deleted invalid-content articles");
   res.json({ deleted, total: articles.length, ids });
+});
+
+// ─── Retenção / limpeza automática de artigos ─────────────────────────────────
+
+const RETENTION_SCOPES = ["all", "published", "draft"] as const;
+
+function normalizeRetentionScope(v: unknown): RetentionOptions["scope"] {
+  return (RETENTION_SCOPES as readonly string[]).includes(String(v))
+    ? (String(v) as RetentionOptions["scope"])
+    : "all";
+}
+
+function nonNegInt(v: unknown): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** Lê e sanitiza a regra de retenção a partir do corpo da requisição. */
+function parseRetentionOptions(body: unknown): RetentionOptions {
+  const b = (body ?? {}) as Record<string, unknown>;
+  return {
+    days: Number(b["days"]),
+    scope: normalizeRetentionScope(b["scope"]),
+    protectCategories: Array.isArray(b["protectCategories"])
+      ? (b["protectCategories"] as unknown[]).filter((x): x is string => typeof x === "string").slice(0, 100)
+      : [],
+    onlyAutomated: b["onlyAutomated"] === true,
+    minViews: nonNegInt(b["minViews"]),
+    keepRecent: nonNegInt(b["keepRecent"]),
+    maxPerRun: nonNegInt(b["maxPerRun"]),
+  };
+}
+
+/** POST /api/admin/articles/retention/preview — prévia (não apaga) */
+router.post("/articles/retention/preview", requireAdmin, async (req, res) => {
+  const stats = await articleService.getRetentionStats(parseRetentionOptions(req.body));
+  res.json(stats);
+});
+
+/** POST /api/admin/articles/retention/run — executa a limpeza agora */
+router.post("/articles/retention/run", requireAdmin, async (req, res) => {
+  const opts = parseRetentionOptions(req.body);
+  const deleted = await articleService.purgeOlderThan(opts);
+  const stats = await articleService.getRetentionStats(opts);
+
+  store.updateSettings({
+    articleRetentionLastRunAt: new Date().toISOString(),
+    articleRetentionLastCount: deleted,
+  });
+
+  await logAudit({
+    userId: req.userId, userEmail: req.userEmail,
+    action: "purge_articles", module: "articles",
+    description: `Exclusão manual de ${deleted} artigo(s) com mais de ${stats.days} dias (escopo: ${opts.scope})`,
+    ipAddress: getClientIp(req), userAgent: req.headers["user-agent"],
+    metadata: {
+      days: stats.days, scope: opts.scope, deleted,
+      protectCategories: opts.protectCategories, onlyAutomated: opts.onlyAutomated,
+      minViews: opts.minViews, keepRecent: opts.keepRecent, maxPerRun: opts.maxPerRun,
+    },
+  });
+  req.log.info({ deleted, days: stats.days, scope: opts.scope }, "admin: article retention purge (manual)");
+
+  res.json({ deleted, days: stats.days, scope: opts.scope, remaining: stats.total });
 });
 
 /**

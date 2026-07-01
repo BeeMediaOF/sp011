@@ -1,6 +1,96 @@
 import { randomUUID } from "crypto";
-import { eq, or, and, isNull, desc, sql } from "drizzle-orm";
-import { db, articlesTable, type ArticleRow } from "@workspace/db";
+import { eq, or, and, isNull, desc, sql, inArray, type SQL } from "drizzle-orm";
+import { db, articlesTable, articleViewsTable, type ArticleRow } from "@workspace/db";
+
+/** Quais artigos a limpeza automática pode remover. */
+export type RetentionScope = "all" | "published" | "draft";
+
+/** Regra completa da limpeza automática de artigos. */
+export interface RetentionOptions {
+  /** Idade mínima (em dias) para um artigo ser candidato à exclusão. */
+  days: number;
+  /** Status alvo: todos, só publicados ou só rascunhos. */
+  scope: RetentionScope;
+  /** Categorias que NUNCA são excluídas (comparadas em minúsculas). */
+  protectCategories?: string[];
+  /** Quando true, só exclui artigos importados automaticamente (rss/perplexity). */
+  onlyAutomated?: boolean;
+  /** Preserva artigos com visualizações ≥ este valor (0 = desativado). */
+  minViews?: number;
+  /** Sempre mantém os N artigos mais recentes, independentemente da idade (0 = desativado). */
+  keepRecent?: number;
+  /** Máximo de artigos excluídos por execução (0 = ilimitado). */
+  maxPerRun?: number;
+}
+
+/** Idade efetiva do artigo (published_at com fallback para created_at). */
+const AGE_EXPR = sql`COALESCE(${articlesTable.publishedAt}, ${articlesTable.createdAt})`;
+
+/** Normaliza o nº de dias de retenção para um intervalo seguro (1..3650). */
+function clampRetentionDays(days: number): number {
+  const n = Math.floor(Number(days));
+  if (!Number.isFinite(n) || n < 1) return 180;
+  return Math.min(n, 3650);
+}
+
+function toNonNegInt(v: unknown): number {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Monta a condição SQL que define os artigos candidatos à exclusão, combinando
+ * idade + todas as proteções configuradas. É assíncrona porque `keepRecent`
+ * precisa consultar a data-limite dos N artigos mais recentes.
+ */
+async function buildRetentionWhere(opts: RetentionOptions): Promise<{ where: SQL; effDays: number; cutoff: Date }> {
+  const effDays = clampRetentionDays(opts.days);
+  const cutoff = new Date(Date.now() - effDays * 24 * 3600 * 1000);
+
+  const conds: SQL[] = [sql`${AGE_EXPR} < ${cutoff}`];
+
+  if (opts.scope !== "all") {
+    conds.push(sql`${articlesTable.status} = ${opts.scope}`);
+  }
+
+  const cats = (opts.protectCategories ?? [])
+    .map((c) => c.toLowerCase().trim())
+    .filter((c) => c.length > 0);
+  if (cats.length > 0) {
+    conds.push(sql`lower(${articlesTable.category}) NOT IN (${sql.join(cats.map((c) => sql`${c}`), sql`, `)})`);
+  }
+
+  if (opts.onlyAutomated) {
+    conds.push(sql`${articlesTable.origin} IN ('rss', 'perplexity')`);
+  }
+
+  const minViews = toNonNegInt(opts.minViews);
+  if (minViews > 0) {
+    conds.push(sql`NOT EXISTS (
+      SELECT 1 FROM ${articleViewsTable}
+      WHERE ${articleViewsTable.articleId} = ${articlesTable.id}
+        AND ${articleViewsTable.views} >= ${minViews}
+    )`);
+  }
+
+  const keepRecent = toNonNegInt(opts.keepRecent);
+  if (keepRecent > 0) {
+    const recent = await db
+      .select({ d: sql<string>`${AGE_EXPR}` })
+      .from(articlesTable)
+      .orderBy(desc(AGE_EXPR))
+      .limit(keepRecent);
+    if (recent.length >= keepRecent && recent[keepRecent - 1]?.d) {
+      // Só exclui artigos mais antigos que o N-ésimo mais recente.
+      conds.push(sql`${AGE_EXPR} < ${new Date(recent[keepRecent - 1]!.d)}`);
+    } else {
+      // Menos artigos que o mínimo a preservar → não exclui nada.
+      conds.push(sql`false`);
+    }
+  }
+
+  return { where: and(...conds) as SQL, effDays, cutoff };
+}
 
 function slugify(text: string): string {
   return text
@@ -254,6 +344,63 @@ export const articleService = {
       .where(eq(articlesTable.id, id))
       .returning({ id: articlesTable.id });
     return rows.length > 0;
+  },
+
+  /**
+   * Prévia da limpeza automática: quantos artigos seriam excluídos com a regra
+   * atual, sem apagar nada. `count` já considera o teto `maxPerRun`; `total` é o
+   * nº de artigos no banco. `cutoff` é a data-limite (ISO) aplicada.
+   */
+  async getRetentionStats(
+    opts: RetentionOptions,
+  ): Promise<{ count: number; total: number; cutoff: string; days: number; scope: RetentionScope }> {
+    const { where, effDays, cutoff } = await buildRetentionWhere(opts);
+    const [matched, totalRow] = await Promise.all([
+      db.select({ n: sql<number>`count(*)::int` }).from(articlesTable).where(where),
+      db.select({ n: sql<number>`count(*)::int` }).from(articlesTable),
+    ]);
+    let count = matched[0]?.n ?? 0;
+    const cap = toNonNegInt(opts.maxPerRun);
+    if (cap > 0) count = Math.min(count, cap);
+    return {
+      count,
+      total: totalRow[0]?.n ?? 0,
+      cutoff: cutoff.toISOString(),
+      days: effDays,
+      scope: opts.scope,
+    };
+  },
+
+  /**
+   * Exclui os artigos que atendem à regra de retenção (idade + proteções).
+   * Respeita o teto `maxPerRun` removendo primeiro os mais antigos. Retorna o
+   * nº de artigos removidos.
+   */
+  async purgeOlderThan(opts: RetentionOptions): Promise<number> {
+    bustCache();
+    const { where } = await buildRetentionWhere(opts);
+    const cap = toNonNegInt(opts.maxPerRun);
+
+    if (cap > 0) {
+      const candidates = await db
+        .select({ id: articlesTable.id })
+        .from(articlesTable)
+        .where(where)
+        .orderBy(AGE_EXPR) // mais antigos primeiro
+        .limit(cap);
+      if (candidates.length === 0) return 0;
+      const rows = await db
+        .delete(articlesTable)
+        .where(inArray(articlesTable.id, candidates.map((c) => c.id)))
+        .returning({ id: articlesTable.id });
+      return rows.length;
+    }
+
+    const rows = await db
+      .delete(articlesTable)
+      .where(where)
+      .returning({ id: articlesTable.id });
+    return rows.length;
   },
 
   /** Import articles from store.json array (startup migration) */

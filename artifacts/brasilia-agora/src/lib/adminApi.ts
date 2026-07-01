@@ -46,6 +46,16 @@ export const adminApi = {
   publishArticle: (id: string) => req<{ article: Article }>("POST", `/publish/${id}`, {}),
   rewriteArticle: (id: string) => req<{ article: Article }>("POST", `/articles/${id}/rewrite`, {}),
   repairContent: () => req<{ fixed: number; skipped: number; total: number }>("POST", "/articles/repair-content", {}),
+
+  // Article retention (limpeza automática — admin only)
+  getArticleRetentionPreview: (opts: RetentionOptions) =>
+    req<{ count: number; total: number; cutoff: string; days: number; scope: string }>(
+      "POST", "/articles/retention/preview", opts
+    ),
+  runArticleRetention: (opts: RetentionOptions) =>
+    req<{ deleted: number; days: number; scope: string; remaining: number }>(
+      "POST", "/articles/retention/run", opts
+    ),
   autofillArticle: (title: string, content: string) =>
     req<{ subtitle: string; summary: string; tags: string[]; seoTitle: string; metaDesc: string; slug: string }>(
       "POST", "/articles/autofill", { title, content }
@@ -305,6 +315,28 @@ export interface SiteSettings {
   headerPaddingX?: number;
   headerMarginTop?: number;
   siteUrl?: string;
+  // Retenção automática de artigos (limpeza do banco)
+  articleRetentionEnabled?: boolean;
+  articleRetentionDays?: number;
+  articleRetentionScope?: "all" | "published" | "draft";
+  articleRetentionProtectCategories?: string[];
+  articleRetentionOnlyAutomated?: boolean;
+  articleRetentionMinViews?: number;
+  articleRetentionKeepRecent?: number;
+  articleRetentionMaxPerRun?: number;
+  articleRetentionLastRunAt?: string;
+  articleRetentionLastCount?: number;
+}
+
+/** Regra de retenção enviada às rotas de prévia/execução da limpeza. */
+export interface RetentionOptions {
+  days: number;
+  scope: "all" | "published" | "draft";
+  protectCategories?: string[];
+  onlyAutomated?: boolean;
+  minViews?: number;
+  keepRecent?: number;
+  maxPerRun?: number;
 }
 
 export interface AnalyticsStats {
