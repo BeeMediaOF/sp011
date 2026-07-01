@@ -36,7 +36,7 @@ const SECRET_FIELDS: Record<string, string[]> = {
     "rssAiApiKey", "diffbotApiKey", "geminiApiKey",
     "openaiApiKey", "youtubeApiKey", "webhookApiKey",
   ],
-  social_config: ["pageAccessToken"],
+  social_config: ["pageAccessToken", "metaAppSecret"],
 };
 
 /** Apply `fn` (encrypt/decrypt) to every secret field of a settings blob. Returns a new object. */
@@ -148,6 +148,8 @@ export interface RssSource {
 export interface RssPrompts { global?: string; categories?: Record<string, string> }
 
 export interface SocialConfig {
+  /** Credenciais do App Meta (global) usadas pelo fluxo OAuth. */
+  metaAppId?: string; metaAppSecret?: string;
   instagramUserId?: string; facebookPageId?: string; pageAccessToken?: string;
   feedCaption?: string; storyCaption?: string;
   autoPublishFeed?: boolean; autoPublishStory?: boolean; autoPublishFacebook?: boolean;

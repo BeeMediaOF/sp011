@@ -5,6 +5,7 @@ import {
   Play, RefreshCw, ChevronDown, ChevronUp, Image as ImageIcon, Type,
   AlignLeft, AlignCenter, AlignRight, Layers, Save,
   Instagram, Facebook, Clock, Send, Link2, TestTube2, ToggleLeft, ToggleRight,
+  Globe, Server, Settings, ExternalLink,
   Upload, Eye, Copy, Sparkles, ArrowUpToLine, ArrowDownToLine, FoldVertical,
   Italic, Underline, Strikethrough, RotateCw, Undo2, Redo2,
   Square, Circle, Triangle, Star, Minus, ArrowRight, Hexagon,
@@ -55,6 +56,37 @@ interface SocialAccount {
   accessToken?: string | null;
   isActive: boolean;
   createdAt: string;
+}
+
+type ConnectionPlatform = "wordpress" | "site_externo" | "blogger";
+
+interface Connection {
+  id: string;
+  platform: ConnectionPlatform;
+  name: string;
+  siteUrl?: string | null;
+  username?: string | null;
+  hasSecret: boolean;
+  secret?: string | null;
+  config?: Record<string, unknown> | null;
+  autoPublish: boolean;
+  status: "online" | "offline" | "error";
+  lastTestAt?: string | null;
+  lastError?: string | null;
+  isActive: boolean;
+}
+
+interface MetaAppConfig {
+  appId: string;
+  hasSecret: boolean;
+  redirectUri: string;
+}
+
+interface OAuthPage {
+  id: string;
+  name: string;
+  instagramId?: string | null;
+  instagramName?: string | null;
 }
 
 export type { TemplateElement };
@@ -639,13 +671,402 @@ function AccountModal({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CONNECTION CARDS & MODALS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function StatusBadge({ status }: { status: "online" | "offline" | "error" }) {
+  const map = {
+    online:  { label: "ONLINE",  cls: "bg-green-100 text-green-700" },
+    error:   { label: "ERRO",    cls: "bg-red-100 text-red-600" },
+    offline: { label: "OFFLINE", cls: "bg-slate-100 text-slate-400" },
+  } as const;
+  const s = map[status] ?? map.offline;
+  return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wide ${s.cls}`}>{s.label}</span>;
+}
+
+function ConnectionCard({
+  icon, iconBg, title, subtitle, docUrl, conn, testStatus, testingId,
+  onConfigure, onTest, onToggleAuto, onDelete,
+}: {
+  platform: ConnectionPlatform;
+  icon: React.ReactNode;
+  iconBg: string;
+  title: string;
+  subtitle: string;
+  docUrl: string | null;
+  conn: Connection | null;
+  testStatus: Record<string, { ok: boolean; msg: string } | null>;
+  testingId: string | null;
+  onConfigure: (conn: Connection | null) => void;
+  onTest: (id: string) => void;
+  onToggleAuto: (conn: Connection) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: iconBg }}>{icon}</div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-slate-800">{title}</p>
+            <StatusBadge status={conn?.status ?? "offline"} />
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
+        </div>
+      </div>
+
+      {conn ? (
+        <>
+          <div className="text-xs text-slate-500 space-y-0.5 min-h-[1.25rem]">
+            {conn.siteUrl && <p className="truncate">{conn.siteUrl}</p>}
+            {conn.autoPublish && (
+              <p className="text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Publicação Automática Ativa</p>
+            )}
+            {conn.status === "error" && conn.lastError && <p className="text-red-500">{conn.lastError}</p>}
+            {testStatus[conn.id] && (
+              <p className={testStatus[conn.id]?.ok ? "text-green-600" : "text-red-500"}>{testStatus[conn.id]?.msg}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-auto pt-1">
+            <button onClick={() => onTest(conn.id)} disabled={testingId === conn.id} title="Testar agora"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+              {testingId === conn.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />} Testar
+            </button>
+            <button onClick={() => onToggleAuto(conn)} title="Publicação automática"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 transition-colors">
+              {conn.autoPublish ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
+            </button>
+            {docUrl && (
+              <a href={docUrl} target="_blank" rel="noreferrer" title="Abrir documentação"
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-50 transition-colors">
+                <ExternalLink size={13} />
+              </a>
+            )}
+            <button onClick={() => onConfigure(conn)} title="Configurar"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors ml-auto">
+              <Settings size={14} />
+            </button>
+            <button onClick={() => onDelete(conn.id)} title="Desconectar"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <button onClick={() => onConfigure(null)}
+          className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
+          style={{ background: PRIMARY }}>
+          <Plus size={15} /> Conectar
+        </button>
+      )}
+    </div>
+  );
+}
+
+function MetaConnectionCard({
+  accounts, metaApp, onConfigure,
+}: {
+  accounts: SocialAccount[];
+  metaApp: MetaAppConfig;
+  onConfigure: () => void;
+}) {
+  const connected = accounts.length;
+  const status: "online" | "offline" = connected > 0 && metaApp.hasSecret ? "online" : "offline";
+  return (
+    <div className="bg-white rounded-2xl p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg,#1877F2,#E1306C)" }}>
+          <Share2 size={20} className="text-white" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-bold text-slate-800">Meta</p>
+            <StatusBadge status={status} />
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">Facebook + Instagram</p>
+        </div>
+      </div>
+      <div className="text-xs text-slate-500 space-y-0.5 min-h-[1.25rem]">
+        {connected === 0
+          ? <p>Nenhuma página conectada.</p>
+          : accounts.slice(0, 3).map((a) => (
+              <p key={a.id} className="truncate flex items-center gap-1.5">
+                {a.instagramId ? <Instagram size={12} className="text-[#E1306C]" /> : <Facebook size={12} className="text-[#1877F2]" />}
+                {a.name}
+              </p>
+            ))}
+        {connected > 3 && <p className="text-slate-400">+{connected - 3} outras</p>}
+      </div>
+      <button onClick={onConfigure}
+        className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
+        style={{ background: PRIMARY }}>
+        <Settings size={15} /> {connected > 0 ? "Gerenciar" : "Conectar"}
+      </button>
+    </div>
+  );
+}
+
+function ModalShell({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-800">{title}</h3>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function LabeledInput({ label, value, onChange, placeholder, type = "text", hint }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string; hint?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50"
+      />
+      {hint && <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">{hint}</p>}
+    </div>
+  );
+}
+
+function AutoPublishToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-2 cursor-pointer py-1">
+      <span className="text-sm text-slate-700 font-medium">Publicação Automática</span>
+      <button type="button" onClick={() => onChange(!value)}>
+        {value ? <ToggleRight size={26} className="text-green-500" /> : <ToggleLeft size={26} className="text-slate-300" />}
+      </button>
+    </label>
+  );
+}
+
+function ConnectionModal({
+  platform, editingConnection, setEditingConnection, onSave, onClose,
+}: {
+  platform: "wordpress" | "site_externo";
+  editingConnection: Partial<Connection>;
+  setEditingConnection: React.Dispatch<React.SetStateAction<Partial<Connection> | null>>;
+  onSave: () => void;
+  onClose: () => void;
+}) {
+  const isWp = platform === "wordpress";
+  const set = (patch: Partial<Connection>) =>
+    setEditingConnection((prev) => (prev ? { ...prev, ...patch } : prev));
+
+  return (
+    <ModalShell title={isWp ? "Configurar WordPress" : "Configurar Site Externo"} onClose={onClose}>
+      <div className="p-6 space-y-4">
+        <LabeledInput label="Nome da conexão" value={editingConnection.name ?? ""}
+          onChange={(v) => set({ name: v })} placeholder={isWp ? "WordPress" : "Site Externo"} />
+        <LabeledInput label={isWp ? "URL do Site *" : "URL / Endpoint *"} value={editingConnection.siteUrl ?? ""}
+          onChange={(v) => set({ siteUrl: v })} placeholder="https://meusite.com" type="url" />
+        {isWp && (
+          <LabeledInput label="Usuário *" value={editingConnection.username ?? ""}
+            onChange={(v) => set({ username: v })} placeholder="admin ou e-mail" />
+        )}
+        <LabeledInput
+          label={isWp ? "Application Password *" : "Token / API Key"}
+          value={editingConnection.secret ?? ""}
+          onChange={(v) => set({ secret: v })}
+          placeholder={isWp ? "xxxx xxxx xxxx xxxx" : "Bearer token (opcional)"}
+          type="password"
+          hint={isWp
+            ? "Gere em WP-Admin → Usuários → Perfil → Senhas de Aplicativo. O usuário precisa ser Admin/Editor."
+            : "Enviado como header Authorization: Bearer … no teste e na publicação (opcional)."}
+        />
+        <AutoPublishToggle value={editingConnection.autoPublish ?? false} onChange={(v) => set({ autoPublish: v })} />
+      </div>
+      <div className="flex gap-2 p-6 pt-0">
+        <button onClick={onSave} disabled={!editingConnection.siteUrl || (isWp && !editingConnection.username)}
+          className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+          style={{ background: PRIMARY }}>
+          <Save size={14} /> Salvar
+        </button>
+        <button onClick={onClose}
+          className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+          Cancelar
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function MetaModal({
+  metaApp, accounts, onClose, onSaveApp, openOAuthPopup, onConnected,
+  onTestAccount, testStatus, testingId, onToggleAccount, onDeleteAccount, onManualToken,
+}: {
+  metaApp: MetaAppConfig;
+  accounts: SocialAccount[];
+  onClose: () => void;
+  onSaveApp: (appId: string, appSecret: string) => Promise<MetaAppConfig>;
+  openOAuthPopup: (url: string) => Promise<{ code: string; state: string }>;
+  onConnected: () => void;
+  onTestAccount: (id: string) => void;
+  testStatus: Record<string, { ok: boolean; msg: string } | null>;
+  testingId: string | null;
+  onToggleAccount: (acc: SocialAccount) => void;
+  onDeleteAccount: (id: string) => void;
+  onManualToken: () => void;
+}) {
+  const [appId, setAppId]         = useState(metaApp.appId);
+  const [appSecret, setAppSecret] = useState(metaApp.hasSecret ? "••••••••" : "");
+  const [busy, setBusy]           = useState(false);
+  const [error, setError]         = useState("");
+  const [oauthPages, setOauthPages] = useState<OAuthPage[] | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [selected, setSelected]   = useState<Set<string>>(new Set());
+
+  async function saveApp() {
+    setBusy(true); setError("");
+    try { await onSaveApp(appId.trim(), appSecret); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  async function selectAccount() {
+    setBusy(true); setError("");
+    try {
+      await onSaveApp(appId.trim(), appSecret);
+      const start = (await apiFetch("/meta/oauth/start")) as { url?: string; error?: string };
+      if (!start.url) throw new Error(start.error ?? "Não foi possível iniciar o OAuth.");
+      const { code, state } = await openOAuthPopup(start.url);
+      const ex = (await apiFetch("/meta/oauth/exchange", { method: "POST", body: JSON.stringify({ code, state }) })) as
+        { sessionId?: string; pages?: OAuthPage[]; error?: string };
+      if (ex.error || !ex.sessionId) throw new Error(ex.error ?? "Falha ao obter as páginas.");
+      setSessionId(ex.sessionId);
+      setOauthPages(ex.pages ?? []);
+      setSelected(new Set((ex.pages ?? []).map((p) => p.id)));
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  async function saveAccounts() {
+    if (!sessionId) return;
+    setBusy(true); setError("");
+    try {
+      const r = (await apiFetch("/meta/oauth/save", { method: "POST", body: JSON.stringify({ sessionId, pageIds: [...selected] }) })) as
+        { ok?: boolean; error?: string };
+      if (r.error) throw new Error(r.error);
+      setOauthPages(null); setSessionId(null);
+      onConnected();
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <ModalShell title="Configurar Meta (Facebook + Instagram)" onClose={onClose}>
+      <div className="p-6 space-y-4">
+        <LabeledInput label="App ID" value={appId} onChange={setAppId} placeholder="819328061112128" />
+        <LabeledInput label="App Secret" value={appSecret} onChange={setAppSecret} placeholder="••••••••••••••••" type="password" />
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          No Meta for Developers, cadastre o Redirect URI do Facebook Login como:<br />
+          <span className="font-mono text-slate-500 break-all">{metaApp.redirectUri || "(defina APP_URL no servidor)"}</span>
+        </p>
+
+        <div className="flex gap-2">
+          <button onClick={() => { void saveApp(); }} disabled={busy || !appId.trim()}
+            className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 transition-colors">
+            Salvar credenciais
+          </button>
+          <button onClick={() => { void selectAccount(); }} disabled={busy || !appId.trim()}
+            className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+            style={{ background: PRIMARY }}>
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Facebook size={14} />} Selecionar conta (popup Meta)
+          </button>
+        </div>
+
+        {error && <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+
+        {/* Seleção de páginas retornadas pelo OAuth */}
+        {oauthPages && (
+          <div className="border-t border-slate-100 pt-4 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase">Escolha as páginas</p>
+            {oauthPages.length === 0 ? (
+              <p className="text-sm text-red-500">
+                Nenhuma Página encontrada nesta conta. Verifique se você tem uma Página do Facebook com Instagram Business vinculado.
+              </p>
+            ) : oauthPages.map((p) => (
+              <label key={p.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
+                <input type="checkbox" checked={selected.has(p.id)}
+                  onChange={(e) => setSelected((prev) => {
+                    const next = new Set(prev);
+                    if (e.target.checked) next.add(p.id); else next.delete(p.id);
+                    return next;
+                  })} />
+                <span className="text-sm text-slate-700">{p.name}</span>
+                {p.instagramName && <span className="text-xs text-[#E1306C]">@{p.instagramName}</span>}
+              </label>
+            ))}
+            {oauthPages.length > 0 && (
+              <button onClick={() => { void saveAccounts(); }} disabled={busy || selected.size === 0}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 mt-1"
+                style={{ background: PRIMARY }}>
+                <Save size={14} /> Salvar contas selecionadas
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Contas já conectadas */}
+        {accounts.length > 0 && (
+          <div className="border-t border-slate-100 pt-4 space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase">Contas conectadas</p>
+            {accounts.map((acc) => (
+              <div key={acc.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50">
+                {acc.instagramId ? <Instagram size={15} className="text-[#E1306C]" /> : <Facebook size={15} className="text-[#1877F2]" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-700 truncate">{acc.name}</p>
+                  {testStatus[acc.id] && (
+                    <p className={`text-[11px] ${testStatus[acc.id]?.ok ? "text-green-600" : "text-red-500"}`}>{testStatus[acc.id]?.msg}</p>
+                  )}
+                </div>
+                <button onClick={() => onTestAccount(acc.id)} disabled={testingId === acc.id} title="Testar"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-50">
+                  {testingId === acc.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />}
+                </button>
+                <button onClick={() => onToggleAccount(acc)} title="Ativar/Pausar"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100">
+                  {acc.isActive ? <ToggleRight size={14} className="text-green-500" /> : <ToggleLeft size={14} />}
+                </button>
+                <button onClick={() => onDeleteAccount(acc.id)} title="Remover"
+                  className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t border-slate-100 pt-3">
+          <button onClick={onManualToken} className="text-xs font-semibold text-[#0B2A66] hover:underline">
+            Ou colar Page Access Token manualmente (avançado)
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function SocialMedia() {
-  const [tab, setTab] = useState<"accounts" | "templates" | "queue">("accounts");
+  const [tab, setTab] = useState<"connections" | "templates" | "queue">("connections");
 
-  // ── Accounts ──────────────────────────────────────────────────────────────
+  // ── Accounts (Meta) ───────────────────────────────────────────────────────
   const [accounts,         setAccounts]         = useState<SocialAccount[]>([]);
   const [accountsLoading,  setAccountsLoading]  = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -653,6 +1074,14 @@ export default function SocialMedia() {
   const [accountSaving,    setAccountSaving]    = useState(false);
   const [testStatus,       setTestStatus]       = useState<Record<string, { ok: boolean; msg: string } | null>>({});
   const [testingId,        setTestingId]        = useState<string | null>(null);
+
+  // ── Connections (WordPress / Site Externo) + Meta OAuth ───────────────────
+  const [connections,      setConnections]      = useState<Connection[]>([]);
+  const [metaApp,          setMetaApp]          = useState<MetaAppConfig>({ appId: "", hasSecret: false, redirectUri: "" });
+  const [openModal,        setOpenModal]        = useState<null | "meta" | "wordpress" | "site_externo">(null);
+  const [editingConnection, setEditingConnection] = useState<Partial<Connection> | null>(null);
+  const [connTestStatus,   setConnTestStatus]   = useState<Record<string, { ok: boolean; msg: string } | null>>({});
+  const [connTestingId,    setConnTestingId]    = useState<string | null>(null);
 
   // ── Templates ─────────────────────────────────────────────────────────────
   const [templates,       setTemplates]       = useState<SocialTemplate[]>([]);
@@ -703,6 +1132,14 @@ export default function SocialMedia() {
     try { setAccounts((await apiFetch("/accounts")) as SocialAccount[]); } finally { setAccountsLoading(false); }
   }, []);
 
+  const fetchConnections = useCallback(async () => {
+    try { setConnections((await apiFetch("/connections")) as Connection[]); } catch { /* ignore */ }
+  }, []);
+
+  const fetchMetaApp = useCallback(async () => {
+    try { setMetaApp((await apiFetch("/meta/app")) as MetaAppConfig); } catch { /* ignore */ }
+  }, []);
+
   const fetchTemplates = useCallback(async () => {
     setTemplates((await apiFetch("/templates")) as SocialTemplate[]);
   }, []);
@@ -734,7 +1171,7 @@ export default function SocialMedia() {
     } catch { /* mantém o default */ }
   }, []);
 
-  useEffect(() => { void fetchAccounts(); void fetchTemplates(); void fetchSocialConfig(); }, [fetchAccounts, fetchTemplates, fetchSocialConfig]);
+  useEffect(() => { void fetchAccounts(); void fetchTemplates(); void fetchSocialConfig(); void fetchConnections(); void fetchMetaApp(); }, [fetchAccounts, fetchTemplates, fetchSocialConfig, fetchConnections, fetchMetaApp]);
   useEffect(() => { if (tab === "templates" && editorArticles.length === 0) void fetchEditorArticles(); }, [tab, editorArticles.length, fetchEditorArticles]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [tab, fetchQueue]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [queueFilter]);
@@ -983,6 +1420,83 @@ export default function SocialMedia() {
   async function toggleAccountActive(account: SocialAccount) {
     await apiFetch(`/accounts/${account.id}`, { method: "PUT", body: JSON.stringify({ isActive: !account.isActive }) });
     await fetchAccounts();
+  }
+
+  // ── Connection ops (WordPress / Site Externo) ─────────────────────────────
+
+  async function saveConnection() {
+    if (!editingConnection?.platform) return;
+    const body = {
+      platform:    editingConnection.platform,
+      name:        editingConnection.name,
+      siteUrl:     editingConnection.siteUrl ?? "",
+      username:    editingConnection.username ?? "",
+      secret:      editingConnection.secret ?? "",
+      autoPublish: editingConnection.autoPublish ?? false,
+      config:      editingConnection.config ?? null,
+    };
+    if (editingConnection.id) {
+      await apiFetch(`/connections/${editingConnection.id}`, { method: "PUT", body: JSON.stringify(body) });
+    } else {
+      await apiFetch("/connections", { method: "POST", body: JSON.stringify(body) });
+    }
+    setOpenModal(null); setEditingConnection(null);
+    await fetchConnections();
+  }
+
+  async function deleteConnection(id: string) {
+    if (!window.confirm("Desconectar e remover esta conexão?")) return;
+    await apiFetch(`/connections/${id}`, { method: "DELETE" });
+    await fetchConnections();
+  }
+
+  async function testConnection(id: string) {
+    setConnTestingId(id); setConnTestStatus((prev) => ({ ...prev, [id]: null }));
+    try {
+      const r = (await apiFetch(`/connections/${id}/test`, { method: "POST" })) as { ok: boolean; error?: string };
+      setConnTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? "✓ Online" : r.error ?? "Erro" } }));
+      await fetchConnections();
+    } catch (e) {
+      setConnTestStatus((prev) => ({ ...prev, [id]: { ok: false, msg: (e as Error).message } }));
+    } finally { setConnTestingId(null); }
+  }
+
+  async function toggleConnectionAuto(conn: Connection) {
+    await apiFetch(`/connections/${conn.id}`, { method: "PUT", body: JSON.stringify({ autoPublish: !conn.autoPublish }) });
+    await fetchConnections();
+  }
+
+  // ── Meta app + OAuth ──────────────────────────────────────────────────────
+
+  async function saveMetaApp(appId: string, appSecret: string) {
+    const body: Record<string, string> = { appId };
+    if (appSecret && !appSecret.includes("••")) body["appSecret"] = appSecret;
+    const r = (await apiFetch("/meta/app", { method: "POST", body: JSON.stringify(body) })) as MetaAppConfig;
+    setMetaApp(r);
+    return r;
+  }
+
+  /** Abre o popup OAuth da Meta e resolve com o code retornado pela callback page. */
+  function openMetaOAuthPopup(url: string): Promise<{ code: string; state: string }> {
+    return new Promise((resolve, reject) => {
+      const popup = window.open(url, "meta-oauth", "popup,width=640,height=740");
+      if (!popup) { reject(new Error("Popup bloqueado — libere popups para este site e tente novamente.")); return; }
+      const onMessage = (ev: MessageEvent) => {
+        if (ev.origin !== window.location.origin) return;
+        const data = ev.data as { source?: string; code?: string; state?: string; error?: string };
+        if (!data || data.source !== "meta-oauth") return;
+        window.removeEventListener("message", onMessage);
+        clearInterval(timer);
+        if (data.error) { reject(new Error(data.error)); return; }
+        if (!data.code || !data.state) { reject(new Error("Autorização cancelada.")); return; }
+        resolve({ code: data.code, state: data.state });
+      };
+      window.addEventListener("message", onMessage);
+      // Se o usuário fechar o popup sem autorizar.
+      const timer = setInterval(() => {
+        if (popup.closed) { clearInterval(timer); window.removeEventListener("message", onMessage); reject(new Error("Janela fechada antes de concluir.")); }
+      }, 700);
+    });
   }
 
   // ── Template ops ──────────────────────────────────────────────────────────
@@ -1296,82 +1810,69 @@ export default function SocialMedia() {
 
       {/* Tab bar */}
       <div className="flex items-center gap-2 mb-6 bg-[#0B2A66] rounded-2xl p-1.5 w-fit">
-        {tabBtn("accounts",  "Contas",    <Facebook size={15} />)}
-        {tabBtn("templates", "Templates", <Layers size={15} />)}
-        {tabBtn("queue",     "Fila",      <Clock size={15} />)}
+        {tabBtn("connections", "Conexões", <Link2 size={15} />)}
+        {tabBtn("templates",   "Templates", <Layers size={15} />)}
+        {tabBtn("queue",       "Fila",      <Clock size={15} />)}
       </div>
 
-      {/* ══════════ CONTAS ══════════════════════════════════════════════════ */}
-      {tab === "accounts" && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Contas Meta conectadas</h2>
-              <p className="text-sm text-slate-500 mt-0.5">Páginas do Facebook e perfis Instagram Business</p>
-            </div>
-            <button
-              onClick={() => { setEditingAccount({ name: "", isActive: true }); setShowAccountModal(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white"
-              style={{ background: PRIMARY }}
-            >
-              <Plus size={15} /> Adicionar Conta
-            </button>
+      {/* ══════════ CONEXÕES ═════════════════════════════════════════════════ */}
+      {tab === "connections" && (
+        <div className="space-y-5">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Conexões de publicação</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Conecte suas plataformas. Depois de testadas e online, ativamos a publicação automática.
+            </p>
           </div>
 
-          {accountsLoading ? (
-            <div className="flex items-center gap-2 text-slate-400 py-8"><Loader2 size={18} className="animate-spin" /> Carregando…</div>
-          ) : accounts.length === 0 ? (
-            <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
-              <div className="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Share2 size={24} className="text-slate-300" />
-              </div>
-              <p className="text-sm text-slate-500 font-medium">Nenhuma conta conectada</p>
-              <p className="text-xs text-slate-400 mt-1">Adicione uma conta Meta (Facebook/Instagram) para começar</p>
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {accounts.map((acc) => (
-                <div key={acc.id} className="bg-white rounded-2xl p-5 flex items-center gap-4" style={{ boxShadow: CARD_SHADOW }}>
-                  <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: acc.instagramId ? "#E1306C" : "#1877F2" }}>
-                    {acc.instagramId ? <Instagram size={20} className="text-white" /> : <Facebook size={20} className="text-white" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800">{acc.name}</p>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs text-slate-500">
-                      {acc.pageId      && <span>Page: {acc.pageId}</span>}
-                      {acc.instagramId && <span>IG: {acc.instagramId}</span>}
-                    </div>
-                    {testStatus[acc.id] && (
-                      <p className={`text-xs mt-1 font-medium ${testStatus[acc.id]?.ok ? "text-green-600" : "text-red-500"}`}>
-                        {testStatus[acc.id]?.msg}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${acc.isActive ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-400"}`}>
-                      {acc.isActive ? "Ativo" : "Pausado"}
-                    </span>
-                    <button onClick={() => { void testAccount(acc.id); }} disabled={testingId === acc.id} title="Testar"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors disabled:opacity-50">
-                      {testingId === acc.id ? <Loader2 size={13} className="animate-spin" /> : <TestTube2 size={13} />}
-                    </button>
-                    <button onClick={() => { void toggleAccountActive(acc); }} title="Ativar/Pausar"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors">
-                      {acc.isActive ? <ToggleRight size={15} className="text-green-500" /> : <ToggleLeft size={15} />}
-                    </button>
-                    <button onClick={() => { setEditingAccount({ ...acc, accessToken: "" }); setShowAccountModal(true); }} title="Editar"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors">
-                      <Pencil size={13} />
-                    </button>
-                    <button onClick={() => { void deleteAccount(acc.id); }} title="Remover"
-                      className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {/* ── Card Meta ── */}
+            <MetaConnectionCard
+              accounts={accounts}
+              metaApp={metaApp}
+              onConfigure={() => setOpenModal("meta")}
+            />
+
+            {/* ── Card WordPress ── */}
+            <ConnectionCard
+              platform="wordpress"
+              icon={<Globe size={20} className="text-white" />}
+              iconBg="#21759B"
+              title="WordPress"
+              subtitle="Publicar posts via REST API"
+              docUrl="https://wordpress.org/documentation/article/application-passwords/"
+              conn={connections.find((c) => c.platform === "wordpress") ?? null}
+              testStatus={connTestStatus}
+              testingId={connTestingId}
+              onConfigure={(conn) => {
+                setEditingConnection(conn ?? { platform: "wordpress", name: "WordPress", autoPublish: false });
+                setOpenModal("wordpress");
+              }}
+              onTest={testConnection}
+              onToggleAuto={toggleConnectionAuto}
+              onDelete={deleteConnection}
+            />
+
+            {/* ── Card Site Externo ── */}
+            <ConnectionCard
+              platform="site_externo"
+              icon={<Server size={20} className="text-white" />}
+              iconBg="#475569"
+              title="Site Externo"
+              subtitle="Publicar via REST API / Webhook"
+              docUrl={null}
+              conn={connections.find((c) => c.platform === "site_externo") ?? null}
+              testStatus={connTestStatus}
+              testingId={connTestingId}
+              onConfigure={(conn) => {
+                setEditingConnection(conn ?? { platform: "site_externo", name: "Site Externo", autoPublish: false });
+                setOpenModal("site_externo");
+              }}
+              onTest={testConnection}
+              onToggleAuto={toggleConnectionAuto}
+              onDelete={deleteConnection}
+            />
+          </div>
         </div>
       )}
 
@@ -2095,7 +2596,7 @@ export default function SocialMedia() {
         </div>
       )}
 
-      {/* ══════════ MODAL — Conta ══════════════════════════════════════════ */}
+      {/* ══════════ MODAL — Conta (token manual Meta) ══════════════════════ */}
       {showAccountModal && editingAccount && (
         <AccountModal
           editingAccount={editingAccount}
@@ -2103,6 +2604,39 @@ export default function SocialMedia() {
           accountSaving={accountSaving}
           onSave={() => { void saveAccount(); }}
           onClose={() => { setShowAccountModal(false); setEditingAccount(null); }}
+        />
+      )}
+
+      {/* ══════════ MODAL — Meta (OAuth + fallback manual) ═════════════════ */}
+      {openModal === "meta" && (
+        <MetaModal
+          metaApp={metaApp}
+          accounts={accounts}
+          onClose={() => setOpenModal(null)}
+          onSaveApp={saveMetaApp}
+          openOAuthPopup={openMetaOAuthPopup}
+          onConnected={() => { void fetchAccounts(); void fetchMetaApp(); }}
+          onTestAccount={testAccount}
+          testStatus={testStatus}
+          testingId={testingId}
+          onToggleAccount={(acc) => { void toggleAccountActive(acc); }}
+          onDeleteAccount={(id) => { void deleteAccount(id); }}
+          onManualToken={() => {
+            setOpenModal(null);
+            setEditingAccount({ name: "", isActive: true });
+            setShowAccountModal(true);
+          }}
+        />
+      )}
+
+      {/* ══════════ MODAL — WordPress / Site Externo ═══════════════════════ */}
+      {(openModal === "wordpress" || openModal === "site_externo") && editingConnection && (
+        <ConnectionModal
+          platform={openModal}
+          editingConnection={editingConnection}
+          setEditingConnection={setEditingConnection}
+          onSave={() => { void saveConnection(); }}
+          onClose={() => { setOpenModal(null); setEditingConnection(null); }}
         />
       )}
 

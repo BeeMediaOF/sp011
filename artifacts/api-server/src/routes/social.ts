@@ -5,11 +5,14 @@ import { authMiddleware } from "../middlewares/auth.js";
 import { db } from "@workspace/db";
 import {
   socialAccountsTable, socialTemplatesTable, socialPublicationQueueTable, articlesTable,
+  socialConnectionsTable,
 } from "@workspace/db";
+import type { SocialConnectionRow } from "@workspace/db";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { store } from "../lib/store.js";
 import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
 import { renderArt } from "../lib/social/renderTemplate.js";
+import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import type { TemplateElement, SocialTemplate, ArticleData } from "@workspace/social-template";
 
 const router = Router();
@@ -38,13 +41,17 @@ router.use(authMiddleware);
 
 // ── Legacy config endpoints ────────────────────────────────────────────────────
 
-router.get("/config", (_req, res) => {
-  const cfg = store.getSocialConfig();
+function maskConfig(cfg: ReturnType<typeof store.getSocialConfig>) {
   const masked = { ...cfg };
   if (masked.pageAccessToken && masked.pageAccessToken.length > 10) {
     masked.pageAccessToken = masked.pageAccessToken.slice(0, 6) + "••••••••" + masked.pageAccessToken.slice(-4);
   }
-  res.json(masked);
+  if (masked.metaAppSecret) masked.metaAppSecret = "••••••••";
+  return masked;
+}
+
+router.get("/config", (_req, res) => {
+  res.json(maskConfig(store.getSocialConfig()));
 });
 
 router.post("/config", (req, res) => {
@@ -52,12 +59,11 @@ router.post("/config", (req, res) => {
   if (typeof body["pageAccessToken"] === "string" && body["pageAccessToken"].includes("••")) {
     delete body["pageAccessToken"];
   }
-  const cfg = store.updateSocialConfig(body);
-  const masked = { ...cfg };
-  if (masked.pageAccessToken && masked.pageAccessToken.length > 10) {
-    masked.pageAccessToken = masked.pageAccessToken.slice(0, 6) + "••••••••" + masked.pageAccessToken.slice(-4);
+  if (typeof body["metaAppSecret"] === "string" && body["metaAppSecret"].includes("••")) {
+    delete body["metaAppSecret"];
   }
-  res.json({ ok: true, config: masked });
+  const cfg = store.updateSocialConfig(body);
+  res.json({ ok: true, config: maskConfig(cfg) });
 });
 
 // ── Legacy direct publish ─────────────────────────────────────────────────────
@@ -159,12 +165,12 @@ router.post("/accounts", async (req, res) => {
     id:             randomUUID(),
     name:           b["name"] ?? "Nova Conta",
     metaAppId:      b["metaAppId"] || null,
-    metaAppSecret:  b["metaAppSecret"] || null,
+    metaAppSecret:  b["metaAppSecret"] ? encryptSecret(b["metaAppSecret"]) : null,
     pageId:         b["pageId"] || null,
     pageName:       b["pageName"] || null,
     instagramId:    b["instagramId"] || null,
     instagramName:  b["instagramName"] || null,
-    accessToken:    b["accessToken"] || null,
+    accessToken:    b["accessToken"] ? encryptSecret(b["accessToken"]) : null,
     isActive:       true,
   }).returning();
   res.json(maskAccount(row[0]!));
@@ -172,11 +178,22 @@ router.post("/accounts", async (req, res) => {
 
 router.put("/accounts/:id", async (req, res) => {
   const b = req.body as Record<string, string | boolean>;
-  const updates: Record<string, unknown> = {};
-  const fields = ["name","metaAppId","metaAppSecret","pageId","pageName","instagramId","instagramName","isActive"] as const;
-  for (const f of fields) if (f in b) updates[snakeCase(f)] = b[f];
-  if ("accessToken" in b && typeof b["accessToken"] === "string" && !b["accessToken"].includes("••")) {
-    updates["access_token"] = b["accessToken"];
+  // Drizzle `.set()` mapeia por nome de propriedade JS (camelCase), não pelo nome
+  // da coluna no banco — por isso usamos as chaves camelCase do schema aqui.
+  const updates: Partial<typeof socialAccountsTable.$inferInsert> = {};
+  if (typeof b["name"]          === "string")  updates.name          = b["name"];
+  if (typeof b["metaAppId"]     === "string")  updates.metaAppId     = b["metaAppId"]     || null;
+  if (typeof b["pageId"]        === "string")  updates.pageId        = b["pageId"]        || null;
+  if (typeof b["pageName"]      === "string")  updates.pageName      = b["pageName"]      || null;
+  if (typeof b["instagramId"]   === "string")  updates.instagramId   = b["instagramId"]   || null;
+  if (typeof b["instagramName"] === "string")  updates.instagramName = b["instagramName"] || null;
+  if (typeof b["isActive"]      === "boolean") updates.isActive      = b["isActive"];
+  // Segredos: só regrava quando enviado sem máscara (evita salvar "••••••••").
+  if (typeof b["metaAppSecret"] === "string" && b["metaAppSecret"] && !b["metaAppSecret"].includes("••")) {
+    updates.metaAppSecret = encryptSecret(b["metaAppSecret"]);
+  }
+  if (typeof b["accessToken"] === "string" && b["accessToken"] && !b["accessToken"].includes("••")) {
+    updates.accessToken = encryptSecret(b["accessToken"]);
   }
   if (Object.keys(updates).length > 0) {
     await db.update(socialAccountsTable).set(updates).where(eq(socialAccountsTable.id, req.params["id"]!));
@@ -195,7 +212,7 @@ router.post("/accounts/:id/test", async (req, res) => {
   if (!account?.accessToken) { res.status(400).json({ ok: false, error: "Conta ou token não encontrado" }); return; }
   try {
     const testRes = await fetch(
-      `https://graph.facebook.com/v20.0/me?access_token=${account.accessToken}`,
+      `https://graph.facebook.com/v20.0/me?access_token=${decryptSecret(account.accessToken)}`,
       { signal: AbortSignal.timeout(10000) },
     );
     const data = (await testRes.json()) as { name?: string; id?: string; error?: { message: string } };
@@ -404,20 +421,311 @@ router.post("/process", async (_req, res) => {
   }
 });
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONNECTIONS — /api/admin/social/connections  (WordPress, Site Externo, …)
+// A Meta continua em /accounts (fila lê social_accounts).
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const CONNECTION_PLATFORMS = ["wordpress", "site_externo", "blogger"] as const;
+
+router.get("/connections", async (_req, res) => {
+  const rows = await db.select().from(socialConnectionsTable).orderBy(desc(socialConnectionsTable.createdAt));
+  res.json(rows.map(maskConnection));
+});
+
+router.post("/connections", async (req, res) => {
+  const b = req.body as Record<string, unknown>;
+  const platform = String(b["platform"] ?? "");
+  if (!CONNECTION_PLATFORMS.includes(platform as (typeof CONNECTION_PLATFORMS)[number])) {
+    res.status(400).json({ error: "platform inválido" });
+    return;
+  }
+  const secret = typeof b["secret"] === "string" && b["secret"] && !b["secret"].includes("••")
+    ? encryptSecret(b["secret"])
+    : null;
+  const [row] = await db.insert(socialConnectionsTable).values({
+    id:          randomUUID(),
+    platform,
+    name:        String(b["name"] || defaultConnectionName(platform)),
+    siteUrl:     typeof b["siteUrl"]  === "string" ? b["siteUrl"]  : null,
+    username:    typeof b["username"] === "string" ? b["username"] : null,
+    secretEnc:   secret,
+    config:      b["config"] != null ? JSON.stringify(b["config"]) : null,
+    autoPublish: Boolean(b["autoPublish"]),
+  }).returning();
+  res.json(maskConnection(row!));
+});
+
+router.put("/connections/:id", async (req, res) => {
+  const b = req.body as Record<string, unknown>;
+  const updates: Partial<typeof socialConnectionsTable.$inferInsert> = { updatedAt: new Date() };
+  if (typeof b["name"]     === "string")  updates.name     = b["name"];
+  if (typeof b["siteUrl"]  === "string")  updates.siteUrl  = b["siteUrl"]  || null;
+  if (typeof b["username"] === "string")  updates.username = b["username"] || null;
+  if (typeof b["autoPublish"] === "boolean") updates.autoPublish = b["autoPublish"];
+  if (typeof b["isActive"]    === "boolean") updates.isActive    = b["isActive"];
+  if (b["config"] !== undefined) updates.config = b["config"] != null ? JSON.stringify(b["config"]) : null;
+  if (typeof b["secret"] === "string" && b["secret"] && !b["secret"].includes("••")) {
+    updates.secretEnc = encryptSecret(b["secret"]);
+  }
+  await db.update(socialConnectionsTable).set(updates).where(eq(socialConnectionsTable.id, req.params["id"]!));
+  const [row] = await db.select().from(socialConnectionsTable).where(eq(socialConnectionsTable.id, req.params["id"]!)).limit(1);
+  res.json(row ? maskConnection(row) : { error: "Not found" });
+});
+
+router.delete("/connections/:id", async (req, res) => {
+  await db.delete(socialConnectionsTable).where(eq(socialConnectionsTable.id, req.params["id"]!));
+  res.json({ ok: true });
+});
+
+router.post("/connections/:id/test", async (req, res) => {
+  const [conn] = await db.select().from(socialConnectionsTable).where(eq(socialConnectionsTable.id, req.params["id"]!)).limit(1);
+  if (!conn) { res.status(404).json({ ok: false, error: "Conexão não encontrada" }); return; }
+  const result = await testConnection(conn);
+  await db.update(socialConnectionsTable).set({
+    status:     result.ok ? "online" : "error",
+    lastTestAt: new Date(),
+    lastError:  result.ok ? null : (result.error ?? null),
+    updatedAt:  new Date(),
+  }).where(eq(socialConnectionsTable.id, conn.id));
+  res.json(result);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// META OAUTH — /api/admin/social/meta/*
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const META_GRAPH  = "https://graph.facebook.com/v20.0";
+const META_DIALOG = "https://www.facebook.com/v20.0/dialog/oauth";
+const META_SCOPES = [
+  "pages_show_list", "pages_read_engagement", "pages_manage_posts",
+  "instagram_basic", "instagram_content_publish", "business_management",
+];
+
+// state anti-CSRF do OAuth + tokens de página temporários (memória, com expiração).
+const metaStates     = new Map<string, number>();
+const metaOauthCache = new Map<string, { expires: number; pages: MetaPage[] }>();
+
+interface MetaPage {
+  id: string;
+  name: string;
+  access_token: string;
+  instagram_business_account?: { id: string; username?: string };
+}
+
+function metaRedirectUri(): string {
+  const base = getPublicBase();
+  return base ? `${base}/meta-auth-complete.html` : "";
+}
+
+// App Meta (App ID/Secret globais) — nunca devolve o secret em texto.
+router.get("/meta/app", (_req, res) => {
+  const cfg = store.getSocialConfig();
+  res.json({
+    appId:       cfg.metaAppId ?? "",
+    hasSecret:   !!cfg.metaAppSecret,
+    redirectUri: metaRedirectUri(),
+    scopes:      META_SCOPES,
+  });
+});
+
+router.post("/meta/app", (req, res) => {
+  const b = req.body as { appId?: string; appSecret?: string };
+  const updates: { metaAppId?: string; metaAppSecret?: string } = {};
+  if (typeof b.appId === "string") updates.metaAppId = b.appId.trim();
+  if (typeof b.appSecret === "string" && b.appSecret && !b.appSecret.includes("••")) {
+    updates.metaAppSecret = b.appSecret;
+  }
+  store.updateSocialConfig(updates);
+  const cfg = store.getSocialConfig();
+  res.json({ ok: true, appId: cfg.metaAppId ?? "", hasSecret: !!cfg.metaAppSecret, redirectUri: metaRedirectUri() });
+});
+
+router.get("/meta/oauth/start", (_req, res) => {
+  const cfg = store.getSocialConfig();
+  if (!cfg.metaAppId) { res.status(400).json({ error: "Configure o App ID da Meta primeiro." }); return; }
+  const redirectUri = metaRedirectUri();
+  if (!redirectUri.startsWith("http")) {
+    res.status(500).json({ error: "URL pública (APP_URL) não configurada no servidor." });
+    return;
+  }
+  const state = randomUUID();
+  metaStates.set(state, Date.now() + 10 * 60 * 1000);
+  const params = new URLSearchParams({
+    client_id:     cfg.metaAppId,
+    redirect_uri:  redirectUri,
+    state,
+    response_type: "code",
+    scope:         META_SCOPES.join(","),
+  });
+  res.json({ url: `${META_DIALOG}?${params.toString()}`, state });
+});
+
+router.post("/meta/oauth/exchange", async (req, res) => {
+  const { code, state } = req.body as { code?: string; state?: string };
+  if (!code) { res.status(400).json({ error: "code ausente" }); return; }
+  const exp = state ? metaStates.get(state) : undefined;
+  if (!state || !exp || exp < Date.now()) { res.status(400).json({ error: "Sessão OAuth inválida ou expirada." }); return; }
+  metaStates.delete(state);
+
+  const cfg = store.getSocialConfig();
+  if (!cfg.metaAppId || !cfg.metaAppSecret) { res.status(400).json({ error: "App Meta (ID/Secret) não configurado." }); return; }
+  const redirectUri = metaRedirectUri();
+
+  try {
+    // 1. code → token curto
+    const shortRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      client_id: cfg.metaAppId, client_secret: cfg.metaAppSecret, redirect_uri: redirectUri, code,
+    }), { signal: AbortSignal.timeout(15000) });
+    const short = (await shortRes.json()) as { access_token?: string; error?: { message: string } };
+    if (short.error) throw new Error(short.error.message);
+    let userToken = short.access_token ?? "";
+
+    // 2. token curto → token de longa duração
+    const longRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
+      grant_type: "fb_exchange_token", client_id: cfg.metaAppId, client_secret: cfg.metaAppSecret, fb_exchange_token: userToken,
+    }), { signal: AbortSignal.timeout(15000) });
+    const long = (await longRes.json()) as { access_token?: string };
+    if (long.access_token) userToken = long.access_token;
+
+    // 3. lista de Páginas (+ Instagram Business vinculado)
+    const pagesRes = await fetch(
+      `${META_GRAPH}/me/accounts?fields=name,id,access_token,instagram_business_account{id,username}&access_token=${userToken}`,
+      { signal: AbortSignal.timeout(15000) },
+    );
+    const pages = (await pagesRes.json()) as { data?: MetaPage[]; error?: { message: string } };
+    if (pages.error) throw new Error(pages.error.message);
+
+    const list = pages.data ?? [];
+    const sessionId = randomUUID();
+    metaOauthCache.set(sessionId, { expires: Date.now() + 10 * 60 * 1000, pages: list });
+
+    res.json({
+      sessionId,
+      pages: list.map((p) => ({
+        id: p.id, name: p.name,
+        instagramId:   p.instagram_business_account?.id ?? null,
+        instagramName: p.instagram_business_account?.username ?? null,
+      })),
+    });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+router.post("/meta/oauth/save", async (req, res) => {
+  const { sessionId, pageIds } = req.body as { sessionId?: string; pageIds?: string[] };
+  const sess = sessionId ? metaOauthCache.get(sessionId) : undefined;
+  if (!sess || sess.expires < Date.now()) {
+    if (sessionId) metaOauthCache.delete(sessionId);
+    res.status(400).json({ error: "Sessão OAuth expirada — refaça a conexão." });
+    return;
+  }
+  const chosen = pageIds?.length ? sess.pages.filter((p) => pageIds.includes(p.id)) : sess.pages;
+  const appId = store.getSocialConfig().metaAppId ?? null;
+  let count = 0;
+  for (const p of chosen) {
+    const values = {
+      name:          p.name,
+      metaAppId:     appId,
+      pageId:        p.id,
+      pageName:      p.name,
+      instagramId:   p.instagram_business_account?.id ?? null,
+      instagramName: p.instagram_business_account?.username ?? null,
+      accessToken:   encryptSecret(p.access_token),
+      isActive:      true,
+    };
+    const [existing] = await db.select().from(socialAccountsTable).where(eq(socialAccountsTable.pageId, p.id)).limit(1);
+    if (existing) {
+      await db.update(socialAccountsTable).set(values).where(eq(socialAccountsTable.id, existing.id));
+    } else {
+      await db.insert(socialAccountsTable).values({ id: randomUUID(), ...values });
+    }
+    count++;
+  }
+  metaOauthCache.delete(sessionId!);
+  res.json({ ok: true, count });
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function maskAccount(row: typeof socialAccountsTable.$inferSelect) {
+function defaultConnectionName(platform: string): string {
+  return platform === "wordpress" ? "WordPress"
+    : platform === "site_externo" ? "Site Externo"
+    : platform === "blogger" ? "Blogger"
+    : "Conexão";
+}
+
+function maskConnection(row: SocialConnectionRow) {
   return {
-    ...row,
-    accessToken: row.accessToken
-      ? row.accessToken.slice(0, 6) + "••••••••" + row.accessToken.slice(-4)
-      : null,
-    metaAppSecret: row.metaAppSecret ? "••••••••" : null,
+    id:          row.id,
+    platform:    row.platform,
+    name:        row.name,
+    siteUrl:     row.siteUrl,
+    username:    row.username,
+    hasSecret:   !!row.secretEnc,
+    secret:      row.secretEnc ? "••••••••" : null,
+    config:      row.config ? safeJsonParse(row.config) : null,
+    autoPublish: row.autoPublish,
+    status:      row.status,
+    lastTestAt:  row.lastTestAt,
+    lastError:   row.lastError,
+    isActive:    row.isActive,
+    createdAt:   row.createdAt,
+    updatedAt:   row.updatedAt,
   };
 }
 
-function snakeCase(s: string): string {
-  return s.replace(/[A-Z]/g, (l) => `_${l.toLowerCase()}`);
+function safeJsonParse(s: string): unknown {
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+/** Teste de comunicação por plataforma. Atualiza status no chamador. */
+async function testConnection(conn: SocialConnectionRow): Promise<{ ok: boolean; error?: string; info?: unknown }> {
+  const secret = conn.secretEnc ? decryptSecret(conn.secretEnc) : "";
+  const url = (conn.siteUrl ?? "").replace(/\/+$/, "");
+  if (!url) return { ok: false, error: "URL não configurada." };
+
+  try {
+    if (conn.platform === "wordpress") {
+      if (!conn.username || !secret) return { ok: false, error: "Usuário e Application Password são obrigatórios." };
+      const auth = Buffer.from(`${conn.username}:${secret}`).toString("base64");
+      const r = await fetch(`${url}/wp-json/wp/v2/users/me?context=edit`, {
+        headers: { Authorization: `Basic ${auth}` },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (r.status === 401) return { ok: false, error: "401 — credenciais inválidas ou firewall bloqueando Basic Auth." };
+      if (r.status === 403) return { ok: false, error: "403 — usuário sem permissão de publicar (precisa ser Admin/Editor)." };
+      if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+      const data = (await r.json()) as { name?: string; id?: number; capabilities?: Record<string, boolean> };
+      if (data.capabilities && data.capabilities["publish_posts"] === false) {
+        return { ok: false, error: "Usuário conectado não pode publicar posts." };
+      }
+      return { ok: true, info: { name: data.name, id: data.id } };
+    }
+
+    if (conn.platform === "site_externo") {
+      const cfg = conn.config ? (safeJsonParse(conn.config) as { headers?: Record<string, string> } | null) : null;
+      const headers: Record<string, string> = { ...(cfg?.headers ?? {}) };
+      if (secret && !headers["Authorization"]) headers["Authorization"] = `Bearer ${secret}`;
+      const r = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(12000) });
+      if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+      return { ok: true };
+    }
+
+    return { ok: false, error: "Teste não implementado para esta plataforma." };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+}
+
+function maskAccount(row: typeof socialAccountsTable.$inferSelect) {
+  // Tokens ficam criptografados at-rest; nunca devolver o valor real ao cliente.
+  return {
+    ...row,
+    accessToken:   row.accessToken   ? "••••••••" : null,
+    metaAppSecret: row.metaAppSecret ? "••••••••" : null,
+  };
 }
 
 export default router;

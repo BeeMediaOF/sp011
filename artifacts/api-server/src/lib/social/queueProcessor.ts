@@ -7,6 +7,7 @@ import { socialPublicationQueueTable, socialAccountsTable, socialTemplatesTable,
 import { eq, and, lte, inArray } from "drizzle-orm";
 import { renderArt, type TemplateElement } from "./renderTemplate.js";
 import { logger } from "../logger.js";
+import { decryptSecret } from "../crypto.js";
 
 const _dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "data", "social-temp");
 if (!existsSync(_dir)) mkdirSync(_dir, { recursive: true });
@@ -156,7 +157,9 @@ async function publishItem(queueId: string): Promise<void> {
 
     const isStory = item.type === "story";
     const caption = item.caption ?? "";
-    const token = account.accessToken;
+    // Tokens são criptografados at-rest (AES-256-GCM). decryptSecret é no-op
+    // para valores legados em texto puro, então tokens antigos continuam válidos.
+    const token = decryptSecret(account.accessToken);
     let metaPostId: string | undefined;
 
     if (account.instagramId) {

@@ -20,6 +20,23 @@ export async function ensureSchema(): Promise<void> {
   const statements = [
     // Título compacto para as artes sociais (não afeta o blog).
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_title text`,
+    // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
+    sql`CREATE TABLE IF NOT EXISTS social_connections (
+      id           text PRIMARY KEY,
+      platform     text NOT NULL,
+      name         text NOT NULL,
+      site_url     text,
+      username     text,
+      secret_enc   text,
+      config       text,
+      auto_publish boolean NOT NULL DEFAULT false,
+      status       text NOT NULL DEFAULT 'offline',
+      last_test_at timestamptz,
+      last_error   text,
+      is_active    boolean NOT NULL DEFAULT true,
+      created_at   timestamptz NOT NULL DEFAULT now(),
+      updated_at   timestamptz NOT NULL DEFAULT now()
+    )`,
   ];
   for (const stmt of statements) {
     try {
