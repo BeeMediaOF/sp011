@@ -30,7 +30,6 @@ import {
   fontStack,
   GOOGLE_FONTS_HREF,
   DEFAULT_CAPTION_TEMPLATE,
-  resolveCaption,
   gradientToCss,
   backgroundCss,
   defaultGradient,
@@ -1162,7 +1161,7 @@ export default function SocialMedia() {
   const [autoSaved,     setAutoSaved]     = useState(false);
   const [autoRunning,   setAutoRunning]   = useState(false);
   const [autoBackfill,  setAutoBackfill]  = useState(true);
-  const [autoRunResult, setAutoRunResult] = useState<{ enqueued: number; articles?: { id: string; title: string }[]; reason?: string } | null>(null);
+  const [autoRunResult, setAutoRunResult] = useState<{ enqueued: number; articles?: { id: string; title: string }[]; skipped?: { id: string; title: string; missing: string[] }[]; reason?: string } | null>(null);
 
   // Compositor manual ("Publicar agora" pela conexão Meta)
   const [manualArticleId,  setManualArticleId]  = useState("");
@@ -1790,16 +1789,20 @@ export default function SocialMedia() {
     finally { setProcessing(false); }
   }
 
-  function captionFor(a: ArticleOption | undefined): string {
-    if (!a) return "";
-    return resolveCaption(captionTemplate, {
-      title: a.title,
-      category: a.category,
-      subtitle: a.subtitle,
-      author: a.author,
-      publishedAt: a.publishedAt,
-      site: "sbcagora.com.br",
-    }, ["sbcagora", "noticias"]);
+  /**
+   * Seleciona um artigo na fila e pré-preenche a legenda pela resolução do
+   * servidor (mesma da publicação: com resumo, link e hashtags). Nunca monta a
+   * legenda no cliente — assim nenhum post sai incompleto. Só pré-preenche se o
+   * usuário ainda não escreveu nada.
+   */
+  async function selectQueueArticle(a: ArticleOption) {
+    const shouldPrefill = !queueForm.caption.trim();
+    setQueueForm((f) => ({ ...f, articleId: a.id }));
+    if (!shouldPrefill) return;
+    try {
+      const r = (await apiFetch(`/caption-preview?articleId=${encodeURIComponent(a.id)}`)) as { caption?: string };
+      setQueueForm((f) => (f.articleId === a.id ? { ...f, caption: r?.caption ?? "" } : f));
+    } catch { /* deixa vazio → o servidor monta a legenda ao enfileirar */ }
   }
 
   // ── Automação ops ─────────────────────────────────────────────────────────
@@ -1832,7 +1835,7 @@ export default function SocialMedia() {
     try {
       const body = autoBackfill ? { backfillHours: 24 } : {};
       const res = (await apiFetch("/automation/run", { method: "POST", body: JSON.stringify(body) })) as
-        { enqueued: number; articles?: { id: string; title: string }[]; reason?: string };
+        { enqueued: number; articles?: { id: string; title: string }[]; skipped?: { id: string; title: string; missing: string[] }[]; reason?: string };
       setAutoRunResult(res);
       void fetchQueue();
     } catch (e) {
@@ -1862,7 +1865,8 @@ export default function SocialMedia() {
       const r = (await apiFetch(`/caption-preview?articleId=${encodeURIComponent(id)}`)) as { caption?: string };
       setManualCaption(r?.caption ?? "");
     } catch {
-      setManualCaption(captionFor(editorArticles.find((a) => a.id === id)));
+      // Falhou o preview → deixa vazio; o servidor monta a legenda ao enfileirar.
+      setManualCaption("");
     }
   }
 
@@ -2914,10 +2918,22 @@ export default function SocialMedia() {
               </button>
             </div>
             {autoRunResult && (
-              <div className={`mt-3 text-sm rounded-lg px-3 py-2 ${autoRunResult.enqueued > 0 ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-500"}`}>
-                {autoRunResult.enqueued > 0
-                  ? <>Enfileirados <b>{autoRunResult.enqueued}</b> post(s){autoRunResult.articles?.length ? `: ${autoRunResult.articles.map((a) => a.title).join(", ")}` : ""}. Veja na aba <b>Fila</b>.</>
-                  : <>Nada enfileirado{autoRunResult.reason ? ` — ${autoRunResult.reason}` : ""}.</>}
+              <div className="mt-3 space-y-2">
+                <div className={`text-sm rounded-lg px-3 py-2 ${autoRunResult.enqueued > 0 ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-500"}`}>
+                  {autoRunResult.enqueued > 0
+                    ? <>Enfileirados <b>{autoRunResult.enqueued}</b> post(s){autoRunResult.articles?.length ? `: ${autoRunResult.articles.map((a) => a.title).join(", ")}` : ""}. Veja na aba <b>Fila</b>.</>
+                    : <>Nada enfileirado{autoRunResult.reason ? ` — ${autoRunResult.reason}` : ""}.</>}
+                </div>
+                {autoRunResult.skipped && autoRunResult.skipped.length > 0 && (
+                  <div className="text-xs rounded-lg px-3 py-2 bg-amber-50 text-amber-700">
+                    <b>{autoRunResult.skipped.length}</b> não publicado(s) por legenda incompleta (verificação):
+                    <ul className="mt-1 list-disc list-inside">
+                      {autoRunResult.skipped.slice(0, 5).map((s) => (
+                        <li key={s.id} className="truncate">{s.title} <span className="text-amber-500">— falta {s.missing.join(", ")}</span></li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -3064,7 +3080,7 @@ export default function SocialMedia() {
                       <button
                         key={a.id}
                         type="button"
-                        onClick={() => setQueueForm((f) => ({ ...f, articleId: a.id, caption: f.caption.trim() ? f.caption : captionFor(a) }))}
+                        onClick={() => { void selectQueueArticle(a); }}
                         className={`w-full text-left px-3 py-2.5 flex items-start gap-2 border-b border-slate-100 last:border-0 hover:bg-white transition-colors ${queueForm.articleId === a.id ? "bg-blue-50 border-l-2 border-l-[#0B2A66]" : ""}`}
                       >
                         {a.imageUrl && (

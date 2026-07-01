@@ -19,7 +19,7 @@ import { and, eq, gte, lte, ne, inArray, desc } from "drizzle-orm";
 import { store } from "../store.js";
 import { logger } from "../logger.js";
 import { processSocialQueue, getPublicBase } from "./queueProcessor.js";
-import { buildArticleCaption } from "./caption.js";
+import { analyzeArticleCaption, type CaptionMissing } from "./caption.js";
 
 /** Statuses que já "consomem" um artigo → não enfileirar de novo. */
 const ACTIVE_QUEUE_STATUSES = ["pending", "processing", "published"];
@@ -32,6 +32,8 @@ let _running = false;
 export interface AutomationRunResult {
   enqueued: number;
   articles: { id: string; title: string }[];
+  /** Artigos elegíveis que foram PULADOS por legenda incompleta (verificação). */
+  skipped?: { id: string; title: string; missing: CaptionMissing[] }[];
   reason?: string;
 }
 
@@ -150,12 +152,24 @@ export async function runAutomationCycle(
     const captionTemplate = cfg.captionTemplate || "";
     const base = getPublicBase();
     const usedArticles: { id: string; title: string }[] = [];
+    const skipped: { id: string; title: string; missing: CaptionMissing[] }[] = [];
     let enqueued = 0;
 
     for (const art of candidates) {
       if (usedArticles.length >= maxPerRun) break;
 
-      const caption = buildArticleCaption(art, captionTemplate, base);
+      // Verificação: não publica automaticamente uma legenda incompleta
+      // (sem resumo / link / hashtags que o template pede).
+      const analysis = analyzeArticleCaption(art, captionTemplate, base);
+      if (analysis.missing.length > 0) {
+        skipped.push({ id: art.id, title: art.title, missing: analysis.missing });
+        logger.warn(
+          { articleId: art.id, missing: analysis.missing },
+          "Social automation: artigo pulado — legenda incompleta",
+        );
+        continue;
+      }
+      const caption = analysis.caption;
 
       let insertedForArticle = false;
       for (const accountId of accountIds) {
@@ -199,7 +213,10 @@ export async function runAutomationCycle(
       }
     }
 
-    return { enqueued, articles: usedArticles };
+    const reason = enqueued === 0 && skipped.length > 0
+      ? `${skipped.length} artigo(s) pulado(s) por legenda incompleta`
+      : undefined;
+    return { enqueued, articles: usedArticles, skipped, reason };
   } finally {
     _running = false;
   }

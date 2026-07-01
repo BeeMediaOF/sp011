@@ -13,6 +13,7 @@ import {
   resolveCaption,
   makeExcerpt,
   hashtagsFromKeywords,
+  toHashtag,
   DEFAULT_CAPTION_TEMPLATE,
 } from "@workspace/social-template";
 
@@ -36,11 +37,33 @@ function siteDomain(base: string): string {
   try { return new URL(base).host.replace(/^www\./, ""); } catch { return ""; }
 }
 
-export function buildArticleCaption(
+/** True se o template usa o placeholder `{{name}}` (case-insensitive). */
+function usesVar(template: string, name: string): boolean {
+  return new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`, "i").test(template);
+}
+
+export type CaptionMissing = "resumo" | "link" | "hashtags";
+
+export interface CaptionAnalysis {
+  caption: string;
+  summary: string;
+  hashtags: string;
+  link: string;
+  /** Placeholders que o template pede mas que ficaram vazios (ex.: legenda sem link). */
+  missing: CaptionMissing[];
+}
+
+/**
+ * Resolve a legenda E diagnostica o que ficou faltando: quando o template usa
+ * {{summary}}/{{link}}/{{hashtags}} mas o valor resolveu para vazio, isso vira
+ * um item em `missing` — usado pela automação para NÃO publicar posts incompletos.
+ */
+export function analyzeArticleCaption(
   a: CaptionArticleInput,
   template: string,
   base: string | null,
-): string {
+): CaptionAnalysis {
+  const tpl = template || DEFAULT_CAPTION_TEMPLATE;
   const b = (base ?? "").replace(/\/+$/, "");
   const slugOrId = a.slug || a.id || "";
   const link = b && slugOrId ? `${b}/artigo/${slugOrId}` : "";
@@ -49,7 +72,7 @@ export function buildArticleCaption(
   const hashtags =
     a.socialHashtags?.trim() ||
     hashtagsFromKeywords(a.keywords ?? "", [a.category]) ||
-    undefined;
+    toHashtag(a.category);
   const publishedAt =
     a.publishedAt instanceof Date
       ? a.publishedAt.toISOString()
@@ -57,7 +80,7 @@ export function buildArticleCaption(
         ? a.publishedAt
         : undefined;
 
-  return resolveCaption(template || DEFAULT_CAPTION_TEMPLATE, {
+  const caption = resolveCaption(tpl, {
     title: a.title,
     category: a.category,
     subtitle: a.subtitle || undefined,
@@ -66,8 +89,23 @@ export function buildArticleCaption(
     publishedAt,
     excerpt,
     summary,
-    hashtags,
+    hashtags: hashtags || undefined,
     link,
     site: siteDomain(b),
   });
+
+  const missing: CaptionMissing[] = [];
+  if (usesVar(tpl, "summary")  && !summary)  missing.push("resumo");
+  if (usesVar(tpl, "link")     && !link)     missing.push("link");
+  if (usesVar(tpl, "hashtags") && !hashtags) missing.push("hashtags");
+
+  return { caption, summary, hashtags, link, missing };
+}
+
+export function buildArticleCaption(
+  a: CaptionArticleInput,
+  template: string,
+  base: string | null,
+): string {
+  return analyzeArticleCaption(a, template, base).caption;
 }

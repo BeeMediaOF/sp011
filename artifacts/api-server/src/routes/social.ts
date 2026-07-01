@@ -378,6 +378,16 @@ router.post("/queue", async (req, res) => {
   }
   const scheduledAt = b.scheduledAt ? new Date(b.scheduledAt) : new Date();
   const types = b.types?.length ? b.types : ["feed"];
+
+  // Legenda: se o cliente não mandou (ou mandou vazia), o SERVIDOR monta a partir
+  // do template + dados do artigo — garante resumo/link/hashtags e evita posts
+  // incompletos vindos de qualquer tela.
+  let caption = b.caption?.trim() ? b.caption : null;
+  if (!caption) {
+    const [article] = await db.select().from(articlesTable).where(eq(articlesTable.id, b.articleId)).limit(1);
+    if (article) caption = buildArticleCaption(article, store.getSocialConfig().captionTemplate ?? "", getPublicBase());
+  }
+
   const inserted = [];
   for (const accountId of b.accountIds) {
     for (const type of types) {
@@ -389,7 +399,7 @@ router.post("/queue", async (req, res) => {
         templateId,
         type,
         status: "pending",
-        caption: b.caption ?? null,
+        caption: caption ?? null,
         scheduledAt,
       }).returning();
       inserted.push(row);
