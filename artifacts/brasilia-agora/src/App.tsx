@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useParams } from "wouter";
+import { Switch, Route, Router as WouterRouter, useParams, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
@@ -35,24 +35,57 @@ const CategoryArchivePage = lazy(() => import("@/pages/CategoryArchivePage"));
 const Toaster = lazy(() => import("@/components/ui/toaster").then((m) => ({ default: m.Toaster })));
 const LGPDConsent = lazy(() => import("@/components/LGPDConsent"));
 
+/* ─── Lazy com preload — permite pré-carregar o chunk antes da navegação ─── */
+type Preloadable<T extends React.ComponentType<unknown>> =
+  React.LazyExoticComponent<T> & { preload: () => Promise<{ default: T }> };
+
+function lazyWithPreload<T extends React.ComponentType<never>>(
+  factory: () => Promise<{ default: T }>,
+): Preloadable<T> {
+  let promise: Promise<{ default: T }> | undefined;
+  const load = () => (promise ??= factory());
+  const Comp = lazy(load) as Preloadable<T>;
+  Comp.preload = load;
+  return Comp;
+}
+
 /* ─── Lazy — páginas admin (jamais carregadas por visitantes) ─── */
 const Login            = lazy(() => import("@/pages/admin/Login"));
-const Dashboard        = lazy(() => import("@/pages/admin/Dashboard"));
-const Articles         = lazy(() => import("@/pages/admin/Articles"));
-const ArticleEdit      = lazy(() => import("@/pages/admin/ArticleEdit"));
-const MenuManager      = lazy(() => import("@/pages/admin/MenuManager"));
-const Settings         = lazy(() => import("@/pages/admin/Settings"));
-const TwoFactorSetup   = lazy(() => import("@/pages/admin/TwoFactorSetup"));
-const Webhook          = lazy(() => import("@/pages/admin/Webhook"));
-const AdsManager       = lazy(() => import("@/pages/admin/AdsManager"));
-const ColumnistsManager = lazy(() => import("@/pages/admin/ColumnistsManager"));
-const Analytics        = lazy(() => import("@/pages/admin/Analytics"));
-const HomeBlocksManager = lazy(() => import("@/pages/admin/HomeBlocksManager"));
-const RSSManager       = lazy(() => import("@/pages/admin/RSSManager"));
-const UsersManager     = lazy(() => import("@/pages/admin/UsersManager"));
-const SecurityCheckup  = lazy(() => import("@/pages/admin/SecurityCheckup"));
-const EditorPermissions = lazy(() => import("@/pages/admin/EditorPermissions"));
-const SocialMedia      = lazy(() => import("@/pages/admin/SocialMedia"));
+const Dashboard        = lazyWithPreload(() => import("@/pages/admin/Dashboard"));
+const Articles         = lazyWithPreload(() => import("@/pages/admin/Articles"));
+const ArticleEdit      = lazyWithPreload(() => import("@/pages/admin/ArticleEdit"));
+const MenuManager      = lazyWithPreload(() => import("@/pages/admin/MenuManager"));
+const Settings         = lazyWithPreload(() => import("@/pages/admin/Settings"));
+const TwoFactorSetup   = lazyWithPreload(() => import("@/pages/admin/TwoFactorSetup"));
+const Webhook          = lazyWithPreload(() => import("@/pages/admin/Webhook"));
+const AdsManager       = lazyWithPreload(() => import("@/pages/admin/AdsManager"));
+const ColumnistsManager = lazyWithPreload(() => import("@/pages/admin/ColumnistsManager"));
+const Analytics        = lazyWithPreload(() => import("@/pages/admin/Analytics"));
+const HomeBlocksManager = lazyWithPreload(() => import("@/pages/admin/HomeBlocksManager"));
+const RSSManager       = lazyWithPreload(() => import("@/pages/admin/RSSManager"));
+const UsersManager     = lazyWithPreload(() => import("@/pages/admin/UsersManager"));
+const SecurityCheckup  = lazyWithPreload(() => import("@/pages/admin/SecurityCheckup"));
+const EditorPermissions = lazyWithPreload(() => import("@/pages/admin/EditorPermissions"));
+const SocialMedia      = lazyWithPreload(() => import("@/pages/admin/SocialMedia"));
+
+/* Pré-carrega todos os chunks do admin uma vez, em segundo plano, para que a
+   troca entre abas seja instantânea (sem o flash do spinner de tela cheia). */
+let _adminPreloaded = false;
+function preloadAdminPages() {
+  if (_adminPreloaded) return;
+  _adminPreloaded = true;
+  const run = () => {
+    for (const c of [
+      Dashboard, Articles, ArticleEdit, MenuManager, Settings, TwoFactorSetup,
+      Webhook, AdsManager, ColumnistsManager, Analytics, HomeBlocksManager,
+      RSSManager, UsersManager, SecurityCheckup, EditorPermissions, SocialMedia,
+    ]) {
+      c.preload().catch(() => {});
+    }
+  };
+  if (typeof requestIdleCallback === "function") requestIdleCallback(run);
+  else setTimeout(run, 200);
+}
 
 /* ─── QueryClient com cache sensato ─── */
 const queryClient = new QueryClient({
@@ -123,6 +156,16 @@ function AnalyticsProvider() {
 }
 
 function Router() {
+  const [location] = useLocation();
+
+  // Ao entrar no admin, pré-carrega os chunks das demais abas em segundo plano
+  // para que a navegação entre elas fique instantânea.
+  useEffect(() => {
+    if (location.startsWith("/admin") && location !== "/admin/login") {
+      preloadAdminPages();
+    }
+  }, [location]);
+
   return (
     <Suspense fallback={<PageSpinner />}>
       <Switch>
