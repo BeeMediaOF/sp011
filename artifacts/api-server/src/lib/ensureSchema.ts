@@ -20,6 +20,9 @@ export async function ensureSchema(): Promise<void> {
   const statements = [
     // Título compacto para as artes sociais (não afeta o blog).
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_title text`,
+    // Resumo + hashtags gerados pela IA para a legenda das redes sociais.
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_summary text`,
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_hashtags text`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,

@@ -12,6 +12,10 @@ export const articlesTable = pgTable("articles", {
    * marcação de destaque inline (*trecho*). Nulo → cai de volta para `title`.
    */
   socialTitle:   text("social_title"),
+  /** Resumo curto gerado pela IA p/ legenda de rede social ({{summary}}). */
+  socialSummary:  text("social_summary"),
+  /** Hashtags geradas pela IA p/ legenda ({{hashtags}}); ex.: "#brasilia #eleicoes". */
+  socialHashtags: text("social_hashtags"),
   subtitle:      text("subtitle").notNull().default(""),
   content:       text("content").notNull().default(""),
   category:      text("category").notNull().default("geral"),

@@ -10,6 +10,7 @@ import {
   Italic, Underline, Strikethrough, RotateCw, Undo2, Redo2,
   Square, Circle, Triangle, Star, Minus, ArrowRight, Hexagon,
   ChevronsUp, ChevronsDown, Lock, Unlock, ChevronRight, Frame,
+  Bot, Zap,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import {
@@ -131,11 +132,38 @@ interface ArticleOption {
   publishedAt?: string;
 }
 
+interface Automation {
+  enabled: boolean;
+  intervalMinutes: number;
+  maxPerRun: number;
+  accountIds: string[];
+  templateIds: string[];
+  types: ("feed" | "story")[];
+  onlyWithImage: boolean;
+  minAgeMinutes?: number;
+  enabledAt?: string;
+  lastRunAt?: string;
+  lastCount?: number;
+  nextRunAt?: string | null;
+}
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 const PRIMARY = "#0B2A66";
 const ACCENT  = "#E71D36";
+
+/** Variáveis clicáveis para montar o template da legenda (inserem no cursor). */
+const CAPTION_VARS: { token: string; label: string }[] = [
+  { token: "{{title}}",    label: "Título" },
+  { token: "{{category}}", label: "Categoria" },
+  { token: "{{summary}}",  label: "Resumo (IA)" },
+  { token: "{{excerpt}}",  label: "Trecho do post" },
+  { token: "{{hashtags}}", label: "Tags (IA)" },
+  { token: "{{link}}",     label: "Link" },
+  { token: "{{subtitle}}", label: "Subtítulo" },
+  { token: "{{author}}",   label: "Autor" },
+];
 
 const PREVIEW_W = 360;
 const ACTUAL_W  = 1080;
@@ -1064,7 +1092,7 @@ function MetaModal({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function SocialMedia() {
-  const [tab, setTab] = useState<"connections" | "templates" | "queue">("connections");
+  const [tab, setTab] = useState<"connections" | "templates" | "queue" | "automation">("connections");
 
   // ── Accounts (Meta) ───────────────────────────────────────────────────────
   const [accounts,         setAccounts]         = useState<SocialAccount[]>([]);
@@ -1125,6 +1153,27 @@ export default function SocialMedia() {
     scheduledAt: "",
   });
 
+  // ── Automação (robô de postagem no Instagram) ──────────────────────────────
+  const [automation, setAutomation] = useState<Automation>({
+    enabled: false, intervalMinutes: 120, maxPerRun: 3,
+    accountIds: [], templateIds: [], types: ["feed"], onlyWithImage: true,
+  });
+  const [autoSaving,    setAutoSaving]    = useState(false);
+  const [autoSaved,     setAutoSaved]     = useState(false);
+  const [autoRunning,   setAutoRunning]   = useState(false);
+  const [autoBackfill,  setAutoBackfill]  = useState(true);
+  const [autoRunResult, setAutoRunResult] = useState<{ enqueued: number; articles?: { id: string; title: string }[]; reason?: string } | null>(null);
+
+  // Compositor manual ("Publicar agora" pela conexão Meta)
+  const [manualArticleId,  setManualArticleId]  = useState("");
+  const [manualTemplateId, setManualTemplateId] = useState("");
+  const [manualAccountId,  setManualAccountId]  = useState("");
+  const [manualType,       setManualType]       = useState<"feed" | "story">("feed");
+  const [manualCaption,    setManualCaption]    = useState("");
+  const [manualPublishing, setManualPublishing] = useState(false);
+  const [manualResult,     setManualResult]     = useState<{ ok: boolean; msg: string } | null>(null);
+  const captionTplRef = useRef<HTMLTextAreaElement>(null);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchAccounts = useCallback(async () => {
@@ -1171,10 +1220,25 @@ export default function SocialMedia() {
     } catch { /* mantém o default */ }
   }, []);
 
-  useEffect(() => { void fetchAccounts(); void fetchTemplates(); void fetchSocialConfig(); void fetchConnections(); void fetchMetaApp(); }, [fetchAccounts, fetchTemplates, fetchSocialConfig, fetchConnections, fetchMetaApp]);
+  const fetchAutomation = useCallback(async () => {
+    try { setAutomation((await apiFetch("/automation")) as Automation); } catch { /* mantém default */ }
+  }, []);
+
+  useEffect(() => { void fetchAccounts(); void fetchTemplates(); void fetchSocialConfig(); void fetchConnections(); void fetchMetaApp(); void fetchAutomation(); }, [fetchAccounts, fetchTemplates, fetchSocialConfig, fetchConnections, fetchMetaApp, fetchAutomation]);
   useEffect(() => { if (tab === "templates" && editorArticles.length === 0) void fetchEditorArticles(); }, [tab, editorArticles.length, fetchEditorArticles]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [tab, fetchQueue]);
   useEffect(() => { if (tab === "queue") void fetchQueue(); }, [queueFilter]);
+  useEffect(() => {
+    if (tab !== "automation") return;
+    void fetchAutomation();
+    if (editorArticles.length === 0) void fetchEditorArticles();
+  }, [tab, fetchAutomation, editorArticles.length, fetchEditorArticles]);
+  // Pré-seleciona conta/máscara padrão no compositor manual quando os dados chegam.
+  useEffect(() => {
+    if (tab !== "automation") return;
+    if (!manualAccountId && accounts[0]) setManualAccountId(accounts[0].id);
+    if (!manualTemplateId && templates[0]) setManualTemplateId(templates[0].id);
+  }, [tab, accounts, templates, manualAccountId, manualTemplateId]);
 
   // Carrega as fontes do editor (mesmas usadas no render server-side) p/ WYSIWYG.
   useEffect(() => {
@@ -1738,6 +1802,91 @@ export default function SocialMedia() {
     }, ["sbcagora", "noticias"]);
   }
 
+  // ── Automação ops ─────────────────────────────────────────────────────────
+
+  function patchAutomation(patch: Partial<Automation>) {
+    setAutomation((a) => ({ ...a, ...patch }));
+  }
+
+  function toggleAutoId(field: "accountIds" | "templateIds", id: string) {
+    setAutomation((a) => {
+      const set = new Set(a[field]);
+      if (set.has(id)) set.delete(id); else set.add(id);
+      return { ...a, [field]: Array.from(set) };
+    });
+  }
+
+  async function saveAutomation() {
+    setAutoSaving(true);
+    try {
+      // Legenda (captionTemplate) vive em social_config → salva junto.
+      await apiFetch("/config", { method: "POST", body: JSON.stringify({ captionTemplate }) });
+      const res = (await apiFetch("/automation", { method: "PUT", body: JSON.stringify(automation) })) as { automation?: Automation };
+      if (res?.automation) setAutomation(res.automation);
+      setAutoSaved(true); setTimeout(() => setAutoSaved(false), 2000);
+    } finally { setAutoSaving(false); }
+  }
+
+  async function runAutomationNow() {
+    setAutoRunning(true); setAutoRunResult(null);
+    try {
+      const body = autoBackfill ? { backfillHours: 24 } : {};
+      const res = (await apiFetch("/automation/run", { method: "POST", body: JSON.stringify(body) })) as
+        { enqueued: number; articles?: { id: string; title: string }[]; reason?: string };
+      setAutoRunResult(res);
+      void fetchQueue();
+    } catch (e) {
+      setAutoRunResult({ enqueued: 0, reason: (e as Error).message });
+    } finally { setAutoRunning(false); }
+  }
+
+  /** Insere um placeholder no template da legenda na posição do cursor. */
+  function insertCaptionVar(token: string) {
+    const el = captionTplRef.current;
+    if (!el) { setCaptionTemplate((t) => `${t}${token}`); return; }
+    const start = el.selectionStart ?? captionTemplate.length;
+    const end   = el.selectionEnd   ?? captionTemplate.length;
+    const next  = captionTemplate.slice(0, start) + token + captionTemplate.slice(end);
+    setCaptionTemplate(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + token.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
+  /** Pré-preenche a legenda do compositor manual com a resolução do servidor. */
+  async function prefillManualCaption(id: string) {
+    if (!id) { setManualCaption(""); return; }
+    try {
+      const r = (await apiFetch(`/caption-preview?articleId=${encodeURIComponent(id)}`)) as { caption?: string };
+      setManualCaption(r?.caption ?? "");
+    } catch {
+      setManualCaption(captionFor(editorArticles.find((a) => a.id === id)));
+    }
+  }
+
+  async function publishManual() {
+    if (!manualArticleId || !manualAccountId) return;
+    setManualPublishing(true); setManualResult(null);
+    try {
+      await apiFetch("/queue", { method: "POST", body: JSON.stringify({
+        articleId: manualArticleId,
+        accountIds: [manualAccountId],
+        templateFeedId:  manualType === "feed"  ? manualTemplateId : "",
+        templateStoryId: manualType === "story" ? manualTemplateId : "",
+        caption: manualCaption,
+        types: [manualType],
+        scheduledAt: "",
+      }) });
+      await apiFetch("/process", { method: "POST" });
+      setManualResult({ ok: true, msg: "Enviado! O post deve aparecer no Instagram em instantes — acompanhe na aba Fila." });
+      void fetchQueue();
+    } catch (e) {
+      setManualResult({ ok: false, msg: (e as Error).message });
+    } finally { setManualPublishing(false); }
+  }
+
   // ── Derived ───────────────────────────────────────────────────────────────
 
   const selectedEl = currentTemplate?.elements.find((e) => e.id === selectedElId) ?? null;
@@ -1812,6 +1961,7 @@ export default function SocialMedia() {
       <div className="flex items-center gap-2 mb-6 bg-[#0B2A66] rounded-2xl p-1.5 w-fit">
         {tabBtn("connections", "Conexões", <Link2 size={15} />)}
         {tabBtn("templates",   "Templates", <Layers size={15} />)}
+        {tabBtn("automation",  "Automação", <Bot size={15} />)}
         {tabBtn("queue",       "Fila",      <Clock size={15} />)}
       </div>
 
@@ -2593,6 +2743,246 @@ export default function SocialMedia() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ══════════ AUTOMAÇÃO ════════════════════════════════════════════════ */}
+      {tab === "automation" && (
+        <div className="space-y-5 max-w-4xl">
+
+          {/* Cabeçalho + toggle mestre */}
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-start gap-4">
+              <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#EEF2FF", color: PRIMARY }}>
+                <Bot size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-slate-800">Publicação automática no Instagram</h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  O robô pega as notícias mais recentes do blog, aplica uma das máscaras selecionadas
+                  (alternando entre elas) e publica no feed automaticamente.
+                </p>
+              </div>
+              <button
+                onClick={() => patchAutomation({ enabled: !automation.enabled })}
+                className="shrink-0 flex items-center gap-2 text-sm font-semibold"
+                style={{ color: automation.enabled ? "#16A34A" : "#94A3B8" }}
+                title={automation.enabled ? "Ativa — clique para desligar" : "Desligada — clique para ligar"}
+              >
+                {automation.enabled ? <ToggleRight size={34} /> : <ToggleLeft size={34} />}
+                {automation.enabled ? "Ativa" : "Desligada"}
+              </button>
+            </div>
+            <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
+              <span>Última execução: <b className="text-slate-700">{automation.lastRunAt ? fmtDate(automation.lastRunAt) : "—"}</b></span>
+              <span>Próxima: <b className="text-slate-700">{automation.enabled && automation.nextRunAt ? fmtDate(automation.nextRunAt) : "—"}</b></span>
+              <span>Último ciclo: <b className="text-slate-700">{automation.lastCount ?? 0} post(s)</b></span>
+            </div>
+            {!automation.enabled && (
+              <p className="mt-3 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                Ao ligar, só serão postadas notícias publicadas <b>a partir deste momento</b> — o acervo antigo é ignorado.
+              </p>
+            )}
+          </div>
+
+          {/* Configuração */}
+          <div className="bg-white rounded-2xl p-5 space-y-5" style={{ boxShadow: CARD_SHADOW }}>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Configuração</h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Intervalo</span>
+                <select
+                  value={automation.intervalMinutes}
+                  onChange={(e) => patchAutomation({ intervalMinutes: Number(e.target.value) })}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  <option value={30}>A cada 30 min</option>
+                  <option value={60}>A cada 1 hora</option>
+                  <option value={120}>A cada 2 horas</option>
+                  <option value={240}>A cada 4 horas</option>
+                  <option value={360}>A cada 6 horas</option>
+                  <option value={720}>A cada 12 horas</option>
+                  <option value={1440}>1 vez por dia</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Máx. por ciclo</span>
+                <input
+                  type="number" min={1} max={20} value={automation.maxPerRun}
+                  onChange={(e) => patchAutomation({ maxPerRun: Math.max(1, Number(e.target.value) || 1) })}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
+              </label>
+              <label className="flex items-end gap-2 pb-1">
+                <button type="button" onClick={() => patchAutomation({ onlyWithImage: !automation.onlyWithImage })}
+                  style={{ color: automation.onlyWithImage ? "#16A34A" : "#94A3B8" }}>
+                  {automation.onlyWithImage ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                </button>
+                <span className="text-xs font-semibold text-slate-600 pb-1.5">Só notícias com imagem</span>
+              </label>
+            </div>
+
+            {/* Contas Meta */}
+            <div>
+              <span className="text-xs font-semibold text-slate-500">Conta(s) de destino</span>
+              {accounts.length === 0 ? (
+                <p className="mt-1 text-xs text-slate-400">Nenhuma conta conectada. Conecte na aba <b>Conexões</b>.</p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {accounts.map((acc) => {
+                    const on = automation.accountIds.includes(acc.id);
+                    return (
+                      <button key={acc.id} type="button" onClick={() => toggleAutoId("accountIds", acc.id)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${on ? "border-[#0B2A66] bg-[#EEF2FF] text-[#0B2A66]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                        <Instagram size={13} /> {acc.instagramName || acc.pageName || acc.name}
+                        {on && <CheckCircle size={13} className="text-[#16A34A]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Máscaras */}
+            <div>
+              <span className="text-xs font-semibold text-slate-500">Máscaras (o robô alterna entre as selecionadas)</span>
+              {templates.length === 0 ? (
+                <p className="mt-1 text-xs text-slate-400">Nenhuma máscara criada. Crie na aba <b>Templates</b>.</p>
+              ) : (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {templates.map((t) => {
+                    const on = automation.templateIds.includes(t.id);
+                    return (
+                      <button key={t.id} type="button" onClick={() => toggleAutoId("templateIds", t.id)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${on ? "border-[#0B2A66] bg-[#EEF2FF] text-[#0B2A66]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                        <Layers size={13} /> {t.name}
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${t.type === "story" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"}`}>{t.type === "story" ? "Story" : "Feed"}</span>
+                        {on && <CheckCircle size={13} className="text-[#16A34A]" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Legenda / Template */}
+            <div>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Legenda / Template</span>
+              <textarea
+                ref={captionTplRef}
+                value={captionTemplate} onChange={(e) => setCaptionTemplate(e.target.value)} rows={5}
+                className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white font-mono" />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {CAPTION_VARS.map((v) => (
+                  <button key={v.token} type="button" onClick={() => insertCaptionVar(v.token)}
+                    title={`Inserir ${v.token}`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-[#EEF2FF] hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors">
+                    {v.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-1.5">
+                Clique num campo para inserir na legenda — são preenchidos automaticamente na publicação.
+                <b> Resumo</b> e <b>Tags</b> são criados pela IA; <b>Trecho do post</b> é o início real da matéria; <b>Link</b> abre a notícia.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: PRIMARY }}>
+                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {autoSaving ? "Salvando…" : "Salvar configuração"}
+              </button>
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+            </div>
+          </div>
+
+          {/* Testar automação */}
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Testar agora</h3>
+            <p className="text-sm text-slate-500 mt-1">Roda um ciclo imediatamente (ignora o intervalo), enfileira e publica.</p>
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={autoBackfill} onChange={(e) => setAutoBackfill(e.target.checked)} />
+                Incluir notícias das últimas 24h
+              </label>
+              <button onClick={() => { void runAutomationNow(); }} disabled={autoRunning}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: "#16A34A" }}>
+                {autoRunning ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                {autoRunning ? "Rodando…" : "Rodar agora"}
+              </button>
+            </div>
+            {autoRunResult && (
+              <div className={`mt-3 text-sm rounded-lg px-3 py-2 ${autoRunResult.enqueued > 0 ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-500"}`}>
+                {autoRunResult.enqueued > 0
+                  ? <>Enfileirados <b>{autoRunResult.enqueued}</b> post(s){autoRunResult.articles?.length ? `: ${autoRunResult.articles.map((a) => a.title).join(", ")}` : ""}. Veja na aba <b>Fila</b>.</>
+                  : <>Nada enfileirado{autoRunResult.reason ? ` — ${autoRunResult.reason}` : ""}.</>}
+              </div>
+            )}
+          </div>
+
+          {/* Publicar manualmente */}
+          <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Publicar uma notícia agora (manual)</h3>
+              <p className="text-sm text-slate-500 mt-1">Escolha a notícia, a máscara e a conta — publica na hora pela conexão Meta.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <label className="block sm:col-span-3">
+                <span className="text-xs font-semibold text-slate-500">Notícia</span>
+                <select value={manualArticleId}
+                  onChange={(e) => { const id = e.target.value; setManualArticleId(id); void prefillManualCaption(id); }}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  <option value="">Selecione uma notícia…</option>
+                  {editorArticles.map((a) => <option key={a.id} value={a.id}>{a.title.slice(0, 70)}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Máscara</span>
+                <select value={manualTemplateId} onChange={(e) => setManualTemplateId(e.target.value)}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Conta</span>
+                <select value={manualAccountId} onChange={(e) => setManualAccountId(e.target.value)}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.instagramName || a.pageName || a.name}</option>)}
+                </select>
+              </label>
+              <div className="block">
+                <span className="text-xs font-semibold text-slate-500">Formato</span>
+                <div className="mt-1 flex gap-2">
+                  {(["feed", "story"] as const).map((tp) => (
+                    <button key={tp} type="button" onClick={() => setManualType(tp)}
+                      className={`flex-1 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${manualType === tp ? "border-[#0B2A66] bg-[#EEF2FF] text-[#0B2A66]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
+                      {tp === "feed" ? "Feed" : "Story"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <label className="block">
+              <span className="text-xs font-semibold text-slate-500">Legenda</span>
+              <textarea value={manualCaption} onChange={(e) => setManualCaption(e.target.value)} rows={4}
+                className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
+            </label>
+            <div className="flex items-center gap-3">
+              <button onClick={() => { void publishManual(); }} disabled={manualPublishing || !manualArticleId || !manualAccountId}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: ACCENT }}>
+                {manualPublishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {manualPublishing ? "Publicando…" : "Publicar agora"}
+              </button>
+              {manualResult && (
+                <span className={`text-xs flex items-center gap-1 ${manualResult.ok ? "text-green-600" : "text-red-500"}`}>
+                  {manualResult.ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />} {manualResult.msg}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

@@ -31,6 +31,8 @@ interface ExtractedAI {
   title?: string;
   subtitle?: string;
   socialTitle?: string;
+  socialSummary?: string;
+  socialHashtags?: string;
   keywords?: string;
   slug?: string;
 }
@@ -76,6 +78,8 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
         title:       ((parsed["title"]    as string | undefined) ?? "").trim() || undefined,
         subtitle:    ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
         socialTitle: sanitizeHighlightMarkers(((parsed["social_title"] as string | undefined) ?? "").trim()) || undefined,
+        socialSummary:  ((parsed["social_summary"]  as string | undefined) ?? "").trim() || undefined,
+        socialHashtags: ((parsed["social_hashtags"] as string | undefined) ?? "").trim() || undefined,
         keywords:    ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
         slug:        ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
       };
@@ -91,6 +95,8 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
       const mTitle  = stripped.match(/"title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       const mSub    = stripped.match(/"subtitle"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       const mSocial = stripped.match(/"social_title"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mSummary = stripped.match(/"social_summary"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      const mTags    = stripped.match(/"social_hashtags"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       const mKw     = stripped.match(/"keywords"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       const mSlug   = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       return {
@@ -98,6 +104,8 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
         title:       mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
         subtitle:    mSub?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
         socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.replace(/\\"/g, '"').trim() || "") || undefined,
+        socialSummary:  mSummary?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+        socialHashtags: mTags?.[1]?.replace(/\\"/g, '"').trim()   || undefined,
         keywords:    mKw?.[1]?.replace(/\\"/g, '"').trim()    || undefined,
         slug:        mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
       };
@@ -350,12 +358,14 @@ async function processItem(item: RewriteJobItem): Promise<void> {
      * doesn't match mid-string. We re-apply the full extraction here with a proper
      * trim() before the fence-strip so we always catch the right content.
      */
-    let finalContent     = result.content;
-    let finalTitle       = result.title;
-    let finalSubtitle    = result.subtitle;
-    let finalSocialTitle = result.socialTitle;
-    let finalKeywords    = result.keywords;
-    let finalSlug        = result.slug;
+    let finalContent        = result.content;
+    let finalTitle          = result.title;
+    let finalSubtitle       = result.subtitle;
+    let finalSocialTitle    = result.socialTitle;
+    let finalSocialSummary  = result.socialSummary;
+    let finalSocialHashtags = result.socialHashtags;
+    let finalKeywords       = result.keywords;
+    let finalSlug           = result.slug;
 
     const contentLooksRaw =
       result.content.trimStart().startsWith("{") ||
@@ -364,12 +374,14 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     if (contentLooksRaw) {
       const recovered = extractFromRawAI(result.content);
       if (recovered) {
-        finalContent     = recovered.content;
-        finalTitle       = recovered.title       ?? result.title;
-        finalSubtitle    = recovered.subtitle    ?? result.subtitle;
-        finalSocialTitle = recovered.socialTitle ?? result.socialTitle;
-        finalKeywords    = recovered.keywords    ?? result.keywords;
-        finalSlug        = recovered.slug        ?? result.slug;
+        finalContent        = recovered.content;
+        finalTitle          = recovered.title          ?? result.title;
+        finalSubtitle       = recovered.subtitle       ?? result.subtitle;
+        finalSocialTitle    = recovered.socialTitle    ?? result.socialTitle;
+        finalSocialSummary  = recovered.socialSummary  ?? result.socialSummary;
+        finalSocialHashtags = recovered.socialHashtags ?? result.socialHashtags;
+        finalKeywords       = recovered.keywords       ?? result.keywords;
+        finalSlug           = recovered.slug           ?? result.slug;
         logger.info({ articleId: item.articleId }, "Rewrite queue: recovered content from raw JSON blob");
       }
     }
@@ -385,9 +397,11 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     }
 
     await articleService.updateArticle(item.articleId, {
-      ...(finalTitle       && { title:       finalTitle }),
-      ...(finalSubtitle    && { subtitle:    finalSubtitle }),
-      ...(finalSocialTitle && { socialTitle: finalSocialTitle }),
+      ...(finalTitle          && { title:          finalTitle }),
+      ...(finalSubtitle       && { subtitle:       finalSubtitle }),
+      ...(finalSocialTitle    && { socialTitle:    finalSocialTitle }),
+      ...(finalSocialSummary  && { socialSummary:  finalSocialSummary }),
+      ...(finalSocialHashtags && { socialHashtags: finalSocialHashtags }),
       content:     finalContent,
       ...(finalKeywords && { keywords: finalKeywords }),
       ...(finalSlug     && { slug:     finalSlug }),
@@ -425,9 +439,11 @@ async function processItem(item: RewriteJobItem): Promise<void> {
         const pResult = await rewriteWithPerplexity(item);
         if (pResult && isContentRenderable(pResult.content)) {
           await articleService.updateArticle(item.articleId, {
-            ...(pResult.title       && { title:       pResult.title }),
-            ...(pResult.subtitle    && { subtitle:    pResult.subtitle }),
-            ...(pResult.socialTitle && { socialTitle: pResult.socialTitle }),
+            ...(pResult.title          && { title:          pResult.title }),
+            ...(pResult.subtitle       && { subtitle:       pResult.subtitle }),
+            ...(pResult.socialTitle    && { socialTitle:    pResult.socialTitle }),
+            ...(pResult.socialSummary  && { socialSummary:  pResult.socialSummary }),
+            ...(pResult.socialHashtags && { socialHashtags: pResult.socialHashtags }),
             content:     pResult.content,
             ...(pResult.keywords && { keywords: pResult.keywords }),
             ...(pResult.slug     && { slug:     pResult.slug }),

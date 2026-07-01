@@ -8,9 +8,12 @@ import {
   socialConnectionsTable,
 } from "@workspace/db";
 import type { SocialConnectionRow } from "@workspace/db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, gte, ne } from "drizzle-orm";
 import { store } from "../lib/store.js";
+import type { SocialAutomation } from "../lib/store.js";
 import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
+import { runAutomationCycle } from "../lib/social/autoScheduler.js";
+import { buildArticleCaption } from "../lib/social/caption.js";
 import { renderArt } from "../lib/social/renderTemplate.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import type { TemplateElement, SocialTemplate, ArticleData } from "@workspace/social-template";
@@ -419,6 +422,116 @@ router.post("/process", async (_req, res) => {
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
   }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// AUTOMATION — /api/admin/social/automation  (robô de postagem no Instagram)
+// Config guardada em social_config.automation; o motor de publish é a fila.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const AUTOMATION_DEFAULTS: SocialAutomation = {
+  enabled: false,
+  intervalMinutes: 120,
+  maxPerRun: 3,
+  accountIds: [],
+  templateIds: [],
+  types: ["feed"],
+  onlyWithImage: true,
+};
+
+function currentAutomation(): SocialAutomation {
+  return { ...AUTOMATION_DEFAULTS, ...(store.getSocialConfig().automation ?? {}) };
+}
+
+function nextRunAt(auto: SocialAutomation): string | null {
+  if (!auto.enabled) return null;
+  const base = auto.lastRunAt ? new Date(auto.lastRunAt).getTime() : Date.now();
+  return new Date(base + Math.max(1, auto.intervalMinutes) * 60 * 1000).toISOString();
+}
+
+router.get("/automation", (_req, res) => {
+  const auto = currentAutomation();
+  res.json({ ...auto, nextRunAt: nextRunAt(auto) });
+});
+
+router.put("/automation", (req, res) => {
+  const b = req.body as Partial<SocialAutomation>;
+  const prev = currentAutomation();
+
+  const next: SocialAutomation = {
+    ...prev,
+    enabled:       typeof b.enabled       === "boolean" ? b.enabled       : prev.enabled,
+    intervalMinutes: typeof b.intervalMinutes === "number" ? Math.max(1, b.intervalMinutes) : prev.intervalMinutes,
+    maxPerRun:     typeof b.maxPerRun     === "number"  ? Math.max(1, b.maxPerRun)  : prev.maxPerRun,
+    accountIds:    Array.isArray(b.accountIds)  ? b.accountIds.map(String)  : prev.accountIds,
+    templateIds:   Array.isArray(b.templateIds) ? b.templateIds.map(String) : prev.templateIds,
+    types:         Array.isArray(b.types) && b.types.length
+                     ? (b.types.filter((t) => t === "feed" || t === "story") as ("feed" | "story")[])
+                     : prev.types,
+    onlyWithImage: typeof b.onlyWithImage === "boolean" ? b.onlyWithImage : prev.onlyWithImage,
+    minAgeMinutes: typeof b.minAgeMinutes === "number"  ? Math.max(0, b.minAgeMinutes) : prev.minAgeMinutes,
+  };
+
+  // Marca d'água: ao LIGAR sem enabledAt, ancora "agora" para não postar o acervo.
+  if (next.enabled && !prev.enabled && !next.enabledAt) {
+    next.enabledAt = new Date().toISOString();
+  }
+
+  store.updateSocialConfig({ automation: next });
+  res.json({ ok: true, automation: { ...next, nextRunAt: nextRunAt(next) } });
+});
+
+router.post("/automation/run", async (req, res) => {
+  const b = req.body as { backfillHours?: number };
+  try {
+    const result = await runAutomationCycle({
+      force: true,
+      backfillHours: typeof b?.backfillHours === "number" ? b.backfillHours : undefined,
+    });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(500).json({ error: (e as Error).message });
+  }
+});
+
+router.get("/automation/preview", async (req, res) => {
+  const auto = currentAutomation();
+  const backfillHours = Number((req.query as Record<string, string>)["backfillHours"] ?? 0);
+  const now = new Date();
+  const cutoff = backfillHours > 0
+    ? new Date(now.getTime() - backfillHours * 3600 * 1000)
+    : (auto.enabledAt ? new Date(auto.enabledAt) : now);
+
+  const conds = [
+    eq(articlesTable.status, "published"),
+    gte(articlesTable.publishedAt, cutoff),
+  ];
+  if (auto.onlyWithImage !== false) conds.push(ne(articlesTable.imageUrl, ""));
+
+  const rows = await db
+    .select({
+      id:          articlesTable.id,
+      title:       articlesTable.title,
+      category:    articlesTable.category,
+      publishedAt: articlesTable.publishedAt,
+    })
+    .from(articlesTable)
+    .where(and(...conds))
+    .orderBy(desc(articlesTable.publishedAt))
+    .limit(Math.max(1, auto.maxPerRun) * 3);
+
+  res.json({ articles: rows, cutoff: cutoff.toISOString() });
+});
+
+// Prévia da legenda resolvida de um artigo com o template atual (para o
+// compositor manual pré-preencher exatamente o que será publicado).
+router.get("/caption-preview", async (req, res) => {
+  const articleId = String((req.query as Record<string, string>)["articleId"] ?? "");
+  if (!articleId) { res.status(400).json({ error: "articleId é obrigatório" }); return; }
+  const [article] = await db.select().from(articlesTable).where(eq(articlesTable.id, articleId)).limit(1);
+  if (!article) { res.status(404).json({ error: "Artigo não encontrado" }); return; }
+  const caption = buildArticleCaption(article, store.getSocialConfig().captionTemplate ?? "", getPublicBase());
+  res.json({ caption });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

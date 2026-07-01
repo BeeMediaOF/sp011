@@ -4,6 +4,7 @@ import { seedAdminUser } from "./lib/seed.js";
 import { initStore, seedDefaultRssSources, startSettingsSync } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
+import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
 import { ensureSchema } from "./lib/ensureSchema.js";
 import { db, articlesTable } from "@workspace/db";
@@ -62,6 +63,9 @@ app.listen(port, async (err) => {
 
   // Start social media publication queue cron (every 5 min)
   startSocialCron();
+
+  // Start Instagram auto-posting scheduler (checks due automation every 5 min)
+  startSocialAutomation();
 
   /*
    * Pré-aquece o cache de imagens dos artigos mais recentes em background.

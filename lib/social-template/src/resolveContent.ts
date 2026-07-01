@@ -4,6 +4,7 @@ import type { ArticleData } from "./types";
  * Substitui os placeholders do template/legenda pelos dados do artigo.
  * Suporta: {{title}} {{subtitle}} {{category}} {{CATEGORY}} (maiúsculo)
  *          {{author}} {{date}} {{site}} {{link}} {{hashtags}}
+ *          {{excerpt}} (trecho do post) {{summary}} (resumo da IA)
  *
  * Importante: {{CATEGORY}} (caixa-alta) é resolvido ANTES de {{category}}
  * (case-insensitive), senão o segundo "comeria" o token maiúsculo.
@@ -21,6 +22,8 @@ export function resolveContent(content: string, a: ArticleData): string {
     .replace(/\{\{\s*date\s*\}\}/gi, date)
     .replace(/\{\{\s*site\s*\}\}/gi, a.site ?? "")
     .replace(/\{\{\s*link\s*\}\}/gi, a.link ?? "")
+    .replace(/\{\{\s*excerpt\s*\}\}/gi, a.excerpt ?? "")
+    .replace(/\{\{\s*summary\s*\}\}/gi, a.summary ?? "")
     .replace(/\{\{\s*hashtags\s*\}\}/gi, a.hashtags ?? "");
 }
 

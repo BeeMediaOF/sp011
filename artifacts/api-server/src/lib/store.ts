@@ -147,6 +147,26 @@ export interface RssSource {
 
 export interface RssPrompts { global?: string; categories?: Record<string, string> }
 
+/**
+ * Configuração da automação de postagem (aba "Automação" em Redes Sociais).
+ * De tempos em tempos o robô pega as notícias mais recentes do blog, aplica uma
+ * das máscaras selecionadas (rotaciona) e enfileira para publicar no Instagram.
+ * Sem segredos → não entra em SECRET_FIELDS. Persistido dentro de social_config.
+ */
+export interface SocialAutomation {
+  enabled: boolean;            // liga/desliga o robô
+  intervalMinutes: number;     // periodicidade (default 120)
+  maxPerRun: number;           // máx. de posts por ciclo (default 3)
+  accountIds: string[];        // contas Meta destino (social_accounts)
+  templateIds: string[];       // máscaras; o robô alterna entre elas
+  types: ("feed" | "story")[]; // default ["feed"]
+  onlyWithImage: boolean;      // só notícias com foto (default true)
+  minAgeMinutes?: number;      // esperar X min após publicar o artigo (opcional)
+  enabledAt?: string;          // marca d'água: só posta publishedAt >= enabledAt
+  lastRunAt?: string;          // controle de "isDue"
+  lastCount?: number;          // nº enfileirado no último ciclo (UI)
+}
+
 export interface SocialConfig {
   /** Credenciais do App Meta (global) usadas pelo fluxo OAuth. */
   metaAppId?: string; metaAppSecret?: string;
@@ -157,6 +177,8 @@ export interface SocialConfig {
   templateGradientFrom?: string; templateGradientTo?: string; lastPublishedAt?: string;
   /** Template de legenda padrão p/ posts (placeholders resolvidos por artigo). */
   captionTemplate?: string;
+  /** Configuração da automação de postagem no Instagram. */
+  automation?: SocialAutomation;
 }
 
 export type PerplexityAutoMode = "none" | "draft" | "published";

@@ -120,6 +120,10 @@ export interface ArticleData {
   site?: string;
   /** Pré-resolvido (ex.: "#politica #noticias") — usado em legendas. */
   hashtags?: string;
+  /** Trecho inicial real do corpo da matéria (sem HTML) — usado em legendas. */
+  excerpt?: string;
+  /** Resumo curto (gerado pela IA) — usado em legendas. */
+  summary?: string;
 }
 
 export function isImageType(type: ElementType): boolean {

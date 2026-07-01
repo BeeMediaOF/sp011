@@ -112,6 +112,10 @@ Conteúdo da fonte:
 - Destaque um único trecho curto; nunca destaque a manchete inteira nem palavras genéricas (preposições, "para", "com", "após", artigos).
 - Exemplos: "SANTOS RENOVA COM *MIGUELITO ATÉ 2029*", "*NEYMAR VOLTA AOS TREINOS* ANTES DO CLÁSSICO", "BRASIL TEM *DESFALQUE IMPORTANTE* NA ESTREIA".
 
+**RESUMO PARA REDES SOCIAIS (social_summary):** Escreva um resumo curto e envolvente da notícia (1 a 2 frases, no máximo ~250 caracteres) para ser usado como legenda de post no Instagram/Facebook. Deve despertar curiosidade e convidar à leitura, em linguagem direta e sem clickbait enganoso. NÃO repita o título literalmente e NÃO use hashtags aqui.
+
+**HASHTAGS PARA REDES SOCIAIS (social_hashtags):** Gere de 4 a 8 hashtags relevantes para a notícia, separadas por espaço, cada uma começando com # (sem acentos, sem espaços internos). Combine termos de tendência com entidades da matéria (pessoas, lugares, tema). Exemplo: "#brasilia #eleicoes2026 #politica #df".
+
 **CONTEÚDO (content_html):**
 - Comece com o subtítulo como primeiro <h2>
 - Após o H2, escreva uma lead com 3 parágrafos curtos introduzindo o assunto, respondendo às perguntas: quem, o quê, quando, onde, por quê e como
@@ -151,6 +155,8 @@ Após o conteúdo principal, inclua uma seção com o título <h2>Perguntas Freq
   "title": "...",
   "subtitle": "...",
   "social_title": "TÍTULO CURTO COM *DESTAQUE* NO TRECHO PRINCIPAL",
+  "social_summary": "Resumo curto e envolvente para a legenda do post (1 a 2 frases).",
+  "social_hashtags": "#hashtag1 #hashtag2 #hashtag3 #hashtag4",
   "content_html": "<h2>...</h2><p>...</p>...<h2>Perguntas Frequentes</h2><h3>...?</h3><p>...</p>",
   "slug": "titulo-seo-kebab-case",
   "keywords": "palavra1, palavra2, palavra3, palavra4, palavra5, palavra6, palavra7, palavra8"
@@ -212,6 +218,10 @@ export interface RewriteResult {
   subtitle?: string;
   /** Título curto p/ a arte social (pode conter *destaque*). */
   socialTitle?: string;
+  /** Resumo curto p/ a legenda das redes ({{summary}}). */
+  socialSummary?: string;
+  /** Hashtags p/ a legenda das redes ({{hashtags}}). */
+  socialHashtags?: string;
 }
 
 /** Trim slug to at most 5 meaningful words and 55 chars, cutting at a word boundary */
@@ -246,6 +256,7 @@ function parseRewriteResult(raw: string): RewriteResult {
     try {
       const parsed = JSON.parse(stripped) as {
         title?: string; subtitle?: string; social_title?: string;
+        social_summary?: string; social_hashtags?: string;
         content_html?: string; slug?: string; keywords?: string;
       };
       const content     = (parsed.content_html ?? "").trim();
@@ -254,7 +265,9 @@ function parseRewriteResult(raw: string): RewriteResult {
       const title       = (parsed.title ?? "").trim();
       const subtitle    = (parsed.subtitle ?? "").trim();
       const socialTitle = sanitizeHighlightMarkers((parsed.social_title ?? "").trim()) || undefined;
-      if (content) return { content, keywords, slug, title, subtitle, socialTitle };
+      const socialSummary  = (parsed.social_summary ?? "").trim() || undefined;
+      const socialHashtags = (parsed.social_hashtags ?? "").trim() || undefined;
+      if (content) return { content, keywords, slug, title, subtitle, socialTitle, socialSummary, socialHashtags };
     } catch { /* try regex fallback below */ }
 
     // Regex fallback for truncated / malformed JSON
@@ -264,6 +277,8 @@ function parseRewriteResult(raw: string): RewriteResult {
       const mTitle   = stripped.match(/"title"\s*:\s*"([^"]+)"/);
       const mSub     = stripped.match(/"subtitle"\s*:\s*"([^"]+)"/);
       const mSocial  = stripped.match(/"social_title"\s*:\s*"([^"]+)"/);
+      const mSummary = stripped.match(/"social_summary"\s*:\s*"([^"]+)"/);
+      const mTags    = stripped.match(/"social_hashtags"\s*:\s*"([^"]+)"/);
       const mSlug    = stripped.match(/"slug"\s*:\s*"([^"]+)"/);
       const mKw      = stripped.match(/"keywords"\s*:\s*"([^"]+)"/);
       return {
@@ -271,6 +286,8 @@ function parseRewriteResult(raw: string): RewriteResult {
         title:    mTitle?.[1]?.trim() ?? "",
         subtitle: mSub?.[1]?.trim() ?? "",
         socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.trim() ?? "") || undefined,
+        socialSummary:  mSummary?.[1]?.trim() || undefined,
+        socialHashtags: mTags?.[1]?.trim() || undefined,
         slug:     trimSlug(mSlug?.[1] ?? ""),
         keywords: mKw?.[1]?.trim() ?? "",
       };
@@ -1067,9 +1084,11 @@ export async function autoProcessArticle(
   let keywords        = "";
   let slug            = "";
   let aiRewriteSuccess = false;
-  let aiTitle:       string | undefined;
-  let aiSubtitle:    string | undefined;
-  let aiSocialTitle: string | undefined;
+  let aiTitle:        string | undefined;
+  let aiSubtitle:     string | undefined;
+  let aiSocialTitle:  string | undefined;
+  let aiSocialSummary:  string | undefined;
+  let aiSocialHashtags: string | undefined;
   let author          = giveCredit ? `Redação (via ${sourceName})` : "Redação";
 
   // ── Ghost-publication guard ────────────────────────────────────────────────
@@ -1130,6 +1149,8 @@ export async function autoProcessArticle(
       aiTitle          = result.title       || undefined;
       aiSubtitle       = result.subtitle    || undefined;
       aiSocialTitle    = result.socialTitle || undefined;
+      aiSocialSummary  = result.socialSummary  || undefined;
+      aiSocialHashtags = result.socialHashtags || undefined;
       aiRewriteSuccess = true;
       addLog({ type: "rewrite", sourceName, articleTitle: aiTitle ?? art.title });
     } catch (err) {
@@ -1161,6 +1182,8 @@ export async function autoProcessArticle(
   await articleService.createArticle({
     title:         aiTitle    ?? art.title,
     socialTitle:   aiSocialTitle,
+    socialSummary:  aiSocialSummary,
+    socialHashtags: aiSocialHashtags,
     subtitle:      aiSubtitle ?? art.excerpt.slice(0, 160),
     content:       finalContent,
     category,

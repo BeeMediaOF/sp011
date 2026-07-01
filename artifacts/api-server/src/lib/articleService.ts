@@ -20,6 +20,10 @@ export interface Article {
   title: string;
   /** Título curto p/ artes sociais (só imagem; pode ter *destaque*). */
   socialTitle?: string;
+  /** Resumo curto (IA) p/ legenda de rede social ({{summary}}). */
+  socialSummary?: string;
+  /** Hashtags (IA) p/ legenda de rede social ({{hashtags}}). */
+  socialHashtags?: string;
   subtitle: string;
   content: string;
   category: string;
@@ -46,6 +50,8 @@ function rowToArticle(row: ArticleRow): Article {
     id:            row.id,
     title:         row.title,
     socialTitle:   row.socialTitle ?? undefined,
+    socialSummary:  row.socialSummary ?? undefined,
+    socialHashtags: row.socialHashtags ?? undefined,
     subtitle:      row.subtitle,
     content:       row.content,
     category:      row.category,
@@ -177,6 +183,8 @@ export const articleService = {
         id,
         title:         data.title,
         socialTitle:   data.socialTitle ?? null,
+        socialSummary:  data.socialSummary ?? null,
+        socialHashtags: data.socialHashtags ?? null,
         subtitle:      data.subtitle ?? "",
         content:       data.content ?? "",
         category:      data.category ?? "geral",
@@ -212,6 +220,8 @@ export const articleService = {
       .set({
         ...(data.title         !== undefined && { title:         data.title }),
         ...(data.socialTitle   !== undefined && { socialTitle:   data.socialTitle }),
+        ...(data.socialSummary  !== undefined && { socialSummary:  data.socialSummary }),
+        ...(data.socialHashtags !== undefined && { socialHashtags: data.socialHashtags }),
         ...(data.subtitle      !== undefined && { subtitle:      data.subtitle }),
         ...(data.content       !== undefined && { content:       data.content }),
         ...(data.category      !== undefined && { category:      data.category }),
