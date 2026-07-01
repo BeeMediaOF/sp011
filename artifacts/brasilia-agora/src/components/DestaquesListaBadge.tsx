@@ -11,6 +11,7 @@ import heroImg from "../assets/images/hero.webp";
 import hospitalImg from "../assets/images/hospital.webp";
 import studentsImg from "../assets/images/students.webp";
 import { useAds, trackClick } from "./ads/useAds";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 const artigos = [
   {
@@ -178,7 +179,7 @@ export default function DestaquesListaBadge() {
                       className="w-16 h-12 object-cover rounded shrink-0"
                     />
                     <h4 className="text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
+                      dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                     />
                   </div>
                 </Link>

@@ -10,6 +10,7 @@ import {
 } from "../middlewares/auth.js";
 import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, generateURI as otpGenerateURI } from "otplib";
 import QRCode from "qrcode";
+import { requirePermission } from "../middlewares/permissions.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
@@ -295,7 +296,7 @@ router.use(authMiddleware);
 // ─── Articles ────────────────────────────────────────────────────────────────
 
 /** GET /api/admin/articles */
-router.get("/articles", async (_req, res) => {
+router.get("/articles", requirePermission("articles.view"), async (_req, res) => {
   const [articles, viewsMap] = await Promise.all([
     articleService.getArticles(),
     Promise.resolve(store.getArticleViews()),
@@ -308,14 +309,14 @@ router.get("/articles", async (_req, res) => {
 });
 
 /** GET /api/admin/articles/:id */
-router.get("/articles/:id", async (req, res) => {
-  const article = await articleService.getArticle(req.params.id ?? "");
+router.get("/articles/:id", requirePermission("articles.view"), async (req, res) => {
+  const article = await articleService.getArticle(String(req.params.id ?? ""));
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** POST /api/admin/articles */
-router.post("/articles", async (req, res) => {
+router.post("/articles", requirePermission("articles.create"), async (req, res) => {
   const { title, subtitle, content, category, tag, imageUrl, author, status } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
@@ -336,22 +337,22 @@ router.post("/articles", async (req, res) => {
 });
 
 /** PUT /api/admin/articles/:id */
-router.put("/articles/:id", async (req, res) => {
-  const article = await articleService.updateArticle(req.params.id ?? "", req.body as Parameters<typeof articleService.updateArticle>[1]);
+router.put("/articles/:id", requirePermission("articles.edit"), async (req, res) => {
+  const article = await articleService.updateArticle(String(req.params.id ?? ""), req.body as Parameters<typeof articleService.updateArticle>[1]);
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** DELETE /api/admin/articles/:id */
-router.delete("/articles/:id", async (req, res) => {
-  const deleted = await articleService.deleteArticle(req.params.id ?? "");
+router.delete("/articles/:id", requirePermission("articles.delete"), async (req, res) => {
+  const deleted = await articleService.deleteArticle(String(req.params.id ?? ""));
   if (!deleted) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ success: true });
 });
 
 /** POST /api/admin/articles/:id/rewrite — re-run AI rewrite on any article */
-router.post("/articles/:id/rewrite", async (req, res) => {
-  const article = await articleService.getArticle(req.params.id ?? "");
+router.post("/articles/:id/rewrite", requirePermission("articles.edit"), async (req, res) => {
+  const article = await articleService.getArticle(String(req.params.id ?? ""));
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
 
   try {
@@ -472,8 +473,8 @@ Regras:
 // ─── Publish ─────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/publish/:id  — mark article as published */
-router.post("/publish/:id", async (req, res) => {
-  const article = await articleService.updateArticle(req.params.id ?? "", {
+router.post("/publish/:id", requirePermission("articles.publish"), async (req, res) => {
+  const article = await articleService.updateArticle(String(req.params.id ?? ""), {
     status: "published",
     publishedAt: new Date().toISOString(),
   });
@@ -485,7 +486,7 @@ router.post("/publish/:id", async (req, res) => {
  *  Scans all articles for JSON-wrapped content and extracts clean HTML.
  *  Safe to run multiple times — only touches broken articles.
  */
-router.post("/articles/repair-content", async (_req, res) => {
+router.post("/articles/repair-content", requireAdmin, async (_req, res) => {
   function extractHtmlFromJson(raw: string): string | null {
     // Strip markdown fences
     const stripped = raw
@@ -546,7 +547,7 @@ router.post("/articles/repair-content", async (_req, res) => {
  * conteúdo vazio, ou apenas metadados sem texto real). Útil para limpar o banco de artigos
  * que o pipeline de reescrita não conseguiu processar corretamente.
  */
-router.post("/articles/delete-invalid", authMiddleware, async (req, res) => {
+router.post("/articles/delete-invalid", requireAdmin, async (req, res) => {
   /**
    * Returns true for articles that had the red "Conteúdo com formatação inválida" error.
    * These are articles where the content looks like JSON but neither a clean JSON parse
@@ -674,7 +675,7 @@ router.post("/articles/retention/run", requireAdmin, async (req, res) => {
  *
  * Resposta: { fixed, failed, failedSlugs, skipped, total, remainingBroken }
  */
-router.post("/articles/migrate-json-content", authMiddleware, async (req, res) => {
+router.post("/articles/migrate-json-content", requireAdmin, async (req, res) => {
   /** Strip code fences and return the JSON body (or null if it's plain HTML). */
   function stripFences(raw: string): string | null {
     // 1. Hard trim — remove ALL leading/trailing whitespace and newlines
@@ -817,7 +818,7 @@ router.post("/articles/migrate-json-content", authMiddleware, async (req, res) =
 });
 
 /** POST /api/publish  — bulk publish all drafts (public endpoint, auth required via header) */
-router.post("/bulk-publish", async (_req, res) => {
+router.post("/bulk-publish", requirePermission("articles.publish"), async (_req, res) => {
   const articles = await articleService.getArticles();
   let count = 0;
   for (const a of articles) {
@@ -837,7 +838,7 @@ router.get("/menu", (_req, res) => {
 });
 
 /** PUT /api/admin/menu  — replace entire menu */
-router.put("/menu", (req, res) => {
+router.put("/menu", requirePermission("menu.edit"), (req, res) => {
   const { menuItems } = req.body as { menuItems?: unknown };
   if (!Array.isArray(menuItems)) {
     res.status(400).json({ error: "menuItems must be an array" }); return;
@@ -848,30 +849,22 @@ router.put("/menu", (req, res) => {
 
 // ─── Settings ────────────────────────────────────────────────────────────────
 
-/** Escape HTML special chars for safe interpolation into index.html */
-function escHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 /**
- * Write the Vite index.html and public/opengraph.jpg whenever settings change
- * so social-media crawlers always see up-to-date Open Graph meta tags without
- * requiring server-side rendering.
+ * Persist public/opengraph.jpg and public/favicon.jpg whenever settings change
+ * so crawlers/browsers see the admin-uploaded versions.
+ *
+ * IMPORTANTE: esta função NÃO reescreve mais o index.html do frontend. A versão
+ * antiga sobrescrevia o index.html otimizado (boot prefetch, fontes locais,
+ * entry-client.tsx) com um template legado que apontava para /src/main.tsx —
+ * quebrando o site quando API e frontend compartilham o mesmo filesystem.
  *
  * Non-critical — errors are logged but never surfaced to the caller.
  */
 function updateIndexHtml(settings: SiteSettings): void {
   try {
     const base      = resolve(process.cwd(), "..", "brasilia-agora");
-    const indexPath = resolve(base, "index.html");
     const ogPath    = resolve(base, "public", "opengraph.jpg");
     const favPath   = resolve(base, "public", "favicon.jpg");
-
-    const siteName = escHtml(settings.siteName  || BRAND.name);
-    const tagline  = escHtml(settings.tagline   || BRAND.tagline);
-    const desc     = escHtml(settings.seoDescription || settings.tagline || "Informação com credibilidade sobre o Distrito Federal e o Brasil.");
-    const siteUrl  = escHtml(settings.siteUrl   || "");
-    const title    = `${siteName} — ${tagline}`;
 
     // Persist OG image so /opengraph.jpg returns the admin-uploaded version
     if (settings.ogImageBase64) {
@@ -892,45 +885,6 @@ function updateIndexHtml(settings: SiteSettings): void {
         logger.warn({ err: favErr }, "updateIndexHtml: could not write favicon.jpg");
       }
     }
-
-    const ogUrlTag = siteUrl
-      ? `\n    <meta property="og:url" content="${siteUrl}" />`
-      : "";
-
-    const html = `<!DOCTYPE html>
-<html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <title>${title}</title>
-    <meta name="description" content="${desc}" />
-    <meta name="robots" content="index, follow" />
-
-    <!-- Open Graph -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="${siteName}" />${ogUrlTag}
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="${desc}" />
-    <meta property="og:image" content="/opengraph.jpg" />
-
-    <!-- Twitter / X -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${title}" />
-    <meta name="twitter:description" content="${desc}" />
-    <meta name="twitter:image" content="/opengraph.jpg" />
-
-    <link rel="icon" type="image/jpeg" href="/favicon.jpg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`;
-
-    writeFileSync(indexPath, html, "utf-8");
   } catch (err) {
     logger.warn({ err }, "updateIndexHtml: failed");
   }
@@ -946,15 +900,16 @@ router.get("/ai-quota", authMiddleware, (_req, res) => {
   res.json(getAIQuotaStatus());
 });
 
-/** PUT /api/admin/settings */
-router.put("/settings", (req, res) => {
+/** PUT /api/admin/settings — admin only: inclui campos sensíveis (chaves de API,
+ *  customHeadCode/customBodyCode injetados no site público). */
+router.put("/settings", requireAdmin, (req, res) => {
   const updated = store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
   updateIndexHtml(updated);
   res.json({ settings: store.getPublicSettings() });
 });
 
 /** POST /api/admin/logo  — upload logo as base64 */
-router.post("/logo", (req, res) => {
+router.post("/logo", requireAdmin, (req, res) => {
   const { logoBase64 } = req.body as { logoBase64?: string };
   if (!logoBase64) { res.status(400).json({ error: "logoBase64 is required" }); return; }
   const settings = store.updateSettings({ logoBase64 });
@@ -989,14 +944,14 @@ router.get("/ads", async (_req, res) => {
 
 /** GET /api/admin/ads/:id */
 router.get("/ads/:id", async (req, res) => {
-  const [row] = await db.select().from(adsTable).where(eq(adsTable.id, req.params.id ?? "")).limit(1);
+  const [row] = await db.select().from(adsTable).where(eq(adsTable.id, String(req.params.id ?? ""))).limit(1);
   if (!row) { res.status(404).json({ error: "Ad not found" }); return; }
   res.json({ ad: adRowToPublic(row) });
 });
 
 
 /** POST /api/admin/ads — create ad */
-router.post("/ads", async (req, res) => {
+router.post("/ads", requirePermission("ads.manage"), async (req, res) => {
   const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices, expiresAt } = req.body as {
     name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
     targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null;
@@ -1025,8 +980,8 @@ router.post("/ads", async (req, res) => {
 });
 
 /** PUT /api/admin/ads/:id */
-router.put("/ads/:id", async (req, res) => {
-  const id = req.params.id ?? "";
+router.put("/ads/:id", requirePermission("ads.manage"), async (req, res) => {
+  const id = String(req.params.id ?? "");
   const { name, imageBase64, imageUrl: imageUrlIn, link, position, active, targetDevices, expiresAt } = req.body as {
     name?: string; imageBase64?: string; imageUrl?: string; link?: string; position?: string; active?: boolean;
     targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null;
@@ -1049,8 +1004,8 @@ router.put("/ads/:id", async (req, res) => {
 });
 
 /** DELETE /api/admin/ads/:id */
-router.delete("/ads/:id", async (req, res) => {
-  const result = await db.delete(adsTable).where(eq(adsTable.id, req.params.id ?? "")).returning({ id: adsTable.id });
+router.delete("/ads/:id", requirePermission("ads.manage"), async (req, res) => {
+  const result = await db.delete(adsTable).where(eq(adsTable.id, String(req.params.id ?? ""))).returning({ id: adsTable.id });
   if (result.length === 0) { res.status(404).json({ error: "Ad not found" }); return; }
   res.json({ success: true });
 });
@@ -1062,26 +1017,26 @@ router.get("/columnists", (_req, res) => {
 });
 
 router.get("/columnists/:id", (req, res) => {
-  const c = store.getColumnist(req.params.id ?? "");
+  const c = store.getColumnist(String(req.params.id ?? ""));
   if (!c) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ columnist: c });
 });
 
-router.post("/columnists", (req, res) => {
+router.post("/columnists", requirePermission("columnists.manage"), (req, res) => {
   const { name, bio, avatarBase64, active } = req.body as { name?: string; bio?: string; avatarBase64?: string; active?: boolean };
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
   const c = store.createColumnist({ name, bio: bio ?? "", specialty: "Outro", avatarBase64: avatarBase64 ?? "", active: !!active });
   res.status(201).json({ columnist: c });
 });
 
-router.put("/columnists/:id", (req, res) => {
-  const c = store.updateColumnist(req.params.id ?? "", req.body as Parameters<typeof store.updateColumnist>[1]);
+router.put("/columnists/:id", requirePermission("columnists.manage"), (req, res) => {
+  const c = store.updateColumnist(String(req.params.id ?? ""), req.body as Parameters<typeof store.updateColumnist>[1]);
   if (!c) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ columnist: c });
 });
 
-router.delete("/columnists/:id", (req, res) => {
-  const ok = store.deleteColumnist(req.params.id ?? "");
+router.delete("/columnists/:id", requirePermission("columnists.manage"), (req, res) => {
+  const ok = store.deleteColumnist(String(req.params.id ?? ""));
   if (!ok) { res.status(404).json({ error: "Not found" }); return; }
   res.json({ success: true });
 });
@@ -1092,7 +1047,8 @@ router.get("/contact", (_req, res) => {
   res.json({ contactInfo: store.getContactInfo() });
 });
 
-router.put("/contact", (req, res) => {
+// Admin only: privacyPolicy/termsOfUse são renderizados como HTML no site público.
+router.put("/contact", requireAdmin, (req, res) => {
   const info = store.updateContactInfo(req.body as Partial<ContactInfo>);
   res.json({ contactInfo: info });
 });
@@ -1207,7 +1163,7 @@ async function scrapeYouTube(url: string): Promise<{ title: string; text: string
 }
 
 /** POST /api/admin/article-from-url — generate article from a URL */
-router.post("/article-from-url", async (req, res) => {
+router.post("/article-from-url", requirePermission("articles.create"), async (req, res) => {
   const { url, category, giveCredit } = req.body as {
     url?: string; category?: string; giveCredit?: boolean;
   };

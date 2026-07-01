@@ -25,6 +25,7 @@ import { existsSync, mkdirSync } from "fs";
 import { Readable } from "stream";
 import { readFileSync } from "fs";
 import { authMiddleware } from "../middlewares/auth.js";
+import { requirePermission } from "../middlewares/permissions.js";
 import { logger } from "../lib/logger.js";
 import {
   cacheKey,
@@ -180,7 +181,7 @@ const router = Router();
  * Multipart upload — field name: "image"
  * Optional field: "title" — generates a SEO-friendly filename
  */
-router.post("/image", authMiddleware, upload.single("image"), async (req, res) => {
+router.post("/image", authMiddleware, requirePermission("upload.images"), upload.single("image"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado. Campo esperado: 'image'." });
     return;
@@ -222,7 +223,7 @@ router.post("/image", authMiddleware, upload.single("image"), async (req, res) =
  * Multipart upload — field name: "media"
  * Accepts images and videos. Optional field: "title".
  */
-router.post("/media", authMiddleware, upload.single("media"), async (req, res) => {
+router.post("/media", authMiddleware, requirePermission("upload.images"), upload.single("media"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado. Campo esperado: 'media'." });
     return;

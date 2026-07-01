@@ -4,6 +4,18 @@
 {$SITE_DOMAIN} {
 	encode gzip zstd
 
+	# Headers de segurança aplicados a TODAS as respostas (API e frontend).
+	# O helmet cobre apenas /api/*; o HTML servido pelo vite preview não tinha
+	# nenhum destes headers.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
 	# API → container api:8080
 	handle /api/* {
 		reverse_proxy api:8080

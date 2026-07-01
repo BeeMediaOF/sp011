@@ -10,6 +10,7 @@ import hospitalImg    from "../assets/images/hospital.webp";
 import busImg         from "../assets/images/bus.webp";
 import studentsImg    from "../assets/images/students.webp";
 import politicaFeatImg from "../assets/images/politica_feat.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type FeaturedItem = {
@@ -117,7 +118,7 @@ function FeaturedCard({
           {item.chapeu}
         </span>
         <h2 className="font-['Merriweather',serif] font-black text-white leading-tight text-[15px] sm:text-[17px] line-clamp-3 mb-2 transition-colors group-hover:text-gray-200"
-          dangerouslySetInnerHTML={{ __html: item.title }}
+          dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
         />
         <div className="flex items-center gap-2 text-[11px] text-white/60">
           <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
@@ -242,7 +243,7 @@ function SmallOverlayCard({ item, priority = false }: { item: SecondaryItem; pri
         </span>
         <h3
           className="font-['Merriweather',serif] font-bold text-white leading-tight text-[13px] line-clamp-2"
-          dangerouslySetInnerHTML={{ __html: item.title }}
+          dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
         />
       </div>
     </Link>
@@ -279,7 +280,7 @@ function HeroSplit({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] 
                 </span>
                 <h3
                   className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2 text-[#1a1a1a]"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                 />
               </div>
             </Link>
@@ -355,7 +356,7 @@ function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
               </span>
               <h3
                 className="font-['Merriweather',serif] text-[13px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
-                dangerouslySetInnerHTML={{ __html: item.title }}
+                dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
               />
             </div>
           </a>
@@ -472,7 +473,7 @@ export default function HeroSection({ variant }: { variant?: string } = {}) {
                       {item.chapeu}
                     </span>
                     <h3 className="font-['Merriweather',serif] text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3 text-[#1a1a1a]"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
+                      dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                     />
                   </div>
                 </Link>

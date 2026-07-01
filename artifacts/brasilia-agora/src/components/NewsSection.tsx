@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 export interface NewsSectionArticle {
   id: string;
@@ -79,7 +80,7 @@ export default function NewsSection({
                   </div>
                 </div>
                 <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-1 group-hover:text-[#c8102e] transition-colors flex-grow"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                 />
                 <span className="text-gray-500 text-xs">{item.time}</span>
               </Link>
@@ -108,7 +109,7 @@ export default function NewsSection({
                     {label}
                   </span>
                   <h3 className="text-white font-bold text-[15px] leading-snug group-hover:opacity-80 transition-opacity"
-                    dangerouslySetInnerHTML={{ __html: featuredArticle.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(featuredArticle.title) }}
                   />
                   <span className="text-gray-400 text-xs mt-1 block">{featuredArticle.time}</span>
                 </div>
@@ -138,7 +139,7 @@ export default function NewsSection({
                       {label}
                     </span>
                     <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
+                      dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                     />
                     <span className="text-gray-500 text-xs mt-1">{item.time}</span>
                   </div>

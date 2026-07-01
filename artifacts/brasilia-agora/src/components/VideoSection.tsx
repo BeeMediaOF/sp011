@@ -5,6 +5,7 @@ import trafficImg from "../assets/images/traffic.webp";
 import policeImg from "../assets/images/police.webp";
 import parkImg from "../assets/images/park.webp";
 import festivalImg from "../assets/images/festival.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 const videos = [
   { id: "v-1", title: "Câmara Legislativa aprova programa Morar DF", thumb: heroImg, duration: "2:45" },
@@ -47,7 +48,7 @@ export default function VideoSection() {
                 </span>
               </div>
               <h4 className="font-serif text-white text-[14px] font-bold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                dangerouslySetInnerHTML={{ __html: item.title }}
+                dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
               />
             </Link>
           ))}

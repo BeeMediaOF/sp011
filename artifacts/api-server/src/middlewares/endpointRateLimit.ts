@@ -5,16 +5,11 @@
 import type { Request, Response, NextFunction } from "express";
 import { db, endpointRateLimitsTable } from "@workspace/db";
 import { eq, and, sql } from "drizzle-orm";
-import { logSecurity } from "../lib/audit.js";
+import { logSecurity, getClientIp } from "../lib/audit.js";
 
 const LIMIT         = 10;
 const WINDOW_MS     = 60_000;        // 1 minute
 const BLOCK_MS      = 60 * 60_000;  // 1 hour
-
-function getClientIp(req: Request): string {
-  const fwd = req.headers["x-forwarded-for"] as string | undefined;
-  return fwd?.split(",")[0]?.trim() ?? req.ip ?? "unknown";
-}
 
 /**
  * Returns middleware that rate-limits an endpoint.

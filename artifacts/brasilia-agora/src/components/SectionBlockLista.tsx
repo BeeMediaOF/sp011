@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { buildSrcSet, THUMB_WIDTHS } from "@/lib/newsImage";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface Article {
   id: string;
@@ -80,7 +81,7 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
                     {item.chapeu}
                   </span>
                   <h4 className="text-[14px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                   />
                   <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
                 </div>

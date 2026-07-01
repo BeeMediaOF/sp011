@@ -1,7 +1,10 @@
+import { randomBytes } from "crypto";
 import { db, usersTable } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { hashPassword } from "../middlewares/auth.js";
 import { logger } from "./logger.js";
+
+const isProd = process.env["NODE_ENV"] === "production";
 
 export async function seedAdminUser(): Promise<void> {
   try {
@@ -9,7 +12,19 @@ export async function seedAdminUser(): Promise<void> {
     if (count > 0) return;
 
     const email = (process.env["ADMIN_DEFAULT_EMAIL"] ?? "admin@sbcagora.com.br").toLowerCase();
-    const password = process.env["ADMIN_DEFAULT_PASSWORD"] ?? "brasilia@2024";
+    let password = process.env["ADMIN_DEFAULT_PASSWORD"];
+    let generated = false;
+
+    if (!password) {
+      if (isProd) {
+        // Nunca semear uma senha conhecida/publicada em produção. Gera uma
+        // aleatória e registra UMA vez no log para o operador copiar.
+        password = randomBytes(12).toString("base64url");
+        generated = true;
+      } else {
+        password = "brasilia@2024"; // dev only — nunca chega a produção
+      }
+    }
 
     await db.insert(usersTable).values({
       name: "Administrador",
@@ -17,10 +32,19 @@ export async function seedAdminUser(): Promise<void> {
       passwordHash: hashPassword(password),
       role: "admin",
       status: "active",
-      mustChangePassword: 0,
+      // Sempre forçar troca no primeiro login quando a senha não veio de env explícita.
+      mustChangePassword: process.env["ADMIN_DEFAULT_PASSWORD"] ? 0 : 1,
     });
 
-    logger.info({ email }, "Admin seed user created");
+    if (generated) {
+      logger.warn(
+        { email },
+        `Admin seed criado com senha ALEATÓRIA (ADMIN_DEFAULT_PASSWORD não definida). ` +
+        `Senha inicial: ${password} — troque no primeiro login.`,
+      );
+    } else {
+      logger.info({ email }, "Admin seed user created");
+    }
   } catch (err) {
     logger.error({ err }, "Failed to seed admin user");
   }

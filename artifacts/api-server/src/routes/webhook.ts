@@ -68,7 +68,15 @@ function deriveTitle(subtitle?: string, content?: string): string {
  *   id          string  optional  if provided without title, publishes an existing draft
  */
 router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
-  req.log.info({ webhookBody: req.body, contentType: String(req.headers["content-type"] ?? "") }, "POST /api/publish received");
+  // Log apenas metadados — o corpo completo pode conter artigos inteiros e
+  // inflar/poluir os logs (dados de terceiros não pertencem ao log de acesso).
+  req.log.info(
+    {
+      fields: Object.keys((req.body ?? {}) as object),
+      contentType: String(req.headers["content-type"] ?? ""),
+    },
+    "POST /api/publish received",
+  );
 
   const {
     id, title, subtitle, content, category, tag, imageUrl, author,

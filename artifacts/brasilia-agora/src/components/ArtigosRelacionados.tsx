@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface RelatedArticle {
   id: string;
@@ -90,7 +91,7 @@ export default function ArtigosRelacionados({ currentSlug }: Props) {
               )}
               <h3
                 className="text-[13px] font-bold text-[#1a1a1a] leading-snug mt-0.5 group-hover:text-[#c8102e] transition-colors line-clamp-3"
-                dangerouslySetInnerHTML={{ __html: a.title }}
+                dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }}
               />
               {time && <p className="text-[11px] text-gray-400 mt-1">{time}</p>}
             </Link>

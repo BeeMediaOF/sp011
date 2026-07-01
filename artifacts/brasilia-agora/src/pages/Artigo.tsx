@@ -12,6 +12,7 @@ import ArtigosRelacionados from "../components/ArtigosRelacionados";
 import { useSite } from "../hooks/useSite";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
+import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
 
 const editoriaColor: Record<string, string> = {
   brasil: "#16a34a",
@@ -54,7 +55,7 @@ function ArticleSidebar() {
                   {idx + 1}
                 </span>
                 <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                 />
               </Link>
             ))}
@@ -344,7 +345,7 @@ export default function Artigo() {
           key="html-body"
           className="article-body"
           style={{ "--chapeu": chapeuColor } as React.CSSProperties}
-          dangerouslySetInnerHTML={{ __html: raw }}
+          dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(raw) }}
           onClick={(e) => {
             const anchor = (e.target as HTMLElement).closest("a");
             if (anchor?.href && !anchor.href.startsWith(window.location.origin)) {
@@ -554,14 +555,14 @@ export default function Artigo() {
                   {/* Título */}
                   <h1 className="font-black text-[#1a2448] leading-tight mb-3 tracking-tight"
                     style={{ fontSize: "clamp(1.6rem, 3vw, 2.6rem)" }}
-                    dangerouslySetInnerHTML={{ __html: article.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.title) }}
                   />
 
                   {/* Subtítulo */}
                   {article.subtitle && (
                     <p className="text-[17px] text-gray-600 leading-relaxed mb-5 border-l-4 pl-4"
                       style={{ borderColor: chapeuColor }}
-                      dangerouslySetInnerHTML={{ __html: article.subtitle }}
+                      dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.subtitle) }}
                     />
                   )}
 

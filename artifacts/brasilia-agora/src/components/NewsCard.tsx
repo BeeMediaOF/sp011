@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
 import { buildSrcSet, CARD_WIDTHS } from "@/lib/newsImage";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface NewsCardProps {
   id: string;
@@ -47,7 +48,7 @@ export default function NewsCard({ id, slug, title, summary, image, chapeu, chap
         {chapeu}
       </span>
       <h3 className="font-serif text-[#1a1a1a] text-[17px] font-bold leading-snug mt-1 group-hover:text-[#c8102e] transition-colors line-clamp-3"
-        dangerouslySetInnerHTML={{ __html: title }}
+        dangerouslySetInnerHTML={{ __html: safeTitleHtml(title) }}
       />
       <p className="text-gray-700 text-sm leading-relaxed mt-1.5 line-clamp-2">
         {summary}

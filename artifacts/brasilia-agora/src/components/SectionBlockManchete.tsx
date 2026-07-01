@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS } from "@/lib/newsImage";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface Article {
   id: string;
@@ -108,7 +109,7 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
                     {item.chapeu}
                   </span>
                   <h4 className="text-[15px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                   />
                   <p className="text-[11px] text-gray-400 mt-1.5">{item.time}</p>
                 </Link>

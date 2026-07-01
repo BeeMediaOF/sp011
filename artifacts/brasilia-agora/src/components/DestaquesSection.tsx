@@ -5,6 +5,7 @@ import parkImg from "../assets/images/park.webp";
 import busImg from "../assets/images/bus.webp";
 import studentsImg from "../assets/images/students.webp";
 import festivalImg from "../assets/images/festival.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 export default function DestaquesSection() {
   const destaques = [
@@ -60,7 +61,7 @@ export default function DestaquesSection() {
                 </div>
               </div>
               <h3 className="font-bold text-[#1a2448] text-[15px] leading-snug mb-2 group-hover:text-[#c8102e] transition-colors flex-grow"
-                dangerouslySetInnerHTML={{ __html: item.title }}
+                dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
               />
               <span className="text-gray-500 text-xs">{item.time}</span>
             </div>

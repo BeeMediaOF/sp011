@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface Article {
   id: string;
@@ -70,7 +71,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                   {featured.chapeu}
                 </span>
                 <h3 className="font-serif text-white font-black text-[24px] leading-tight line-clamp-3 mb-2"
-                  dangerouslySetInnerHTML={{ __html: featured.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(featured.title) }}
                 />
                 <p className="text-white/70 text-[13px] line-clamp-2">{featured.summary}</p>
                 <div className="flex items-center gap-2 mt-3 text-[11px] text-white/60">
@@ -100,7 +101,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
                 </div>
                 <div className="flex-1 min-w-0 py-1">
                   <h4 className="font-serif font-black text-[#1a1a1a] group-hover:text-[#c8102e] transition-colors line-clamp-3 mb-2 text-[15px] sm:text-[19px]"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                   />
                   <div className="flex items-center gap-2 text-[12px] text-gray-500">
                     <span>Escrito por <strong className="font-bold text-[#1a1a1a]">{bylineName}</strong></span>

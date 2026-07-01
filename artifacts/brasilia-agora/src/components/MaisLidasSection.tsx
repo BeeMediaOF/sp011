@@ -7,6 +7,7 @@ import studentsImg from "../assets/images/students.webp";
 import policeImg from "../assets/images/police.webp";
 import parkImg from "../assets/images/park.webp";
 import culturaFeatImg from "../assets/images/cultura_feat.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 const maisLidas = [
   { id: "ml-1", rank: 1, title: "Câmara Legislativa aprova projeto que cria o programa Morar DF", tag: "POLÍTICA", tagColor: "#1d4ed8", time: "2 horas atrás", img: heroImg },
@@ -46,7 +47,7 @@ export default function MaisLidasSection() {
               <div className="absolute bottom-0 left-0 p-5 w-full">
                 <span className="text-[10px] font-bold text-[#1d4ed8] uppercase">{maisLidas[0].tag}</span>
                 <h3 className="text-white font-black text-lg leading-snug mt-1 group-hover:text-blue-200 transition-colors"
-                  dangerouslySetInnerHTML={{ __html: maisLidas[0].title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(maisLidas[0].title) }}
                 />
                 <span className="text-gray-400 text-xs mt-2 block">{maisLidas[0].time}</span>
               </div>
@@ -64,7 +65,7 @@ export default function MaisLidasSection() {
                     <span className="text-[10px] font-bold uppercase" style={{ color: item.tagColor }}>{item.tag}</span>
                   </div>
                   <h4 className="font-bold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                   />
                   <span className="text-gray-400 text-xs mt-1 block">{item.time}</span>
                 </div>
@@ -93,7 +94,7 @@ export default function MaisLidasSection() {
                     <span className="text-[#c8102e] font-black text-xs min-w-[38px] pt-0.5 shrink-0">{item.time}</span>
                     <div>
                       <h4 className="font-semibold text-[#0d1633] text-sm leading-snug group-hover:text-[#c8102e] transition-colors"
-                        dangerouslySetInnerHTML={{ __html: item.title }}
+                        dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                       />
                       {index === 0 && <span className="inline-block mt-1 bg-[#0d1633] text-white text-[10px] font-bold px-2 py-0.5 uppercase">Nova</span>}
                     </div>

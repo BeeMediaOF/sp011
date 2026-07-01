@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import { type Article } from "../lib/adminApi";
 import { Search, Calendar } from "lucide-react";
 import { useCategories, categoryColor } from "../hooks/useCategories";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 function imgFallback(url: string) {
   return url || "https://placehold.co/400x260/e5e7eb/9ca3af?text=Sem+imagem";
@@ -30,7 +31,7 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
             {article.tag || article.category}
           </span>
           <h3 className="font-serif text-white font-black text-[16px] leading-snug line-clamp-2"
-            dangerouslySetInnerHTML={{ __html: article.title }}
+            dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.title) }}
           />
           <p className="text-white/50 text-[11px] mt-1">
             {new Date(article.publishedAt).toLocaleDateString("pt-BR")}
@@ -60,7 +61,7 @@ function ListCard({ article, color }: { article: Article; color: string }) {
           {article.tag || article.category}
         </span>
         <h4 className="font-serif text-[13px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-          dangerouslySetInnerHTML={{ __html: article.title }}
+          dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.title) }}
         />
         <p className="text-[11px] text-gray-400 mt-1">
           {new Date(article.publishedAt).toLocaleDateString("pt-BR")}

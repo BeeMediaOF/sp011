@@ -2,6 +2,7 @@ import { Router } from "express";
 import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { randomUUID } from "crypto";
 import { authMiddleware } from "../middlewares/auth.js";
+import { requirePermission, requirePermissionForWrites } from "../middlewares/permissions.js";
 import { db } from "@workspace/db";
 import {
   socialAccountsTable, socialTemplatesTable, socialPublicationQueueTable, articlesTable,
@@ -41,6 +42,10 @@ router.get("/image/:token", (req, res) => {
 
 // ── All routes below require authentication ───────────────────────────────────
 router.use(authMiddleware);
+// Leituras exigem social.view; alterações (config, contas, tokens, fila)
+// exigem social.manage. Admins passam direto em ambos.
+router.use(requirePermission("social.view"));
+router.use(requirePermissionForWrites("social.manage"));
 
 // ── Legacy config endpoints ────────────────────────────────────────────────────
 

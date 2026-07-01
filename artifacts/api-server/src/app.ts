@@ -96,6 +96,12 @@ const corsOptions: cors.CorsOptions = {
 
 const app: Express = express();
 
+// Atrás do Caddy (1 hop): req.ip passa a ser o IP real do cliente extraído do
+// X-Forwarded-For adicionado pelo proxy — sem confiar em valores forjados pelo
+// cliente (com "1", só o último hop é confiável). Essencial para rate limiting
+// e logs de auditoria corretos.
+app.set("trust proxy", 1);
+
 app.use(
   pinoHttp({
     logger,

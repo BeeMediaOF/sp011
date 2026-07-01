@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authMiddleware } from "../middlewares/auth.js";
+import { requirePermission, requirePermissionForWrites } from "../middlewares/permissions.js";
 import { store, type RssAutoMode } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
 import {
@@ -10,6 +11,10 @@ import {
 
 const router = Router();
 router.use(authMiddleware);
+// Leituras exigem rss.view; qualquer alteração (fontes, prompts, chaves de IA)
+// exige rss.manage. Admins passam direto em ambos.
+router.use(requirePermission("rss.view"));
+router.use(requirePermissionForWrites("rss.manage"));
 
 // ─── Sources CRUD ─────────────────────────────────────────────────────────────
 

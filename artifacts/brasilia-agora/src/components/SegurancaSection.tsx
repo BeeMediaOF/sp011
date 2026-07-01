@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import policeImg from "../assets/images/police.webp";
 import security2Img from "../assets/images/security2.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 const articles = [
   {
@@ -73,7 +74,7 @@ export default function SegurancaSection() {
               <div className="flex flex-col justify-center">
                 <span className="text-[#dc2626] text-[10px] font-bold mb-1">SEGURANÇA</span>
                 <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#dc2626] transition-colors"
-                  dangerouslySetInnerHTML={{ __html: item.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                 />
                 <span className="text-gray-500 text-xs mt-1">{item.time}</span>
               </div>

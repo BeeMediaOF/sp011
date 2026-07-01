@@ -59,11 +59,13 @@ export async function logSecurity(params: SecurityParams): Promise<void> {
   }
 }
 
-export function getClientIp(req: { ip?: string; headers: Record<string, string | string[] | undefined> }): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    const first = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(",")[0];
-    return first?.trim() ?? req.ip ?? "unknown";
-  }
+/**
+ * IP do cliente. Com `app.set("trust proxy", 1)`, o Express já resolve req.ip
+ * a partir do X-Forwarded-For adicionado pelo proxy confiável (Caddy) — sem
+ * aceitar valores forjados pelo cliente. Não ler o primeiro elemento cru do
+ * header: ele é controlado pelo atacante e permitiria burlar rate limiting
+ * e falsificar IPs nos logs de auditoria.
+ */
+export function getClientIp(req: { ip?: string }): string {
   return req.ip ?? "unknown";
 }

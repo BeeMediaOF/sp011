@@ -24,16 +24,26 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]*>/g, "").trim();
 }
 
-/** Convert article content to AMP-safe HTML (replace <img> with <amp-img>) */
+/**
+ * Convert article content to AMP-safe HTML (replace <img> with <amp-img>).
+ * Também remove vetores de script que sobreviveriam ao filtro antigo:
+ * event handlers inline (onload/onerror/...), URLs javascript:, e elementos
+ * proibidos no AMP (object/embed/form/svg/style/link/meta).
+ */
 function toAmpHtml(content: string): string {
-  // Replace img tags with amp-img
-  let amp = content
+  const amp = content
     .replace(
       /<img([^>]*?)src="([^"]*)"([^>]*?)>/gi,
       '<amp-img$1src="$2"$3 width="800" height="450" layout="responsive"></amp-img>'
     )
     .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<script[^>]*>/gi, "")
     .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<(object|embed|form|svg|math|style|link|meta|base)[\s\S]*?(<\/\1>|>)/gi, "")
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
+    .replace(/(href|src)\s*=\s*(["']?)\s*javascript:[^"'\s>]*\2/gi, '$1="#"')
     .replace(/style="[^"]*"/gi, "");
   return amp;
 }

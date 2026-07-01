@@ -2,6 +2,7 @@ import { Link } from "wouter";
 import sportsImg from "../assets/images/sports.webp";
 import parkImg from "../assets/images/park.webp";
 import festivalImg from "../assets/images/festival.webp";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 const articles = [
   {
@@ -75,7 +76,7 @@ export default function EsportesSection() {
                 <div className="flex flex-col justify-center">
                   <span className="text-[#b45309] text-[10px] font-bold mb-1">ESPORTES</span>
                   <h4 className="font-bold text-[#1a2448] text-sm leading-snug group-hover:text-[#b45309] transition-colors"
-                    dangerouslySetInnerHTML={{ __html: item.title }}
+                    dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                   />
                   <span className="text-gray-500 text-xs mt-1">{item.time}</span>
                 </div>

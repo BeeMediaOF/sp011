@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
 import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import { safeTitleHtml } from "@/lib/sanitize";
 
 interface Article {
   id: string;
@@ -88,7 +89,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                   {featured.chapeu}
                 </span>
                 <h3 className="text-white font-black line-clamp-3 text-[27px] mr-[46px] mb-[11px] pt-[0px] pb-[0px] group-hover:text-red-300 transition-colors"
-                  dangerouslySetInnerHTML={{ __html: featured.title }}
+                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(featured.title) }}
                 />
               </div>
             </div>
@@ -141,7 +142,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
                       {item.chapeu}
                     </span>
                     <h4 className="text-[16px] font-bold text-[#1a1a1a] leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: item.title }}
+                      dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
                     />
                     <p className="text-[11px] text-gray-400 mt-1">{item.time}</p>
                   </div>

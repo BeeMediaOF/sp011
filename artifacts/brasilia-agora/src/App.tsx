@@ -127,7 +127,9 @@ function DynamicCategory() {
 
   useEffect(() => {
     if (!slug) { setMenuItem(null); return; }
-    fetch("/api/admin/menu")
+    // /api/site é público e já inclui os menuItems visíveis — /api/admin/menu
+    // exige token e devolvia 401 para visitantes anônimos (NotFound indevido).
+    fetch("/api/site")
       .then((r) => r.json())
       .then((d: { menuItems: MenuItemApi[] }) => {
         const found = (d.menuItems ?? []).find(
