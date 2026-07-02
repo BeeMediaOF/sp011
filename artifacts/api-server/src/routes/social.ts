@@ -448,6 +448,7 @@ const AUTOMATION_DEFAULTS: SocialAutomation = {
   enabled: false,
   intervalMinutes: 120,
   maxPerRun: 3,
+  spacingMinutes: 5,
   accountIds: [],
   templateIds: [],
   types: ["feed"],
@@ -478,6 +479,7 @@ router.put("/automation", (req, res) => {
     enabled:       typeof b.enabled       === "boolean" ? b.enabled       : prev.enabled,
     intervalMinutes: typeof b.intervalMinutes === "number" ? Math.max(1, b.intervalMinutes) : prev.intervalMinutes,
     maxPerRun:     typeof b.maxPerRun     === "number"  ? Math.max(1, b.maxPerRun)  : prev.maxPerRun,
+    spacingMinutes: typeof b.spacingMinutes === "number" ? Math.max(0, b.spacingMinutes) : prev.spacingMinutes,
     accountIds:    Array.isArray(b.accountIds)  ? b.accountIds.map(String)  : prev.accountIds,
     templateIds:   Array.isArray(b.templateIds) ? b.templateIds.map(String) : prev.templateIds,
     types:         Array.isArray(b.types) && b.types.length

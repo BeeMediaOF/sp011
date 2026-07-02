@@ -184,8 +184,9 @@ export interface RssPrompts { global?: string; categories?: Record<string, strin
  */
 export interface SocialAutomation {
   enabled: boolean;            // liga/desliga o robô
-  intervalMinutes: number;     // periodicidade (default 120)
+  intervalMinutes: number;     // periodicidade entre ciclos (default 120)
   maxPerRun: number;           // máx. de posts por ciclo (default 3)
+  spacingMinutes?: number;     // intervalo entre um post e o próximo do MESMO ciclo (default 5; 0 = todos de uma vez)
   accountIds: string[];        // contas Meta destino (social_accounts)
   templateIds: string[];       // máscaras; o robô alterna entre elas
   types: ("feed" | "story")[]; // default ["feed"]

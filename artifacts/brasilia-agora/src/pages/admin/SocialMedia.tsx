@@ -135,6 +135,7 @@ interface Automation {
   enabled: boolean;
   intervalMinutes: number;
   maxPerRun: number;
+  spacingMinutes?: number;
   accountIds: string[];
   templateIds: string[];
   types: ("feed" | "story")[];
@@ -1154,7 +1155,7 @@ export default function SocialMedia() {
 
   // ── Automação (robô de postagem no Instagram) ──────────────────────────────
   const [automation, setAutomation] = useState<Automation>({
-    enabled: false, intervalMinutes: 120, maxPerRun: 3,
+    enabled: false, intervalMinutes: 120, maxPerRun: 3, spacingMinutes: 5,
     accountIds: [], templateIds: [], types: ["feed"], onlyWithImage: true,
   });
   const [autoSaving,    setAutoSaving]    = useState(false);
@@ -2798,7 +2799,7 @@ export default function SocialMedia() {
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Intervalo</span>
+                <span className="text-xs font-semibold text-slate-500">Intervalo entre ciclos</span>
                 <select
                   value={automation.intervalMinutes}
                   onChange={(e) => patchAutomation({ intervalMinutes: Number(e.target.value) })}
@@ -2819,14 +2820,36 @@ export default function SocialMedia() {
                   onChange={(e) => patchAutomation({ maxPerRun: Math.max(1, Number(e.target.value) || 1) })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
               </label>
-              <label className="flex items-end gap-2 pb-1">
-                <button type="button" onClick={() => patchAutomation({ onlyWithImage: !automation.onlyWithImage })}
-                  style={{ color: automation.onlyWithImage ? "#16A34A" : "#94A3B8" }}>
-                  {automation.onlyWithImage ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
-                </button>
-                <span className="text-xs font-semibold text-slate-600 pb-1.5">Só notícias com imagem</span>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Intervalo entre posts</span>
+                <select
+                  value={automation.spacingMinutes ?? 5}
+                  onChange={(e) => patchAutomation({ spacingMinutes: Number(e.target.value) })}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  <option value={0}>Todos de uma vez</option>
+                  <option value={5}>1 a cada 5 min</option>
+                  <option value={10}>1 a cada 10 min</option>
+                  <option value={15}>1 a cada 15 min</option>
+                  <option value={30}>1 a cada 30 min</option>
+                  <option value={60}>1 a cada 1 hora</option>
+                </select>
               </label>
             </div>
+
+            <label className="flex items-center gap-2">
+              <button type="button" onClick={() => patchAutomation({ onlyWithImage: !automation.onlyWithImage })}
+                style={{ color: automation.onlyWithImage ? "#16A34A" : "#94A3B8" }}>
+                {automation.onlyWithImage ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+              </button>
+              <span className="text-xs font-semibold text-slate-600">Só notícias com imagem</span>
+            </label>
+
+            <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+              A cada ciclo o robô seleciona até <b>{automation.maxPerRun}</b> notícia(s) e,
+              {(automation.spacingMinutes ?? 5) > 0
+                ? <> em vez de postar tudo junto, publica <b>1 a cada {automation.spacingMinutes ?? 5} min</b> (sem spam).</>
+                : <> publica <b>todas de uma vez</b>.</>}
+            </p>
 
             {/* Contas Meta */}
             <div>

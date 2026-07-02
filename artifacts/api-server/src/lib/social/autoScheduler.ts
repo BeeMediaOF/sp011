@@ -64,6 +64,9 @@ export async function runAutomationCycle(
     const templateIds = auto.templateIds ?? [];
     const types = (auto.types?.length ? auto.types : ["feed"]) as ("feed" | "story")[];
     const maxPerRun = Math.max(1, auto.maxPerRun || 3);
+    // Intervalo entre um post e o próximo do MESMO ciclo (drip), p/ não sair tudo
+    // de uma vez (spam). 0 = todos com scheduledAt=now (publica todos já).
+    const spacingMs = Math.max(0, auto.spacingMinutes ?? 5) * 60 * 1000;
 
     if (!accountIds.length) return { enqueued: 0, articles: [], reason: "nenhuma conta selecionada" };
     if (!templateIds.length) return { enqueued: 0, articles: [], reason: "nenhuma máscara selecionada" };
@@ -154,6 +157,9 @@ export async function runAutomationCycle(
     const usedArticles: { id: string; title: string }[] = [];
     const skipped: { id: string; title: string; missing: CaptionMissing[] }[] = [];
     let enqueued = 0;
+    // "Slot" de agendamento: cada post entra `spacingMs` depois do anterior, para
+    // que o cron da fila (que só publica scheduledAt <= now) solte um de cada vez.
+    let slot = 0;
 
     for (const art of candidates) {
       if (usedArticles.length >= maxPerRun) break;
@@ -179,6 +185,9 @@ export async function runAutomationCycle(
           const templateId = pickTemplate(type);
           if (!templateId) continue;
 
+          // Agenda escalonada: 1º post = agora, os seguintes espaçados por spacingMs.
+          const scheduledAt = new Date(now.getTime() + slot * spacingMs);
+
           await db.insert(socialPublicationQueueTable).values({
             id: randomUUID(),
             articleId: art.id,
@@ -187,10 +196,11 @@ export async function runAutomationCycle(
             type,
             status: "pending",
             caption,
-            scheduledAt: now,
+            scheduledAt,
           });
           taken.add(key);
           enqueued++;
+          slot++;
           insertedForArticle = true;
         }
       }
@@ -204,7 +214,9 @@ export async function runAutomationCycle(
       });
     }
 
-    // Publica já o que foi enfileirado (não espera o cron de 5 min).
+    // Publica já apenas os que estão "vencidos" (scheduledAt <= now) — com o drip
+    // isso é só o 1º post; os demais ficam agendados e o cron da fila (5 min)
+    // solta um de cada vez conforme o spacing configurado.
     if (enqueued > 0) {
       try {
         await processSocialQueue(Math.max(enqueued, 5));
