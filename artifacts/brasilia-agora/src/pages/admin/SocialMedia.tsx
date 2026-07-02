@@ -2752,7 +2752,10 @@ export default function SocialMedia() {
 
       {/* ══════════ AUTOMAÇÃO ════════════════════════════════════════════════ */}
       {tab === "automation" && (
-        <div className="space-y-5 max-w-4xl">
+        <div className="max-w-4xl xl:max-w-7xl grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+
+          {/* ── Coluna esquerda ── */}
+          <div className="space-y-5">
 
           {/* Cabeçalho + toggle mestre */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
@@ -2901,6 +2904,11 @@ export default function SocialMedia() {
             </div>
           </div>
 
+          </div>
+
+          {/* ── Coluna direita ── */}
+          <div className="space-y-5">
+
           {/* Testar automação */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Testar agora</h3>
@@ -2998,6 +3006,7 @@ export default function SocialMedia() {
                 </span>
               )}
             </div>
+          </div>
           </div>
         </div>
       )}

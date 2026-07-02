@@ -46,7 +46,7 @@ export function RequireAdmin({ children }: { children: React.ReactNode }) {
 
   if (!token) return null;
   if (role && role !== "admin") return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+    <div className="h-full min-h-[50vh] flex items-center justify-center bg-[#F8FAFC]">
       <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🚫</span>

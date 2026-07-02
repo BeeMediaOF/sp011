@@ -512,7 +512,7 @@ export default function Settings() {
       <div className="space-y-5">
 
         {/* Tab bar */}
-        <div className="flex gap-1 p-1 bg-white rounded-2xl w-fit" style={CARD_SHADOW}>
+        <div className="flex flex-wrap gap-1 p-1 bg-white rounded-2xl w-fit" style={CARD_SHADOW}>
           {TABS.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
               className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
@@ -527,11 +527,14 @@ export default function Settings() {
 
         {/* ── INFORMAÇÕES ─────────────────────────────────────── */}
         {activeTab === "informacoes" && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-2xl xl:max-w-6xl space-y-5">
             {loadingSettings ? (
               <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>Carregando…</div>
             ) : (
               <>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+                {/* ── Coluna esquerda ── */}
+                <div className="space-y-5">
                 {/* Site info */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
                   <SectionHeader icon={<Globe size={15}/>} label="Informações do Site"/>
@@ -641,7 +644,10 @@ export default function Settings() {
                     </div>
                   </div>
                 </div>
+                </div>
 
+                {/* ── Coluna direita ── */}
+                <div className="space-y-5">
                 {/* Byline */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
                   <SectionHeader icon={<UserCircle size={15}/>} label="Assinatura dos artigos"/>
@@ -737,6 +743,8 @@ export default function Settings() {
                     </span>
                   </button>
                 </div>
+                </div>
+                </div>
 
                 <SaveBar saving={savingSettings} onSave={saveSettings}/>
               </>
@@ -746,7 +754,10 @@ export default function Settings() {
 
         {/* ── LOGO & IMAGENS ──────────────────────────────────── */}
         {activeTab === "logo" && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-2xl xl:max-w-6xl space-y-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+            {/* ── Coluna esquerda ── */}
+            <div className="space-y-5">
             {/* Logo do portal */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
               <SectionHeader icon={<Image size={15}/>} label="Logo do Portal"/>
@@ -832,7 +843,10 @@ export default function Settings() {
                 {savingLogo ? "Salvando…" : "Salvar Logo"}
               </button>
             </div>
+            </div>
 
+            {/* ── Coluna direita ── */}
+            <div className="space-y-5">
             {/* OG Image */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<Image size={15}/>} label="OG Image (compartilhamento social)"/>
@@ -940,6 +954,8 @@ export default function Settings() {
                 ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do portal</p>}
               </div>
             </div>
+            </div>
+            </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings} label="Salvar imagens"/>
           </div>
@@ -947,7 +963,8 @@ export default function Settings() {
 
         {/* ── APARÊNCIA ───────────────────────────────────────── */}
         {activeTab === "aparencia" && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-2xl xl:max-w-6xl space-y-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             {/* Admin panel colors */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
               <SectionHeader icon={<LayoutDashboard size={15}/>} label="Painel Administrativo"/>
@@ -999,6 +1016,7 @@ export default function Settings() {
                   preview="Rodapé"/>
               </div>
             </div>
+            </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings}/>
           </div>
@@ -1006,7 +1024,10 @@ export default function Settings() {
 
         {/* ── CONEXÕES ────────────────────────────────────────── */}
         {activeTab === "conexoes" && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-2xl xl:max-w-6xl space-y-5">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+            {/* ── Coluna esquerda ── */}
+            <div className="space-y-5">
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<Link2 size={15}/>} label="Google Tag Manager"/>
               <p className="text-xs text-[#94A3B8]">
@@ -1076,7 +1097,10 @@ export default function Settings() {
               )}
             </div>
 
-            {/* ── Código personalizado ── */}
+            </div>
+
+            {/* ── Coluna direita — Código personalizado ── */}
+            <div className="space-y-5">
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
               <SectionHeader icon={<Code size={15}/>} label="Código personalizado de rastreamento"/>
               <p className="text-xs text-[#94A3B8]">
@@ -1121,6 +1145,8 @@ export default function Settings() {
                 </div>
               )}
             </div>
+            </div>
+            </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings}/>
           </div>
@@ -1128,12 +1154,16 @@ export default function Settings() {
 
         {/* ── CONTATO ─────────────────────────────────────────── */}
         {activeTab === "contato" && (
-          <div className="max-w-2xl space-y-5">
+          <div className="max-w-2xl xl:max-w-6xl space-y-5">
             {loadingContact ? (
               <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>Carregando…</div>
             ) : contact ? (
               <>
-                {CONTACT_GROUPS.map(({ title, icon: Icon, color, fields }) => (
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+                {/* Coluna esquerda: Contato + Redes | direita: Dados e Textos Legais */}
+                {[CONTACT_GROUPS.slice(0, 2), CONTACT_GROUPS.slice(2)].map((groups, gi) => (
+                <div key={gi} className="space-y-5">
+                {groups.map(({ title, icon: Icon, color, fields }) => (
                   <div key={title} className={`${CARD} p-6`} style={CARD_SHADOW}>
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + "18" }}>
@@ -1159,6 +1189,9 @@ export default function Settings() {
                     </div>
                   </div>
                 ))}
+                </div>
+                ))}
+                </div>
                 <SaveBar saving={savingContact} onSave={saveContact}/>
               </>
             ) : (
@@ -1384,7 +1417,10 @@ export default function Settings() {
 }`;
 
           return (
-            <div className="max-w-3xl space-y-6">
+            <div className="max-w-3xl xl:max-w-6xl space-y-6">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+              {/* ── Coluna esquerda ── */}
+              <div className="space-y-6">
               {/* Endpoint */}
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <div className="flex items-start justify-between mb-3">
@@ -1480,6 +1516,22 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* Make / Zapier */}
+              <div className="bg-[#0B2A66] text-white rounded-2xl p-6 space-y-3">
+                <h2 className="font-bold text-base">Integração com Make, Zapier, n8n</h2>
+                <p className="text-sm text-white/70">Use o módulo <strong className="text-white">HTTP / Webhook</strong> da plataforma de automação:</p>
+                <ol className="text-sm text-white/80 space-y-1 list-decimal list-inside">
+                  <li>URL: <code className="bg-white/10 px-1.5 rounded font-mono">{publishUrl}</code></li>
+                  <li>Método: <strong className="text-white">POST</strong></li>
+                  <li>Header: <code className="bg-white/10 px-1.5 rounded font-mono">Authorization: Bearer {"{"}api-key{"}"}</code></li>
+                  <li>Body: JSON com os campos acima</li>
+                </ol>
+                <p className="text-xs text-white/50 pt-1">Use a Chave de API Permanente acima — ela não expira.</p>
+              </div>
+              </div>
+
+              {/* ── Coluna direita ── */}
+              <div className="space-y-6">
               {/* Schema */}
               <div className="bg-white rounded-xl shadow-sm p-6 space-y-4">
                 <h2 className="font-bold text-gray-800 text-base">Body da Requisição (JSON)</h2>
@@ -1510,18 +1562,7 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
-
-              {/* Make / Zapier */}
-              <div className="bg-[#0B2A66] text-white rounded-2xl p-6 space-y-3">
-                <h2 className="font-bold text-base">Integração com Make, Zapier, n8n</h2>
-                <p className="text-sm text-white/70">Use o módulo <strong className="text-white">HTTP / Webhook</strong> da plataforma de automação:</p>
-                <ol className="text-sm text-white/80 space-y-1 list-decimal list-inside">
-                  <li>URL: <code className="bg-white/10 px-1.5 rounded font-mono">{publishUrl}</code></li>
-                  <li>Método: <strong className="text-white">POST</strong></li>
-                  <li>Header: <code className="bg-white/10 px-1.5 rounded font-mono">Authorization: Bearer {"{"}api-key{"}"}</code></li>
-                  <li>Body: JSON com os campos acima</li>
-                </ol>
-                <p className="text-xs text-white/50 pt-1">Use a Chave de API Permanente acima — ela não expira.</p>
+              </div>
               </div>
             </div>
           );
@@ -1687,7 +1728,7 @@ export default function Settings() {
           const totalEnabled = perms.filter(p => p.enabled).length;
 
           return (
-            <div className="max-w-3xl space-y-6">
+            <div className="max-w-3xl xl:max-w-6xl space-y-6">
               {/* Header card */}
               <div className="bg-[#0B2A66] rounded-2xl p-6 text-white relative overflow-hidden">
                 <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10"><Shield size={96} /></div>
@@ -1733,6 +1774,7 @@ export default function Settings() {
                 </div>
               )}
 
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
               {!permsLoading && !permsError && groups.map(group => {
                 const GroupIcon = GROUP_ICONS[group] ?? Shield;
                 const groupPerms = perms.filter(p => p.group === group);
@@ -1785,6 +1827,7 @@ export default function Settings() {
                   </div>
                 );
               })}
+              </div>
 
               {!permsLoading && !permsError && (
                 <div className="flex items-center gap-2 text-[11px] text-slate-400 px-1">
@@ -1817,7 +1860,10 @@ export default function Settings() {
             : null;
 
           return (
-            <div className="max-w-2xl space-y-5">
+            <div className="max-w-2xl xl:max-w-6xl space-y-5">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
+              {/* ── Coluna esquerda ── */}
+              <div className="space-y-5">
               {/* Explicação */}
               <div className="bg-[#0B2A66] rounded-2xl p-6 text-white relative overflow-hidden">
                 <div className="absolute right-6 top-1/2 -translate-y-1/2 opacity-10"><Database size={96} /></div>
@@ -1896,6 +1942,10 @@ export default function Settings() {
                 </Field>
               </div>
 
+              </div>
+
+              {/* ── Coluna direita ── */}
+              <div className="space-y-5">
               {/* Proteções — o que nunca excluir */}
               <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
                 <SectionHeader icon={<Shield size={15}/>} label="Proteções (o que preservar)"/>
@@ -2036,6 +2086,8 @@ export default function Settings() {
                     Última limpeza: {fmtDate(settings.articleRetentionLastRunAt)} — {settings.articleRetentionLastCount ?? 0} artigo(s) excluído(s)
                   </p>
                 )}
+              </div>
+              </div>
               </div>
             </div>
           );

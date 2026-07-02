@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useContext, useLayoutEffect, Suspense, createContext } from "react";
 import { BRAND } from "../../brand";
 import { Link, useLocation } from "wouter";
 import {
@@ -418,7 +418,7 @@ function UserMenu({ onLogout, isDark, onToggleDark }: { onLogout: () => void; is
   );
 }
 
-export default function AdminLayout({ children, title, noPadding, topbarExtra }: AdminLayoutProps) {
+function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNode; title: string; topbarExtra?: React.ReactNode }) {
   const [isDark, setIsDark] = useState(() => getAdminDarkMode());
   const [location, navigate] = useLocation();
   const { accent, logo } = usePanelTheme();
@@ -555,10 +555,76 @@ export default function AdminLayout({ children, title, noPadding, topbarExtra }:
         </header>
 
         {/* Content */}
-        <main className={`flex-1 overflow-hidden ${noPadding ? "" : "overflow-y-auto p-8"}`}>
+        <main className="flex-1 overflow-hidden">
           {children}
         </main>
       </div>
     </div>
+  );
+}
+
+// ─── Shell persistente ────────────────────────────────────────────────────────
+// O AdminShell monta o chrome (sidebar + topbar) UMA única vez, acima das rotas
+// do painel. Cada página continua usando <AdminLayout title=...> normalmente:
+// dentro do shell ele apenas publica título/ações via contexto, em vez de
+// remontar a tela inteira — trocar de aba não "recarrega" mais o painel.
+
+interface ChromeState { title: string; topbarExtra?: React.ReactNode; noPadding?: boolean }
+
+const ChromeSetterContext = createContext<React.Dispatch<React.SetStateAction<ChromeState>> | null>(null);
+
+function PageBody({ noPadding, children }: { noPadding?: boolean; children: React.ReactNode }) {
+  return (
+    <div className={noPadding ? "h-full overflow-hidden" : "h-full overflow-x-hidden overflow-y-auto p-8"}>
+      {children}
+    </div>
+  );
+}
+
+function ContentSpinner() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="w-8 h-8 border-4 border-[#0B2A66] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+export function AdminShell({ children }: { children: React.ReactNode }) {
+  const [chrome, setChrome] = useState<ChromeState>({ title: "" });
+  // Sem token não há chrome — RequireAuth/RequireAdmin redirecionam ao login.
+  const hasToken = typeof window !== "undefined" && !!localStorage.getItem("admin_token");
+  if (!hasToken) return <>{children}</>;
+  return (
+    <ChromeSetterContext.Provider value={setChrome}>
+      <AdminChrome title={chrome.title} topbarExtra={chrome.topbarExtra}>
+        <Suspense fallback={<ContentSpinner />}>{children}</Suspense>
+      </AdminChrome>
+    </ChromeSetterContext.Provider>
+  );
+}
+
+function ShellPage({ children, title, noPadding, topbarExtra, publish }: AdminLayoutProps & {
+  publish: React.Dispatch<React.SetStateAction<ChromeState>>;
+}) {
+  // Sincroniza o topbar a cada render (topbarExtra carrega estado da página);
+  // o updater devolve o estado anterior quando nada mudou para evitar re-render.
+  useLayoutEffect(() => {
+    publish((prev) =>
+      prev.title === title && prev.noPadding === noPadding && prev.topbarExtra === topbarExtra
+        ? prev
+        : { title, topbarExtra, noPadding },
+    );
+  });
+  return <PageBody noPadding={noPadding}>{children}</PageBody>;
+}
+
+export default function AdminLayout(props: AdminLayoutProps) {
+  const publish = useContext(ChromeSetterContext);
+  if (publish) return <ShellPage {...props} publish={publish} />;
+  // Fora do shell (fallback): comportamento antigo, chrome próprio da página.
+  return (
+    <AdminChrome title={props.title} topbarExtra={props.topbarExtra}>
+      <PageBody noPadding={props.noPadding}>{props.children}</PageBody>
+    </AdminChrome>
   );
 }

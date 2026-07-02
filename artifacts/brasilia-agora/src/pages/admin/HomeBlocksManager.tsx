@@ -1332,7 +1332,7 @@ export default function HomeBlocksManager() {
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title="Blocos da Home" noPadding>
-      <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden bg-[#F8FAFC]">
+      <div className="flex flex-col h-full overflow-hidden bg-[#F8FAFC]">
 
         {/* ══ Top action bar ═══════════════════════════════════════════════════ */}
         <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 md:px-6 py-3 bg-white border-b border-[#E2E8F0]">

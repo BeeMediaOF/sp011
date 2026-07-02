@@ -51,6 +51,10 @@ function lazyWithPreload<T extends React.ComponentType<never>>(
 
 /* ─── Lazy — páginas admin (jamais carregadas por visitantes) ─── */
 const Login            = lazy(() => import("@/pages/admin/Login"));
+/* Shell persistente do painel: sidebar + topbar montados uma única vez acima
+   das rotas admin — trocar de aba não remonta o layout ("flash" de reload). */
+const loadAdminShell   = () => import("@/components/admin/AdminLayout").then((m) => ({ default: m.AdminShell }));
+const AdminShell       = lazy(loadAdminShell);
 const Dashboard        = lazyWithPreload(() => import("@/pages/admin/Dashboard"));
 const Articles         = lazyWithPreload(() => import("@/pages/admin/Articles"));
 const ArticleEdit      = lazyWithPreload(() => import("@/pages/admin/ArticleEdit"));
@@ -75,6 +79,7 @@ function preloadAdminPages() {
   if (_adminPreloaded) return;
   _adminPreloaded = true;
   const run = () => {
+    loadAdminShell().catch(() => {});
     for (const c of [
       Dashboard, Articles, ArticleEdit, MenuManager, Settings, TwoFactorSetup,
       Webhook, AdsManager, ColumnistsManager, Analytics, HomeBlocksManager,
@@ -159,17 +164,17 @@ function AnalyticsProvider() {
 
 function Router() {
   const [location] = useLocation();
+  const isAdminArea = /^\/admin(\/|$)/.test(location) && location !== "/admin/login";
 
   // Ao entrar no admin, pré-carrega os chunks das demais abas em segundo plano
   // para que a navegação entre elas fique instantânea.
   useEffect(() => {
-    if (location.startsWith("/admin") && location !== "/admin/login") {
+    if (isAdminArea) {
       preloadAdminPages();
     }
-  }, [location]);
+  }, [isAdminArea]);
 
-  return (
-    <Suspense fallback={<PageSpinner />}>
+  const routes = (
       <Switch>
         {/* ── Admin routes ── */}
         <Route path="/admin/login" component={Login} />
@@ -261,6 +266,11 @@ function Router() {
         <Route path="/:slug" component={DynamicCategory} />
         <Route component={NotFound} />
       </Switch>
+  );
+
+  return (
+    <Suspense fallback={<PageSpinner />}>
+      {isAdminArea ? <AdminShell>{routes}</AdminShell> : routes}
     </Suspense>
   );
 }
