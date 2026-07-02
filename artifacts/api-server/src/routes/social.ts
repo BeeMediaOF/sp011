@@ -231,6 +231,39 @@ router.post("/accounts/:id/test", async (req, res) => {
   }
 });
 
+// Limite de publicação do Instagram (quota rotativa de 24h da Graph API).
+// GET /{ig-user-id}/content_publishing_limit?fields=quota_usage,config
+// A resposta traz quota_usage (usados) e config.quota_total/quota_duration.
+router.get("/accounts/:id/publishing-limit", async (req, res) => {
+  const [account] = await db.select().from(socialAccountsTable).where(eq(socialAccountsTable.id, req.params["id"]!)).limit(1);
+  if (!account?.accessToken) { res.status(400).json({ ok: false, error: "Conta ou token não encontrado" }); return; }
+  if (!account.instagramId)  { res.status(400).json({ ok: false, error: "Conta sem Instagram vinculado (limite só se aplica ao Instagram)" }); return; }
+  try {
+    const u = new URL(`https://graph.facebook.com/v20.0/${account.instagramId}/content_publishing_limit`);
+    u.searchParams.set("fields", "quota_usage,config");
+    u.searchParams.set("access_token", decryptSecret(account.accessToken));
+    const apiRes = await fetch(u.toString(), { signal: AbortSignal.timeout(10000) });
+    const json = (await apiRes.json()) as {
+      data?: { quota_usage?: number; config?: { quota_total?: number; quota_duration?: number } }[];
+      error?: { message: string };
+    };
+    if (json.error) { res.json({ ok: false, error: json.error.message }); return; }
+    const entry = json.data?.[0];
+    const quotaUsage = entry?.quota_usage ?? 0;
+    const quotaTotal = entry?.config?.quota_total ?? 100;
+    const quotaDuration = entry?.config?.quota_duration ?? 86400;
+    res.json({
+      ok: true,
+      quotaUsage,
+      quotaTotal,
+      quotaDuration,
+      remaining: Math.max(0, quotaTotal - quotaUsage),
+    });
+  } catch (e) {
+    res.json({ ok: false, error: (e as Error).message });
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // TEMPLATES — /api/admin/social/templates
 // ═══════════════════════════════════════════════════════════════════════════════

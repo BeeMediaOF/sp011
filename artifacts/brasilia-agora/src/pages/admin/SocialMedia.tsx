@@ -10,7 +10,7 @@ import {
   Italic, Underline, Strikethrough, RotateCw, Undo2, Redo2,
   Square, Circle, Triangle, Star, Minus, ArrowRight, Hexagon,
   ChevronsUp, ChevronsDown, Lock, Unlock, ChevronRight, Frame,
-  Bot, Zap,
+  Bot, Zap, Gauge,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import {
@@ -1174,6 +1174,11 @@ export default function SocialMedia() {
   const [manualResult,     setManualResult]     = useState<{ ok: boolean; msg: string } | null>(null);
   const captionTplRef = useRef<HTMLTextAreaElement>(null);
 
+  // Limite de postagens do Instagram (quota rotativa de 24h da Graph API)
+  type QuotaInfo = { ok: boolean; quotaUsage?: number; quotaTotal?: number; quotaDuration?: number; remaining?: number; error?: string };
+  const [quotas, setQuotas] = useState<Record<string, QuotaInfo>>({});
+  const [quotaLoading, setQuotaLoading] = useState(false);
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
   const fetchAccounts = useCallback(async () => {
@@ -1842,6 +1847,24 @@ export default function SocialMedia() {
     } catch (e) {
       setAutoRunResult({ enqueued: 0, reason: (e as Error).message });
     } finally { setAutoRunning(false); }
+  }
+
+  /** Consulta o limite de publicação (quota 24h) de todas as contas com Instagram. */
+  async function checkPublishingLimits() {
+    const igAccounts = accounts.filter((a) => a.instagramId);
+    if (!igAccounts.length) return;
+    setQuotaLoading(true);
+    try {
+      const entries = await Promise.all(igAccounts.map(async (a) => {
+        try {
+          const r = (await apiFetch(`/accounts/${a.id}/publishing-limit`)) as QuotaInfo;
+          return [a.id, r] as const;
+        } catch (e) {
+          return [a.id, { ok: false, error: (e as Error).message }] as const;
+        }
+      }));
+      setQuotas(Object.fromEntries(entries));
+    } finally { setQuotaLoading(false); }
   }
 
   /** Insere um placeholder no template da legenda na posição do cursor. */
@@ -2791,6 +2814,75 @@ export default function SocialMedia() {
                 Ao ligar, só serão postadas notícias publicadas <b>a partir deste momento</b> — o acervo antigo é ignorado.
               </p>
             )}
+          </div>
+
+          {/* Limite de postagens (quota do Instagram) */}
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#FEF3C7", color: "#B45309" }}>
+                <Gauge size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-700">Limite de postagens disponíveis</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  O Instagram permite um número máximo de publicações por janela de 24h por conta.
+                  Verifique quanto ainda resta antes de programar a automação.
+                </p>
+              </div>
+              <button
+                onClick={() => { void checkPublishingLimits(); }}
+                disabled={quotaLoading || accounts.filter((a) => a.instagramId).length === 0}
+                className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {quotaLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                Verificar
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {accounts.filter((a) => a.instagramId).length === 0 && (
+                <p className="text-xs text-slate-400">Nenhuma conta com Instagram vinculado.</p>
+              )}
+              {accounts.filter((a) => a.instagramId).map((acc) => {
+                const q = quotas[acc.id];
+                const used = q?.quotaUsage ?? 0;
+                const total = q?.quotaTotal ?? 100;
+                const remaining = q?.remaining ?? Math.max(0, total - used);
+                const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+                const barColor = pct >= 90 ? "#DC2626" : pct >= 70 ? "#F59E0B" : "#16A34A";
+                return (
+                  <div key={acc.id} className="border border-slate-100 rounded-xl p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700 min-w-0">
+                        <Instagram size={14} className="text-[#E1306C] shrink-0" />
+                        <span className="truncate">{acc.instagramName || acc.name}</span>
+                      </span>
+                      {q && q.ok && (
+                        <span className="text-xs font-semibold shrink-0" style={{ color: barColor }}>
+                          {remaining} restante(s)
+                        </span>
+                      )}
+                    </div>
+                    {q && q.ok ? (
+                      <>
+                        <div className="mt-2 h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
+                        </div>
+                        <p className="mt-1.5 text-xs text-slate-500">
+                          <b className="text-slate-700">{used}</b> de <b className="text-slate-700">{total}</b> usados nas últimas {Math.round((q.quotaDuration ?? 86400) / 3600)}h
+                        </p>
+                      </>
+                    ) : q && !q.ok ? (
+                      <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                        <AlertCircle size={12} /> {q.error || "Não foi possível consultar."}
+                      </p>
+                    ) : (
+                      <p className="mt-2 text-xs text-slate-400">Clique em “Verificar” para consultar o limite.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Configuração */}
