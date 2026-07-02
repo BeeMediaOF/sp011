@@ -112,7 +112,8 @@ export async function runAutomationCycle(
       .from(articlesTable)
       .where(and(...conds))
       .orderBy(desc(articlesTable.publishedAt))
-      .limit(maxPerRun * 3);
+      // Pool amplo: precisa de folga p/ dedup, garantias por categoria e frescor.
+      .limit(Math.max(maxPerRun * 5, 40));
 
     if (!candidates.length) return { enqueued: 0, articles: [], reason: "nenhuma notícia elegível" };
 
@@ -161,7 +162,79 @@ export async function runAutomationCycle(
     // que o cron da fila (que só publica scheduledAt <= now) solte um de cada vez.
     let slot = 0;
 
-    for (const art of candidates) {
+    // ── Prioridade de seleção ──────────────────────────────────────────────
+    // Ordena os candidatos: (1) ordenação base (recentes/populares/aleatória),
+    // (2) garantias por categoria — cada uma com sua janela — entram na FRENTE,
+    // (3) preenche o resto respeitando "frescor" opcional e categorias preferidas.
+    type Candidate = (typeof candidates)[number];
+    const priority = auto.priority ?? {};
+    const orderMode = priority.order ?? "recent";
+    const viewsMap: Record<string, { title: string; views: number }> =
+      orderMode === "popular" ? store.getArticleViews() : {};
+
+    const baseSort = (list: Candidate[]): Candidate[] => {
+      const arr = [...list];
+      if (orderMode === "random") {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+        }
+        return arr;
+      }
+      if (orderMode === "popular") {
+        return arr.sort((a, b) => (viewsMap[b.id]?.views ?? 0) - (viewsMap[a.id]?.views ?? 0));
+      }
+      return arr.sort((a, b) => (b.publishedAt?.getTime() ?? 0) - (a.publishedAt?.getTime() ?? 0));
+    };
+
+    const bumpPreferred = (list: Candidate[]): Candidate[] => {
+      const pref = new Set((priority.preferredCategories ?? []).map((c) => c.toLowerCase()));
+      if (!pref.size) return list;
+      const first = list.filter((a) => pref.has((a.category ?? "").toLowerCase()));
+      const rest = list.filter((a) => !pref.has((a.category ?? "").toLowerCase()));
+      return [...first, ...rest];
+    };
+
+    // Só considera artigos ainda não postados (algum par conta×tipo livre).
+    const isFullyTaken = (articleId: string): boolean => {
+      for (const accountId of accountIds)
+        for (const type of types)
+          if (!taken.has(`${articleId}::${accountId}::${type}`)) return false;
+      return true;
+    };
+
+    const sorted = baseSort(candidates.filter((c) => !isFullyTaken(c.id)));
+
+    // (2) Garantias por categoria — cada regra puxa até `minPerRun` da sua categoria
+    // dentro da SUA janela (windowHours), sem forçar notícia velha se não houver.
+    const rules = (priority.categoryRules ?? []).filter((r) => r.category && r.minPerRun > 0);
+    const picked: Candidate[] = [];
+    const pickedIds = new Set<string>();
+    for (const rule of rules) {
+      const winCut = now.getTime() - Math.max(1, rule.windowHours) * 3600 * 1000;
+      const matches = sorted.filter(
+        (a) =>
+          (a.category ?? "").toLowerCase() === rule.category.toLowerCase() &&
+          (a.publishedAt?.getTime() ?? 0) >= winCut &&
+          !pickedIds.has(a.id),
+      );
+      for (let i = 0; i < Math.min(rule.minPerRun, matches.length); i++) {
+        picked.push(matches[i]!);
+        pickedIds.add(matches[i]!.id);
+      }
+    }
+
+    // (3) Preenchimento geral. O "frescor" só limita este preenchimento — as
+    // garantias acima já entraram com a janela própria de cada categoria.
+    let fill = sorted.filter((a) => !pickedIds.has(a.id));
+    const freshnessHours = priority.freshnessHours && priority.freshnessHours > 0 ? priority.freshnessHours : 0;
+    if (freshnessHours > 0) {
+      const freshCut = now.getTime() - freshnessHours * 3600 * 1000;
+      fill = fill.filter((a) => (a.publishedAt?.getTime() ?? 0) >= freshCut);
+    }
+    const ordered: Candidate[] = [...picked, ...bumpPreferred(fill)];
+
+    for (const art of ordered) {
       if (usedArticles.length >= maxPerRun) break;
 
       // Verificação: não publica automaticamente uma legenda incompleta

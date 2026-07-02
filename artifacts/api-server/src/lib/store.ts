@@ -182,6 +182,26 @@ export interface RssPrompts { global?: string; categories?: Record<string, strin
  * das máscaras selecionadas (rotaciona) e enfileira para publicar no Instagram.
  * Sem segredos → não entra em SECRET_FIELDS. Persistido dentro de social_config.
  */
+/**
+ * Regra de garantia por categoria dentro de um ciclo. Ex.: "pelo menos 1 notícia
+ * de esportes das últimas 5h". A janela (`windowHours`) é própria da regra, então
+ * a garantia pode olhar mais para trás que o preenchimento geral SEM arrastar
+ * notícia velha para os demais posts.
+ */
+export interface SocialCategoryRule {
+  category: string;    // slug da categoria (ex.: "esportes")
+  minPerRun: number;   // garantir ao menos N desta categoria por ciclo
+  windowHours: number; // só considerar artigos publicados nas últimas N horas p/ a regra
+}
+
+/** Prioridade de seleção das notícias a postar (aba Automação → card Prioridade). */
+export interface SocialPriority {
+  order?: "recent" | "popular" | "random"; // ordenação base dos candidatos (default recent)
+  freshnessHours?: number;                  // 0 = sem limite; senão só posta artigos das últimas N horas (não afeta as garantias)
+  preferredCategories?: string[];           // categorias que entram na frente (peso leve, sem obrigar)
+  categoryRules?: SocialCategoryRule[];     // garantias por categoria (cada uma com sua janela)
+}
+
 export interface SocialAutomation {
   enabled: boolean;            // liga/desliga o robô
   intervalMinutes: number;     // periodicidade entre ciclos (default 120)
@@ -192,6 +212,7 @@ export interface SocialAutomation {
   types: ("feed" | "story")[]; // default ["feed"]
   onlyWithImage: boolean;      // só notícias com foto (default true)
   minAgeMinutes?: number;      // esperar X min após publicar o artigo (opcional)
+  priority?: SocialPriority;   // prioridade/ordem de escolha das notícias
   enabledAt?: string;          // marca d'água: só posta publishedAt >= enabledAt
   lastRunAt?: string;          // controle de "isDue"
   lastCount?: number;          // nº enfileirado no último ciclo (UI)

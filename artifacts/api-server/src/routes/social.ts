@@ -11,7 +11,7 @@ import {
 import type { SocialConnectionRow } from "@workspace/db";
 import { eq, desc, and, inArray, gte, ne } from "drizzle-orm";
 import { store } from "../lib/store.js";
-import type { SocialAutomation } from "../lib/store.js";
+import type { SocialAutomation, SocialPriority, SocialCategoryRule } from "../lib/store.js";
 import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
 import { runAutomationCycle } from "../lib/social/autoScheduler.js";
 import { buildArticleCaption } from "../lib/social/caption.js";
@@ -477,6 +477,13 @@ router.post("/process", async (_req, res) => {
 // Config guardada em social_config.automation; o motor de publish é a fila.
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const PRIORITY_DEFAULT: SocialPriority = {
+  order: "recent",
+  freshnessHours: 0,
+  preferredCategories: [],
+  categoryRules: [],
+};
+
 const AUTOMATION_DEFAULTS: SocialAutomation = {
   enabled: false,
   intervalMinutes: 120,
@@ -486,10 +493,39 @@ const AUTOMATION_DEFAULTS: SocialAutomation = {
   templateIds: [],
   types: ["feed"],
   onlyWithImage: true,
+  priority: PRIORITY_DEFAULT,
 };
 
 function currentAutomation(): SocialAutomation {
-  return { ...AUTOMATION_DEFAULTS, ...(store.getSocialConfig().automation ?? {}) };
+  const cur = { ...AUTOMATION_DEFAULTS, ...(store.getSocialConfig().automation ?? {}) };
+  cur.priority = { ...PRIORITY_DEFAULT, ...(cur.priority ?? {}) };
+  return cur;
+}
+
+/** Valida/normaliza a prioridade recebida do cliente. */
+function sanitizePriority(input: unknown, prev: SocialPriority): SocialPriority {
+  const p = (input && typeof input === "object" ? input : {}) as Partial<SocialPriority>;
+  const order: SocialPriority["order"] =
+    p.order === "popular" || p.order === "random" || p.order === "recent" ? p.order : prev.order;
+  const rulesIn = Array.isArray(p.categoryRules) ? p.categoryRules : null;
+  const categoryRules: SocialCategoryRule[] | undefined = rulesIn
+    ? rulesIn
+        .map((r) => r as Partial<SocialCategoryRule>)
+        .map((r) => ({
+          category: String(r.category ?? "").trim().toLowerCase(),
+          minPerRun: Math.max(1, Math.floor(Number(r.minPerRun) || 1)),
+          windowHours: Math.max(1, Math.floor(Number(r.windowHours) || 5)),
+        }))
+        .filter((r) => r.category)
+    : prev.categoryRules;
+  return {
+    order,
+    freshnessHours: typeof p.freshnessHours === "number" ? Math.max(0, Math.floor(p.freshnessHours)) : prev.freshnessHours,
+    preferredCategories: Array.isArray(p.preferredCategories)
+      ? Array.from(new Set(p.preferredCategories.map((c) => String(c).trim().toLowerCase()).filter(Boolean)))
+      : prev.preferredCategories,
+    categoryRules,
+  };
 }
 
 function nextRunAt(auto: SocialAutomation): string | null {
@@ -520,6 +556,7 @@ router.put("/automation", (req, res) => {
                      : prev.types,
     onlyWithImage: typeof b.onlyWithImage === "boolean" ? b.onlyWithImage : prev.onlyWithImage,
     minAgeMinutes: typeof b.minAgeMinutes === "number"  ? Math.max(0, b.minAgeMinutes) : prev.minAgeMinutes,
+    priority:      sanitizePriority(b.priority, prev.priority ?? PRIORITY_DEFAULT),
   };
 
   // Marca d'água: ao LIGAR sem enabledAt, ancora "agora" para não postar o acervo.

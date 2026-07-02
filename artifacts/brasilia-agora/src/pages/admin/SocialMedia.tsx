@@ -41,6 +41,7 @@ import {
 } from "@workspace/social-template";
 import type { CSSProperties } from "react";
 import { useLayoutEffect } from "react";
+import { useCategories } from "@/hooks/useCategories";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,11 +132,25 @@ interface ArticleOption {
   publishedAt?: string;
 }
 
+interface CategoryRule {
+  category: string;
+  minPerRun: number;
+  windowHours: number;
+}
+
+interface Priority {
+  order?: "recent" | "popular" | "random";
+  freshnessHours?: number;
+  preferredCategories?: string[];
+  categoryRules?: CategoryRule[];
+}
+
 interface Automation {
   enabled: boolean;
   intervalMinutes: number;
   maxPerRun: number;
   spacingMinutes?: number;
+  priority?: Priority;
   accountIds: string[];
   templateIds: string[];
   types: ("feed" | "story")[];
@@ -1157,6 +1172,7 @@ export default function SocialMedia() {
   const [automation, setAutomation] = useState<Automation>({
     enabled: false, intervalMinutes: 120, maxPerRun: 3, spacingMinutes: 5,
     accountIds: [], templateIds: [], types: ["feed"], onlyWithImage: true,
+    priority: { order: "recent", freshnessHours: 0, preferredCategories: [], categoryRules: [] },
   });
   const [autoSaving,    setAutoSaving]    = useState(false);
   const [autoSaved,     setAutoSaved]     = useState(false);
@@ -1178,6 +1194,9 @@ export default function SocialMedia() {
   type QuotaInfo = { ok: boolean; quotaUsage?: number; quotaTotal?: number; quotaDuration?: number; remaining?: number; error?: string };
   const [quotas, setQuotas] = useState<Record<string, QuotaInfo>>({});
   const [quotaLoading, setQuotaLoading] = useState(false);
+
+  // Categorias (para o card de prioridade)
+  const { categories } = useCategories();
 
   // ── Fetch ──────────────────────────────────────────────────────────────────
 
@@ -1865,6 +1884,45 @@ export default function SocialMedia() {
       }));
       setQuotas(Object.fromEntries(entries));
     } finally { setQuotaLoading(false); }
+  }
+
+  // ── Prioridade de seleção ──────────────────────────────────────────────────
+  function patchPriority(patch: Partial<Priority>) {
+    setAutomation((a) => ({ ...a, priority: { ...(a.priority ?? {}), ...patch } }));
+  }
+
+  function togglePreferredCategory(cat: string) {
+    setAutomation((a) => {
+      const cur = new Set(a.priority?.preferredCategories ?? []);
+      if (cur.has(cat)) cur.delete(cat); else cur.add(cat);
+      return { ...a, priority: { ...(a.priority ?? {}), preferredCategories: Array.from(cur) } };
+    });
+  }
+
+  function addCategoryRule() {
+    const firstCat = categories[0]?.value ?? "";
+    patchPriority({ categoryRules: [ ...(automation.priority?.categoryRules ?? []), { category: firstCat, minPerRun: 1, windowHours: 5 } ] });
+  }
+
+  function updateCategoryRule(idx: number, patch: Partial<CategoryRule>) {
+    setAutomation((a) => {
+      const rules = [...(a.priority?.categoryRules ?? [])];
+      if (!rules[idx]) return a;
+      rules[idx] = { ...rules[idx], ...patch };
+      return { ...a, priority: { ...(a.priority ?? {}), categoryRules: rules } };
+    });
+  }
+
+  function removeCategoryRule(idx: number) {
+    setAutomation((a) => {
+      const rules = [...(a.priority?.categoryRules ?? [])];
+      rules.splice(idx, 1);
+      return { ...a, priority: { ...(a.priority ?? {}), categoryRules: rules } };
+    });
+  }
+
+  function catLabel(value: string): string {
+    return categories.find((c) => c.value === value)?.label ?? value;
   }
 
   /** Insere um placeholder no template da legenda na posição do cursor. */
@@ -3014,6 +3072,123 @@ export default function SocialMedia() {
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {autoSaving ? "Salvando…" : "Salvar configuração"}
+              </button>
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+            </div>
+          </div>
+
+          {/* Prioridade de seleção das notícias */}
+          <div className="bg-white rounded-2xl p-5 space-y-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#EEF2FF", color: PRIMARY }}>
+                <Sparkles size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-700">Prioridade de seleção</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Define quais notícias o robô escolhe primeiro a cada ciclo.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Ordenar por</span>
+                <select
+                  value={automation.priority?.order ?? "recent"}
+                  onChange={(e) => patchPriority({ order: e.target.value as Priority["order"] })}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
+                  <option value="recent">Mais recentes primeiro</option>
+                  <option value="popular">Mais populares (mais vistas)</option>
+                  <option value="random">Aleatória</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-500">Postar só notícias das últimas (h)</span>
+                <input
+                  type="number" min={0} max={168}
+                  value={automation.priority?.freshnessHours ?? 0}
+                  onChange={(e) => patchPriority({ freshnessHours: Math.max(0, Number(e.target.value) || 0) })}
+                  className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
+                <span className="text-[11px] text-slate-400">0 = sem limite. Não afeta as garantias abaixo.</span>
+              </label>
+            </div>
+
+            {/* Categorias prioritárias (peso leve) */}
+            <div>
+              <span className="text-xs font-semibold text-slate-500">Categorias prioritárias</span>
+              <p className="text-[11px] text-slate-400 mb-1.5">Sobem na fila quando houver, mas não obrigam.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {categories.length === 0 && <span className="text-xs text-slate-400">Carregando categorias…</span>}
+                {categories.map((c) => {
+                  const on = (automation.priority?.preferredCategories ?? []).includes(c.value);
+                  return (
+                    <button key={c.value} type="button" onClick={() => togglePreferredCategory(c.value)}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors"
+                      style={on
+                        ? { background: PRIMARY, borderColor: PRIMARY, color: "#fff" }
+                        : { background: "#fff", borderColor: "#E2E8F0", color: "#64748B" }}>
+                      {c.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Garantias por categoria (com janela própria) */}
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-500">Garantias por categoria</span>
+                <button type="button" onClick={addCategoryRule}
+                  className="flex items-center gap-1 text-xs font-semibold text-[#0B2A66] hover:underline">
+                  <Plus size={13} /> Adicionar regra
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-2">
+                Ex.: “pelo menos 1 de Esportes das últimas 5h” — o robô garante essa cota (se houver notícia na janela), sem puxar matéria antiga.
+              </p>
+              <div className="space-y-2">
+                {(automation.priority?.categoryRules ?? []).length === 0 && (
+                  <p className="text-xs text-slate-400">Nenhuma regra — o robô só usa a ordenação acima.</p>
+                )}
+                {(automation.priority?.categoryRules ?? []).map((rule, idx) => (
+                  <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                    <span className="text-xs text-slate-500">Pelo menos</span>
+                    <input
+                      type="number" min={1} max={10} value={rule.minPerRun}
+                      onChange={(e) => updateCategoryRule(idx, { minPerRun: Math.max(1, Number(e.target.value) || 1) })}
+                      className="w-14 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
+                    <span className="text-xs text-slate-500">de</span>
+                    <select
+                      value={rule.category}
+                      onChange={(e) => updateCategoryRule(idx, { category: e.target.value })}
+                      className="text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white">
+                      {!categories.some((c) => c.value === rule.category) && rule.category && (
+                        <option value={rule.category}>{catLabel(rule.category)}</option>
+                      )}
+                      {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                    </select>
+                    <span className="text-xs text-slate-500">das últimas</span>
+                    <input
+                      type="number" min={1} max={168} value={rule.windowHours}
+                      onChange={(e) => updateCategoryRule(idx, { windowHours: Math.max(1, Number(e.target.value) || 1) })}
+                      className="w-16 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
+                    <span className="text-xs text-slate-500">h</span>
+                    <button type="button" onClick={() => removeCategoryRule(idx)}
+                      className="ml-auto text-slate-400 hover:text-red-500" title="Remover regra">
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: PRIMARY }}>
+                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {autoSaving ? "Salvando…" : "Salvar prioridade"}
               </button>
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
             </div>
