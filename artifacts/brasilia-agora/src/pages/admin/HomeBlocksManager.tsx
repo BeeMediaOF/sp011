@@ -2,16 +2,18 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
+import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl } from "../../lib/homeBlocks";
+import FooterEditor from "./FooterEditor";
 import {
   GripVertical, Eye, EyeOff, Plus, Trash2, ChevronDown,
-  CheckCircle, RefreshCw, Save, LayoutGrid, X, AlignLeft,
+  CheckCircle, RefreshCw, Save, LayoutGrid, X,
   Upload, Minus, ImageIcon, Monitor, Tablet, Smartphone, ExternalLink,
   Undo2, Redo2, FileText, Image, GalleryHorizontal, Play, Megaphone,
-  List, Radio, Mail, FolderOpen, CloudSun, CircleDollarSign, Share2,
-  Code, Frame, Map as MapIcon, Settings, Info, RotateCcw, Pencil, Copy,
-  Newspaper, Users, Hash, AlignJustify, Globe, Flame,
-  Trophy, Tv2, Building2, Heart, Cpu, Star, Zap, BarChart3,
-  Type, Palette, Eye as EyeIcon, Calendar, User, FileImage,
+  List, Radio, Mail, FolderOpen, CircleDollarSign, Share2,
+  Code, Frame, Map as MapIcon, Settings, Info, RotateCcw, Copy,
+  Newspaper, Users, AlignJustify, Globe, Flame,
+  Trophy, Building2, Heart, Cpu, Star, BarChart3,
+  Type, Palette, Eye as EyeIcon, FileImage,
   ChevronRight, ChevronUp, Layers,
 } from "lucide-react";
 
@@ -52,28 +54,55 @@ const MAIN_MODULES = [
   { type: "ticker" as BlockType,      name: "Ticker",       desc: "Faixa de notícias rolando.",           Icon: Radio,             iconBg: "#EFF6FF", iconColor: "#3B82F6" },
   { type: "newsletter" as BlockType,  name: "Newsletter",   desc: "Captura de e-mails.",                  Icon: Mail,              iconBg: "#F0FDFA", iconColor: "#14B8A6" },
   { type: "categories" as BlockType,  name: "Categorias",   desc: "Navegação por categorias.",            Icon: FolderOpen,        iconBg: "#FFF7ED", iconColor: "#EA580C" },
-  { type: "weather" as BlockType,     name: "Clima",        desc: "Widget de clima.",                     Icon: CloudSun,          iconBg: "#F0F9FF", iconColor: "#0EA5E9" },
   { type: "quotes" as BlockType,      name: "Cotações",     desc: "Moedas e índices.",                    Icon: CircleDollarSign,  iconBg: "#F0FDF4", iconColor: "#16A34A" },
   { type: "social" as BlockType,      name: "Redes Sociais",desc: "Links para redes sociais.",            Icon: Share2,            iconBg: "#EFF6FF", iconColor: "#2563EB" },
 ];
+// "Clima", "Tabela" e "Contador" foram removidos do seletor: não têm
+// renderizador no site — criavam blocos que não exibiam nada.
 const OTHER_MODULES = [
-  { type: "table" as BlockType,   name: "Tabela",            desc: "Dados em tabela.",          Icon: AlignJustify },
-  { type: "counter" as BlockType, name: "Contador",          desc: "Estatísticas em números.",  Icon: Hash },
   { type: "sep" as BlockType,     name: "Separador",         desc: "Divisor entre seções.",     Icon: Minus },
   { type: "html" as BlockType,    name: "HTML Personalizado",desc: "Código HTML livre.",        Icon: Code },
   { type: "map" as BlockType,     name: "Mapa",              desc: "Google Maps.",              Icon: MapIcon },
   { type: "embed" as BlockType,   name: "Embed",             desc: "Conteúdo externo.",         Icon: Frame },
 ];
 
-// ─── Formats per type ─────────────────────────────────────────────────────────
-const FORMATS_BY_TYPE: Record<string, { value: string; label: string }[]> = {
-  content:     [{ value: "grid", label: "Grade 4" }, { value: "featured", label: "Destaque" }, { value: "duplo", label: "Duplo" }, { value: "cultura", label: "Foto+Lista" }, { value: "lista", label: "Lista" }, { value: "manchete", label: "Manchete" }, { value: "mosaico", label: "Mosaico" }],
-  advertising: [{ value: "banner_970x90", label: "Banner 970×90" }, { value: "banner_728x90", label: "Banner 728×90" }, { value: "sidebar_300x250", label: "Sidebar 300×250" }, { value: "full_width", label: "Full Width" }],
-  image:       [{ value: "full_width_image", label: "Full Width" }, { value: "image_card", label: "Card" }, { value: "image_with_text", label: "Imagem + Texto" }, { value: "background_overlay", label: "Overlay" }],
-  carousel:    [{ value: "carousel_news", label: "Notícias" }, { value: "carousel_images", label: "Imagens" }, { value: "carousel_columnists", label: "Colunistas" }, { value: "carousel_ads", label: "Anúncios" }],
-  video:       [{ value: "video_featured", label: "Destaque" }, { value: "video_grid", label: "Grade" }, { value: "youtube_embed", label: "YouTube Embed" }],
-  list:        [{ value: "list_compact", label: "Compacta" }, { value: "ranking_horizontal", label: "Ranking" }],
+// ─── Meta visual por TIPO (blocos personalizados na lista) ───────────────────
+const TYPE_META: Record<string, { tag: string; tagColor: string; tagBg: string; Icon: React.ElementType; iconBg: string; iconColor: string }> = {
+  content:     { tag: "CONTEÚDO",   tagColor: "#1e40af", tagBg: "#DBEAFE", Icon: FileText,          iconBg: "#EFF6FF", iconColor: "#2563EB" },
+  image:       { tag: "IMAGEM",     tagColor: "#86198f", tagBg: "#FAE8FF", Icon: Image,             iconBg: "#FDF4FF", iconColor: "#A855F7" },
+  carousel:    { tag: "CARROSSEL",  tagColor: "#9a3412", tagBg: "#FFEDD5", Icon: GalleryHorizontal, iconBg: "#FFF7ED", iconColor: "#F97316" },
+  video:       { tag: "VÍDEO",      tagColor: "#991b1b", tagBg: "#FEE2E2", Icon: Play,              iconBg: "#FEF2F2", iconColor: "#EF4444" },
+  advertising: { tag: "PROPAGANDA", tagColor: "#92400e", tagBg: "#FEF3C7", Icon: Megaphone,         iconBg: "#FFFBEB", iconColor: "#F59E0B" },
+  list:        { tag: "LISTA",      tagColor: "#166534", tagBg: "#DCFCE7", Icon: List,              iconBg: "#F0FDF4", iconColor: "#22C55E" },
+  ticker:      { tag: "TICKER",     tagColor: "#1e40af", tagBg: "#DBEAFE", Icon: Radio,             iconBg: "#EFF6FF", iconColor: "#3B82F6" },
+  newsletter:  { tag: "NEWSLETTER", tagColor: "#115e59", tagBg: "#CCFBF1", Icon: Mail,              iconBg: "#F0FDFA", iconColor: "#14B8A6" },
+  categories:  { tag: "CATEGORIAS", tagColor: "#9a3412", tagBg: "#FFEDD5", Icon: FolderOpen,        iconBg: "#FFF7ED", iconColor: "#EA580C" },
+  quotes:      { tag: "COTAÇÕES",   tagColor: "#166534", tagBg: "#DCFCE7", Icon: CircleDollarSign,  iconBg: "#F0FDF4", iconColor: "#16A34A" },
+  social:      { tag: "REDES",      tagColor: "#1e40af", tagBg: "#DBEAFE", Icon: Share2,            iconBg: "#EFF6FF", iconColor: "#2563EB" },
+  html:        { tag: "HTML",       tagColor: "#3f3f46", tagBg: "#F4F4F5", Icon: Code,              iconBg: "#FAFAFA", iconColor: "#52525B" },
+  embed:       { tag: "EMBED",      tagColor: "#3f3f46", tagBg: "#F4F4F5", Icon: Frame,             iconBg: "#FAFAFA", iconColor: "#52525B" },
+  map:         { tag: "MAPA",       tagColor: "#14532d", tagBg: "#DCFCE7", Icon: MapIcon,           iconBg: "#F0FDF4", iconColor: "#16A34A" },
+  sep:         { tag: "SEPARADOR",  tagColor: "#3f3f46", tagBg: "#F4F4F5", Icon: Minus,             iconBg: "#FAFAFA", iconColor: "#52525B" },
 };
+
+// ─── Formats per type ─────────────────────────────────────────────────────────
+// Só a imagem tem variações visuais reais no site. Os demais tipos definem o
+// visual pelo próprio renderizador (e o Conteúdo pelo seletor "Layout visual").
+const IMAGE_FORMATS: { value: string; label: string }[] = [
+  { value: "full_width_image",  label: "Largura total" },
+  { value: "image_card",        label: "Card centrado" },
+  { value: "image_with_text",   label: "Imagem + texto" },
+  { value: "background_overlay",label: "Texto sobre a imagem" },
+];
+
+// ─── Slots de propaganda (AdBanner) ───────────────────────────────────────────
+const AD_SLOT_OPTIONS = Array.from({ length: 11 }, (_, i) => {
+  const n = String(i + 1).padStart(2, "0");
+  return { value: `slot_${n}`, label: `Slot ${n}` };
+});
+
+// ─── Tipos de bloco com artigos (mostram fonte/categoria/quantidade) ─────────
+const ARTICLE_TYPES = new Set<BlockType>(["content", "carousel", "list", "ticker"]);
 
 // ─── Estilos do Hero (bloco fixo de destaques) ────────────────────────────────
 const HERO_FORMATS: { value: string; label: string }[] = [
@@ -84,13 +113,10 @@ const HERO_FORMATS: { value: string; label: string }[] = [
 ];
 
 // ─── Sources ──────────────────────────────────────────────────────────────────
+// Apenas fontes que o site realmente renderiza (sem opções mortas).
 const SOURCES: { value: SourceType; label: string }[] = [
   { value: "automatic_by_category", label: "Automático por categoria" },
-  { value: "most_read",             label: "Mais lidas" },
-  { value: "latest",                label: "Últimas notícias" },
-  { value: "manual",                label: "Selecionar manualmente" },
-  { value: "rss",                   label: "Fonte RSS" },
-  { value: "perplexity",            label: "Perplexity" },
+  { value: "latest",                label: "Últimas notícias (todas as categorias)" },
 ];
 
 // ─── Categories ───────────────────────────────────────────────────────────────
@@ -384,47 +410,73 @@ interface BlockForm {
   source: SourceType;
   itemsLimit: number;
   color: string;
-  primaryColor: string;
-  accentColor: string;
-  textColor: string;
-  showTitle: boolean;
-  showCategory: boolean;
-  showImage: boolean;
-  showAuthorDate: boolean;
-  showSummary: boolean;
   reverse: boolean;
+  imageUrl: string;
+  linkUrl: string;
+  caption: string;
+  videoUrl: string;
+  html: string;
+  embedUrl: string;
+  adSlot: string;
 }
 
 const EMPTY_FORM: BlockForm = {
   name: "", blockType: "content", format: "grid",
   categories: [], category: "politica", layout: "grid",
   source: "automatic_by_category", itemsLimit: 4,
-  color: "#1d4ed8", primaryColor: "#0B2A66", accentColor: "#E71D36", textColor: "#FFFFFF",
-  showTitle: true, showCategory: true, showImage: true, showAuthorDate: true, showSummary: false,
-  reverse: false,
+  color: "#1d4ed8", reverse: false,
+  imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
+  adSlot: "slot_05",
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
   const d = BLOCK_DEFAULTS[block.id];
+  const type = inferBlockType(block) as BlockType;
   return {
     name:          block.name,
-    blockType:     "content" as BlockType,
-    format:        (block.layout ?? d?.layout ?? "grid"),
+    blockType:     type,
+    format:        block.format ?? (type === "content" ? (block.layout ?? d?.layout ?? "grid") : defaultFormatForType(type)),
     categories:    block.category ? [block.category] : [],
     category:      block.category ?? d?.category ?? "geral",
     layout:        (block.layout ?? d?.layout ?? "grid") as LayoutId,
-    source:        "automatic_by_category",
-    itemsLimit:    4,
+    source:        (block.source as SourceType) ?? "automatic_by_category",
+    itemsLimit:    block.itemsLimit ?? 4,
     color:         block.color ?? d?.color ?? "#6b7280",
-    primaryColor:  "#0B2A66",
-    accentColor:   "#E71D36",
-    textColor:     "#FFFFFF",
-    showTitle:     true,
-    showCategory:  true,
-    showImage:     true,
-    showAuthorDate: true,
-    showSummary:   false,
     reverse:       block.reverse ?? false,
+    imageUrl:      block.imageUrl ?? "",
+    linkUrl:       block.linkUrl ?? "",
+    caption:       block.caption ?? "",
+    videoUrl:      block.videoUrl ?? "",
+    html:          block.html ?? "",
+    embedUrl:      block.embedUrl ?? "",
+    adSlot:        block.adSlot ?? "slot_05",
+  };
+}
+
+/**
+ * Único ponto que converte o formulário → campos persistidos do bloco.
+ * Usado pelo auto-save, pelo "Fechar painel" e pela prévia instantânea —
+ * garante que TUDO que o formulário mostra é de fato salvo e renderizado.
+ */
+function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
+  const isContent = f.blockType === "content";
+  return {
+    name:       f.name,
+    blockType:  f.blockType,
+    format:     f.format,
+    category:   f.categories[0] ?? f.category,
+    layout:     (isContent ? f.layout : undefined) as HomeBlock["layout"],
+    color:      f.color,
+    reverse:    f.reverse,
+    source:     f.source,
+    itemsLimit: f.itemsLimit,
+    imageUrl:   f.imageUrl.trim() || undefined,
+    linkUrl:    f.linkUrl.trim() || undefined,
+    caption:    f.caption.trim() || undefined,
+    videoUrl:   f.videoUrl.trim() || undefined,
+    html:       f.html.trim() || undefined,
+    embedUrl:   f.embedUrl.trim() || undefined,
+    adSlot:     f.blockType === "advertising" ? f.adSlot : undefined,
   };
 }
 
@@ -487,13 +539,25 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
 }) {
   const isSpecial = new Set(["hero", "mais-lidas", "colunistas", "ultimas"]).has(block.id);
   const isHero = block.id === "hero";
-  const formats = FORMATS_BY_TYPE[form.blockType] ?? FORMATS_BY_TYPE.content!;
+  const isArticleType = ARTICLE_TYPES.has(form.blockType);
   const INPUT = "w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors";
 
+  const [uploading, setUploading] = useState(false);
+  const [uploadErr, setUploadErr]  = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
+
+  async function uploadBlockImage(file: File) {
+    setUploading(true); setUploadErr(false);
+    try {
+      const r = await adminApi.uploadImage(file, block.name);
+      onChange("imageUrl", r.url);
+    } catch { setUploadErr(true); } finally { setUploading(false); }
+  }
+
+  // Seleção única: o site usa UMA categoria por bloco — chips agem como rádio.
   function toggleCategory(val: string) {
-    const cur = form.categories;
-    onChange("categories", cur.includes(val) ? cur.filter((c) => c !== val) : [...cur, val]);
-    if (!cur.includes(val)) { onChange("category", val); }
+    onChange("categories", form.categories[0] === val ? [] : [val]);
+    onChange("category", val);
   }
 
   return (
@@ -514,46 +578,141 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
           </select>
           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Define como as notícias de capa são organizadas no topo da home.</p>
         </PanelSection>
-      ) : (
-        /* Tipo + Formato */
-        <div className="grid grid-cols-2 gap-2">
+      ) : !isSpecial ? (
+        /* Tipo (+ formato quando o tipo tem variações reais) */
+        <div className={form.blockType === "image" ? "grid grid-cols-2 gap-2" : ""}>
           <PanelSection label="Tipo">
-            <select value={form.blockType} onChange={(e) => { onChange("blockType", e.target.value as BlockType); onChange("format", FORMATS_BY_TYPE[e.target.value]?.[0]?.value ?? "grid"); }}
+            <select value={form.blockType}
+              onChange={(e) => {
+                const t = e.target.value as BlockType;
+                onChange("blockType", t);
+                onChange("format", defaultFormatForType(t));
+              }}
               className={INPUT}>
-              <option value="content">Conteúdo</option>
-              <option value="advertising">Propaganda</option>
+              <option value="content">Conteúdo (artigos)</option>
               <option value="image">Imagem</option>
               <option value="carousel">Carrossel</option>
-              <option value="list">Lista</option>
               <option value="video">Vídeo</option>
+              <option value="advertising">Propaganda</option>
+              <option value="list">Lista</option>
+              <option value="ticker">Ticker</option>
               <option value="newsletter">Newsletter</option>
+              <option value="categories">Categorias</option>
+              <option value="quotes">Cotações</option>
+              <option value="social">Redes Sociais</option>
               <option value="html">HTML Livre</option>
+              <option value="embed">Embed</option>
+              <option value="map">Mapa</option>
+              <option value="sep">Separador</option>
             </select>
           </PanelSection>
-          <PanelSection label="Formato">
-            <select value={form.format} onChange={(e) => { onChange("format", e.target.value); onChange("layout", e.target.value as LayoutId); }}
-              className={INPUT}>
-              {formats.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-            </select>
-          </PanelSection>
+          {form.blockType === "image" && (
+            <PanelSection label="Formato">
+              <select value={form.format} onChange={(e) => onChange("format", e.target.value)} className={INPUT}>
+                {IMAGE_FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+            </PanelSection>
+          )}
         </div>
+      ) : null}
+
+      {/* ── Imagem: upload/URL + link + legenda ── */}
+      {!isSpecial && form.blockType === "image" && (
+        <PanelSection label="Imagem" icon={FileImage}>
+          {form.imageUrl ? (
+            <div className="relative rounded-xl overflow-hidden border border-slate-200 mb-2 group/img">
+              <img src={form.imageUrl} alt="Imagem do bloco" className="w-full h-28 object-cover" />
+              <button type="button" title="Remover imagem" onClick={() => onChange("imageUrl", "")}
+                className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-red-600 transition-colors">
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => imgInputRef.current?.click()} disabled={uploading}
+              className="w-full border-2 border-dashed border-slate-200 rounded-xl py-5 flex flex-col items-center gap-1.5 hover:border-[#0B2A66] hover:bg-slate-50 transition-colors mb-2 disabled:opacity-60">
+              {uploading
+                ? <><RefreshCw size={16} className="animate-spin text-[#0B2A66]" /><span className="text-[11px] text-slate-500">Enviando…</span></>
+                : <><Upload size={16} className="text-slate-400" /><span className="text-[11px] text-slate-500">Clique para enviar (JPG, PNG, WEBP)</span></>}
+            </button>
+          )}
+          <input ref={imgInputRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadBlockImage(f); e.target.value = ""; }} />
+          {uploadErr && <p className="text-[11px] text-red-600 mb-2">Falha no upload — tente novamente.</p>}
+          <div className="space-y-1.5">
+            <input value={form.imageUrl} onChange={(e) => onChange("imageUrl", e.target.value)}
+              className={INPUT} placeholder="…ou cole a URL da imagem" />
+            <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+              className={INPUT} placeholder="Link ao clicar (opcional)" />
+            <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
+              className={INPUT} placeholder="Legenda / texto (opcional)" />
+          </div>
+        </PanelSection>
       )}
 
-      {/* Propaganda: link rápido para gerenciar anúncios */}
-      {form.blockType === "advertising" && (
-        <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 flex items-start gap-2.5">
-          <Megaphone size={14} className="text-[#D97706] mt-0.5 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] font-bold text-[#92400E] mb-1">Espaço de anúncio</p>
-            <p className="text-[10px] text-[#92400E]/80 leading-relaxed mb-2">
-              Clique abaixo para subir ou gerenciar propagandas para este espaço.
-            </p>
-            <a href="/admin/propagandas" target="_blank" rel="noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-[#D97706] hover:bg-[#B45309] rounded-lg transition-colors">
-              <Upload size={11} /> Gerenciar propagandas
-            </a>
+      {/* ── Vídeo: URL YouTube/Vimeo/arquivo ── */}
+      {!isSpecial && form.blockType === "video" && (
+        <PanelSection label="Vídeo" icon={Play}>
+          <input value={form.videoUrl} onChange={(e) => onChange("videoUrl", e.target.value)}
+            className={INPUT} placeholder="URL do YouTube, Vimeo ou .mp4" />
+          {form.videoUrl.trim() !== "" && !parseVideoEmbedUrl(form.videoUrl) && (
+            <p className="text-[11px] text-amber-600 mt-1.5">URL não reconhecida — use um link do YouTube, Vimeo ou arquivo .mp4/.webm.</p>
+          )}
+        </PanelSection>
+      )}
+
+      {/* ── Propaganda: slot + gerenciar ── */}
+      {!isSpecial && form.blockType === "advertising" && (
+        <>
+          <PanelSection label="Slot do anúncio" icon={Megaphone}>
+            <select value={form.adSlot} onChange={(e) => onChange("adSlot", e.target.value)} className={INPUT}>
+              {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          </PanelSection>
+          <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 flex items-start gap-2.5">
+            <Megaphone size={14} className="text-[#D97706] mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-[#92400E]/80 leading-relaxed mb-2">
+                A arte exibida neste espaço é a do slot escolhido, cadastrada em Propagandas.
+              </p>
+              <a href="/admin/propagandas" target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-white bg-[#D97706] hover:bg-[#B45309] rounded-lg transition-colors">
+                <Upload size={11} /> Gerenciar propagandas
+              </a>
+            </div>
           </div>
-        </div>
+        </>
+      )}
+
+      {/* ── HTML livre ── */}
+      {!isSpecial && form.blockType === "html" && (
+        <PanelSection label="Código HTML" icon={Code}>
+          <textarea value={form.html} onChange={(e) => onChange("html", e.target.value)}
+            rows={6} spellCheck={false}
+            className={`${INPUT} font-mono text-xs resize-y`} placeholder="<div>…</div>" />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Scripts e eventos inline são removidos por segurança ao exibir.</p>
+        </PanelSection>
+      )}
+
+      {/* ── Embed / Mapa ── */}
+      {!isSpecial && (form.blockType === "embed" || form.blockType === "map") && (
+        <PanelSection label={form.blockType === "map" ? "URL do mapa" : "URL do conteúdo"} icon={Frame}>
+          <input value={form.embedUrl} onChange={(e) => onChange("embedUrl", e.target.value)}
+            className={INPUT} placeholder={form.blockType === "map" ? "https://www.google.com/maps/embed?…" : "https://…"} />
+          {form.embedUrl.trim() !== "" && !safeEmbedUrl(form.embedUrl) && (
+            <p className="text-[11px] text-amber-600 mt-1.5">Use uma URL https completa.</p>
+          )}
+          {form.blockType === "map" && (
+            <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">No Google Maps: Compartilhar → Incorporar um mapa → copie a URL do iframe.</p>
+          )}
+        </PanelSection>
+      )}
+
+      {/* ── Newsletter: chamada ── */}
+      {!isSpecial && form.blockType === "newsletter" && (
+        <PanelSection label="Chamada" icon={Mail}>
+          <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
+            className={INPUT} placeholder="Receba as principais notícias no seu e-mail." />
+        </PanelSection>
       )}
 
       {/* Layout visual (content only) */}
@@ -575,7 +734,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
       )}
 
       {/* Inverter layout (só para Foto+Lista) */}
-      {!isSpecial && form.layout === "cultura" && (
+      {!isSpecial && form.blockType === "content" && form.layout === "cultura" && (
         <PanelSection label="Layout da imagem" icon={Layers}>
           <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
             <div className="flex items-center gap-2">
@@ -587,9 +746,9 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
         </PanelSection>
       )}
 
-      {/* Categorias chips */}
-      {!isSpecial && (
-        <PanelSection label="Categorias" icon={FolderOpen}>
+      {/* Categorias chips (fonte automática por categoria) */}
+      {!isSpecial && isArticleType && form.source === "automatic_by_category" && (
+        <PanelSection label="Categoria" icon={FolderOpen}>
           <div className="flex flex-wrap gap-1">
             {CATEGORIES.map((c) => {
               const active = form.categories.includes(c.value);
@@ -624,7 +783,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
       )}
 
       {/* Fonte */}
-      {!isSpecial && (
+      {!isSpecial && isArticleType && (
         <PanelSection label="Fonte dos artigos">
           <select value={form.source} onChange={(e) => onChange("source", e.target.value as SourceType)} className={INPUT}>
             {SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
@@ -632,8 +791,8 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
         </PanelSection>
       )}
 
-      {/* Quantidade */}
-      {!isSpecial && (
+      {/* Quantidade (layouts de Conteúdo definem as próprias contagens) */}
+      {!isSpecial && isArticleType && form.blockType !== "content" && (
         <PanelSection label="Quantidade de itens">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => onChange("itemsLimit", Math.max(1, form.itemsLimit - 1))}
@@ -651,45 +810,26 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
         </PanelSection>
       )}
 
-      {/* Cores */}
-      <PanelSection label="Cores" icon={Palette}>
-        <div className="space-y-2">
-          {([
-            { key: "primaryColor" as keyof BlockForm, label: "Cor principal", value: form.primaryColor as string },
-            { key: "accentColor"  as keyof BlockForm, label: "Cor destaque",  value: form.accentColor  as string },
-            { key: "color"        as keyof BlockForm, label: "Cor categoria", value: form.color        as string },
-          ] as { key: keyof BlockForm; label: string; value: string }[]).map(({ key, label, value }) => (
-            <div key={String(key)} className="flex items-center gap-2">
-              <input type="color" value={value} onChange={(e) => onChange(key, e.target.value)}
-                className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" />
-              <input type="text" value={value} onChange={(e) => onChange(key, e.target.value)}
-                className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#0B2A66]" />
-              <span className="text-[10px] text-slate-400 w-20 shrink-0">{label}</span>
-            </div>
-          ))}
-        </div>
-      </PanelSection>
-
-      {/* Display toggles */}
-      <PanelSection label="Exibir elementos" icon={EyeIcon}>
-        <div className="space-y-2">
-          {([
-            { key: "showTitle"      as keyof BlockForm, label: "Título",        icon: Type       },
-            { key: "showCategory"   as keyof BlockForm, label: "Categoria",     icon: FolderOpen },
-            { key: "showImage"      as keyof BlockForm, label: "Imagem",        icon: FileImage  },
-            { key: "showAuthorDate" as keyof BlockForm, label: "Autor e data",  icon: User       },
-            { key: "showSummary"    as keyof BlockForm, label: "Resumo",        icon: AlignLeft  },
-          ] as { key: keyof BlockForm; label: string; icon: React.ElementType }[]).map(({ key, label, icon: Icon }) => (
-            <div key={String(key)} className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
-              <div className="flex items-center gap-2">
-                <Icon size={12} className="text-slate-400" />
-                <span className="text-[12px] font-medium text-slate-700">{label}</span>
-              </div>
-              <Toggle checked={form[key] as boolean} onChange={() => onChange(key, !form[key] as boolean)} />
-            </div>
-          ))}
-        </div>
-      </PanelSection>
+      {/* Cor do bloco (barra de título, chapéus e acentos) */}
+      {form.blockType !== "sep" ? (
+        <PanelSection label="Cor do bloco" icon={Palette}>
+          <div className="flex items-center gap-2">
+            <input type="color" value={form.color} onChange={(e) => onChange("color", e.target.value)}
+              className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" />
+            <input type="text" value={form.color} onChange={(e) => onChange("color", e.target.value)}
+              className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#0B2A66]" />
+          </div>
+        </PanelSection>
+      ) : (
+        <PanelSection label="Cor da linha" icon={Palette}>
+          <div className="flex items-center gap-2">
+            <input type="color" value={form.color} onChange={(e) => onChange("color", e.target.value)}
+              className="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer p-0.5" />
+            <input type="text" value={form.color} onChange={(e) => onChange("color", e.target.value)}
+              className="flex-1 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-[#0B2A66]" />
+          </div>
+        </PanelSection>
+      )}
 
       {/* Actions */}
       <div className="space-y-2 pt-1">
@@ -1119,18 +1259,10 @@ export default function HomeBlocksManager() {
     // ── Instant preview: push block state to iframe immediately (no debounce) ──
     const previewId = editingIdRef.current;
     if (previewId) {
+      const base = blocksRef.current.find((b) => b.id === previewId);
       iframeRef.current?.contentWindow?.postMessage({
         type: "block:preview",
-        block: {
-          id: previewId,
-          name: nextForm.name,
-          category: nextForm.categories[0] ?? nextForm.category,
-          layout: nextForm.layout,
-          color: nextForm.color,
-          reverse: nextForm.reverse,
-          visible: true,
-          order: 0,
-        },
+        block: { ...(base ?? { id: previewId, visible: true, order: 0 }), ...formToBlockPatch(nextForm), id: previewId },
       }, "*");
     }
     // Optimistic update name in block list immediately
@@ -1142,14 +1274,8 @@ export default function HomeBlocksManager() {
     debounceRef.current = setTimeout(() => {
       const id = editingIdRef.current;
       if (!id) return;
-      const updated = blocksRef.current.map((b) => b.id === id ? {
-        ...b,
-        name: nextForm.name,
-        category: nextForm.categories[0] ?? nextForm.category,
-        layout: nextForm.layout as HomeBlock["layout"],
-        color: nextForm.color,
-        reverse: nextForm.reverse,
-      } : b) as HomeBlock[];
+      const patch = formToBlockPatch(editFormRef.current);
+      const updated = blocksRef.current.map((b) => b.id === id ? { ...b, ...patch } : b) as HomeBlock[];
       // Update state so the list reflects latest changes immediately
       setBlocks(updated);
       debounceSave(updated);
@@ -1160,15 +1286,8 @@ export default function HomeBlocksManager() {
     // Changes are already auto-saved via handleFormChange debounce.
     // Just flush any pending debounce, update history and close the panel.
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const cur = editFormRef.current;
-    const next = blocksRef.current.map((b) => b.id === id ? {
-      ...b,
-      name: cur.name,
-      category: cur.categories[0] ?? cur.category,
-      layout: cur.layout as HomeBlock["layout"],
-      color: cur.color,
-      reverse: cur.reverse,
-    } : b) as HomeBlock[];
+    const patch = formToBlockPatch(editFormRef.current);
+    const next = blocksRef.current.map((b) => b.id === id ? { ...b, ...patch } : b) as HomeBlock[];
     setBlocks(next);
     pushHistory(next);
     setEditingId(null);
@@ -1177,7 +1296,17 @@ export default function HomeBlocksManager() {
 
   // ── Add block ───────────────────────────────────────────────────────────────
   function addBlockFromType(type: string, name: string) {
-    const newBlock: HomeBlock = { id: `${type}-${Date.now()}`, name, visible: true, order: blocks.length, custom: true };
+    // O tipo é PERSISTIDO no bloco (blockType) — o site renderiza imagem como
+    // imagem, carrossel como carrossel etc. (antes só existia o prefixo do id).
+    const newBlock: HomeBlock = {
+      id: `${type}-${Date.now()}`, name, visible: true, order: blocks.length, custom: true,
+      blockType: type,
+      format: defaultFormatForType(type),
+      ...(type === "content"     ? { layout: "grid" as const, category: "politica", source: "automatic_by_category", itemsLimit: 4 } : {}),
+      ...(type === "carousel" || type === "ticker" ? { source: "latest", itemsLimit: 8 } : {}),
+      ...(type === "list"        ? { source: "latest", itemsLimit: 6 } : {}),
+      ...(type === "advertising" ? { adSlot: "slot_05" } : {}),
+    };
     let next: HomeBlock[];
     if (insertAtIdx !== null) {
       next = [...blocks.slice(0, insertAtIdx + 1), newBlock, ...blocks.slice(insertAtIdx + 1)].map((b, i) => ({ ...b, order: i }));
@@ -1186,7 +1315,7 @@ export default function HomeBlocksManager() {
     }
     setBlocks(next); pushHistory(next); setShowAdd(false); setInsertAtIdx(null); debounceSave(next);
     setEditingId(newBlock.id);
-    setEditForm({ ...EMPTY_FORM, name, blockType: type as BlockType });
+    setEditForm(blockToForm(newBlock));
   }
 
   // ── Derived ─────────────────────────────────────────────────────────────────
@@ -1206,12 +1335,12 @@ export default function HomeBlocksManager() {
       <div className="flex flex-col h-[calc(100vh-57px)] overflow-hidden bg-[#F8FAFC]">
 
         {/* ══ Top action bar ═══════════════════════════════════════════════════ */}
-        <div className="shrink-0 flex items-center justify-between px-6 py-3 bg-white border-b border-[#E2E8F0]">
-          <div>
+        <div className="shrink-0 flex flex-wrap items-center justify-between gap-2 px-4 md:px-6 py-3 bg-white border-b border-[#E2E8F0]">
+          <div className="min-w-0">
             <h1 className="text-[15px] font-black text-[#0F172A]">Blocos da Home</h1>
-            <p className="text-[12px] text-[#64748B] mt-0.5">Gerencie, ordene e edite os blocos que aparecem na página inicial.</p>
+            <p className="hidden md:block text-[12px] text-[#64748B] mt-0.5">Gerencie, ordene e edite os blocos que aparecem na página inicial.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {saved && (
               <span className="flex items-center gap-1.5 text-xs text-green-600 font-semibold bg-green-50 px-3 py-1.5 rounded-lg border border-green-200">
                 <CheckCircle size={13} /> Salvo
@@ -1239,7 +1368,7 @@ export default function HomeBlocksManager() {
         </div>
 
         {/* ══ Tabs ════════════════════════════════════════════════════════════ */}
-        <div className="shrink-0 flex border-b border-[#E2E8F0] bg-white px-6">
+        <div className="shrink-0 flex overflow-x-auto border-b border-[#E2E8F0] bg-white px-4 md:px-6">
           {(["styles","blocks","header","footer","settings"] as Tab[]).map((t) => (
             <button key={t} onClick={() => { setTab(t); setShowAdd(false); }}
               className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
@@ -1251,10 +1380,11 @@ export default function HomeBlocksManager() {
         </div>
 
         {/* ══ Main ════════════════════════════════════════════════════════════ */}
-        <div className="flex flex-1 overflow-hidden">
+        {/* Em telas < lg o painel e a prévia empilham (painel em cima, prévia embaixo) */}
+        <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
 
           {/* ── Left panel ──────────────────────────────────────────────────── */}
-          <div className="w-[320px] shrink-0 flex flex-col border-r border-[#E2E8F0] bg-white overflow-hidden">
+          <div className="w-full lg:w-[320px] shrink-0 flex flex-col border-b lg:border-b-0 lg:border-r border-[#E2E8F0] bg-white overflow-hidden max-h-[48vh] lg:max-h-none">
 
             {/* ── STYLES tab ── */}
             {tab === "styles" && (
@@ -1310,10 +1440,11 @@ export default function HomeBlocksManager() {
                               </span>
                             </div>
                           )}
-                          <div className="flex gap-0 h-[108px]">
+                          {/* min-h (não h fixo): altura cresce com o conteúdo — botões nunca cortados */}
+                          <div className="flex gap-0 min-h-[108px]">
                             {/* Color accent + diagram */}
-                            <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 rounded-l-2xl" style={{ backgroundColor: preset.accentColor + "18", color: preset.accentColor }}>
-                              <div className="w-full h-full">
+                            <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 rounded-l-2xl self-stretch" style={{ backgroundColor: preset.accentColor + "18", color: preset.accentColor }}>
+                              <div className="w-full h-full max-h-[96px]">
                                 {preset.diagram}
                               </div>
                             </div>
@@ -1428,7 +1559,7 @@ export default function HomeBlocksManager() {
                     const realIdx  = blocks.findIndex((b) => b.id === block.id);
                     const isEditing  = editingId === block.id;
                     const isDragging = dragIdx === realIdx;
-                    const meta = BLOCK_META[block.id] ?? DEFAULT_META;
+                    const meta = BLOCK_META[block.id] ?? TYPE_META[inferBlockType(block)] ?? DEFAULT_META;
 
                     return (
                       <React.Fragment key={block.id}>
@@ -1765,6 +1896,12 @@ export default function HomeBlocksManager() {
                     ))}
                   </div>
                 </div>
+
+                {/* ── Conteúdo do rodapé (textos, links, redes, contato…) ── */}
+                <div className="border-t border-[#E2E8F0] pt-4">
+                  <FooterEditor saving={saving}
+                    onSave={(cfg) => saveSettingsPatch({ footerConfig: cfg })} />
+                </div>
               </div>
             )}
 
@@ -1828,8 +1965,8 @@ export default function HomeBlocksManager() {
                   </div>
                   <button onClick={() => setShowAdd(false)} className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] rounded-xl transition-colors"><X size={18}/></button>
                 </div>
-                <div className="px-6 py-5 space-y-6">
-                  <div className="grid grid-cols-4 gap-3">
+                <div className="px-4 md:px-6 py-5 space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
                     {MAIN_MODULES.map((m) => (
                       <button key={m.type} type="button" onClick={() => addBlockFromType(m.type, m.name)}
                         className="flex flex-col p-4 bg-white rounded-2xl border border-[#E2E8F0] hover:border-[#0B2A66] hover:shadow-md text-left transition-all group"
@@ -1844,7 +1981,7 @@ export default function HomeBlocksManager() {
                   </div>
                   <div>
                     <h3 className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider mb-3">Outros módulos</h3>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
                       {OTHER_MODULES.map((m) => (
                         <button key={m.type} type="button" onClick={() => addBlockFromType(m.type, m.name)}
                           className="flex items-center gap-3 p-3 bg-white rounded-2xl border border-[#E2E8F0] hover:border-[#0B2A66] text-left transition-all group"

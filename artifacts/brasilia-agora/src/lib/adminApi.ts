@@ -264,17 +264,9 @@ export interface MenuItem {
   highlight?: boolean;
 }
 
-export interface HomeBlock {
-  id: string;
-  name: string;
-  visible: boolean;
-  order: number;
-  category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico";
-  color?: string;
-  custom?: boolean;
-  reverse?: boolean;
-}
+export type { HomeBlock } from "./homeBlocks";
+import type { HomeBlock } from "./homeBlocks";
+import type { FooterConfig } from "./footerConfig";
 
 export interface SiteSettings {
   siteName: string;
@@ -326,6 +318,8 @@ export interface SiteSettings {
   articleRetentionMaxPerRun?: number;
   articleRetentionLastRunAt?: string;
   articleRetentionLastCount?: number;
+  /** Configuração editável do rodapé (painel → aba Rodapé). */
+  footerConfig?: FooterConfig;
 }
 
 /** Regra de retenção enviada às rotas de prévia/execução da limpeza. */

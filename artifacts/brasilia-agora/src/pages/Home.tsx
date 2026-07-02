@@ -17,6 +17,12 @@ import { useArticles } from "../hooks/useArticles";
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import { inferBlockType } from "../lib/homeBlocks";
+import {
+  BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
+  EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
+  QuotesBlock, SeparatorBlock, AdSlotBlock,
+} from "../components/blocks/HomeCustomBlocks";
 
 /* Lazy: ColumnistsSection não é crítico para LCP — carregado sob demanda */
 const ColumnistsSection = lazy(() => import("../components/ColumnistsSection"));
@@ -213,16 +219,60 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
 }
 
 // ─── Custom block renderer ────────────────────────────────────────────────────
-function CustomBlock({ block, getArticles }: {
+function CustomBlock({ block, getArticles, preview }: {
   block: HomeBlock;
   getArticles: (cat: string) => SectionArticle[];
+  preview?: boolean;
 }) {
+  const type = inferBlockType(block);
   const cat = block.category ?? "geral";
-  const articles = getArticles(cat);
   const color = block.color ?? EDITORIA_COLORS[cat] ?? "#6b7280";
   const href = `/${cat}`;
 
-  if (articles.length === 0) return null;
+  // Fonte dos artigos (carrossel/ticker/lista/conteúdo): por categoria ou geral.
+  // getArticles("") devolve todos (mais recentes primeiro) — usado por
+  // "Últimas notícias" e como fallback de "Mais lidas".
+  const byCategory = block.source === "latest" || block.source === "most_read"
+    ? getArticles("")
+    : getArticles(cat);
+  // itemsLimit só vale para lista/carrossel/ticker — layouts editoriais
+  // (featured, duplo, mosaico…) definem as próprias contagens.
+  const limited = block.itemsLimit ? byCategory.slice(0, block.itemsLimit) : byCategory;
+
+  // ── Tipos não-editoriais: cada bloco renderiza o SEU conteúdo ──
+  switch (type) {
+    case "image":       return <ImageBlock block={block} preview={preview} />;
+    case "video":       return <VideoEmbedBlock block={block} preview={preview} />;
+    case "carousel":    return <CarouselBlock block={block} articles={byCategory} preview={preview} />;
+    case "ticker":      return <TickerBlock block={block} articles={byCategory} preview={preview} />;
+    case "advertising": return <AdSlotBlock block={block} preview={preview} />;
+    case "newsletter":  return <NewsletterBlock block={block} />;
+    case "categories":  return <CategoriesBlock block={block} />;
+    case "social":      return <SocialLinksBlock block={block} preview={preview} />;
+    case "quotes":      return <QuotesBlock />;
+    case "html":        return <HtmlBlock block={block} preview={preview} />;
+    case "embed":       return <EmbedBlock block={block} preview={preview} />;
+    case "map":         return <EmbedBlock block={block} preview={preview} map />;
+    case "sep":         return <SeparatorBlock block={block} />;
+    case "list":
+      return limited.length > 0
+        ? <SectionBlockLista title={block.name} color={color} href={href} articles={limited} />
+        : <BlockPlaceholder preview={preview} label={`Lista: ${block.name}`}
+            hint="Nenhum artigo encontrado para a categoria configurada." />;
+    case "weather":
+    case "table":
+    case "counter":
+      // Tipos ainda sem renderizador dedicado — nunca mostrar conteúdo errado.
+      return <BlockPlaceholder preview={preview} label={block.name}
+        hint="Este tipo de bloco ainda não possui visual no site (em desenvolvimento)." />;
+  }
+
+  // ── Conteúdo editorial (layouts de artigos) ──
+  const articles = byCategory;
+  if (articles.length === 0) {
+    return <BlockPlaceholder preview={preview} label={`Seção: ${block.name}`}
+      hint="Nenhum artigo publicado na categoria configurada." />;
+  }
 
   switch (block.layout) {
     case "featured":
@@ -543,7 +593,7 @@ export default function Home() {
               {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
               {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
               {block.custom
-                ? <CustomBlock block={block} getArticles={getArticles} />
+                ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
                 : <PredefinedBlock block={block} getArticles={getArticles} />
               }
             </>

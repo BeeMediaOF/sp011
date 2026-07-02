@@ -53,6 +53,7 @@ export default function MenuManager() {
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [saved, setSaved]       = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [applying, setApplying] = useState(false);
   const [applied, setApplied]   = useState(false);
 
@@ -122,7 +123,7 @@ export default function MenuManager() {
       invalidateSiteCache();
       setApplied(true);
       setTimeout(() => setApplied(false), 2500);
-    } catch { } finally { setApplying(false); }
+    } catch { setSaveError(true); } finally { setApplying(false); }
   }
 
   function addItem(label: string, path: string) {
@@ -133,9 +134,19 @@ export default function MenuManager() {
     syncEdit(item);
   }
 
-  function removeItem(id: string) {
-    setItems((prev) => prev.filter((it) => it.id !== id));
+  async function removeItem(id: string) {
+    if (!confirm("Remover este item do menu?")) return;
+    // Persiste a exclusão na hora — antes o item só sumia da tela e voltava
+    // ao recarregar se o usuário esquecesse de clicar em "Salvar".
+    const next = items.filter((it) => it.id !== id).map((it, i) => ({ ...it, order: i }));
+    setItems(next);
     if (selected === id) { setSelected(null); }
+    setSaveError(false);
+    try {
+      const { menuItems } = await adminApi.updateMenu(next);
+      setItems(menuItems);
+      invalidateSiteCache();
+    } catch { setSaveError(true); }
   }
 
   function toggleExpand(id: string) {
@@ -162,7 +173,7 @@ export default function MenuManager() {
   function handleDragEnd() { setDragIdx(null); }
 
   async function handleSave() {
-    setSaving(true); setSaved(false);
+    setSaving(true); setSaved(false); setSaveError(false);
     const ordered = items.map((it, i) => ({ ...it, order: i }));
     try {
       const { menuItems } = await adminApi.updateMenu(ordered);
@@ -170,7 +181,7 @@ export default function MenuManager() {
       invalidateSiteCache();
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch { } finally { setSaving(false); }
+    } catch { setSaveError(true); } finally { setSaving(false); }
   }
 
   const selectedItem = items.find((it) => it.id === selected) ?? null;
@@ -208,6 +219,11 @@ export default function MenuManager() {
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 shrink-0">
+            {saveError && (
+              <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                Erro ao salvar — tente novamente
+              </span>
+            )}
             <button
               onClick={() => addItem("Novo item", "/")}
               className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-slate-300 transition-colors"

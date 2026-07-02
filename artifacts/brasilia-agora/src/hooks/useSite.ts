@@ -1,16 +1,8 @@
 import { useState, useEffect } from "react";
+import type { HomeBlock } from "../lib/homeBlocks";
+import type { FooterConfig, PublicContact } from "../lib/footerConfig";
 
-export interface HomeBlock {
-  id: string;
-  name: string;
-  visible: boolean;
-  order: number;
-  category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
-  color?: string;
-  custom?: boolean;
-  reverse?: boolean;
-}
+export type { HomeBlock };
 
 export interface MenuItem {
   id: string;
@@ -58,6 +50,10 @@ export interface SiteSettings {
   headerMarginTop?: number;
   customHeadCode?: string;
   customBodyCode?: string;
+  /** Configuração editável do rodapé (painel → aba Rodapé). */
+  footerConfig?: FooterConfig;
+  /** Contato público (hub de Contato) — telefone, e-mail e redes do rodapé. */
+  contact?: PublicContact;
 }
 
 const STORAGE_KEY = "bee_site_v1";

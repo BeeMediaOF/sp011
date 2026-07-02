@@ -97,6 +97,23 @@ export interface HomeBlock {
   category?: string;
   layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
   color?: string; custom?: boolean; reverse?: boolean;
+  /** Tipo do bloco (image, carousel, video, html…). Ausente = content. */
+  blockType?: string;
+  format?: string; source?: string; itemsLimit?: number;
+  imageUrl?: string; linkUrl?: string; caption?: string;
+  videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
+}
+
+/** Configuração editável do rodapé (persistida em site_settings.footerConfig). */
+export interface FooterConfig {
+  description?: string;
+  showSocial?: boolean;
+  social?: Partial<Record<"instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp", string>>;
+  columns?: { id: string; title: string; links: { id: string; label: string; href: string }[] }[];
+  showContact?: boolean; phone?: string; email?: string;
+  showNewsletter?: boolean; newsletterTitle?: string;
+  copyright?: string;
+  legalLinks?: { id: string; label: string; href: string }[];
 }
 
 export interface SiteSettings {
@@ -131,6 +148,7 @@ export interface SiteSettings {
   articleRetentionMaxPerRun?: number;                  // teto de exclusões por execução (0 = ilimitado)
   articleRetentionLastRunAt?: string;                   // último ciclo de limpeza (ISO)
   articleRetentionLastCount?: number;                   // nº excluído no último ciclo
+  footerConfig?: FooterConfig;                          // rodapé editável (aba Rodapé)
 }
 
 export type ColumnistSpecialty =
