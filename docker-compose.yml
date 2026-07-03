@@ -16,8 +16,14 @@ services:
       # required:false evita erro de import quando o .env não está no clone.
       - path: .env
         required: false
+    environment:
+      # Endpoint interno do Ollama (reescrita de IA self-hosted, grátis).
+      # A api fala com o container ollama pela rede interna do compose.
+      OLLAMA_BASE_URL: "http://ollama:11434"
     expose:
       - "8080"          # interno (somente o Caddy acessa)
+    depends_on:
+      - ollama
 
   web:
     build:
@@ -33,6 +39,18 @@ services:
       - "3000"
     depends_on:
       - api
+
+  # LLM local para reescrita de artigos (grátis, roda na própria VPS via CPU).
+  # Não publica porta no host — só a api acessa pela rede interna do compose.
+  # Baixe o modelo uma vez após subir: docker compose exec ollama ollama pull qwen2.5:7b-instruct
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: "-1"    # mantém o modelo na RAM (não recarrega a cada artigo)
+      OLLAMA_NUM_PARALLEL: "1"   # 1 geração por vez (CPU não paraleliza bem)
+    volumes:
+      - ollama_models:/root/.ollama
 
   caddy:
     image: caddy:2
@@ -53,3 +71,4 @@ services:
 volumes:
   caddy_data:
   caddy_config:
+  ollama_models:     # modelos do Ollama (persistem entre deploys/reinícios)

@@ -132,8 +132,10 @@ export interface SiteSettings {
   ogImageBase64?: string; faviconBase64?: string;
   homeBlocks?: HomeBlock[]; adminLogoBase64?: string; loginLogoBase64?: string;
   adminSidebarColor?: string; adminAccentColor?: string;
-  rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai";
+  rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai" | "ollama";
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;
+  /** Base URL do Ollama self-hosted (default: env OLLAMA_BASE_URL ou http://ollama:11434). Não é secret. */
+  rssAiBaseUrl?: string;
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;

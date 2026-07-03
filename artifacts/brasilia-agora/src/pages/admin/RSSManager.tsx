@@ -14,7 +14,7 @@ const token = () => localStorage.getItem("admin_token") ?? "";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type AutoMode = "none" | "draft" | "publish" | "rewrite_draft" | "rewrite_publish";
-type AiProvider = "gemini_free" | "gemini_paid" | "openai";
+type AiProvider = "gemini_free" | "gemini_paid" | "openai" | "ollama";
 
 interface RssSource {
   id: string; name: string; url: string; category: string;
@@ -98,12 +98,14 @@ const AUTO_MODE_OPTS: { label: string; value: AutoMode; desc: string }[] = [
   { value: "rewrite_publish",  label: "IA → Publicar",             desc: "Reescreve e publica" },
 ];
 const AI_PROVIDERS: { label: string; value: AiProvider; desc: string }[] = [
+  { value: "ollama",      label: "Ollama — Self-hosted (VPS)", desc: "Grátis · roda na sua VPS" },
   { value: "gemini_paid", label: "Gemini — Google AI Studio", desc: "Chave própria · tier gratuito disponível" },
   { value: "openai",      label: "ChatGPT — OpenAI",          desc: "Chave própria da OpenAI" },
   { value: "gemini_free", label: "Gemini via Replit",         desc: "Usa créditos do plano Replit" },
 ];
 const OPENAI_MODELS = ["gpt-4o","gpt-4o-mini","gpt-4-turbo","gpt-3.5-turbo"];
 const GEMINI_MODELS = ["gemini-2.5-flash","gemini-2.5-pro","gemini-3-flash-preview","gemini-3.1-pro-preview"];
+const OLLAMA_MODELS = ["qwen2.5:7b-instruct","llama3.1:8b","gemma2:9b"];
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -917,7 +919,7 @@ export default function RSSManager() {
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
-  const needsKey = aiSettings.provider !== "gemini_free";
+  const needsKey = aiSettings.provider !== "gemini_free" && aiSettings.provider !== "ollama";
 
   // ── Queue derived stats ──
   const queueStats = useMemo(() => {
@@ -1625,13 +1627,25 @@ export default function RSSManager() {
                           onChange={(e) => setAiSettings((a) => ({ ...a, model: e.target.value }))}
                           className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none">
                           <option value="">Padrão (recomendado)</option>
-                          {(aiSettings.provider === "openai" ? OPENAI_MODELS : GEMINI_MODELS).map((m) => (
+                          {(aiSettings.provider === "openai" ? OPENAI_MODELS
+                            : aiSettings.provider === "ollama" ? OLLAMA_MODELS
+                            : GEMINI_MODELS).map((m) => (
                             <option key={m} value={m}>{m}</option>
                           ))}
                         </select>
                         <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       </div>
                     </div>
+                    {aiSettings.provider === "ollama" && (
+                      <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+                        <p className="text-[11px] text-emerald-800 leading-relaxed">
+                          <b>Grátis, roda na sua VPS</b> — sem chave de API e sem limite diário.
+                          Se o servidor local estiver fora do ar, a reescrita cai automaticamente
+                          para o Gemini (mantenha as chaves Gemini cadastradas como reserva).
+                          Baixe o modelo uma vez: <code className="bg-emerald-100 px-1 rounded">docker compose exec ollama ollama pull qwen2.5:7b-instruct</code>
+                        </p>
+                      </div>
+                    )}
                     {needsKey && aiSettings.provider !== "gemini_paid" && (
                       <div>
                         <label className="block text-xs font-semibold text-slate-600 mb-1.5">

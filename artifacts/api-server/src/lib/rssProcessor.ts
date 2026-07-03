@@ -210,6 +210,32 @@ function getGeminiDirect() {
   return new GoogleGenAI({ apiKey });
 }
 
+/**
+ * Chama um servidor Ollama self-hosted pelo endpoint compatível com OpenAI.
+ * Não precisa de API key. Inferência em CPU é lenta, então o timeout é generoso.
+ */
+async function callOllama(baseUrl: string, model: string, prompt: string): Promise<string> {
+  const url = `${baseUrl.replace(/\/+$/, "")}/v1/chat/completions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user", content: prompt }],
+      stream: false,
+      response_format: { type: "json_object" }, // força JSON válido
+      max_tokens: 8192,
+    }),
+    signal: AbortSignal.timeout(300_000), // 5 min — CPU é lento
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => "");
+    throw new Error(`Ollama: ${res.status} ${res.statusText} ${err}`.trim());
+  }
+  const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
 export interface RewriteResult {
   content: string;
   keywords: string;
@@ -583,7 +609,6 @@ async function withRetry<T>(
 export async function rewriteWithAI(
   title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
 ): Promise<RewriteResult> {
-  checkQuota();
   // Note: enforceCallInterval removed — per-key cooldown + 429 handling manage rate limiting.
   // This allows N parallel workers (one per key) to run without serialising each other.
 
@@ -596,6 +621,28 @@ export async function rewriteWithAI(
     : buildPrompt(title, text, sourceName, giveCredit);
 
   let raw = "";
+
+  // Ollama (self-hosted na VPS): sem limite diário/cota — reescreve de graça.
+  // Se o servidor local falhar (fora do ar, OOM, timeout), cai para o Gemini.
+  if (provider === "ollama") {
+    const baseUrl = settings.rssAiBaseUrl || process.env["OLLAMA_BASE_URL"] || "http://ollama:11434";
+    const model   = settings.rssAiModel || "qwen2.5:7b-instruct";
+    try {
+      raw = await callOllama(baseUrl, model, prompt);
+    } catch (ollamaErr) {
+      const keys = getGeminiKeys(settings);
+      if (keys.length === 0) throw ollamaErr; // sem fallback configurado
+      logger.warn({ err: String(ollamaErr) }, "Ollama indisponível — caindo para fallback Gemini");
+      checkQuota();
+      // Modelo do fallback é sempre um modelo Gemini (rssAiModel aqui é nome de modelo Ollama).
+      raw = await callGeminiWithRotation(keys, "gemini-2.5-flash", prompt);
+      _quota.usedToday++;
+    }
+    return parseRewriteResult(raw);
+  }
+
+  // Provedores cloud abaixo respeitam o limite diário e o cooldown de cota.
+  checkQuota();
 
   if (provider === "openai") {
     const apiKey = settings.rssAiApiKey;

@@ -22,6 +22,7 @@ import {
   type RewriteJobItem,
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
+import { store } from "./store.js";
 import { sanitizeHighlightMarkers } from "@workspace/social-template";
 
 // ── Content quality guard & JSON recovery ────────────────────────────────────
@@ -518,14 +519,18 @@ async function processItem(item: RewriteJobItem): Promise<void> {
 async function processBatch(): Promise<void> {
   if (_paused || _queue.length === 0) return;
 
+  // Ollama roda local, sem cota nem limite diário: não pausa por cota do Gemini
+  // e processa 1 artigo por vez (inferência em CPU não paraleliza bem).
+  const isOllama = store.getSettings().rssAiProvider === "ollama";
+
   const quota = getAIQuotaStatus();
 
-  if (quota.isQuotaExhausted) {
+  if (!isOllama && quota.isQuotaExhausted) {
     logger.debug("Rewrite queue paused — daily quota exhausted");
     return;
   }
 
-  if (quota.isOnCooldown && !_forceNextBatch) {
+  if (!isOllama && quota.isOnCooldown && !_forceNextBatch) {
     const remaining = quota.cooldownRemainingMs;
     logger.debug(
       { cooldownSecs: Math.ceil(remaining / 1_000) },
@@ -554,7 +559,9 @@ async function processBatch(): Promise<void> {
   // Determine how many articles to process in parallel:
   // = number of Gemini keys currently not on per-key cooldown, capped at queue size and MAX_CONCURRENCY
   const availableKeys = getAvailableKeyCount();
-  const concurrency = Math.min(availableKeys, _queue.length, MAX_CONCURRENCY);
+  const concurrency = isOllama
+    ? Math.min(1, _queue.length)                                  // Ollama: 1 por vez (CPU)
+    : Math.min(availableKeys, _queue.length, MAX_CONCURRENCY);
 
   if (concurrency <= 0) return;
 

@@ -291,9 +291,10 @@ export interface SiteSettings {
   loginLogoBase64?: string;
   adminSidebarColor?: string;
   adminAccentColor?: string;
-  rssAiProvider?: "gemini_free" | "gemini_paid" | "openai";
+  rssAiProvider?: "gemini_free" | "gemini_paid" | "openai" | "ollama";
   rssAiApiKey?: string;
   rssAiModel?: string;
+  rssAiBaseUrl?: string;
   bylineName?: string;
   bylineLogoBase64?: string;
   headerStyle?: "standard" | "compact" | "centered";
