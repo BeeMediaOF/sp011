@@ -259,19 +259,23 @@ export function TickerBlock({ block, articles, preview, contained = true }: {
       <style>{`@keyframes hb-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
       {/* Contido na largura do site (não full-bleed) — mesma faixa dos portais de referência. */}
       <div className={contained ? "max-w-[1280px] mx-auto px-4" : ""}>
-      <div className="flex items-center overflow-hidden border border-gray-200 bg-white">
+      <div className="flex items-center border border-gray-200 bg-white">
         <span className="shrink-0 text-[11px] font-black text-white uppercase tracking-wider px-3 py-2"
           style={{ backgroundColor: color }}>
           {block.name || "Últimas"}
         </span>
-        <div className="flex whitespace-nowrap" style={{ animation: `hb-ticker ${Math.max(20, items.length * 6)}s linear infinite` }}>
-          {loop.map((a, i) => (
-            <Link key={`${a.id}-${i}`} href={`/artigo/${a.slug ?? a.id}`}
-              className="text-[13px] text-gray-700 hover:text-black px-4 py-2 inline-flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
-              <span dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }} />
-            </Link>
-          ))}
+        {/* Área de rolagem com clipping próprio — sem ela a faixa animada
+            desliza por cima do rótulo e vaza pela borda esquerda. */}
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex whitespace-nowrap w-max" style={{ animation: `hb-ticker ${Math.max(20, items.length * 6)}s linear infinite` }}>
+            {loop.map((a, i) => (
+              <Link key={`${a.id}-${i}`} href={`/artigo/${a.slug ?? a.id}`}
+                className="text-[13px] text-gray-700 hover:text-black px-4 py-2 inline-flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }} />
+              </Link>
+            ))}
+          </div>
         </div>
       </div>
       </div>
