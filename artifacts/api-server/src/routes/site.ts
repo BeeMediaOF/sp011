@@ -8,7 +8,9 @@ router.get("/site", (_req, res) => {
   const settings = { ...store.getPublicSettings() };
   // Templates de home são material do painel (aba Templates) — fora do payload público.
   delete settings.homeTemplates;
-  const menuItems = store.getMenuItems().filter((m) => m.visible);
+  const menuItems = store.getMenuItems()
+    .filter((m) => m.visible)
+    .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));
   // Subconjunto público do hub de Contato: rodapé (telefone/e-mail/redes) e
   // bloco "Redes Sociais" da home. supportEmail e textos legais ficam de fora.
   const c = store.getContactInfo();

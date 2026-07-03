@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
-import { Search, Menu, X, House } from "lucide-react";
+import { Search, Menu, X, House, ChevronDown } from "lucide-react";
 import { useSite } from "../hooks/useSite";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_sbc_agora.png";
 
-const FALLBACK_NAV = [
+const FALLBACK_NAV: NavEntry[] = [
   { label: "HOME",       path: "/" },
   { label: "POLÍTICA",   path: "/politica" },
   { label: "CIDADE",     path: "/cidade" },
@@ -20,6 +20,28 @@ const FALLBACK_NAV = [
   { label: "ESPORTES",   path: "/esportes" },
   { label: "COLUNAS",    path: "/colunas" },
 ];
+
+// ─── Submenu (1 nível) ────────────────────────────────────────────────────────
+/** Shape mínimo dos itens de navegação (settings.menuItems ou FALLBACK_NAV). */
+type NavEntry = { label: string; path: string; visible?: boolean; children?: NavEntry[] };
+
+function visibleChildren(item: NavEntry): NavEntry[] {
+  return (item.children ?? []).filter((c) => c.visible !== false);
+}
+
+/** Painel dropdown aberto no hover/focus do item pai (desktop). */
+function NavDropdown({ items }: { items: NavEntry[] }) {
+  return (
+    <div className="absolute left-0 top-full min-w-[190px] z-50 hidden group-hover:block group-focus-within:block bg-white border border-gray-200 shadow-lg rounded-b-lg overflow-hidden">
+      {items.map((c) => (
+        <Link key={c.path} href={c.path}
+          className="block px-4 py-2.5 text-[12px] font-semibold text-gray-700 hover:bg-gray-100">
+          {c.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 // ─── Ticker de cotações ───────────────────────────────────────────────────────
 interface FxQuote   { bid: string; pctChange: string; }
@@ -102,7 +124,7 @@ function TickerBar() {
 interface MobileNavProps {
   open: boolean;
   onClose: () => void;
-  navItems: { label: string; path: string }[];
+  navItems: NavEntry[];
   isActive: (path: string) => boolean;
   activeColor: string;
   logoSrc: string;
@@ -110,6 +132,8 @@ interface MobileNavProps {
 }
 
 function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, siteName }: MobileNavProps) {
+  // Submenus abertos no drawer (acordeão por path do item pai).
+  const [openSub, setOpenSub] = useState<Record<string, boolean>>({});
   useEffect(() => {
     if (!open) return;
     const prevOverflow = document.body.style.overflow;
@@ -144,19 +168,45 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
         </div>
         <nav className="flex-1 overflow-y-auto px-3 py-3">
           <ul className="flex flex-col gap-0.5">
-            {navItems.map(({ label, path }) => {
+            {navItems.map((item) => {
+              const { label, path } = item;
               const active = isActive(path);
+              const kids = visibleChildren(item);
               return (
                 <li key={path}>
-                  <Link
-                    href={path}
-                    onClick={onClose}
-                    className="flex items-center gap-3 py-3 px-3 rounded-xl text-[15px] font-semibold transition-colors hover:bg-gray-50 active:bg-gray-100"
-                    style={{ color: active ? activeColor : "#374151" }}
-                  >
-                    <span className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: active ? activeColor : "#e5e7eb" }} />
-                    {label}
-                  </Link>
+                  <div className="flex items-center">
+                    <Link
+                      href={path}
+                      onClick={onClose}
+                      className="flex-1 flex items-center gap-3 py-3 px-3 rounded-xl text-[15px] font-semibold transition-colors hover:bg-gray-50 active:bg-gray-100"
+                      style={{ color: active ? activeColor : "#374151" }}
+                    >
+                      <span className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: active ? activeColor : "#e5e7eb" }} />
+                      {label}
+                    </Link>
+                    {kids.length > 0 && (
+                      <button
+                        onClick={() => setOpenSub((p) => ({ ...p, [path]: !p[path] }))}
+                        aria-label={openSub[path] ? "Fechar submenu" : "Abrir submenu"}
+                        className="p-2 mr-1 text-gray-400 hover:text-gray-700 rounded-lg transition-colors"
+                      >
+                        <ChevronDown size={16} className={`transition-transform ${openSub[path] ? "rotate-180" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+                  {kids.length > 0 && openSub[path] && (
+                    <ul className="pl-9 pb-1">
+                      {kids.map((c) => (
+                        <li key={c.path}>
+                          <Link href={c.path} onClick={onClose}
+                            className="block py-2 px-3 rounded-lg text-[14px] font-medium hover:bg-gray-50"
+                            style={{ color: isActive(c.path) ? activeColor : "#4b5563" }}>
+                            {c.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               );
             })}
@@ -232,6 +282,10 @@ export default function Header() {
   // abaixo dela (estilo portal), com a busca dentro da própria faixa no desktop.
   const menuBarStyle: "attached" | "bar" = settings?.menuBarStyle === "bar" ? "bar" : "attached";
   const menuBarBg = settings?.menuBarBgColor || menuActiveColor;
+  // Menus com submenu não podem viver num nav com overflow-x-auto (o dropdown
+  // seria cortado); sem submenu, mantém o scroll horizontal original.
+  const hasDropdowns = navItems.some((it) => visibleChildren(it).length > 0);
+  const navOverflow = hasDropdowns ? "overflow-visible" : "overflow-x-auto no-scrollbar";
   const headerBannerClean = sanitizeArticleHtml(settings?.headerBannerHtml);
   const headerBanner = headerBannerClean ? (
     <div className="hidden lg:flex flex-1 min-w-0 items-center justify-end"
@@ -242,18 +296,25 @@ export default function Header() {
   const menuBar = menuBarStyle === "bar" ? (
     <div className="hidden lg:block" style={{ backgroundColor: menuBarBg }}>
       <div className="max-w-[1280px] mx-auto flex items-stretch" style={padStyle}>
-        <nav className="flex items-stretch flex-1 overflow-x-auto no-scrollbar">
-          {navItems.map(({ label, path }) => (
-            <Link
-              key={path}
-              href={path}
-              style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
-              className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
-            >
-              {path === "/" && <House size={13} className="shrink-0" />}
-              {label}
-            </Link>
-          ))}
+        <nav className="flex items-stretch flex-1 overflow-x-visible">
+          {navItems.map((item) => {
+            const { label, path } = item;
+            const kids = visibleChildren(item);
+            const link = (
+              <Link
+                href={path}
+                style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
+                className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
+              >
+                {path === "/" && <House size={13} className="shrink-0" />}
+                {label}
+                {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
+              </Link>
+            );
+            return kids.length > 0
+              ? <div key={path} className="relative group flex items-stretch">{link}<NavDropdown items={kids} /></div>
+              : <React.Fragment key={path}>{link}</React.Fragment>;
+          })}
         </nav>
         <div className="flex items-center pl-2 shrink-0">
           {searchOpen ? (
@@ -305,17 +366,25 @@ export default function Header() {
             </Link>
 
             {menuBarStyle === "attached" && (
-              <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
-                {navItems.map(({ label, path }) => (
-                  <Link
-                    key={path}
-                    href={path}
-                    style={navItemStyle(path)}
-                    className="px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100"
-                  >
-                    {label}
-                  </Link>
-                ))}
+              <nav className={`hidden lg:flex items-center self-center gap-0 flex-1 ${navOverflow}`}>
+                {navItems.map((item) => {
+                  const { label, path } = item;
+                  const kids = visibleChildren(item);
+                  const link = (
+                    <Link
+                      key={path}
+                      href={path}
+                      style={navItemStyle(path)}
+                      className={`px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+                    >
+                      {label}
+                      {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-60" />}
+                    </Link>
+                  );
+                  return kids.length > 0
+                    ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
+                    : <React.Fragment key={path}>{link}</React.Fragment>;
+                })}
               </nav>
             )}
             {headerBanner}
@@ -396,23 +465,30 @@ export default function Header() {
           <div className="hidden lg:block border-t border-gray-100"
             style={{ backgroundColor: settings?.menuBarBgColor || "#1a2448" }}>
             <nav className="max-w-[1280px] mx-auto flex items-center justify-center gap-1" style={padStyle}>
-              {navItems.map(({ label, path }) => (
-                <Link
-                  key={path}
-                  href={path}
-                  style={{
-                    // Barra escura própria: mantemos texto claro/legível e usamos a
-                    // cor do item ativo, tamanho e peso configurados no painel.
-                    fontSize: menuFontSize,
-                    fontWeight: menuFontWeight,
-                    color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
-                    borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
-                  }}
-                  className="px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10"
-                >
-                  {label}
-                </Link>
-              ))}
+              {navItems.map((item) => {
+                const { label, path } = item;
+                const kids = visibleChildren(item);
+                const link = (
+                  <Link
+                    href={path}
+                    style={{
+                      // Barra escura própria: mantemos texto claro/legível e usamos a
+                      // cor do item ativo, tamanho e peso configurados no painel.
+                      fontSize: menuFontSize,
+                      fontWeight: menuFontWeight,
+                      color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
+                      borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
+                    }}
+                    className={`px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+                  >
+                    {label}
+                    {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
+                  </Link>
+                );
+                return kids.length > 0
+                  ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
+                  : <React.Fragment key={path}>{link}</React.Fragment>;
+              })}
             </nav>
           </div>
 
@@ -466,17 +542,24 @@ export default function Header() {
           </Link>
 
           {menuBarStyle === "attached" && (
-            <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
-              {navItems.map(({ label, path }) => (
-                <Link
-                  key={path}
-                  href={path}
-                  style={navItemStyle(path)}
-                  className="px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]"
-                >
-                  {label}
-                </Link>
-              ))}
+            <nav className={`hidden lg:flex items-center self-center gap-0 flex-1 ${navOverflow}`}>
+              {navItems.map((item) => {
+                const { label, path } = item;
+                const kids = visibleChildren(item);
+                const link = (
+                  <Link
+                    href={path}
+                    style={navItemStyle(path)}
+                    className={`px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+                  >
+                    {label}
+                    {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-60" />}
+                  </Link>
+                );
+                return kids.length > 0
+                  ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
+                  : <React.Fragment key={path}>{link}</React.Fragment>;
+              })}
             </nav>
           )}
           {headerBanner}

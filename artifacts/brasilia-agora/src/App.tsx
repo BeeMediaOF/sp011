@@ -124,7 +124,7 @@ function colorForSlug(slug: string): string {
   return COLOR_PALETTE[h % COLOR_PALETTE.length]!;
 }
 
-interface MenuItemApi { label: string; path: string; visible?: boolean; }
+interface MenuItemApi { label: string; path: string; visible?: boolean; children?: MenuItemApi[]; }
 
 function DynamicCategory() {
   const { slug } = useParams<{ slug: string }>();
@@ -137,7 +137,9 @@ function DynamicCategory() {
     fetch("/api/site")
       .then((r) => r.json())
       .then((d: { menuItems: MenuItemApi[] }) => {
-        const found = (d.menuItems ?? []).find(
+        // Procura o slug nos itens de topo e nos submenus (1 nível).
+        const flat = (d.menuItems ?? []).flatMap((m) => [m, ...(m.children ?? [])]);
+        const found = flat.find(
           (m) => m.path === `/${slug}` || m.path.replace(/^\//, "") === slug
         );
         setMenuItem(found ?? null);

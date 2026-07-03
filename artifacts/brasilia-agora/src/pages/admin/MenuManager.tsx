@@ -98,9 +98,20 @@ export default function MenuManager() {
     syncEdit(item);
   }
 
+  /** Aplica um patch a um item pelo id, procurando no topo e nos subitens (1 nível). */
+  function patchItemIn(list: MenuItem[], id: string, patch: Partial<MenuItem>): MenuItem[] {
+    return list.map((it) => {
+      if (it.id === id) return { ...it, ...patch };
+      if (it.children?.some((c) => c.id === id)) {
+        return { ...it, children: it.children.map((c) => (c.id === id ? { ...c, ...patch } : c)) };
+      }
+      return it;
+    });
+  }
+
   function updateSelected(patch: Partial<MenuItem>) {
     if (!selected) return;
-    setItems((prev) => prev.map((it) => it.id === selected ? { ...it, ...patch } : it));
+    setItems((prev) => patchItemIn(prev, selected, patch));
   }
 
   async function applyEditToSelected() {
@@ -112,7 +123,7 @@ export default function MenuManager() {
       newTab: editNewTab,
       highlight: editHighlight,
     };
-    const nextItems = items.map((it) => it.id === selected ? { ...it, ...patch } : it);
+    const nextItems = patchItemIn(items, selected, patch);
     setItems(nextItems);
 
     setApplying(true); setApplied(false);
@@ -134,11 +145,36 @@ export default function MenuManager() {
     syncEdit(item);
   }
 
+  /** Cria um subitem real dentro do item pai (1 nível de submenu). */
+  function addChild(parent: MenuItem) {
+    const id = crypto.randomUUID();
+    const child: MenuItem = {
+      id,
+      label: "Novo subitem",
+      path: `${parent.path === "/" ? "" : parent.path}-sub`,
+      order: parent.children?.length ?? 0,
+      visible: true,
+    };
+    setItems((prev) => prev.map((it) =>
+      it.id === parent.id ? { ...it, children: [...(it.children ?? []), child] } : it
+    ));
+    setExpanded((prev) => new Set(prev).add(parent.id));
+    setSelected(id);
+    syncEdit(child);
+  }
+
   async function removeItem(id: string) {
     if (!confirm("Remover este item do menu?")) return;
     // Persiste a exclusão na hora — antes o item só sumia da tela e voltava
     // ao recarregar se o usuário esquecesse de clicar em "Salvar".
-    const next = items.filter((it) => it.id !== id).map((it, i) => ({ ...it, order: i }));
+    // Remove do topo (com a subárvore) ou de dentro de um submenu.
+    const next = items
+      .filter((it) => it.id !== id)
+      .map((it, i) => ({
+        ...it,
+        order: i,
+        ...(it.children ? { children: it.children.filter((c) => c.id !== id).map((c, j) => ({ ...c, order: j })) } : {}),
+      }));
     setItems(next);
     if (selected === id) { setSelected(null); }
     setSaveError(false);
@@ -184,7 +220,15 @@ export default function MenuManager() {
     } catch { setSaveError(true); } finally { setSaving(false); }
   }
 
-  const selectedItem = items.find((it) => it.id === selected) ?? null;
+  // Item selecionado: procura no topo e nos subitens (1 nível).
+  const selectedItem = (() => {
+    for (const it of items) {
+      if (it.id === selected) return it;
+      const child = it.children?.find((c) => c.id === selected);
+      if (child) return child;
+    }
+    return null;
+  })();
 
   const filteredPages = AVAILABLE_PAGES.filter((p) =>
     !pageSearch || p.toLowerCase().includes(pageSearch.toLowerCase())
@@ -405,7 +449,7 @@ export default function MenuManager() {
             <div className="px-5 pt-5 pb-3 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-semibold text-[#0B2A66]">Estrutura do menu</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Arraste e solte para reordenar. Arraste para a direita para criar subitens.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Arraste e solte para reordenar. Expanda um item para criar subitens (dropdown no site).</p>
               </div>
               <button
                 onClick={() => addItem("Novo item", "/")}
@@ -502,11 +546,47 @@ export default function MenuManager() {
                           </div>
                         </div>
 
-                        {/* Placeholder children */}
+                        {/* Subitens (1 nível) */}
                         {isExpanded && (
                           <div className="ml-8 mt-1 space-y-1">
+                            {(item.children ?? []).map((child) => (
+                              <div
+                                key={child.id}
+                                onClick={(e) => { e.stopPropagation(); selectItem(child); }}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer transition-all border ${
+                                  selected === child.id
+                                    ? "border-[#0B2A66] bg-[#EEF2FF]"
+                                    : "border-transparent hover:bg-slate-50 hover:border-slate-200"
+                                } ${!child.visible ? "opacity-50" : ""}`}
+                              >
+                                <ChevronRight size={11} className="text-slate-300 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-xs font-semibold truncate ${selected === child.id ? "text-[#0B2A66]" : "text-slate-600"}`}>
+                                    {child.label || "—"}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 truncate">{child.path}</p>
+                                </div>
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setItems((prev) => patchItemIn(prev, child.id, { visible: !child.visible }));
+                                    }}
+                                    className={`p-1 rounded transition-colors ${child.visible ? "text-slate-300 hover:text-slate-600" : "text-amber-400 hover:text-amber-600"}`}
+                                  >
+                                    {child.visible ? <Eye size={11} /> : <EyeOff size={11} />}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); removeItem(child.id); }}
+                                    className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                  >
+                                    <Trash2 size={11} />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
                             <div
-                              onClick={() => addItem(`Subitem de ${item.label}`, `${item.path}/sub`)}
+                              onClick={() => addChild(item)}
                               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 hover:border-[#0B2A66] hover:text-[#0B2A66] cursor-pointer transition-colors text-xs"
                             >
                               <Plus size={10} /> Adicionar subitem
@@ -619,7 +699,8 @@ export default function MenuManager() {
                     <span className="text-white text-[9px] font-black">i</span>
                   </div>
                   <p className="text-[11px] text-blue-600 leading-relaxed">
-                    Dica: arraste os itens para definir a ordem e criar subitens.
+                    Dica: arraste os itens de topo para definir a ordem; expanda um item e use
+                    "Adicionar subitem" para montar o dropdown exibido no site.
                   </p>
                 </div>
 
