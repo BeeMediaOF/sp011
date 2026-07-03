@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
-import { Search, Menu, X } from "lucide-react";
+import { Search, Menu, X, House } from "lucide-react";
 import { useSite } from "../hooks/useSite";
 import { trackSearch } from "../hooks/useAnalytics";
+import { sanitizeArticleHtml } from "../lib/sanitize";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_sbc_agora.png";
 
@@ -226,6 +227,61 @@ export default function Header() {
   const wrapStyle: React.CSSProperties = { marginTop: headerMarginTop };
   const siteName = settings?.siteName ?? BRAND.name;
 
+  // ── Menu em faixa + banner do cabeçalho (opcionais; ausentes = layout atual) ─
+  // "bar": a navegação sai da linha do logo e vira uma faixa colorida full-width
+  // abaixo dela (estilo portal), com a busca dentro da própria faixa no desktop.
+  const menuBarStyle: "attached" | "bar" = settings?.menuBarStyle === "bar" ? "bar" : "attached";
+  const menuBarBg = settings?.menuBarBgColor || menuActiveColor;
+  const headerBannerClean = sanitizeArticleHtml(settings?.headerBannerHtml);
+  const headerBanner = headerBannerClean ? (
+    <div className="hidden lg:flex flex-1 min-w-0 items-center justify-end"
+      style={{ minHeight: 48 }}
+      dangerouslySetInnerHTML={{ __html: headerBannerClean }} />
+  ) : null;
+
+  const menuBar = menuBarStyle === "bar" ? (
+    <div className="hidden lg:block" style={{ backgroundColor: menuBarBg }}>
+      <div className="max-w-[1280px] mx-auto flex items-stretch" style={padStyle}>
+        <nav className="flex items-stretch flex-1 overflow-x-auto no-scrollbar">
+          {navItems.map(({ label, path }) => (
+            <Link
+              key={path}
+              href={path}
+              style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
+              className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
+            >
+              {path === "/" && <House size={13} className="shrink-0" />}
+              {label}
+            </Link>
+          ))}
+        </nav>
+        <div className="flex items-center pl-2 shrink-0">
+          {searchOpen ? (
+            <div className="flex items-center gap-1">
+              <input autoFocus type="text" placeholder="Pesquisar..."
+                aria-label="Pesquisar no site"
+                value={searchQuery}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={handleSearchKey}
+                className="bg-white/15 border border-white/30 text-white placeholder-white/60 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-white w-[180px]"
+              />
+              <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-white/80 hover:text-white p-1">
+                <Search size={14} />
+              </button>
+              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-white/60 hover:text-white p-1">
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setSearch(true)} aria-label="Abrir busca" className="text-white/80 hover:text-white p-1.5 transition-colors">
+              <Search size={15} />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   // ── Compact style ─────────────────────────────────────────────────────────
   if (style === "compact") {
     return (
@@ -248,23 +304,28 @@ export default function Header() {
               />
             </Link>
 
-            <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
-              {navItems.map(({ label, path }) => (
-                <Link
-                  key={path}
-                  href={path}
-                  style={navItemStyle(path)}
-                  className="px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100"
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
+            {menuBarStyle === "attached" && (
+              <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
+                {navItems.map(({ label, path }) => (
+                  <Link
+                    key={path}
+                    href={path}
+                    style={navItemStyle(path)}
+                    className="px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100"
+                  >
+                    {label}
+                  </Link>
+                ))}
+              </nav>
+            )}
+            {headerBanner}
+            {menuBarStyle === "bar" && !headerBanner && <div className="hidden lg:block flex-1" />}
 
             <div className="flex-1 lg:hidden" />
 
             <div className="flex items-center gap-1 ml-auto">
               <PushSubscribeButton />
+              <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
               {searchOpen ? (
                 <>
                   <input autoFocus type="text" placeholder="Pesquisar..."
@@ -286,9 +347,11 @@ export default function Header() {
                   <Search size={15} />
                 </button>
               )}
+              </div>
             </div>
           </div>
 
+          {menuBar}
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
         <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
@@ -329,7 +392,9 @@ export default function Header() {
             </button>
           </div>
 
-          <div className="hidden lg:block border-t border-gray-100 bg-[#1a2448]">
+          {/* Barra escura própria do estilo centered — cor configurável (menuBarBgColor). */}
+          <div className="hidden lg:block border-t border-gray-100"
+            style={{ backgroundColor: settings?.menuBarBgColor || "#1a2448" }}>
             <nav className="max-w-[1280px] mx-auto flex items-center justify-center gap-1" style={padStyle}>
               {navItems.map(({ label, path }) => (
                 <Link
@@ -400,23 +465,29 @@ export default function Header() {
             />
           </Link>
 
-          <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
-            {navItems.map(({ label, path }) => (
-              <Link
-                key={path}
-                href={path}
-                style={navItemStyle(path)}
-                className="px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]"
-              >
-                {label}
-              </Link>
-            ))}
-          </nav>
+          {menuBarStyle === "attached" && (
+            <nav className="hidden lg:flex items-center self-center gap-0 flex-1 overflow-x-auto no-scrollbar">
+              {navItems.map(({ label, path }) => (
+                <Link
+                  key={path}
+                  href={path}
+                  style={navItemStyle(path)}
+                  className="px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
+          )}
+          {headerBanner}
+          {menuBarStyle === "bar" && !headerBanner && <div className="hidden lg:block flex-1" />}
 
           <div className="flex-1 lg:hidden" />
 
           <div className="flex items-center gap-1 ml-auto">
             <PushSubscribeButton />
+            {/* Com o menu em faixa, a busca do desktop mora na própria faixa. */}
+            <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
             {searchOpen ? (
               <>
                 <input
@@ -453,9 +524,11 @@ export default function Header() {
                 <Search size={17} />
               </button>
             )}
+            </div>
           </div>
         </div>
 
+        {menuBar}
       </header>
       {settings?.showTickerBar !== false && <TickerBar />}
       <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}

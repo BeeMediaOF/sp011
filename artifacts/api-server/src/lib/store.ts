@@ -149,6 +149,14 @@ export interface SiteSettings {
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
   headerPaddingX?: number; headerMarginTop?: number;
+  /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */
+  showTopBar?: boolean; topBarBgColor?: string;
+  /** Banner HTML (sanitizado no front) exibido ao lado do logo no desktop. */
+  headerBannerHtml?: string;
+  /** "bar" = menu vira faixa colorida full-width abaixo do logo. */
+  menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
+  /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */
+  footerAccentColor?: string;
   seoDescription?: string; seoKeywords?: string;
   facebookPixelId?: string; gtmId?: string; ga4MeasurementId?: string;
   customHeadCode?: string; customBodyCode?: string;

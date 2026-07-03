@@ -39,6 +39,16 @@ export interface SiteSettings {
   footerStyle?: "dark" | "light" | "minimal";
   headerBgColor?: string;
   footerBgColor?: string;
+  /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */
+  showTopBar?: boolean;
+  topBarBgColor?: string;
+  /** Banner HTML (sanitizado) exibido ao lado do logo no desktop. */
+  headerBannerHtml?: string;
+  /** "bar" = menu vira faixa colorida full-width abaixo do logo. */
+  menuBarStyle?: "attached" | "bar";
+  menuBarBgColor?: string;
+  /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */
+  footerAccentColor?: string;
   /** Estilo do menu principal (cor do texto, cor do item ativo, tamanho e peso da fonte). */
   menuTextColor?: string;
   menuActiveColor?: string;
