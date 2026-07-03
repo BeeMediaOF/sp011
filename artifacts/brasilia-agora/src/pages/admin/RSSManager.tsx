@@ -80,6 +80,35 @@ interface CollectionSettings {
 
 const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+interface FallbackSettings {
+  fallbackGeminiEnabled: boolean;
+  fallbackPerplexityEnabled: boolean;
+  hasPerplexityKey: boolean;
+  perplexityKeySource: "painel" | "ambiente" | null;
+  perplexityModel: string;
+  hasGeminiKeys: boolean;
+  boost: {
+    enabled: boolean;
+    provider: "gemini" | "perplexity" | "both";
+    timesPerDay: number;
+    batchSize: number;
+    queueThreshold: number;
+    maxPerDay: number;
+  };
+}
+
+const BURST_OPTIONS = [
+  { value: 0,  label: "Desligado" },
+  { value: 1,  label: "1× por dia (a cada 24h)" },
+  { value: 2,  label: "2× por dia (a cada 12h)" },
+  { value: 3,  label: "3× por dia (a cada 8h)" },
+  { value: 4,  label: "4× por dia (a cada 6h)" },
+  { value: 6,  label: "6× por dia (a cada 4h)" },
+  { value: 8,  label: "8× por dia (a cada 3h)" },
+  { value: 12, label: "12× por dia (a cada 2h)" },
+  { value: 24, label: "24× por dia (a cada 1h)" },
+];
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CATEGORIES = [
@@ -325,6 +354,10 @@ export default function RSSManager() {
   const [rwQueue, setRwQueue] = useState<{
     pending: number; paused: boolean; processedTotal: number; failedTotal: number; activeworkers: number;
     backlogDb?: number; maxPendingRewrites?: number; collectionPaused?: boolean;
+    boost?: {
+      enabled: boolean; provider: string; activeHelpers: number;
+      usedToday: number; maxPerDay: number; burstRemaining: number; nextBurstAt: string | null;
+    };
     quota: { usedToday: number; dailyLimit: number; remaining: number; isOnCooldown: boolean; isExhausted: boolean; cooldownSecs: number };
   } | null>(null);
   const [queueLoading, setQueueLoading] = useState(false);
@@ -333,6 +366,12 @@ export default function RSSManager() {
   const [colCfg, setColCfg] = useState<CollectionSettings | null>(null);
   const [colSaving, setColSaving] = useState(false);
   const [colSaved,  setColSaved]  = useState(false);
+
+  // ── IAs de Apoio (fallback + reforço) ──
+  const [fbCfg, setFbCfg] = useState<FallbackSettings | null>(null);
+  const [fbPerplexityKey, setFbPerplexityKey] = useState(""); // write-only
+  const [fbSaving, setFbSaving] = useState(false);
+  const [fbSaved,  setFbSaved]  = useState(false);
 
   // ── Table UI ──
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -421,6 +460,37 @@ export default function RSSManager() {
       setColCfg(d);
     } catch { /* ignore */ }
   }, []);
+
+  const loadFallbackSettings = useCallback(async () => {
+    try {
+      const d = await apiFetch<FallbackSettings>("/fallback-settings");
+      setFbCfg(d);
+    } catch { /* ignore */ }
+  }, []);
+
+  async function saveFallbackSettings() {
+    if (!fbCfg) return;
+    setFbSaving(true); setFbSaved(false);
+    try {
+      await apiFetch("/fallback-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          fallbackGeminiEnabled:     fbCfg.fallbackGeminiEnabled,
+          fallbackPerplexityEnabled: fbCfg.fallbackPerplexityEnabled,
+          // Chave só é enviada quando o usuário digitou algo (write-only)
+          ...(fbPerplexityKey.trim() && { perplexityApiKey: fbPerplexityKey.trim() }),
+          perplexityModel: fbCfg.perplexityModel,
+          boost: fbCfg.boost,
+        }),
+      });
+      setFbSaved(true); setFbPerplexityKey("");
+      await loadFallbackSettings();
+      await loadQueueStats();
+      setTimeout(() => setFbSaved(false), 2500);
+    } catch { /* ignore */ } finally {
+      setFbSaving(false);
+    }
+  }
 
   async function saveCollectionSettings() {
     if (!colCfg) return;
@@ -525,10 +595,11 @@ export default function RSSManager() {
     void loadLogs();
     void loadQueueStats();
     void loadCollectionSettings();
+    void loadFallbackSettings();
     const quotaInterval = setInterval(() => void loadAiQuota(), 15_000);
     const queueInterval = setInterval(() => void loadQueueStats(), 10_000);
     return () => { clearInterval(quotaInterval); clearInterval(queueInterval); };
-  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats, loadCollectionSettings]);
+  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats, loadCollectionSettings, loadFallbackSettings]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -1751,6 +1822,193 @@ export default function RSSManager() {
                 <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
                   <Loader2 size={14} className="animate-spin" />
                   Carregando status da fila…
+                </div>
+              )}
+            </div>
+
+            {/* ── Fallback / Boost AI card (IAs de Apoio) ───────────────────── */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-amber-50">
+                  <Brain size={16} className="text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#0B2A66]">IAs de Apoio</h3>
+                  <p className="text-[11px] text-slate-400">
+                    {!fbCfg
+                      ? "Carregando…"
+                      : fbCfg.boost.enabled
+                        ? <span className="text-green-600 font-semibold">● Reforço ativo{rwQueue?.boost?.activeHelpers ? ` · ${rwQueue.boost.activeHelpers} em curso` : ""}</span>
+                        : "Fallback em erro + reforço da fila"
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {fbCfg ? (
+                <div className="space-y-3">
+                  {/* Chave Perplexity */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                      Chave da Perplexity{" "}
+                      {fbCfg.hasPerplexityKey && (
+                        <span className="text-green-600 font-normal">
+                          ✓ configurada {fbCfg.perplexityKeySource === "painel" ? "(painel)" : "(ambiente)"}
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      type="password"
+                      value={fbPerplexityKey}
+                      onChange={(e) => setFbPerplexityKey(e.target.value)}
+                      placeholder={fbCfg.hasPerplexityKey ? "•••••••• (digite para substituir)" : "pplx-…"}
+                      className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50 placeholder:text-slate-400"
+                    />
+                  </div>
+
+                  {/* Fallback em erro */}
+                  <div className="space-y-1.5">
+                    {[
+                      {
+                        label: "Gemini assume se o Ollama falhar",
+                        hint:  fbCfg.hasGeminiKeys ? undefined : "Sem chave Gemini configurada",
+                        value: fbCfg.fallbackGeminiEnabled,
+                        set:   (v: boolean) => setFbCfg({ ...fbCfg, fallbackGeminiEnabled: v }),
+                      },
+                      {
+                        label: "Perplexity assume se o Gemini ficar sem cota",
+                        hint:  fbCfg.hasPerplexityKey ? undefined : "Configure a chave acima",
+                        value: fbCfg.fallbackPerplexityEnabled,
+                        set:   (v: boolean) => setFbCfg({ ...fbCfg, fallbackPerplexityEnabled: v }),
+                      },
+                    ].map(({ label, hint, value, set }) => (
+                      <div key={label} className="flex items-center justify-between gap-2 bg-slate-50 rounded-xl px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="text-[11px] text-slate-600 font-medium">{label}</p>
+                          {hint && <p className="text-[10px] text-amber-600">{hint}</p>}
+                        </div>
+                        <button
+                          onClick={() => set(!value)}
+                          className={`relative w-9 rounded-full transition-colors shrink-0 ${value ? "bg-green-500" : "bg-slate-300"}`}
+                          style={{ height: 20 }}
+                        >
+                          <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all" style={{ left: value ? 18 : 2 }} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Reforço automático */}
+                  <div className="border border-slate-100 rounded-xl p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-[11px] font-semibold text-slate-700">Reforço automático da fila</p>
+                        <p className="text-[10px] text-slate-400">As IAs de apoio reescrevem artigos da fila em paralelo, sem esperar o Ollama dar erro.</p>
+                      </div>
+                      <button
+                        onClick={() => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, enabled: !fbCfg.boost.enabled } })}
+                        className={`relative w-9 rounded-full transition-colors shrink-0 ${fbCfg.boost.enabled ? "bg-green-500" : "bg-slate-300"}`}
+                        style={{ height: 20 }}
+                      >
+                        <span className="absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all" style={{ left: fbCfg.boost.enabled ? 18 : 2 }} />
+                      </button>
+                    </div>
+
+                    {fbCfg.boost.enabled && (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1">IA usada no reforço</label>
+                          <select
+                            value={fbCfg.boost.provider}
+                            onChange={(e) => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, provider: e.target.value as FallbackSettings["boost"]["provider"] } })}
+                            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                          >
+                            <option value="both">Ambas (alterna Gemini e Perplexity)</option>
+                            <option value="gemini">Somente Gemini</option>
+                            <option value="perplexity">Somente Perplexity</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Rajadas agendadas: nesses horários as IAs de apoio pegam uma leva da fila e processam, mesmo com o Ollama funcionando.">
+                            Rajadas agendadas
+                          </label>
+                          <select
+                            value={fbCfg.boost.timesPerDay}
+                            onChange={(e) => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, timesPerDay: parseInt(e.target.value, 10) } })}
+                            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                          >
+                            {BURST_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Quantos artigos cada rajada processa no máximo.">
+                              Artigos por rajada
+                            </label>
+                            <input
+                              type="number" min={1} max={100}
+                              value={fbCfg.boost.batchSize}
+                              onChange={(e) => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, batchSize: Math.max(1, parseInt(e.target.value, 10) || 1) } })}
+                              className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Reforço contínuo: enquanto a fila tiver este tamanho ou mais, as IAs de apoio ficam ligadas até desafogar. 0 = desligado.">
+                              Reforçar c/ fila ≥ <span className="font-normal text-slate-400">(0 = off)</span>
+                            </label>
+                            <input
+                              type="number" min={0} max={1000}
+                              value={fbCfg.boost.queueThreshold}
+                              onChange={(e) => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, queueThreshold: Math.max(0, parseInt(e.target.value, 10) || 0) } })}
+                              className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Protege seus créditos: máximo de artigos reescritos pelas IAs de apoio por dia. 0 = sem limite.">
+                            Máx. reescritas de apoio por dia <span className="font-normal text-slate-400">(0 = ∞)</span>
+                          </label>
+                          <input
+                            type="number" min={0} max={2000}
+                            value={fbCfg.boost.maxPerDay}
+                            onChange={(e) => setFbCfg({ ...fbCfg, boost: { ...fbCfg.boost, maxPerDay: Math.max(0, parseInt(e.target.value, 10) || 0) } })}
+                            className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                          />
+                        </div>
+
+                        {rwQueue?.boost && (
+                          <p className="text-[10px] text-slate-400">
+                            Hoje: <b className="text-slate-600">{rwQueue.boost.usedToday}</b> reescrita(s) de apoio
+                            {rwQueue.boost.maxPerDay > 0 && <> de <b className="text-slate-600">{rwQueue.boost.maxPerDay}</b></>}
+                            {rwQueue.boost.nextBurstAt && (
+                              <> · próxima rajada ~{new Date(rwQueue.boost.nextBurstAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</>
+                            )}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() => void saveFallbackSettings()}
+                      disabled={fbSaving}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
+                    >
+                      {fbSaving ? <Loader2 size={12} className="animate-spin" /> : fbSaved ? <CheckCircle size={12} /> : null}
+                      {fbSaved ? "Salvo!" : "Salvar"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Carregando configurações…
                 </div>
               )}
             </div>

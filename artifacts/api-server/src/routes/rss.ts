@@ -277,6 +277,64 @@ router.put("/collection-settings", (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Fallback / reforço de IA (IAs de Apoio) ──────────────────────────────────
+
+/** GET /api/admin/rss/fallback-settings — config das IAs de apoio (fallback + reforço) */
+router.get("/fallback-settings", (_req, res) => {
+  const s = store.getSettings();
+  const geminiKeys = (s.geminiApiKeys ?? []).filter((k) => k.trim().length > 0);
+  res.json({
+    fallbackGeminiEnabled:     s.fallbackGeminiEnabled ?? true,
+    fallbackPerplexityEnabled: s.fallbackPerplexityEnabled ?? true,
+    hasPerplexityKey:          !!(s.perplexityApiKey || process.env["PERPLEXITY_API_KEY"]),
+    perplexityKeySource:       s.perplexityApiKey ? "painel" : (process.env["PERPLEXITY_API_KEY"] ? "ambiente" : null),
+    perplexityModel:           s.perplexityModel ?? "sonar",
+    hasGeminiKeys:             geminiKeys.length > 0 || !!s.geminiApiKey || !!process.env["GEMINI_API_KEY"],
+    boost: {
+      enabled:        s.aiBoostEnabled ?? false,
+      provider:       s.aiBoostProvider ?? "both",
+      timesPerDay:    s.aiBoostTimesPerDay ?? 0,
+      batchSize:      s.aiBoostBatchSize ?? 10,
+      queueThreshold: s.aiBoostQueueThreshold ?? 0,
+      maxPerDay:      s.aiBoostMaxPerDay ?? 0,
+    },
+  });
+});
+
+/** PUT /api/admin/rss/fallback-settings */
+router.put("/fallback-settings", (req, res) => {
+  const b = req.body as {
+    fallbackGeminiEnabled?: boolean; fallbackPerplexityEnabled?: boolean;
+    perplexityApiKey?: string; perplexityModel?: string;
+    boost?: {
+      enabled?: boolean; provider?: string; timesPerDay?: number;
+      batchSize?: number; queueThreshold?: number; maxPerDay?: number;
+    };
+  };
+  const clamp = (v: unknown, min: number, max: number): number | undefined => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) ? Math.max(min, Math.min(n, max)) : undefined;
+  };
+  const update: Record<string, unknown> = {};
+  if (b.fallbackGeminiEnabled     !== undefined) update["fallbackGeminiEnabled"]     = !!b.fallbackGeminiEnabled;
+  if (b.fallbackPerplexityEnabled !== undefined) update["fallbackPerplexityEnabled"] = !!b.fallbackPerplexityEnabled;
+  // Chave é write-only: string vazia remove, ausente mantém
+  if (b.perplexityApiKey !== undefined) update["perplexityApiKey"] = b.perplexityApiKey.trim() || undefined;
+  if (b.perplexityModel  !== undefined) update["perplexityModel"]  = b.perplexityModel.trim() || undefined;
+  if (b.boost) {
+    if (b.boost.enabled !== undefined) update["aiBoostEnabled"] = !!b.boost.enabled;
+    if (b.boost.provider && ["gemini", "perplexity", "both"].includes(b.boost.provider)) {
+      update["aiBoostProvider"] = b.boost.provider;
+    }
+    if (b.boost.timesPerDay    !== undefined) update["aiBoostTimesPerDay"]    = clamp(b.boost.timesPerDay, 0, 48);
+    if (b.boost.batchSize      !== undefined) update["aiBoostBatchSize"]      = clamp(b.boost.batchSize, 1, 100);
+    if (b.boost.queueThreshold !== undefined) update["aiBoostQueueThreshold"] = clamp(b.boost.queueThreshold, 0, 1000);
+    if (b.boost.maxPerDay      !== undefined) update["aiBoostMaxPerDay"]      = clamp(b.boost.maxPerDay, 0, 2000);
+  }
+  store.updateSettings(update as Parameters<typeof store.updateSettings>[0]);
+  res.json({ ok: true });
+});
+
 // ─── AI settings ──────────────────────────────────────────────────────────────
 
 /** GET /api/admin/rss/ai-settings */

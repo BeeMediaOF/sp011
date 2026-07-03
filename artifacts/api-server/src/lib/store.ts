@@ -35,6 +35,7 @@ const SECRET_FIELDS: Record<string, string[]> = {
   site_settings: [
     "rssAiApiKey", "diffbotApiKey", "geminiApiKey",
     "openaiApiKey", "youtubeApiKey", "webhookApiKey",
+    "perplexityApiKey",
   ],
   social_config: ["pageAccessToken", "metaAppSecret"],
 };
@@ -148,6 +149,17 @@ export interface SiteSettings {
   collectionStartHour?: number;         // início da janela de coleta, hora de Brasília 0-23 (padrão: 0)
   collectionEndHour?: number;           // fim da janela, inclusive (padrão: 23; início > fim = janela noturna)
   collectionDays?: number[];            // dias da semana permitidos, 0=domingo … 6=sábado (padrão: todos)
+  // ── IAs de apoio (fallback quando dá erro + reforço agendado da fila) ──
+  perplexityApiKey?: string;            // secret — chave da Perplexity configurável no painel
+  perplexityModel?: string;             // modelo Perplexity (padrão: sonar)
+  fallbackGeminiEnabled?: boolean;      // Gemini assume quando o Ollama falha (padrão: true)
+  fallbackPerplexityEnabled?: boolean;  // Perplexity assume quando Gemini está sem cota/chave (padrão: true)
+  aiBoostEnabled?: boolean;             // reforço: IAs de apoio drenam a fila sem esperar erro do Ollama
+  aiBoostProvider?: "gemini" | "perplexity" | "both"; // qual IA usar no reforço (padrão: both)
+  aiBoostTimesPerDay?: number;          // rajadas por dia (ex.: 3 = a cada 8h; 0 = desligado)
+  aiBoostBatchSize?: number;            // artigos processados por rajada (padrão: 10)
+  aiBoostQueueThreshold?: number;       // reforço contínuo quando a fila ≥ N (0 = desligado)
+  aiBoostMaxPerDay?: number;            // teto diário de reescritas via apoio (0 = sem teto)
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;

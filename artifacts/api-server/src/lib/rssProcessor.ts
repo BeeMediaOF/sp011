@@ -607,7 +607,8 @@ async function withRetry<T>(
 }
 
 export async function rewriteWithAI(
-  title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string
+  title: string, text: string, sourceName: string, giveCredit: boolean, customPrompt?: string,
+  forceProvider?: "gemini"
 ): Promise<RewriteResult> {
   // Note: enforceCallInterval removed — per-key cooldown + 429 handling manage rate limiting.
   // This allows N parallel workers (one per key) to run without serialising each other.
@@ -615,7 +616,11 @@ export async function rewriteWithAI(
   const settings = store.getSettings();
   // Default: gemini_direct (GEMINI_API_KEY env var, Google AI Studio free tier)
   // Falls back to gemini_paid (settings key) or gemini_free (Replit integration)
-  const provider = settings.rssAiProvider ?? (process.env["GEMINI_API_KEY"] ? "gemini_direct" : "gemini_paid");
+  // forceProvider "gemini": usado pela lane de reforço da fila para pular o Ollama
+  // e reescrever direto no Gemini (mais rápido), sem mudar o provider configurado.
+  const provider = forceProvider === "gemini"
+    ? "gemini_direct"
+    : settings.rssAiProvider ?? (process.env["GEMINI_API_KEY"] ? "gemini_direct" : "gemini_paid");
   const prompt   = customPrompt
     ? applyPromptTemplate(customPrompt, title, text, sourceName, giveCredit)
     : buildPrompt(title, text, sourceName, giveCredit);
@@ -630,6 +635,8 @@ export async function rewriteWithAI(
     try {
       raw = await callOllama(baseUrl, model, prompt);
     } catch (ollamaErr) {
+      // Fallback Gemini desligável no painel (card IAs de Apoio)
+      if (!(settings.fallbackGeminiEnabled ?? true)) throw ollamaErr;
       const keys = getGeminiKeys(settings);
       if (keys.length === 0) throw ollamaErr; // sem fallback configurado
       logger.warn({ err: String(ollamaErr) }, "Ollama indisponível — caindo para fallback Gemini");

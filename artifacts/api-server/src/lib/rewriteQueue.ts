@@ -136,8 +136,11 @@ interface PerplexityResponse {
 }
 
 async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI | null> {
-  const apiKey = process.env["PERPLEXITY_API_KEY"];
+  // Chave do painel (Configurações → IAs de Apoio) tem prioridade sobre a env var
+  const settings = store.getSettings();
+  const apiKey = settings.perplexityApiKey || process.env["PERPLEXITY_API_KEY"];
   if (!apiKey) return null;
+  const model = settings.perplexityModel || "sonar";
 
   const systemPrompt = [
     "Você é um editor de notícias brasileiro experiente do portal SBC Agora (Brasília).",
@@ -161,7 +164,7 @@ async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "sonar",
+      model,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user",   content: userPrompt },
@@ -232,6 +235,108 @@ function notifyProvidersDown(isKeyProblem: boolean): void {
   logger.warn({ isKeyProblem }, "Rewrite queue: both AI providers unavailable — articles held in queue");
 }
 
+// ── Reforço de IA (boost) ─────────────────────────────────────────────────────
+// IAs de apoio (Gemini/Perplexity) drenam a fila em paralelo com o provider
+// principal, SEM esperar o Ollama falhar. Dois gatilhos independentes:
+//   1. Rajadas agendadas: N vezes por dia (ex.: 3 = a cada 8h), cada rajada
+//      processa até `batchSize` artigos.
+//   2. Fila cheia: enquanto a fila ≥ `queueThreshold`, o reforço fica ativo.
+// `maxPerDay` limita o total diário de reescritas via apoio (protege créditos).
+
+/** Quantos artigos o reforço processa em paralelo (além da lane principal). */
+const HELPER_CONCURRENCY = 2;
+
+interface BoostConfig {
+  enabled: boolean;
+  provider: "gemini" | "perplexity" | "both";
+  timesPerDay: number;
+  batchSize: number;
+  queueThreshold: number;
+  maxPerDay: number;
+}
+
+function getBoostConfig(): BoostConfig {
+  const s = store.getSettings();
+  return {
+    enabled:        s.aiBoostEnabled ?? false,
+    provider:       s.aiBoostProvider ?? "both",
+    timesPerDay:    Math.max(0, Math.min(Math.floor(s.aiBoostTimesPerDay ?? 0), 48)),
+    batchSize:      Math.max(1, Math.min(Math.floor(s.aiBoostBatchSize ?? 10), 100)),
+    queueThreshold: Math.max(0, Math.min(Math.floor(s.aiBoostQueueThreshold ?? 0), 1000)),
+    maxPerDay:      Math.max(0, Math.min(Math.floor(s.aiBoostMaxPerDay ?? 0), 2000)),
+  };
+}
+
+let _activeHelperCount = 0;
+let _boostDateKey = "";
+let _boostUsedToday = 0;
+let _lastBurstAt = 0;
+let _burstRemaining = 0;
+let _helperFlip = 0; // alterna gemini/perplexity quando provider = both
+
+function refreshBoostDay(): void {
+  const today = new Date().toISOString().slice(0, 10);
+  if (_boostDateKey !== today) { _boostDateKey = today; _boostUsedToday = 0; }
+}
+
+function burstIntervalMs(cfg: BoostConfig): number {
+  return Math.floor((24 * 3600 * 1000) / Math.max(1, cfg.timesPerDay));
+}
+
+/** Escolhe a IA de apoio do próximo item. Com "both", alterna — e se o Gemini
+ *  estiver em cooldown de cota, manda tudo para a Perplexity. */
+function pickHelperProvider(cfg: BoostConfig): "gemini" | "perplexity" {
+  if (cfg.provider !== "both") return cfg.provider;
+  if (getAIQuotaStatus().isOnCooldown) return "perplexity";
+  return _helperFlip++ % 2 === 0 ? "gemini" : "perplexity";
+}
+
+/**
+ * Despacha itens da fila para as IAs de apoio quando o reforço está ativo.
+ * Roda a cada tick do processBatch, independente da lane principal (Ollama),
+ * que costuma ficar ocupada por minutos com um único artigo.
+ */
+function dispatchHelpers(): void {
+  const cfg = getBoostConfig();
+  if (!cfg.enabled || _queue.length === 0) return;
+  refreshBoostDay();
+  if (cfg.maxPerDay > 0 && _boostUsedToday >= cfg.maxPerDay) return;
+
+  // Gatilho contínuo: fila acima do limiar
+  let active = cfg.queueThreshold > 0 && _queue.length >= cfg.queueThreshold;
+  let fromBurst = false;
+
+  // Gatilho agendado: rajadas N vezes por dia
+  if (!active && cfg.timesPerDay > 0) {
+    if (_burstRemaining > 0) {
+      active = true; fromBurst = true;
+    } else if (Date.now() - _lastBurstAt >= burstIntervalMs(cfg)) {
+      _lastBurstAt = Date.now();
+      _burstRemaining = cfg.batchSize;
+      active = true; fromBurst = true;
+      logger.info({ batchSize: cfg.batchSize, provider: cfg.provider }, "AI boost: scheduled burst started");
+      addLog({ type: "rewrite", sourceName: "Sistema", articleTitle: "Rajada de reforço iniciada", message: `IAs de apoio (${cfg.provider === "both" ? "Gemini+Perplexity" : cfg.provider}) vão processar até ${cfg.batchSize} artigo(s) da fila.` });
+    }
+  }
+  if (!active) return;
+
+  let free = Math.min(HELPER_CONCURRENCY - _activeHelperCount, _queue.length);
+  if (cfg.maxPerDay > 0) free = Math.min(free, cfg.maxPerDay - _boostUsedToday);
+  if (fromBurst) free = Math.min(free, _burstRemaining);
+  if (free <= 0) return;
+
+  const batch = _queue.splice(0, free);
+  if (fromBurst) _burstRemaining -= batch.length;
+
+  logger.info(
+    { batchSize: batch.length, fromBurst, usedToday: _boostUsedToday, queueLeft: _queue.length },
+    "AI boost: dispatching items to helper AIs",
+  );
+  for (const item of batch) {
+    void processItem(item, pickHelperProvider(cfg));
+  }
+}
+
 // ── Cooldown wake-up: schedule processBatch exactly when cooldown expires ─────
 let _cooldownWakeupHandle: ReturnType<typeof setTimeout> | null = null;
 // ── Force-bypass: admin can request one immediate batch attempt ───────────────
@@ -251,12 +356,25 @@ export function enqueueRewriteFront(item: RewriteJobItem): void {
 
 export function getQueueStats() {
   const quota = getAIQuotaStatus();
+  const boostCfg = getBoostConfig();
+  refreshBoostDay();
   return {
     pending:        _queue.length,
     paused:         _paused,
     processedTotal: _processedTotal,
     failedTotal:    _failedTotal,
-    activeworkers:  _activeCount,
+    activeworkers:  _activeCount + _activeHelperCount,
+    boost: {
+      enabled:        boostCfg.enabled,
+      provider:       boostCfg.provider,
+      activeHelpers:  _activeHelperCount,
+      usedToday:      _boostUsedToday,
+      maxPerDay:      boostCfg.maxPerDay,
+      burstRemaining: _burstRemaining,
+      nextBurstAt:    boostCfg.enabled && boostCfg.timesPerDay > 0
+        ? new Date(Math.max(Date.now(), _lastBurstAt + burstIntervalMs(boostCfg))).toISOString()
+        : null,
+    },
     queuedIds:      _queue.map((i) => i.articleId),
     currentItem:    null, // kept for API compat — use activeWorkers instead
     recentHistory:  [..._recentHistory],
@@ -346,23 +464,43 @@ async function sweepPendingDrafts(): Promise<void> {
 }
 
 // ── Single article processor ───────────────────────────────────────────────────
-async function processItem(item: RewriteJobItem): Promise<void> {
-  _activeCount++;
+// `helperProvider` (opcional): item despachado pela lane de reforço — reescreve
+// direto na IA de apoio indicada, sem passar pelo provider principal (Ollama).
+async function processItem(item: RewriteJobItem, helperProvider?: "gemini" | "perplexity"): Promise<void> {
+  const isHelper = !!helperProvider;
+  if (isHelper) _activeHelperCount++; else _activeCount++;
   const attempt = (item.attempts ?? 0) + 1;
 
   try {
     logger.info(
-      { articleId: item.articleId, attempt, queueLeft: _queue.length },
+      { articleId: item.articleId, attempt, helperProvider, queueLeft: _queue.length },
       "Rewriting queued article",
     );
 
-    const result = await rewriteWithAI(
-      item.title,
-      item.text,
-      item.sourceName,
-      item.giveCredit,
-      item.customPrompt,
-    );
+    let result: Awaited<ReturnType<typeof rewriteWithAI>>;
+    if (helperProvider === "perplexity") {
+      const p = await rewriteWithPerplexity(item);
+      if (!p) throw new Error("PERPLEXITY_UNAVAILABLE: chave não configurada ou resposta vazia");
+      result = {
+        content:        p.content,
+        keywords:       p.keywords ?? "",
+        slug:           p.slug ?? "",
+        title:          p.title,
+        subtitle:       p.subtitle,
+        socialTitle:    p.socialTitle,
+        socialSummary:  p.socialSummary,
+        socialHashtags: p.socialHashtags,
+      };
+    } else {
+      result = await rewriteWithAI(
+        item.title,
+        item.text,
+        item.sourceName,
+        item.giveCredit,
+        item.customPrompt,
+        helperProvider, // "gemini" força o Gemini na lane de reforço; undefined = provider configurado
+      );
+    }
 
     /*
      * Recovery pass: rssProcessor.parseRewriteResult may fall through to the
@@ -424,15 +562,30 @@ async function processItem(item: RewriteJobItem): Promise<void> {
     });
 
     _processedTotal++;
-    addLog({ type: "rewrite",  sourceName: item.sourceName, articleTitle: result.title || item.title });
+    if (isHelper) { refreshBoostDay(); _boostUsedToday++; }
+    const rewriteMsg = isHelper ? `Reescrito pela IA de apoio (${helperProvider})` : undefined;
+    addLog({ type: "rewrite",  sourceName: item.sourceName, articleTitle: result.title || item.title, message: rewriteMsg });
     if (item.finalStatus === "published") {
-      addLog({ type: "publish", sourceName: item.sourceName, articleTitle: result.title || item.title, message: "Publicado após reescrita" });
+      addLog({ type: "publish", sourceName: item.sourceName, articleTitle: result.title || item.title, message: isHelper ? `Publicado após reescrita (apoio: ${helperProvider})` : "Publicado após reescrita" });
     }
     pushHistory({ articleId: item.articleId, title: result.title || item.title, status: "ok", at: Date.now() });
-    logger.info({ articleId: item.articleId, attempt }, "Rewrite queue: article updated successfully");
+    logger.info({ articleId: item.articleId, attempt, helperProvider }, "Rewrite queue: article updated successfully");
 
   } catch (err) {
     const msg = String(err);
+
+    if (isHelper) {
+      // Falha na IA de apoio não pode punir o artigo: volta ao FIM da fila sem
+      // consumir tentativa — a lane principal (Ollama) processa normalmente.
+      if (!_queue.some((q) => q.articleId === item.articleId)) {
+        _queue.push({ ...item });
+      }
+      logger.warn(
+        { err, articleId: item.articleId, helperProvider },
+        "AI boost: helper rewrite failed — item returned to queue for main lane",
+      );
+      return;
+    }
     const isQuotaError = msg.includes("QUOTA_COOLDOWN") || msg.includes("QUOTA_EXHAUSTED");
     // Provider/config failures (no key, invalid/leaked key, 401/403) are NOT the
     // article's fault — they must never cause the article to be deleted. Treat them
@@ -449,7 +602,10 @@ async function processItem(item: RewriteJobItem): Promise<void> {
       logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: Gemini unavailable — trying Perplexity fallback");
       let perplexityOk = false;
       try {
-        const pResult = await rewriteWithPerplexity(item);
+        // Fallback Perplexity desligável no painel (card IAs de Apoio)
+        const pResult = (store.getSettings().fallbackPerplexityEnabled ?? true)
+          ? await rewriteWithPerplexity(item)
+          : null;
         if (pResult && isContentRenderable(pResult.content)) {
           await articleService.updateArticle(item.articleId, {
             ...(pResult.title          && { title:          pResult.title }),
@@ -523,13 +679,18 @@ async function processItem(item: RewriteJobItem): Promise<void> {
       }
     }
   } finally {
-    _activeCount--;
+    if (isHelper) _activeHelperCount--; else _activeCount--;
   }
 }
 
 // ── Batch worker: process N articles in parallel ──────────────────────────────
 async function processBatch(): Promise<void> {
   if (_paused || _queue.length === 0) return;
+
+  // Lane de reforço: roda ANTES dos gates de cota/concorrência da lane principal —
+  // com o Ollama ocupado por minutos, o reforço é o que mantém a fila drenando.
+  dispatchHelpers();
+  if (_queue.length === 0) return;
 
   // Ollama roda local, sem cota nem limite diário: não pausa por cota do Gemini
   // e processa 1 artigo por vez (inferência em CPU não paraleliza bem).
