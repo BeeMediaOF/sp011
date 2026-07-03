@@ -7,7 +7,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
-  isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
+  isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks,
+  type HomeBlock,
 } from "./homeBlocks";
 
 test("inferBlockType: campo persistido tem prioridade", () => {
@@ -79,4 +80,76 @@ test("safeLinkUrl: http(s) e caminhos relativos, nunca javascript:", () => {
   assert.equal(safeLinkUrl("//evil.com"), null);
   assert.equal(safeLinkUrl("javascript:alert(1)"), null);
   assert.equal(safeLinkUrl(undefined), null);
+});
+
+// ─── segmentBlocks (zonas da home) ───────────────────────────────────────────
+function blk(id: string, extra: Partial<HomeBlock> = {}): HomeBlock {
+  return { id, name: id, visible: true, order: 0, ...extra };
+}
+
+test("segmentBlocks: sem area/width → um flow por bloco com idx da posição (retrocompat)", () => {
+  const segs = segmentBlocks([blk("hero"), blk("brasil"), blk("mundo"), blk("ultimas")]);
+  assert.equal(segs.length, 4);
+  segs.forEach((s, i) => {
+    assert.equal(s.kind, "flow");
+    if (s.kind === "flow") {
+      assert.equal(s.idx, i);
+    }
+  });
+});
+
+test("segmentBlocks: run com area vira uma única zona main/sidebar", () => {
+  const segs = segmentBlocks([
+    blk("hero", { area: "main" }),
+    blk("ticker", { area: "main" }),
+    blk("mais-lidas", { area: "sidebar" }),
+    blk("recent", { area: "main" }),
+  ]);
+  assert.equal(segs.length, 1);
+  const zone = segs[0]!;
+  assert.equal(zone.kind, "zone");
+  if (zone.kind === "zone") {
+    assert.deepEqual(zone.main.map((e) => e.block.id), ["hero", "ticker", "recent"]);
+    assert.deepEqual(zone.sidebar.map((e) => e.block.id), ["mais-lidas"]);
+    assert.deepEqual(zone.main.map((e) => e.idx), [0, 1, 3]);
+    assert.equal(zone.startIdx, 0);
+  }
+});
+
+test("segmentBlocks: run half vira segmento e o flow seguinte preserva o idx global", () => {
+  const segs = segmentBlocks([
+    blk("hero"),
+    blk("football", { width: "half" }),
+    blk("basketball", { width: "half" }),
+    blk("ultimas"),
+  ]);
+  assert.equal(segs.length, 3);
+  assert.equal(segs[0]!.kind, "flow");
+  const half = segs[1]!;
+  assert.equal(half.kind, "half");
+  if (half.kind === "half") {
+    assert.deepEqual(half.items.map((e) => e.idx), [1, 2]);
+    assert.equal(half.startIdx, 1);
+  }
+  const tail = segs[2]!;
+  assert.equal(tail.kind, "flow");
+  if (tail.kind === "flow") {
+    assert.equal(tail.idx, 3);
+  }
+});
+
+test("segmentBlocks: area vence width quando os dois estão definidos", () => {
+  const segs = segmentBlocks([
+    blk("a", { area: "main", width: "half" }),
+    blk("b", { width: "half" }),
+  ]);
+  assert.equal(segs.length, 2);
+  assert.equal(segs[0]!.kind, "zone");
+  assert.equal(segs[1]!.kind, "half");
+});
+
+test("segmentBlocks: width full explícito continua no fluxo clássico", () => {
+  const segs = segmentBlocks([blk("a", { width: "full" }), blk("b", { width: "half" })]);
+  assert.equal(segs[0]!.kind, "flow");
+  assert.equal(segs[1]!.kind, "half");
 });

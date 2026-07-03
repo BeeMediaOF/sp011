@@ -103,6 +103,10 @@ export interface HomeBlock {
   format?: string; source?: string; itemsLimit?: number;
   imageUrl?: string; linkUrl?: string; caption?: string;
   videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
+  /** Zona da home (blocos consecutivos formam a zona 2 colunas) e meia largura. */
+  area?: "main" | "sidebar"; width?: "full" | "half";
+  /** Texto do link do cabeçalho de seção nos renderizadores de zona. */
+  linkLabel?: string;
 }
 
 /** Template de home salvo no painel (aba Templates de Blocos da Home):

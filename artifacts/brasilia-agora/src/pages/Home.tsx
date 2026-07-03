@@ -17,12 +17,13 @@ import { useArticles } from "../hooks/useArticles";
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
-import { inferBlockType } from "../lib/homeBlocks";
+import { inferBlockType, segmentBlocks, type SegmentEntry } from "../lib/homeBlocks";
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
   QuotesBlock, SeparatorBlock, AdSlotBlock,
 } from "../components/blocks/HomeCustomBlocks";
+import { ZoneBlock } from "../components/blocks/PortalZoneBlocks";
 
 /* Lazy: ColumnistsSection não é crítico para LCP — carregado sob demanda */
 const ColumnistsSection = lazy(() => import("../components/ColumnistsSection"));
@@ -569,6 +570,82 @@ export default function Home() {
     }
   }
 
+  // Fluxo clássico (blocos sem area/width) — JSX idêntico ao layout original:
+  // ads por índice global, cv-auto a partir do 4º bloco, wrapper de edição no preview.
+  function renderFlowBlock(block: HomeBlock, idx: number): React.ReactNode {
+    const content = (
+      <>
+        {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" priority /></div>}
+        {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
+        {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
+        {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
+        {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
+        {block.custom
+          ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
+          : <PredefinedBlock block={block} getArticles={getArticles} />
+        }
+      </>
+    );
+
+    if (!isAdminPreview) {
+      // Blocos abaixo da dobra (idx >= 3) ganham content-visibility:auto para
+      // baratear o render inicial. Os 3 primeiros (hero/destaques) renderizam
+      // imediatamente. Não aplicado no modo admin para não afetar drag/scroll.
+      return idx >= 3
+        ? <div key={block.id} className="cv-auto">{content}</div>
+        : <React.Fragment key={block.id}>{content}</React.Fragment>;
+    }
+
+    return (
+      <AdminBlockWrapper
+        key={block.id}
+        block={block}
+        idx={idx}
+        total={visibleBlocks.length}
+        dragOver={dragOverIdx === idx}
+        isDragging={dragIdx === idx}
+        isSelected={selectedBlockId === block.id}
+        onEdit={() => handleEditBlock(block.id)}
+        onDragStart={() => handlePreviewDragStart(idx)}
+        onDragOver={(e) => handlePreviewDragOver(e, idx)}
+        onDragEnd={handlePreviewDragEnd}
+      >
+        <div id={`block-${block.id}`}>{content}</div>
+      </AdminBlockWrapper>
+    );
+  }
+
+  // Bloco dentro de zona (coluna principal/lateral/meia largura): renderer
+  // dedicado com fallback para o componente clássico; mantém o wrapper de
+  // edição do preview com o índice global (drag reordena a lista plana).
+  function renderZoneItem(entry: SegmentEntry, zone: "main" | "sidebar" | "half"): React.ReactNode {
+    const { block, idx } = entry;
+    const inner = (
+      <ZoneBlock block={block} zone={zone} getArticles={getArticles} preview={isAdminPreview}
+        fallback={block.custom
+          ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
+          : <PredefinedBlock block={block} getArticles={getArticles} />} />
+    );
+    if (!isAdminPreview) return <React.Fragment key={block.id}>{inner}</React.Fragment>;
+    return (
+      <AdminBlockWrapper
+        key={block.id}
+        block={block}
+        idx={idx}
+        total={visibleBlocks.length}
+        dragOver={dragOverIdx === idx}
+        isDragging={dragIdx === idx}
+        isSelected={selectedBlockId === block.id}
+        onEdit={() => handleEditBlock(block.id)}
+        onDragStart={() => handlePreviewDragStart(idx)}
+        onDragOver={(e) => handlePreviewDragOver(e, idx)}
+        onDragEnd={handlePreviewDragEnd}
+      >
+        <div id={`block-${block.id}`}>{inner}</div>
+      </AdminBlockWrapper>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-white flex flex-col overflow-x-hidden">
       <TopBar />
@@ -584,46 +661,44 @@ export default function Home() {
       <main className="flex-1">
         <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
 
-        {visibleBlocks.map((block, idx) => {
-          const content = (
-            <>
-              {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" priority /></div>}
-              {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
-              {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
-              {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
-              {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
-              {block.custom
-                ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-                : <PredefinedBlock block={block} getArticles={getArticles} />
-              }
-            </>
-          );
+        {segmentBlocks(visibleBlocks).map((seg) => {
+          if (seg.kind === "flow") return renderFlowBlock(seg.block, seg.idx);
 
-          if (!isAdminPreview) {
-            // Blocos abaixo da dobra (idx >= 3) ganham content-visibility:auto para
-            // baratear o render inicial. Os 3 primeiros (hero/destaques) renderizam
-            // imediatamente. Não aplicado no modo admin para não afetar drag/scroll.
-            return idx >= 3
-              ? <div key={block.id} className="cv-auto">{content}</div>
-              : <React.Fragment key={block.id}>{content}</React.Fragment>;
+          const firstId = seg.kind === "zone"
+            ? (seg.main[0] ?? seg.sidebar[0])!.block.id
+            : seg.items[0]!.block.id;
+          const belowFold = !isAdminPreview && seg.startIdx >= 3;
+
+          if (seg.kind === "zone") {
+            const hasBoth = seg.main.length > 0 && seg.sidebar.length > 0;
+            return (
+              <div key={`zone-${firstId}`} className={belowFold ? "cv-auto" : undefined}>
+                <div className="max-w-[1280px] mx-auto px-4 py-6">
+                  <div className={`grid grid-cols-1 gap-6 items-start ${hasBoth ? "lg:grid-cols-[minmax(0,1fr)_320px]" : ""}`}>
+                    {seg.main.length > 0 && (
+                      <div className="min-w-0 flex flex-col gap-6">
+                        {seg.main.map((e) => renderZoneItem(e, "main"))}
+                      </div>
+                    )}
+                    {seg.sidebar.length > 0 && (
+                      <aside className="min-w-0 flex flex-col gap-6">
+                        {seg.sidebar.map((e) => renderZoneItem(e, "sidebar"))}
+                      </aside>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
           }
 
           return (
-            <AdminBlockWrapper
-              key={block.id}
-              block={block}
-              idx={idx}
-              total={visibleBlocks.length}
-              dragOver={dragOverIdx === idx}
-              isDragging={dragIdx === idx}
-              isSelected={selectedBlockId === block.id}
-              onEdit={() => handleEditBlock(block.id)}
-              onDragStart={() => handlePreviewDragStart(idx)}
-              onDragOver={(e) => handlePreviewDragOver(e, idx)}
-              onDragEnd={handlePreviewDragEnd}
-            >
-              <div id={`block-${block.id}`}>{content}</div>
-            </AdminBlockWrapper>
+            <div key={`half-${firstId}`} className={belowFold ? "cv-auto" : undefined}>
+              <div className="max-w-[1280px] mx-auto px-4 py-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                  {seg.items.map((e) => renderZoneItem(e, "half"))}
+                </div>
+              </div>
+            </div>
           );
         })}
 

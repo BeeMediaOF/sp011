@@ -34,7 +34,7 @@ export interface BlockArticle {
   time: string;
 }
 
-const AD_SLOTS: readonly string[] = [
+export const AD_SLOTS: readonly string[] = [
   "slot_01", "slot_02", "slot_03", "slot_04", "slot_05", "slot_06",
   "slot_07", "slot_08", "slot_09", "slot_10", "slot_11",
 ];
@@ -203,14 +203,18 @@ export function VideoEmbedBlock({ block, preview }: { block: HomeBlock; preview?
 }
 
 // ─── HTML livre (sanitizado) ─────────────────────────────────────────────────
-export function HtmlBlock({ block, preview }: { block: HomeBlock; preview?: boolean }) {
+export function HtmlBlock({ block, preview, contained = true }: {
+  block: HomeBlock; preview?: boolean;
+  /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas da home). */
+  contained?: boolean;
+}) {
   const clean = sanitizeArticleHtml(block.html);
   if (!clean) {
     return <BlockPlaceholder preview={preview} label={`Bloco HTML: ${block.name}`}
       hint="Adicione o código HTML no painel (scripts são removidos por segurança)." />;
   }
   return (
-    <section className="max-w-[1280px] mx-auto px-4 py-6">
+    <section className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}>
       <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />
     </section>
   );
@@ -237,8 +241,10 @@ export function EmbedBlock({ block, preview, map }: { block: HomeBlock; preview?
 }
 
 // ─── Ticker de manchetes ─────────────────────────────────────────────────────
-export function TickerBlock({ block, articles, preview }: {
+export function TickerBlock({ block, articles, preview, contained = true }: {
   block: HomeBlock; articles: BlockArticle[]; preview?: boolean;
+  /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas da home). */
+  contained?: boolean;
 }) {
   const color = block.color ?? "#E71D36";
   const items = articles.slice(0, block.itemsLimit ?? 10);
@@ -249,10 +255,10 @@ export function TickerBlock({ block, articles, preview }: {
   // Lista duplicada para o loop contínuo da animação.
   const loop = [...items, ...items];
   return (
-    <section className="py-2">
+    <section className={contained ? "py-2" : ""}>
       <style>{`@keyframes hb-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
       {/* Contido na largura do site (não full-bleed) — mesma faixa dos portais de referência. */}
-      <div className="max-w-[1280px] mx-auto px-4">
+      <div className={contained ? "max-w-[1280px] mx-auto px-4" : ""}>
       <div className="flex items-center overflow-hidden border border-gray-200 bg-white">
         <span className="shrink-0 text-[11px] font-black text-white uppercase tracking-wider px-3 py-2"
           style={{ backgroundColor: color }}>

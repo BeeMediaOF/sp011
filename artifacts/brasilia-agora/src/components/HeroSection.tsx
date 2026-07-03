@@ -384,9 +384,14 @@ function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
 // ─── HeroSection principal ────────────────────────────────────────────────────
 export type HeroVariant = "grid" | "featured" | "mosaico" | "manchete" | "portal";
 
-export default function HeroSection({ variant }: { variant?: string } = {}) {
+export default function HeroSection({ variant, contained = true }: {
+  variant?: string;
+  /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas da home). */
+  contained?: boolean;
+} = {}) {
   const { articles, loading } = useArticles();
   const { settings } = useSite();
+  const sectionClass = contained ? "max-w-[1280px] mx-auto px-4 py-6" : "";
   const layout: HeroVariant =
     variant === "featured" || variant === "mosaico" || variant === "manchete" || variant === "portal"
       ? variant : "grid";
@@ -423,7 +428,7 @@ export default function HeroSection({ variant }: { variant?: string } = {}) {
      Reserva exatamente o mesmo espaço que o hero real vai ocupar → CLS=0. */
   if (loading && featured.length === 0) {
     return (
-      <section className="max-w-[1280px] mx-auto px-4 py-6">
+      <section className={sectionClass}>
         {/* Mobile skeleton */}
         <div className="block lg:hidden mb-5">
           <div className="animate-pulse bg-gray-100 rounded-lg" style={{ aspectRatio: "16/9" }} />
@@ -439,7 +444,7 @@ export default function HeroSection({ variant }: { variant?: string } = {}) {
   }
 
   return (
-    <section className="max-w-[1280px] mx-auto px-4 py-6">
+    <section className={sectionClass}>
       <div className="block lg:hidden mb-5">
         {featured.length > 0 && <MobileCarousel items={featured} />}
       </div>

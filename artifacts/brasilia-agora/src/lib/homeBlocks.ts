@@ -47,6 +47,13 @@ export interface HomeBlock {
   embedUrl?: string;
   /** Bloco de propaganda: slot do AdBanner. */
   adSlot?: string;
+  /** Zona da home: blocos consecutivos com area formam a zona de 2 colunas
+   *  (coluna principal + lateral de 320px). Ausente = fluxo clássico. */
+  area?: "main" | "sidebar";
+  /** Meia largura: blocos consecutivos "half" (sem area) formam pares lado a lado. */
+  width?: "full" | "half";
+  /** Texto do link do cabeçalho de seção nos renderizadores de zona (padrão "Ver mais"). */
+  linkLabel?: string;
 }
 
 /** Template de home salvo no painel (aba Templates de Blocos da Home):
@@ -134,6 +141,59 @@ export function safeEmbedUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
   const url = raw.trim();
   return /^https:\/\/[^\s]+$/i.test(url) ? url : null;
+}
+
+/** Item de um segmento: bloco + índice global na lista de visíveis (ads/cv-auto por posição). */
+export interface SegmentEntry {
+  block: HomeBlock;
+  idx: number;
+}
+
+/** Segmento de renderização da home: fluxo clássico (1 bloco), zona de 2 colunas
+ *  (principal + lateral) ou run de blocos de meia largura. */
+export type HomeSegment =
+  | { kind: "flow"; block: HomeBlock; idx: number }
+  | { kind: "zone"; main: SegmentEntry[]; sidebar: SegmentEntry[]; startIdx: number }
+  | { kind: "half"; items: SegmentEntry[]; startIdx: number };
+
+/**
+ * Agrupa os blocos visíveis em segmentos: runs consecutivos com `area` viram uma
+ * zona de 2 colunas, runs de `width === "half"` viram pares; o resto continua no
+ * fluxo clássico com o índice global preservado. Sem `area`/`width` em nenhum
+ * bloco o resultado é 1 flow por bloco — o layout atual não muda. `area` vence
+ * quando os dois campos estão definidos.
+ */
+export function segmentBlocks(visible: HomeBlock[]): HomeSegment[] {
+  const segments: HomeSegment[] = [];
+  let i = 0;
+  while (i < visible.length) {
+    const block = visible[i]!;
+    if (block.area === "main" || block.area === "sidebar") {
+      const main: SegmentEntry[] = [];
+      const sidebar: SegmentEntry[] = [];
+      const startIdx = i;
+      while (i < visible.length && (visible[i]!.area === "main" || visible[i]!.area === "sidebar")) {
+        const b = visible[i]!;
+        (b.area === "sidebar" ? sidebar : main).push({ block: b, idx: i });
+        i++;
+      }
+      segments.push({ kind: "zone", main, sidebar, startIdx });
+      continue;
+    }
+    if (block.width === "half") {
+      const items: SegmentEntry[] = [];
+      const startIdx = i;
+      while (i < visible.length && visible[i]!.width === "half" && !visible[i]!.area) {
+        items.push({ block: visible[i]!, idx: i });
+        i++;
+      }
+      segments.push({ kind: "half", items, startIdx });
+      continue;
+    }
+    segments.push({ kind: "flow", block, idx: i });
+    i++;
+  }
+  return segments;
 }
 
 /** Links clicáveis (imagem/banner): http(s) ou caminho relativo do site. Nunca javascript:. */
