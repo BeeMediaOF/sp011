@@ -17,7 +17,7 @@ import { useArticles } from "../hooks/useArticles";
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
-import { inferBlockType, segmentBlocks, type SegmentEntry } from "../lib/homeBlocks";
+import { inferBlockType, segmentBlocks, sampleForPreview, type SegmentEntry } from "../lib/homeBlocks";
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
@@ -242,7 +242,12 @@ function CustomBlock({ block, getArticles, preview }: {
   const bySource = block.source === "latest" || block.source === "most_read"
     ? getArticles("")
     : getArticles(cat);
-  const byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
+  let byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
+  // Preview do admin: categoria ainda sem notícias exibe uma amostra aleatória
+  // (chapéu "EXEMPLO") para dar noção do layout. No site público continua null.
+  if (preview && byCategory.length === 0) {
+    byCategory = sampleForPreview(getArticles(""), block.id, 8);
+  }
   // itemsLimit só vale para lista/carrossel/ticker — layouts editoriais
   // (featured, duplo, mosaico…) definem as próprias contagens.
   const limited = block.itemsLimit ? byCategory.slice(0, block.itemsLimit) : byCategory;
@@ -325,9 +330,10 @@ const PREDEFINED_DEFAULTS: Record<string, {
 };
 
 // ─── Configurable block renderer (predefined + custom) ────────────────────────
-function ConfigurableBlock({ block, getArticles }: {
+function ConfigurableBlock({ block, getArticles, preview }: {
   block: HomeBlock;
   getArticles: (cat: string) => SectionArticle[];
+  preview?: boolean;
 }) {
   const defaults = PREDEFINED_DEFAULTS[block.id];
 
@@ -336,8 +342,12 @@ function ConfigurableBlock({ block, getArticles }: {
   const layout = block.layout   ?? defaults?.layout   ?? "grid";
   const href   = `/${cat}`;
   const title  = block.name;
-  const articles = getArticles(cat);
+  let articles = getArticles(cat);
 
+  // Preview do admin: categoria vazia mostra amostra "EXEMPLO" (público: null).
+  if (preview && articles.length === 0) {
+    articles = sampleForPreview(getArticles(""), block.id, 8);
+  }
   if (articles.length === 0) return null;
 
   switch (layout) {
@@ -366,9 +376,10 @@ function ConfigurableBlock({ block, getArticles }: {
 }
 
 // ─── Predefined block renderer ────────────────────────────────────────────────
-function PredefinedBlock({ block, getArticles }: {
+function PredefinedBlock({ block, getArticles, preview }: {
   block: HomeBlock;
   getArticles: (cat: string) => SectionArticle[];
+  preview?: boolean;
 }) {
   // Special fixed blocks (no category makes sense)
   if (block.id === "hero")       return <HeroSection variant={block.layout} />;
@@ -378,7 +389,7 @@ function PredefinedBlock({ block, getArticles }: {
 
   // All other predefined blocks are fully configurable
   if (PREDEFINED_DEFAULTS[block.id]) {
-    return <ConfigurableBlock block={block} getArticles={getArticles} />;
+    return <ConfigurableBlock block={block} getArticles={getArticles} preview={preview} />;
   }
 
   return null;
@@ -590,7 +601,7 @@ export default function Home() {
         {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
         {block.custom
           ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-          : <PredefinedBlock block={block} getArticles={getArticles} />
+          : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
         }
       </>
     );
@@ -632,7 +643,7 @@ export default function Home() {
       <ZoneBlock block={block} zone={zone} getArticles={getArticles} preview={isAdminPreview}
         fallback={block.custom
           ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-          : <PredefinedBlock block={block} getArticles={getArticles} />} />
+          : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />} />
     );
     if (!isAdminPreview) return <React.Fragment key={block.id}>{inner}</React.Fragment>;
     return (

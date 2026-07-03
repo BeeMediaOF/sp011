@@ -7,7 +7,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
-  isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks,
+  isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks, sampleForPreview,
   type HomeBlock,
 } from "./homeBlocks";
 
@@ -152,4 +152,16 @@ test("segmentBlocks: width full explícito continua no fluxo clássico", () => {
   const segs = segmentBlocks([blk("a", { width: "full" }), blk("b", { width: "half" })]);
   assert.equal(segs[0]!.kind, "flow");
   assert.equal(segs[1]!.kind, "half");
+});
+
+test("sampleForPreview: determinística por seed, com limite e chapéu EXEMPLO", () => {
+  const pool = Array.from({ length: 10 }, (_, i) => ({ id: `a${i}`, chapeu: "ESPORTES" }));
+  const s1 = sampleForPreview(pool, "bloco-1", 4);
+  const s2 = sampleForPreview(pool, "bloco-1", 4);
+  const s3 = sampleForPreview(pool, "bloco-2", 4);
+  assert.equal(s1.length, 4);
+  assert.deepEqual(s1.map((a) => a.id), s2.map((a) => a.id));          // estável
+  assert.notDeepEqual(s1.map((a) => a.id), s3.map((a) => a.id));       // varia por bloco
+  assert.ok(s1.every((a) => a.chapeu === "EXEMPLO"));
+  assert.deepEqual(sampleForPreview([], "x", 4), []);                   // pool vazio
 });

@@ -223,6 +223,36 @@ export function segmentBlocks(visible: HomeBlock[]): HomeSegment[] {
   return segments;
 }
 
+/**
+ * Amostra pseudo-aleatória de artigos para o PREVIEW do admin quando a
+ * categoria do bloco ainda não tem notícias — mostra como o bloco ficará.
+ * Determinística por `seed` (id do bloco): não pisca a cada re-render e cada
+ * bloco exibe uma seleção diferente. Os itens saem com chapéu "EXEMPLO".
+ * No site público o bloco vazio continua não renderizando nada.
+ */
+export function sampleForPreview<T extends { id: string; chapeu: string }>(
+  all: T[], seed: string, limit: number,
+): T[] {
+  const hash = (s: string): number => {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return h;
+  };
+  // Mistura não-linear (finalizer do murmur3): sem ela a seed viraria só um
+  // deslocamento constante e a ordem seria a mesma para qualquer bloco.
+  const seedHash = hash(seed);
+  const mix = (id: string): number => {
+    let h = seedHash ^ hash(id);
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return (h ^ (h >>> 16)) >>> 0;
+  };
+  return [...all]
+    .sort((a, b) => mix(a.id) - mix(b.id))
+    .slice(0, limit)
+    .map((a) => ({ ...a, chapeu: "EXEMPLO" }));
+}
+
 /** Links clicáveis (imagem/banner): http(s) ou caminho relativo do site. Nunca javascript:. */
 export function safeLinkUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;

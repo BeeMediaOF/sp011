@@ -16,7 +16,7 @@ import AdBanner from "../ads/AdBanner";
 import type { AdSlotKey } from "../ads/useAds";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "../../lib/sanitize";
-import { inferBlockType, type HomeBlock } from "../../lib/homeBlocks";
+import { inferBlockType, sampleForPreview, type HomeBlock } from "../../lib/homeBlocks";
 import { AD_SLOTS, BlockPlaceholder, HtmlBlock, TickerBlock } from "./HomeCustomBlocks";
 
 /** Mesmo shape do SectionArticle da Home (mapeado de useArticles). */
@@ -238,7 +238,12 @@ export function ZoneBlock({ block, zone, getArticles, preview, fallback }: {
   const bySource = block.source === "latest" || block.source === "most_read"
     ? getArticles("")
     : getArticles(cat);
-  const byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
+  let byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
+  // Preview do admin: categoria ainda sem notícias exibe amostra "EXEMPLO"
+  // para dar noção do layout. No site público o bloco continua não renderizando.
+  if (preview && byCategory.length === 0) {
+    byCategory = sampleForPreview(getArticles(""), block.id, 8);
+  }
 
   switch (type) {
     case "ticker":
