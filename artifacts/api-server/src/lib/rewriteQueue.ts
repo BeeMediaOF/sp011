@@ -565,8 +565,15 @@ async function processBatch(): Promise<void> {
 
   if (concurrency <= 0) return;
 
-  // Dequeue up to `concurrency` items at once
-  const batch = _queue.splice(0, concurrency);
+  // Respeita os artigos já em processamento: processBatch roda a cada
+  // PROCESS_INTERVAL_MS independentemente do batch anterior ter terminado. Sem esta
+  // trava, com o Ollama (cada reescrita leva minutos) cada tick de 10 s empilharia
+  // outra requisição no servidor Ollama (1 slot só) e todas estourariam o timeout.
+  const freeSlots = concurrency - _activeCount;
+  if (freeSlots <= 0) return;
+
+  // Dequeue up to `freeSlots` items at once
+  const batch = _queue.splice(0, freeSlots);
 
   logger.info(
     { batchSize: batch.length, availableKeys, queueLeft: _queue.length },
