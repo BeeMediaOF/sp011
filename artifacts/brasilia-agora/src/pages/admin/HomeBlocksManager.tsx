@@ -495,6 +495,9 @@ interface BlockForm {
   html: string;
   embedUrl: string;
   adSlot: string;
+  area: "" | "main" | "sidebar";
+  width: "" | "full" | "half";
+  linkLabel: string;
 }
 
 const EMPTY_FORM: BlockForm = {
@@ -504,6 +507,7 @@ const EMPTY_FORM: BlockForm = {
   color: "#1d4ed8", reverse: false,
   imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
   adSlot: "slot_05",
+  area: "", width: "", linkLabel: "",
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
@@ -527,6 +531,9 @@ function blockToForm(block: HomeBlock): BlockForm {
     html:          block.html ?? "",
     embedUrl:      block.embedUrl ?? "",
     adSlot:        block.adSlot ?? "slot_05",
+    area:          block.area ?? "",
+    width:         block.width ?? "",
+    linkLabel:     block.linkLabel ?? "",
   };
 }
 
@@ -554,6 +561,9 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     html:       f.html.trim() || undefined,
     embedUrl:   f.embedUrl.trim() || undefined,
     adSlot:     f.blockType === "advertising" ? f.adSlot : undefined,
+    area:       f.area || undefined,
+    width:      f.width || undefined,
+    linkLabel:  f.linkLabel.trim() || undefined,
   };
 }
 
@@ -970,6 +980,35 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
         </PanelSection>
       )}
 
+      {/* Posicionamento na home (zona de 2 colunas / meia largura) */}
+      <PanelSection label="Posicionamento na home" icon={Layers}>
+        <select
+          value={form.area ? `area:${form.area}` : form.width === "half" ? "half" : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            onChange("area", v === "area:main" ? "main" : v === "area:sidebar" ? "sidebar" : "");
+            onChange("width", v === "half" ? "half" : "");
+          }}
+          className={INPUT}>
+          <option value="">Fluxo normal (largura inteira)</option>
+          <option value="area:main">Coluna principal (zona 2 colunas)</option>
+          <option value="area:sidebar">Barra lateral (zona 2 colunas)</option>
+          <option value="half">Meia largura (pares lado a lado)</option>
+        </select>
+        <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+          Blocos consecutivos marcados como coluna principal/lateral formam a zona de 2 colunas;
+          blocos consecutivos de meia largura formam pares lado a lado.
+        </p>
+      </PanelSection>
+
+      {/* Texto do link do cabeçalho de seção (renderizadores de zona) */}
+      {!isSpecial && isArticleType && (form.area !== "" || form.width === "half") && (
+        <PanelSection label="Texto do link da seção">
+          <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+            className={INPUT} placeholder='Padrão: "Ver mais"' />
+        </PanelSection>
+      )}
+
       {/* Cor do bloco (barra de título, chapéus e acentos) */}
       {form.blockType !== "sep" ? (
         <PanelSection label="Cor do bloco" icon={Palette}>
@@ -1050,6 +1089,14 @@ export default function HomeBlocksManager() {
   const [headerMarginTop, setHeaderMarginTop] = useState(0);
   const [showTickerBar, setShowTickerBar]     = useState(true);
   const [showHeroStrip, setShowHeroStrip]     = useState(true);
+  // Campos "portal" (barra do topo, banner do logo, menu em faixa, acento do rodapé).
+  // Strings vazias = não configurado (o site usa os defaults clássicos).
+  const [showTopBar, setShowTopBar]               = useState(false);
+  const [topBarBgColor, setTopBarBgColor]         = useState("");
+  const [headerBannerHtml, setHeaderBannerHtml]   = useState("");
+  const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
+  const [menuBarBgColor, setMenuBarBgColor]       = useState("");
+  const [footerAccentColor, setFooterAccentColor] = useState("");
   const [logoBase64, setLogoBase64]     = useState<string | null>(null);
   const [logoPreview, setLogoPreview]   = useState<string | null>(null);
   const [logoSize, setLogoSize]         = useState(48);
@@ -1115,6 +1162,12 @@ export default function HomeBlocksManager() {
         setHeaderMarginTop(r.settings.headerMarginTop ?? 0);
         setShowTickerBar(r.settings.showTickerBar ?? true);
         setShowHeroStrip(r.settings.showHeroStrip ?? true);
+        setShowTopBar(r.settings.showTopBar ?? false);
+        setTopBarBgColor(r.settings.topBarBgColor ?? "");
+        setHeaderBannerHtml(r.settings.headerBannerHtml ?? "");
+        setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
+        setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
+        setFooterAccentColor(r.settings.footerAccentColor ?? "");
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
         if (r.settings.logoSize)   setLogoSize(r.settings.logoSize);
         setTemplates(r.settings.homeTemplates ?? []);
@@ -2162,6 +2215,64 @@ export default function HomeBlocksManager() {
                     <Toggle checked={showHeroStrip} onChange={() => { const v = !showHeroStrip; setShowHeroStrip(v); saveSettingsPatch({ showHeroStrip: v }); }} />
                   </div>
                 </div>
+
+                {/* ── Estilo portal: barra do topo, banner do logo e menu em faixa ── */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-2.5">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider flex items-center gap-1.5"><Layers size={12} /> Estilo portal</p>
+                  <div className="flex items-center justify-between p-3 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[#0F172A]">Barra do topo</p>
+                      <p className="text-[11px] text-[#64748B] mt-0.5">Faixa acima do cabeçalho com data, manchete "Trending" e redes sociais</p>
+                    </div>
+                    <Toggle checked={showTopBar} onChange={() => { const v = !showTopBar; setShowTopBar(v); saveSettingsPatch({ showTopBar: v }); }} />
+                  </div>
+                  {showTopBar && (
+                    <div>
+                      <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Cor da barra do topo</p>
+                      <div className="flex gap-2">
+                        <input type="color" value={topBarBgColor || "#0b0d0c"} onChange={(e) => setTopBarBgColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
+                        <input type="text" value={topBarBgColor} placeholder="#0b0d0c" onChange={(e) => setTopBarBgColor(e.target.value)}
+                          className="flex-1 min-w-0 border border-[#E2E8F0] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                        <button onClick={() => saveSettingsPatch({ topBarBgColor })} disabled={saving}
+                          className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">OK</button>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Posição do menu</p>
+                    <select value={menuBarStyle}
+                      onChange={(e) => { const v = e.target.value === "bar" ? "bar" as const : "attached" as const; setMenuBarStyle(v); saveSettingsPatch({ menuBarStyle: v }); }}
+                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20">
+                      <option value="attached">Na linha do logo (padrão)</option>
+                      <option value="bar">Faixa colorida abaixo do logo (portal)</option>
+                    </select>
+                  </div>
+                  {menuBarStyle === "bar" && (
+                    <div>
+                      <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Cor da faixa do menu</p>
+                      <div className="flex gap-2">
+                        <input type="color" value={menuBarBgColor || menuActiveColor} onChange={(e) => setMenuBarBgColor(e.target.value)}
+                          className="w-9 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
+                        <input type="text" value={menuBarBgColor} placeholder="Vazio = cor do item ativo" onChange={(e) => setMenuBarBgColor(e.target.value)}
+                          className="flex-1 min-w-0 border border-[#E2E8F0] rounded-xl px-2 py-1.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                        <button onClick={() => saveSettingsPatch({ menuBarBgColor })} disabled={saving}
+                          className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">OK</button>
+                      </div>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Banner ao lado do logo (HTML)</p>
+                    <textarea value={headerBannerHtml} onChange={(e) => setHeaderBannerHtml(e.target.value)} rows={4}
+                      placeholder="<div>…HTML do banner…</div> (vazio = sem banner)"
+                      className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                    <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo.</p>
+                    <button onClick={() => saveSettingsPatch({ headerBannerHtml })} disabled={saving}
+                      className="w-full mt-1.5 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                      <Save size={13} /> Salvar banner
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2204,6 +2315,20 @@ export default function HomeBlocksManager() {
                         className={`w-6 h-6 rounded-lg border-2 transition-all ${footerBgColor === c ? "border-[#0B2A66] scale-110" : "border-[#E2E8F0] hover:border-[#94A3B8]"}`}
                         style={{ backgroundColor: c }} />
                     ))}
+                  </div>
+                </div>
+
+                {/* ── Cor de acento (rodapé escuro) ── */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-3">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Cor de acento</p>
+                  <p className="text-[11px] text-[#94A3B8] -mt-1">Borda superior, títulos das colunas e botão da newsletter (formato Escuro). Vazio = dourado padrão.</p>
+                  <div className="flex gap-2">
+                    <input type="color" value={footerAccentColor || "#c89110"} onChange={(e) => setFooterAccentColor(e.target.value)}
+                      className="w-10 h-9 rounded-lg border border-[#E2E8F0] cursor-pointer" />
+                    <input type="text" value={footerAccentColor} placeholder="#c89110" onChange={(e) => setFooterAccentColor(e.target.value)}
+                      className="flex-1 border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                    <button onClick={() => saveSettingsPatch({ footerAccentColor })} disabled={saving}
+                      className="px-3 py-1.5 bg-[#0B2A66] text-white text-xs font-semibold rounded-xl hover:bg-[#0a2255] transition-colors">OK</button>
                   </div>
                 </div>
 
