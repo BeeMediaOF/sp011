@@ -147,8 +147,10 @@ async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI 
     "Reescreva o artigo de forma original, profissional e envolvente, preservando todos os fatos.",
     "Escreva APENAS em português do Brasil. Nunca use inglês.",
     "Responda SOMENTE com um JSON válido (sem markdown fences) no formato:",
-    '{"title":"Título reescrito","subtitle":"Subtítulo curto","social_title":"TÍTULO CURTO COM *DESTAQUE* NO TRECHO PRINCIPAL","content_html":"<p>...</p>","keywords":"palavra1, palavra2","slug":"slug-do-artigo"}',
-    "O social_title é uma versão CURTA e direta do título (máx 60 caracteres, 4 a 8 palavras) para uma arte de rede social. Envolva com asteriscos (*assim*) apenas o trecho de maior impacto da manchete (nome, resultado, prazo, valor ou consequência), em qualquer posição. Nunca destaque a manchete inteira nem palavras genéricas.",
+    '{"title":"Título reescrito","subtitle":"Subtítulo curto","social_title":"MANCHETE DE 70 A 85 CARACTERES COM *DESTAQUE* NO TRECHO DE MAIOR IMPACTO","content_html":"<p>...</p>","keywords":"palavra1, palavra2","slug":"slug-do-artigo"}',
+    "O social_title é a manchete da arte de rede social: analise o conteúdo completo e escolha o ângulo mais chamativo para o público (fato surpreendente, número, prazo, consequência prática), em voz ativa e tempo presente.",
+    "TAMANHO OBRIGATÓRIO do social_title: entre 70 e 85 caracteres (10 a 13 palavras) — NUNCA menos de 70, a arte do Instagram precisa de 3 linhas cheias de título; NUNCA mais de 90. Sem reticências, sem cortar palavras, sem clickbait enganoso.",
+    "Envolva com asteriscos (*assim*) apenas o trecho de maior impacto da manchete (nome, resultado, prazo, valor ou consequência), em qualquer posição. Nunca destaque a manchete inteira nem palavras genéricas.",
   ].join("\n");
 
   const creditLine = item.giveCredit

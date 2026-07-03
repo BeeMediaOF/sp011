@@ -106,11 +106,15 @@ Conteúdo da fonte:
 
 **SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título, introduza o texto e contenha palavras-chave semânticas relacionadas. Ele será o primeiro <h2> dentro do content_html.
 
-**TÍTULO PARA IMAGEM (social_title):** Crie uma versão CURTA, direta e impactante do título, pensada para aparecer em destaque numa arte de rede social (máximo 60 caracteres, idealmente de 4 a 8 palavras). Use o fato principal e as entidades mais fortes (nomes, clubes, resultados, prazos, valores). NÃO use reticências e NUNCA corte uma palavra no meio. Este campo é usado SOMENTE na imagem; o blog continua com o título longo.
+**TÍTULO PARA IMAGEM (social_title):** Antes de escrever, analise o conteúdo COMPLETO da matéria e identifique o ângulo mais forte para o público: o fato mais surpreendente, o número, o valor, o prazo, a consequência prática na vida do leitor, o conflito ou a declaração mais impactante — nem sempre é o mesmo ângulo do título do blog. Escreva então uma manchete chamativa no estilo das grandes páginas de notícia do Instagram, em voz ativa e tempo presente. Este campo é usado SOMENTE na imagem; o blog continua com o título longo.
+- TAMANHO OBRIGATÓRIO: entre 70 e 85 caracteres (10 a 13 palavras). NUNCA menos de 70 caracteres — a arte do Instagram é diagramada para o título ocupar 3 linhas cheias, e manchetes curtas deixam a arte vazia. NUNCA mais de 90 caracteres.
+- Priorize entidades fortes (nomes, clubes, órgãos, cidades) e complete a manchete com o desdobramento ou a consequência do fato (o "e daí?" da notícia) para alcançar o tamanho, sem encher linguiça.
+- Chamativo sem clickbait enganoso: nada de "você não vai acreditar"; tudo que a manchete promete precisa estar na matéria.
+- NÃO use reticências, NUNCA corte uma palavra no meio e não termine em preposição ou artigo solto.
 - Envolva com asteriscos (*assim*) APENAS o trecho de maior força da manchete, ou seja, o principal gancho: o nome, acontecimento, resultado, prazo, valor ou consequência mais relevante.
 - A posição do destaque depende do conteúdo (pode ser no início, no meio ou no fim) e NÃO deve seguir uma regra fixa.
 - Destaque um único trecho curto; nunca destaque a manchete inteira nem palavras genéricas (preposições, "para", "com", "após", artigos).
-- Exemplos: "SANTOS RENOVA COM *MIGUELITO ATÉ 2029*", "*NEYMAR VOLTA AOS TREINOS* ANTES DO CLÁSSICO", "BRASIL TEM *DESFALQUE IMPORTANTE* NA ESTREIA".
+- Exemplos no tamanho certo: "GOVERNO *LIBERA NOVO SAQUE DO FGTS* E PAGAMENTO COMEÇA AINDA NESTE MÊS PARA MILHÕES", "SANTOS RENOVA COM *MIGUELITO ATÉ 2029* E PREPARA MAIS DUAS CONTRATAÇÕES PARA A SÉRIE A", "NOVA LEI MUDA *REGRAS DA CNH A PARTIR DE JANEIRO* E PEGA MOTORISTAS DE SURPRESA".
 
 **RESUMO PARA REDES SOCIAIS (social_summary):** Escreva um resumo curto e envolvente da notícia (1 a 2 frases, no máximo ~250 caracteres) para ser usado como legenda de post no Instagram/Facebook. Deve despertar curiosidade e convidar à leitura, em linguagem direta e sem clickbait enganoso. NÃO repita o título literalmente e NÃO use hashtags aqui.
 
@@ -154,7 +158,7 @@ Após o conteúdo principal, inclua uma seção com o título <h2>Perguntas Freq
 {
   "title": "...",
   "subtitle": "...",
-  "social_title": "TÍTULO CURTO COM *DESTAQUE* NO TRECHO PRINCIPAL",
+  "social_title": "MANCHETE DE 70 A 85 CARACTERES COM *DESTAQUE* NO TRECHO DE MAIOR IMPACTO",
   "social_summary": "Resumo curto e envolvente para a legenda do post (1 a 2 frases).",
   "social_hashtags": "#hashtag1 #hashtag2 #hashtag3 #hashtag4",
   "content_html": "<h2>...</h2><p>...</p>...<h2>Perguntas Frequentes</h2><h3>...?</h3><p>...</p>",
