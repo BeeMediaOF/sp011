@@ -136,6 +136,9 @@ export interface SiteSettings {
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;
   /** Base URL do Ollama self-hosted (default: env OLLAMA_BASE_URL ou http://ollama:11434). Não é secret. */
   rssAiBaseUrl?: string;
+  /** Backpressure da coleta: adia a coleta automática de fontes com reescrita quando a fila
+   *  de rascunhos pendentes atinge este tamanho (0 = sem limite; padrão: 30). */
+  rssMaxPendingRewrites?: number;
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;
@@ -216,6 +219,10 @@ export interface SocialAutomation {
   storiesMax?: number;
   /** Janela do limite de stories em horas (0 = o limite vale por ciclo). */
   storiesWindowHours?: number;
+  /** Horário de funcionamento (fuso de Brasília): fora da janela o robô pausa. */
+  activeHoursEnabled?: boolean;
+  activeHoursStart?: number;   // hora 0-23 (default 7)
+  activeHoursEnd?: number;     // hora 0-23 (default 23; início === fim = 24h)
   onlyWithImage: boolean;      // só notícias com foto (default true)
   minAgeMinutes?: number;      // esperar X min após publicar o artigo (opcional)
   priority?: SocialPriority;   // prioridade/ordem de escolha das notícias

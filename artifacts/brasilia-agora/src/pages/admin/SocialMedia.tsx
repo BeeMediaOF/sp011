@@ -168,6 +168,9 @@ interface Automation {
   spacingMinutes?: number;
   storiesMax?: number;
   storiesWindowHours?: number;
+  activeHoursEnabled?: boolean;
+  activeHoursStart?: number;
+  activeHoursEnd?: number;
   priority?: Priority;
   accountIds: string[];
   templateIds: string[];
@@ -1194,6 +1197,7 @@ export default function SocialMedia() {
   const [automation, setAutomation] = useState<Automation>({
     enabled: false, intervalMinutes: 120, maxPerRun: 3, spacingMinutes: 5,
     storiesMax: 1, storiesWindowHours: 0,
+    activeHoursEnabled: false, activeHoursStart: 7, activeHoursEnd: 23,
     accountIds: [], templateIds: [], types: ["feed"], onlyWithImage: true,
     priority: { order: "recent", freshnessHours: 0, preferredCategories: [], categoryRules: [] },
   });
@@ -3305,6 +3309,72 @@ export default function SocialMedia() {
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {autoSaving ? "Salvando…" : "Salvar formatos"}
+              </button>
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+            </div>
+          </div>
+
+          {/* Horário de funcionamento */}
+          <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#ECFEFF", color: "#0891B2" }}>
+                <Clock size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-700">Horário de funcionamento</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Fora da janela o robô pausa e retoma sozinho quando ela abre — nada de post de madrugada.
+                </p>
+              </div>
+              <button type="button" onClick={() => patchAutomation({ activeHoursEnabled: !automation.activeHoursEnabled })}
+                className="shrink-0" style={{ color: automation.activeHoursEnabled ? "#16A34A" : "#94A3B8" }}
+                title={automation.activeHoursEnabled ? "Janela ativa — clique para postar 24h" : "Desligado (posta 24h) — clique para limitar"}>
+                {automation.activeHoursEnabled ? <ToggleRight size={30} /> : <ToggleLeft size={30} />}
+              </button>
+            </div>
+
+            {automation.activeHoursEnabled ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  <span>Postar somente entre</span>
+                  <select
+                    value={automation.activeHoursStart ?? 7}
+                    onChange={(e) => patchAutomation({ activeHoursStart: Number(e.target.value) })}
+                    className="text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white">
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                    ))}
+                  </select>
+                  <span>e</span>
+                  <select
+                    value={automation.activeHoursEnd ?? 23}
+                    onChange={(e) => patchAutomation({ activeHoursEnd: Number(e.target.value) })}
+                    className="text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white">
+                    {Array.from({ length: 24 }, (_, h) => (
+                      <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                    ))}
+                  </select>
+                  <span className="text-slate-400">(horário de Brasília)</span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  {(automation.activeHoursStart ?? 7) === (automation.activeHoursEnd ?? 23)
+                    ? "Início igual ao fim = funciona 24h."
+                    : (automation.activeHoursStart ?? 7) > (automation.activeHoursEnd ?? 23)
+                      ? "Janela virando a madrugada: posta da hora inicial até a final do dia seguinte."
+                      : "O intervalo entre posts também respeita a janela — o que não couber fica para o próximo ciclo."}
+                  {" "}O botão “Rodar agora” ignora a janela (é teste manual).
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-slate-400">Desligado — o robô pode postar em qualquer horário.</p>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: PRIMARY }}>
+                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {autoSaving ? "Salvando…" : "Salvar horário"}
               </button>
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
             </div>

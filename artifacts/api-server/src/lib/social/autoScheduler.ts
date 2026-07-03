@@ -43,6 +43,37 @@ function isDue(lastRunAt: string | undefined, intervalMinutes: number): boolean 
   return elapsed >= Math.max(1, intervalMinutes) * 60 * 1000;
 }
 
+// ─── Horário de funcionamento ────────────────────────────────────────────────
+// O servidor roda em UTC; a janela é configurada no fuso de Brasília.
+
+const BR_TZ = "America/Sao_Paulo";
+
+/** Minutos do dia (0-1439) de `d` no fuso de Brasília. */
+function minutesOfDayBR(d: Date): number {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", hour12: false, timeZone: BR_TZ,
+  }).formatToParts(d);
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? "0") % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  return h * 60 + m;
+}
+
+/**
+ * True se `d` está dentro do horário de funcionamento configurado.
+ * Janela normal (7→23) ou virando a madrugada (20→2); início === fim = 24h.
+ */
+export function inActiveHours(
+  auto: { activeHoursEnabled?: boolean; activeHoursStart?: number; activeHoursEnd?: number },
+  d: Date,
+): boolean {
+  if (!auto.activeHoursEnabled) return true;
+  const start = (((auto.activeHoursStart ?? 7) % 24) + 24) % 24 * 60;
+  const end   = (((auto.activeHoursEnd  ?? 23) % 24) + 24) % 24 * 60;
+  if (start === end) return true;
+  const m = minutesOfDayBR(d);
+  return start < end ? m >= start && m < end : m >= start || m < end;
+}
+
 /**
  * Roda um ciclo da automação. Em modo normal respeita `enabled` e atualiza a
  * marca de agenda (`lastRunAt`). Em `force` (teste manual) ignora `enabled` e
@@ -72,6 +103,12 @@ export async function runAutomationCycle(
     if (!templateIds.length) return { enqueued: 0, articles: [], reason: "nenhuma máscara selecionada" };
 
     const now = new Date();
+
+    // Horário de funcionamento: fora da janela o ciclo não roda (não mexe em
+    // lastRunAt → dispara assim que a janela abrir). "Rodar agora" (force) ignora.
+    if (!opts.force && !inActiveHours(auto, now)) {
+      return { enqueued: 0, articles: [], reason: "fora do horário de funcionamento" };
+    }
 
     // Janela elegível. Normal: só artigos publicados a partir de quando a
     // automação foi ligada (não despeja o acervo antigo). Force+backfill: varre
@@ -288,6 +325,7 @@ export async function runAutomationCycle(
       const caption = analysis.caption;
 
       let insertedForArticle = false;
+      let windowClosed = false;
       for (const accountId of accountIds) {
         for (const type of types) {
           if (type === "story" && storyBudget <= 0) continue; // limite de stories atingido
@@ -298,6 +336,13 @@ export async function runAutomationCycle(
 
           // Agenda escalonada: 1º post = agora, os seguintes espaçados por spacingMs.
           const scheduledAt = new Date(now.getTime() + slot * spacingMs);
+
+          // O drip não pode agendar post p/ depois do fim da janela — o que não
+          // couber fica para o próximo ciclo dentro do horário.
+          if (slot > 0 && !opts.force && !inActiveHours(auto, scheduledAt)) {
+            windowClosed = true;
+            break;
+          }
 
           await db.insert(socialPublicationQueueTable).values({
             id: randomUUID(),
@@ -315,8 +360,10 @@ export async function runAutomationCycle(
           if (type === "story") storyBudget--;
           insertedForArticle = true;
         }
+        if (windowClosed) break;
       }
       if (insertedForArticle) usedArticles.push({ id: art.id, title: art.title });
+      if (windowClosed) break;
     }
 
     // Atualiza a agenda apenas em ciclo normal (force = teste, não mexe no ritmo).

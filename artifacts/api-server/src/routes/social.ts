@@ -13,7 +13,7 @@ import { eq, desc, and, inArray, gte, ne } from "drizzle-orm";
 import { store } from "../lib/store.js";
 import type { SocialAutomation, SocialPriority, SocialCategoryRule } from "../lib/store.js";
 import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
-import { runAutomationCycle } from "../lib/social/autoScheduler.js";
+import { runAutomationCycle, inActiveHours } from "../lib/social/autoScheduler.js";
 import { buildArticleCaption } from "../lib/social/caption.js";
 import { renderArt } from "../lib/social/renderTemplate.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
@@ -500,6 +500,9 @@ const AUTOMATION_DEFAULTS: SocialAutomation = {
   types: ["feed"],
   storiesMax: 1,
   storiesWindowHours: 0,
+  activeHoursEnabled: false,
+  activeHoursStart: 7,
+  activeHoursEnd: 23,
   onlyWithImage: true,
   priority: PRIORITY_DEFAULT,
 };
@@ -539,7 +542,14 @@ function sanitizePriority(input: unknown, prev: SocialPriority): SocialPriority 
 function nextRunAt(auto: SocialAutomation): string | null {
   if (!auto.enabled) return null;
   const base = auto.lastRunAt ? new Date(auto.lastRunAt).getTime() : Date.now();
-  return new Date(base + Math.max(1, auto.intervalMinutes) * 60 * 1000).toISOString();
+  let next = new Date(base + Math.max(1, auto.intervalMinutes) * 60 * 1000);
+  // Se cair fora do horário de funcionamento, avança até a janela abrir
+  // (passos de 5 min; teto de 24h de busca).
+  let guard = 0;
+  while (!inActiveHours(auto, next) && guard++ < 288) {
+    next = new Date(next.getTime() + 5 * 60 * 1000);
+  }
+  return next.toISOString();
 }
 
 router.get("/automation", (_req, res) => {
@@ -564,6 +574,9 @@ router.put("/automation", (req, res) => {
                      : prev.types,
     storiesMax:        typeof b.storiesMax        === "number" ? Math.max(0, Math.floor(b.storiesMax))        : prev.storiesMax,
     storiesWindowHours: typeof b.storiesWindowHours === "number" ? Math.max(0, Math.floor(b.storiesWindowHours)) : prev.storiesWindowHours,
+    activeHoursEnabled: typeof b.activeHoursEnabled === "boolean" ? b.activeHoursEnabled : prev.activeHoursEnabled,
+    activeHoursStart:  typeof b.activeHoursStart   === "number" ? Math.min(23, Math.max(0, Math.floor(b.activeHoursStart))) : prev.activeHoursStart,
+    activeHoursEnd:    typeof b.activeHoursEnd     === "number" ? Math.min(23, Math.max(0, Math.floor(b.activeHoursEnd)))   : prev.activeHoursEnd,
     onlyWithImage: typeof b.onlyWithImage === "boolean" ? b.onlyWithImage : prev.onlyWithImage,
     minAgeMinutes: typeof b.minAgeMinutes === "number"  ? Math.max(0, b.minAgeMinutes) : prev.minAgeMinutes,
     priority:      sanitizePriority(b.priority, prev.priority ?? PRIORITY_DEFAULT),
