@@ -6,6 +6,8 @@
  * inferido do prefixo do id ("image-1719848…" → "image") por inferBlockType().
  */
 
+import type { FooterConfig } from "./footerConfig";
+
 export type HomeBlockLayout =
   | "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
   | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
@@ -56,6 +58,19 @@ export interface HomeBlock {
   linkLabel?: string;
 }
 
+/** Item de menu carregado por um template (mesmo shape do menu do site). */
+export interface TemplateMenuItem {
+  id: string;
+  label: string;
+  path: string;
+  order: number;
+  visible: boolean;
+  newTab?: boolean;
+  highlight?: boolean;
+  /** Submenu (1 nível). */
+  children?: TemplateMenuItem[];
+}
+
 /** Template de home salvo no painel (aba Templates de Blocos da Home):
  *  snapshot completo dos blocos + estilos de cabeçalho/rodapé/menu. */
 export interface HomeTemplate {
@@ -79,6 +94,18 @@ export interface HomeTemplate {
   headerMarginTop?: number;
   showTickerBar?: boolean;
   showHeroStrip?: boolean;
+  /** Itens de menu instalados ao aplicar (ausente = menu do site não é tocado). */
+  menuItems?: TemplateMenuItem[];
+  /** Rodapé completo aplicado junto (ausente = rodapé do site não é tocado). */
+  footerConfig?: FooterConfig;
+  /** Campos "portal" — ao aplicar um template SEM eles, recebem reset neutro
+   *  (templates antigos restauram o visual clássico em vez de herdar sobras). */
+  showTopBar?: boolean;
+  topBarBgColor?: string;
+  headerBannerHtml?: string;
+  menuBarStyle?: "attached" | "bar";
+  menuBarBgColor?: string;
+  footerAccentColor?: string;
 }
 
 /** Prefixos de id gerados pelo painel ao adicionar blocos ("<tipo>-<timestamp>"). */

@@ -10,6 +10,10 @@ export interface MenuItem {
   path: string;
   order: number;
   visible: boolean;
+  newTab?: boolean;
+  highlight?: boolean;
+  /** Submenu (1 nível) — dropdown no cabeçalho / acordeão no mobile. */
+  children?: MenuItem[];
 }
 
 export interface SiteSettings {

@@ -91,6 +91,8 @@ export interface Article {
 export interface MenuItem {
   id: string; label: string; path: string;
   order: number; visible: boolean; newTab?: boolean; highlight?: boolean;
+  /** Submenu (1 nível) — dropdown no cabeçalho / acordeão no mobile. */
+  children?: MenuItem[];
 }
 
 export interface HomeBlock {
@@ -125,6 +127,14 @@ export interface HomeTemplate {
   menuFontSize?: number; menuFontWeight?: number;
   headerPaddingX?: number; headerMarginTop?: number;
   showTickerBar?: boolean; showHeroStrip?: boolean;
+  /** Menu e rodapé completos do template (aplicados só quando definidos). */
+  menuItems?: MenuItem[];
+  footerConfig?: FooterConfig;
+  /** Campos "portal" (barra do topo, banner do logo, menu em faixa, acento). */
+  showTopBar?: boolean; topBarBgColor?: string;
+  headerBannerHtml?: string;
+  menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
+  footerAccentColor?: string;
 }
 
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */

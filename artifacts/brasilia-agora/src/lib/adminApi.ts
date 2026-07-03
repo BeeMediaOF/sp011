@@ -262,6 +262,8 @@ export interface MenuItem {
   visible: boolean;
   newTab?: boolean;
   highlight?: boolean;
+  /** Submenu (1 nível) — dropdown no cabeçalho / acordeão no mobile. */
+  children?: MenuItem[];
 }
 
 export type { HomeBlock, HomeTemplate } from "./homeBlocks";
