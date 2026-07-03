@@ -139,6 +139,15 @@ export interface SiteSettings {
   /** Backpressure da coleta: adia a coleta automática de fontes com reescrita quando a fila
    *  de rascunhos pendentes atinge este tamanho (0 = sem limite; padrão: 30). */
   rssMaxPendingRewrites?: number;
+  // ── Configurações globais da coleta automática (RSS + Perplexity) ──
+  collectionEnabled?: boolean;          // interruptor geral da coleta automática (padrão: true)
+  collectionIntervalMinutes?: number;   // intervalo entre ciclos do scheduler em minutos (padrão: 20)
+  collectionDefaultFetchLimit?: number; // artigos por fonte quando ela não define o próprio limite (padrão: 3)
+  collectionMaxPerCycle?: number;       // teto de artigos importados por ciclo, todas as fontes (0 = sem teto)
+  collectionMaxPerDay?: number;         // teto diário de artigos importados (0 = sem teto)
+  collectionStartHour?: number;         // início da janela de coleta, hora de Brasília 0-23 (padrão: 0)
+  collectionEndHour?: number;           // fim da janela, inclusive (padrão: 23; início > fim = janela noturna)
+  collectionDays?: number[];            // dias da semana permitidos, 0=domingo … 6=sábado (padrão: todos)
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;

@@ -5,13 +5,104 @@
 
 import { store } from "./store.js";
 import { articleService } from "./articleService.js";
-import { processDueSource } from "./rssProcessor.js";
+import { processDueSource, addLog } from "./rssProcessor.js";
 import { searchNews } from "./perplexitySearch.js";
 import { rewriteWithAI } from "./rssProcessor.js";
 import { logger } from "./logger.js";
 import { startRewriteWorker } from "./rewriteQueue.js";
 
-const CHECK_INTERVAL_MS = 20 * 60 * 1000; // 20 minutes
+/** O tick roda a cada minuto e decide se um ciclo de coleta é devido (intervalo configurável). */
+const TICK_MS = 60 * 1000;
+
+// ─── Configuração global da coleta (Configurações da Coleta no painel) ────────
+
+export interface CollectionConfig {
+  /** Interruptor geral da coleta automática. */
+  enabled: boolean;
+  /** Intervalo entre ciclos de coleta, em minutos. */
+  intervalMinutes: number;
+  /** Teto de artigos importados por ciclo (0 = sem teto). */
+  maxPerCycle: number;
+  /** Teto diário de artigos importados (0 = sem teto). */
+  maxPerDay: number;
+  /** Janela de funcionamento (hora de Brasília, inclusive). início > fim = janela noturna. */
+  startHour: number;
+  endHour: number;
+  /** Dias da semana permitidos (0=domingo … 6=sábado). */
+  days: number[];
+  /** Backpressure: adia fontes com reescrita quando a fila atinge este tamanho (0 = off). */
+  maxPending: number;
+}
+
+function clampInt(v: unknown, min: number, max: number, dflt: number): number {
+  const n = Math.floor(Number(v));
+  if (!Number.isFinite(n)) return dflt;
+  return Math.max(min, Math.min(n, max));
+}
+
+export function getCollectionConfig(): CollectionConfig {
+  const s = store.getSettings();
+  const days = (s.collectionDays ?? [0, 1, 2, 3, 4, 5, 6])
+    .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  return {
+    enabled:         s.collectionEnabled ?? true,
+    intervalMinutes: clampInt(s.collectionIntervalMinutes, 5, 24 * 60, 20),
+    maxPerCycle:     clampInt(s.collectionMaxPerCycle, 0, 500, 0),
+    maxPerDay:       clampInt(s.collectionMaxPerDay, 0, 5000, 0),
+    startHour:       clampInt(s.collectionStartHour, 0, 23, 0),
+    endHour:         clampInt(s.collectionEndHour, 0, 23, 23),
+    days:            days.length > 0 ? days : [0, 1, 2, 3, 4, 5, 6],
+    maxPending:      clampInt(s.rssMaxPendingRewrites, 0, 1000, DEFAULT_MAX_PENDING_REWRITES),
+  };
+}
+
+/** Hora e dia da semana atuais no fuso de Brasília (o servidor pode rodar em UTC). */
+function nowInBrasilia(): { hour: number; day: number } {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  return { hour: d.getHours(), day: d.getDay() };
+}
+
+export function isInCollectionWindow(cfg: CollectionConfig = getCollectionConfig()): boolean {
+  const { hour, day } = nowInBrasilia();
+  if (!cfg.days.includes(day)) return false;
+  const { startHour: s, endHour: e } = cfg;
+  if (s === e) return true; // início = fim → janela cobre o dia inteiro
+  // Janela normal (ex.: 6→22 = 06:00–22:59) ou noturna (ex.: 22→5 = 22:00–05:59)
+  return s < e ? hour >= s && hour <= e : hour >= s || hour <= e;
+}
+
+// ── Estado do ciclo (exposto ao painel via getCollectionStatus) ──
+let _lastCycleAt = 0;
+let _lastCycleCollected = 0;
+
+export function getCollectionStatus() {
+  const cfg = getCollectionConfig();
+  const nextDue = _lastCycleAt + cfg.intervalMinutes * 60_000;
+  return {
+    enabled:            cfg.enabled,
+    inWindow:           isInCollectionWindow(cfg),
+    lastCycleAt:        _lastCycleAt ? new Date(_lastCycleAt).toISOString() : null,
+    nextCycleAt:        cfg.enabled ? new Date(Math.max(Date.now(), nextDue)).toISOString() : null,
+    lastCycleCollected: _lastCycleCollected,
+  };
+}
+
+/** Orçamento compartilhado do ciclo — decrementado a cada artigo importado. */
+interface CycleBudget { remaining: number; collected: number }
+
+async function computeCycleBudget(cfg: CollectionConfig): Promise<CycleBudget> {
+  let remaining = Number.POSITIVE_INFINITY;
+  if (cfg.maxPerCycle > 0) remaining = cfg.maxPerCycle;
+  if (cfg.maxPerDay > 0) {
+    try {
+      const today = await articleService.countAutomatedToday();
+      remaining = Math.min(remaining, Math.max(0, cfg.maxPerDay - today));
+    } catch (err) {
+      logger.warn({ err }, "Scheduler: failed to count today's automated articles — daily cap not applied this cycle");
+    }
+  }
+  return { remaining, collected: 0 };
+}
 
 const TAG_MAP: Record<string, string> = {
   politica: "POLÍTICA", cidade: "CIDADE", seguranca: "SEGURANÇA",
@@ -28,7 +119,10 @@ function isDue(src: { scheduleHours: number; lastRunAt?: string; lastFetchedAt?:
   return elapsed >= src.scheduleHours * 3600 * 1000;
 }
 
-async function runRssCheck(): Promise<void> {
+/** Padrão do backpressure: adia a coleta quando há ≥ N rascunhos aguardando reescrita. */
+export const DEFAULT_MAX_PENDING_REWRITES = 30;
+
+async function runRssCheck(cfg: CollectionConfig, budget: CycleBudget): Promise<void> {
   const sources = store.getRssSources().filter(
     (s) => s.active && s.scheduleHours > 0 && s.autoMode !== "none" && isDue(s)
   );
@@ -36,17 +130,63 @@ async function runRssCheck(): Promise<void> {
 
   logger.info({ count: sources.length }, "RSS scheduler: processing due sources");
 
+  // Backpressure: a coleta é muito mais rápida que a reescrita (sobretudo no Ollama
+  // em CPU). Sem esta trava a fila de rascunhos cresce sem limite. Fontes cujo
+  // autoMode exige reescrita são adiadas enquanto o backlog estiver no limite;
+  // como lastFetchedAt não é atualizado, elas voltam a ser "due" no próximo ciclo.
+  let deferred = 0;
+  let backlog = 0;
+  let budgetStopped = false;
+
   for (const src of sources) {
+    if (budget.remaining <= 0) { budgetStopped = true; break; }
+
+    const needsRewrite = src.autoMode === "rewrite_draft" || src.autoMode === "rewrite_publish";
+    if (needsRewrite && cfg.maxPending > 0) {
+      try {
+        backlog = await articleService.countPendingRewrites();
+      } catch (err) {
+        logger.warn({ err }, "RSS scheduler: failed to count pending rewrites — skipping backpressure check");
+        backlog = 0;
+      }
+      if (backlog >= cfg.maxPending) {
+        deferred++;
+        continue;
+      }
+    }
     try {
-      const n = await processDueSource(src);
+      const cap = Number.isFinite(budget.remaining) ? budget.remaining : undefined;
+      const n = await processDueSource(src, cap);
+      budget.remaining -= n;
+      budget.collected += n;
       logger.info({ sourceId: src.id, sourceName: src.name, articles: n }, "RSS scheduler: source processed");
     } catch (err) {
       logger.warn({ err, sourceId: src.id }, "RSS scheduler: error processing source");
     }
   }
+
+  if (deferred > 0) {
+    logger.info({ deferred, backlog, maxPending: cfg.maxPending }, "RSS scheduler: sources deferred — rewrite backlog full (backpressure)");
+    addLog({
+      type: "skip",
+      sourceName: "Sistema",
+      articleTitle: "Coleta adiada (fila cheia)",
+      message: `Fila de reescrita com ${backlog} artigo(s) (limite: ${cfg.maxPending}). ${deferred} fonte(s) adiada(s) até a fila esvaziar.`,
+    });
+  }
+
+  if (budgetStopped) {
+    logger.info({ collected: budget.collected }, "RSS scheduler: cycle/day budget reached — remaining sources deferred");
+    addLog({
+      type: "skip",
+      sourceName: "Sistema",
+      articleTitle: "Coleta interrompida (teto atingido)",
+      message: `Teto de artigos por ciclo/dia atingido (${budget.collected} importado(s) neste ciclo). Fontes restantes ficam para o próximo ciclo.`,
+    });
+  }
 }
 
-async function runPerplexityCheck(): Promise<void> {
+async function runPerplexityCheck(budget: CycleBudget): Promise<void> {
   const topics = store.getPerplexityTopics().filter(
     (t) => t.active && t.scheduleHours > 0 && t.autoMode !== "none" && isDue({ scheduleHours: t.scheduleHours, lastRunAt: t.lastRunAt })
   );
@@ -55,6 +195,9 @@ async function runPerplexityCheck(): Promise<void> {
   logger.info({ count: topics.length }, "Perplexity scheduler: processing due topics");
 
   for (const topic of topics) {
+    // Teto por ciclo/dia vale para toda a coleta automática, Perplexity incluído.
+    // Tópicos não iniciados mantêm o lastRunAt antigo e voltam no próximo ciclo.
+    if (budget.remaining <= 0) break;
     try {
       store.updatePerplexityTopic(topic.id, { lastRunAt: new Date().toISOString() });
 
@@ -62,6 +205,7 @@ async function runPerplexityCheck(): Promise<void> {
       let published = 0;
 
       for (const article of result.articles) {
+        if (budget.remaining <= 0) break;
         try {
           // Skip duplicates
           if (await articleService.isDuplicateArticle(article.title, article.sourceUrl)) continue;
@@ -103,6 +247,8 @@ async function runPerplexityCheck(): Promise<void> {
             slug:          slug     || undefined,
           });
           published++;
+          budget.remaining -= 1;
+          budget.collected += 1;
         } catch (artErr) {
           logger.warn({ err: artErr, topicId: topic.id }, "Perplexity scheduler: error processing article");
         }
@@ -115,9 +261,32 @@ async function runPerplexityCheck(): Promise<void> {
   }
 }
 
-async function runCheck(): Promise<void> {
-  await runRssCheck();
-  await runPerplexityCheck();
+/** Um ciclo completo de coleta: RSS + Perplexity, dividindo o mesmo orçamento. */
+async function runCycle(): Promise<void> {
+  const cfg = getCollectionConfig();
+  const budget = await computeCycleBudget(cfg);
+  if (budget.remaining <= 0) {
+    logger.info("Scheduler: daily collection cap already reached — cycle skipped");
+    return;
+  }
+  await runRssCheck(cfg, budget);
+  await runPerplexityCheck(budget);
+  _lastCycleCollected = budget.collected;
+}
+
+/**
+ * Tick por minuto: dispara um ciclo quando (a) o intervalo configurado passou,
+ * (b) a coleta está ligada e (c) estamos dentro da janela de horário/dias.
+ * Fora da janela o ciclo NÃO conta como executado — assim a coleta dispara
+ * no primeiro minuto em que a janela abrir.
+ */
+async function tick(): Promise<void> {
+  const cfg = getCollectionConfig();
+  if (!cfg.enabled) return;
+  if (Date.now() - _lastCycleAt < cfg.intervalMinutes * 60_000) return;
+  if (!isInCollectionWindow(cfg)) return;
+  _lastCycleAt = Date.now();
+  await runCycle();
 }
 
 // ─── Log retention (daily cleanup) ───────────────────────────────────────────
@@ -179,10 +348,11 @@ export function startScheduler(): void {
   // Start the async rewrite queue worker (processes 1 article/5s)
   startRewriteWorker();
 
-  // Initial run after 1 minute (let the server warm up)
+  // Primeiro tick após 1 minuto (deixa o servidor aquecer); depois avalia a cada
+  // minuto se um ciclo é devido — o intervalo real vem das Configurações da Coleta.
   setTimeout(() => {
-    void runCheck();
-    setInterval(() => { void runCheck(); }, CHECK_INTERVAL_MS);
+    void tick();
+    setInterval(() => { void tick(); }, TICK_MS);
   }, 60_000);
 
   // Log retention: run once per day (first run after 2 minutes)
@@ -197,5 +367,5 @@ export function startScheduler(): void {
     setInterval(() => { void runArticleRetention(); }, LOG_RETENTION_INTERVAL_MS);
   }, 3 * 60_000);
 
-  logger.info("RSS scheduler started (checking every 20 min)");
+  logger.info("RSS scheduler started (tick every 60s; cycle interval from collection settings)");
 }

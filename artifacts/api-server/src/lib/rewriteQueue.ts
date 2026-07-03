@@ -275,6 +275,18 @@ export function pauseQueue(): void  { _paused = true;  logger.info("Rewrite queu
 export function resumeQueue(): void { _paused = false; logger.info("Rewrite queue resumed by admin"); }
 
 /**
+ * Esvazia a fila em memória (itens ainda não iniciados). Não toca no banco —
+ * a exclusão dos rascunhos pendentes é feita à parte pelo articleService.
+ * Retorna quantos itens foram removidos da fila.
+ */
+export function clearQueue(): number {
+  const removed = _queue.length;
+  _queue.length = 0;
+  logger.info({ removed }, "Rewrite queue cleared by admin");
+  return removed;
+}
+
+/**
  * Force the queue to attempt one immediate batch, bypassing the cooldown gate.
  * Useful when the admin wants to manually unstick a queue that appears frozen.
  * The underlying Gemini call still enforces its own quota — if quota is truly

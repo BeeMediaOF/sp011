@@ -61,6 +61,25 @@ interface RssLogEntry {
   sourceName: string; articleTitle: string; message?: string;
 }
 
+interface CollectionSettings {
+  enabled: boolean;
+  intervalMinutes: number;
+  defaultFetchLimit: number;
+  maxPerCycle: number;
+  maxPerDay: number;
+  startHour: number;
+  endHour: number;
+  days: number[];
+  maxPendingRewrites: number;
+  status?: {
+    enabled: boolean; inWindow: boolean;
+    lastCycleAt: string | null; nextCycleAt: string | null;
+    lastCycleCollected: number; collectedToday: number;
+  };
+}
+
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BASE_CATEGORIES = [
@@ -305,9 +324,15 @@ export default function RSSManager() {
   // ── Rewrite Queue (server-side) ──
   const [rwQueue, setRwQueue] = useState<{
     pending: number; paused: boolean; processedTotal: number; failedTotal: number; activeworkers: number;
+    backlogDb?: number; maxPendingRewrites?: number; collectionPaused?: boolean;
     quota: { usedToday: number; dailyLimit: number; remaining: number; isOnCooldown: boolean; isExhausted: boolean; cooldownSecs: number };
   } | null>(null);
   const [queueLoading, setQueueLoading] = useState(false);
+
+  // ── Configurações da Coleta (globais) ──
+  const [colCfg, setColCfg] = useState<CollectionSettings | null>(null);
+  const [colSaving, setColSaving] = useState(false);
+  const [colSaved,  setColSaved]  = useState(false);
 
   // ── Table UI ──
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -390,6 +415,57 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadCollectionSettings = useCallback(async () => {
+    try {
+      const d = await apiFetch<CollectionSettings>("/collection-settings");
+      setColCfg(d);
+    } catch { /* ignore */ }
+  }, []);
+
+  async function saveCollectionSettings() {
+    if (!colCfg) return;
+    setColSaving(true); setColSaved(false);
+    try {
+      await apiFetch("/collection-settings", {
+        method: "PUT",
+        body: JSON.stringify({
+          enabled:            colCfg.enabled,
+          intervalMinutes:    colCfg.intervalMinutes,
+          defaultFetchLimit:  colCfg.defaultFetchLimit,
+          maxPerCycle:        colCfg.maxPerCycle,
+          maxPerDay:          colCfg.maxPerDay,
+          startHour:          colCfg.startHour,
+          endHour:            colCfg.endHour,
+          days:               colCfg.days,
+          maxPendingRewrites: colCfg.maxPendingRewrites,
+        }),
+      });
+      setColSaved(true);
+      await loadCollectionSettings();
+      await loadQueueStats();
+      setTimeout(() => setColSaved(false), 2500);
+    } catch { /* ignore */ } finally {
+      setColSaving(false);
+    }
+  }
+
+  async function clearRewriteQueue() {
+    const backlog = rwQueue?.backlogDb ?? rwQueue?.pending ?? 0;
+    if (!confirm(`Descartar os ${backlog} rascunho(s) pendentes de reescrita?\n\nApenas rascunhos criados pela automação (RSS/Perplexity) serão excluídos — rascunhos manuais não são afetados. Esta ação não pode ser desfeita.`)) return;
+    setQueueLoading(true);
+    try {
+      const res = await fetch(`${BASE}api/admin/queue/clear`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const d = await res.json() as { deleted: number };
+      await loadQueueStats();
+      alert(`${d.deleted} rascunho(s) descartado(s). A fila está limpa.`);
+    } catch { /* ignore */ } finally {
+      setQueueLoading(false);
+    }
+  }
+
   async function processDrafts() {
     setQueueLoading(true);
     try {
@@ -448,10 +524,11 @@ export default function RSSManager() {
     void loadPrompts();
     void loadLogs();
     void loadQueueStats();
+    void loadCollectionSettings();
     const quotaInterval = setInterval(() => void loadAiQuota(), 15_000);
     const queueInterval = setInterval(() => void loadQueueStats(), 10_000);
     return () => { clearInterval(quotaInterval); clearInterval(queueInterval); };
-  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats]);
+  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats, loadCollectionSettings]);
 
   const allCategories = useMemo(() => {
     const baseSet = new Set(BASE_CATEGORIES);
@@ -1364,6 +1441,187 @@ export default function RSSManager() {
           {/* ── RIGHT: add form + advanced ────────────────────────────────── */}
           <div className="space-y-4">
 
+            {/* ── Collection Settings card ──────────────────────────────────── */}
+            <div className="bg-white rounded-2xl p-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-sky-50">
+                    <Clock size={16} className="text-sky-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0B2A66]">Configurações da Coleta</h3>
+                    <p className="text-[11px] text-slate-400">
+                      {!colCfg
+                        ? "Carregando…"
+                        : !colCfg.enabled
+                          ? <span className="text-red-600 font-semibold">● Coleta desativada</span>
+                          : colCfg.status && !colCfg.status.inWindow
+                            ? <span className="text-amber-600">◐ Fora do horário de coleta</span>
+                            : colCfg.status?.nextCycleAt
+                              ? <span className="text-green-600">● Ativa · próximo ciclo ~{new Date(colCfg.status.nextCycleAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
+                              : <span className="text-green-600">● Ativa</span>
+                      }
+                    </p>
+                  </div>
+                </div>
+                {colCfg && (
+                  <button
+                    onClick={() => setColCfg((c) => c ? { ...c, enabled: !c.enabled } : c)}
+                    className={`relative w-10 rounded-full transition-colors shrink-0 ${colCfg.enabled ? "bg-green-500" : "bg-slate-300"}`}
+                    style={{ height: 22 }}
+                    title={colCfg.enabled ? "Desativar coleta automática" : "Ativar coleta automática"}
+                  >
+                    <span
+                      className="absolute top-0.5 w-[18px] h-[18px] bg-white rounded-full shadow transition-all"
+                      style={{ left: colCfg.enabled ? 20 : 2 }}
+                    />
+                  </button>
+                )}
+              </div>
+
+              {colCfg ? (
+                <div className="space-y-3">
+                  {/* Frequência + volume */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="De quanto em quanto tempo o sistema verifica as fontes e coleta notícias novas.">
+                        Intervalo entre ciclos
+                      </label>
+                      <select
+                        value={colCfg.intervalMinutes}
+                        onChange={(e) => setColCfg({ ...colCfg, intervalMinutes: parseInt(e.target.value, 10) })}
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      >
+                        {[10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 360, 480, 720, 1440].map((m) => (
+                          <option key={m} value={m}>{m < 60 ? `${m} min` : `${m / 60} h`}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Quantos artigos coletar de cada fonte por ciclo, quando a fonte não define o próprio limite.">
+                        Artigos por fonte
+                      </label>
+                      <input
+                        type="number" min={1} max={20}
+                        value={colCfg.defaultFetchLimit}
+                        onChange={(e) => setColCfg({ ...colCfg, defaultFetchLimit: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Máximo de artigos importados por ciclo, somando todas as fontes. 0 = sem limite.">
+                        Máx. por ciclo <span className="font-normal text-slate-400">(0 = ∞)</span>
+                      </label>
+                      <input
+                        type="number" min={0} max={500}
+                        value={colCfg.maxPerCycle}
+                        onChange={(e) => setColCfg({ ...colCfg, maxPerCycle: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Máximo de artigos importados por dia (horário de Brasília). 0 = sem limite.">
+                        Máx. por dia <span className="font-normal text-slate-400">(0 = ∞)</span>
+                      </label>
+                      <input
+                        type="number" min={0} max={5000}
+                        value={colCfg.maxPerDay}
+                        onChange={(e) => setColCfg({ ...colCfg, maxPerDay: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Limite da fila (backpressure) */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="Quando a fila de reescrita atingir este número de artigos, a coleta é pausada automaticamente até a fila esvaziar. 0 = nunca pausar.">
+                      Máx. de artigos aguardando na fila de reescrita <span className="font-normal text-slate-400">(0 = sem pausa)</span>
+                    </label>
+                    <input
+                      type="number" min={0} max={1000}
+                      value={colCfg.maxPendingRewrites}
+                      onChange={(e) => setColCfg({ ...colCfg, maxPendingRewrites: Math.max(0, parseInt(e.target.value, 10) || 0) })}
+                      className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                    />
+                  </div>
+
+                  {/* Janela de horário */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1" title="A coleta só roda dentro deste horário (fuso de Brasília). Início maior que o fim cria uma janela noturna (ex.: 22h às 5h).">
+                      Horário de coleta (Brasília)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={colCfg.startHour}
+                        onChange={(e) => setColCfg({ ...colCfg, startHour: parseInt(e.target.value, 10) })}
+                        className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      >
+                        {Array.from({ length: 24 }, (_, h) => (
+                          <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
+                        ))}
+                      </select>
+                      <span className="text-[11px] text-slate-400">até</span>
+                      <select
+                        value={colCfg.endHour}
+                        onChange={(e) => setColCfg({ ...colCfg, endHour: parseInt(e.target.value, 10) })}
+                        className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:border-[#0B2A66] bg-slate-50"
+                      >
+                        {Array.from({ length: 24 }, (_, h) => (
+                          <option key={h} value={h}>{String(h).padStart(2, "0")}:59</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Dias da semana */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Dias de coleta</label>
+                    <div className="flex gap-1">
+                      {DAY_LABELS.map((label, d) => {
+                        const on = colCfg.days.includes(d);
+                        return (
+                          <button
+                            key={d}
+                            onClick={() => setColCfg({
+                              ...colCfg,
+                              days: on ? colCfg.days.filter((x) => x !== d) : [...colCfg.days, d].sort(),
+                            })}
+                            className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-colors ${on ? "bg-[#0B2A66] text-white" : "bg-slate-100 text-slate-400 hover:bg-slate-200"}`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Status + salvar */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <p className="text-[10px] text-slate-400">
+                      Hoje: <b className="text-slate-600">{colCfg.status?.collectedToday ?? 0}</b> coletado(s)
+                      {colCfg.maxPerDay > 0 && <> de <b className="text-slate-600">{colCfg.maxPerDay}</b></>}
+                    </p>
+                    <button
+                      onClick={() => void saveCollectionSettings()}
+                      disabled={colSaving || colCfg.days.length === 0}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
+                    >
+                      {colSaving ? <Loader2 size={12} className="animate-spin" /> : colSaved ? <CheckCircle size={12} /> : null}
+                      {colSaved ? "Salvo!" : "Salvar"}
+                    </button>
+                  </div>
+                  {colCfg.days.length === 0 && (
+                    <p className="text-[10px] text-red-500">Selecione pelo menos um dia da semana.</p>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
+                  <Loader2 size={14} className="animate-spin" />
+                  Carregando configurações…
+                </div>
+              )}
+            </div>
+
             {/* ── Rewrite Queue Status card ─────────────────────────────────── */}
             <div className="bg-white rounded-2xl p-5" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
               <div className="flex items-center justify-between mb-3">
@@ -1435,10 +1693,20 @@ export default function RSSManager() {
                     </div>
                   )}
 
+                  {/* Backpressure banner: coleta adiada porque a fila está cheia */}
+                  {rwQueue.collectionPaused && (
+                    <div className="bg-orange-50 border border-orange-200 rounded-xl px-3 py-2">
+                      <p className="text-[11px] text-orange-700 font-medium">
+                        ⛔ Coleta automática pausada — fila com {rwQueue.backlogDb ?? rwQueue.pending} artigo(s) (limite: {rwQueue.maxPendingRewrites}).
+                        Novas notícias só serão coletadas quando a fila esvaziar.
+                      </p>
+                    </div>
+                  )}
+
                   {/* Stats row */}
                   <div className="grid grid-cols-3 gap-2">
                     {[
-                      { label: "Na fila", value: rwQueue.pending, color: "text-blue-600 bg-blue-50" },
+                      { label: "Na fila", value: rwQueue.backlogDb ?? rwQueue.pending, color: "text-blue-600 bg-blue-50" },
                       { label: "Publicados", value: rwQueue.processedTotal, color: "text-green-600 bg-green-50" },
                       { label: "Falhas", value: rwQueue.failedTotal, color: "text-red-600 bg-red-50" },
                     ].map(({ label, value, color }) => (
@@ -1465,6 +1733,14 @@ export default function RSSManager() {
                       title={rwQueue.paused ? "Retomar fila" : "Pausar fila"}
                     >
                       {rwQueue.paused ? <Play size={12} /> : <StopCircle size={12} />}
+                    </button>
+                    <button
+                      onClick={() => void clearRewriteQueue()}
+                      disabled={queueLoading || !(rwQueue.backlogDb ?? rwQueue.pending)}
+                      className="px-3 py-2 rounded-xl text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 transition-colors"
+                      title="Descartar todos os rascunhos pendentes de reescrita (RSS/Perplexity)"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </div>
                   {rwQueue.paused && (

@@ -8,6 +8,7 @@ import {
   processDueSource, DEFAULT_PROMPT_TEMPLATE, resolvePrompt,
   getRssLog,
 } from "../lib/rssProcessor.js";
+import { DEFAULT_MAX_PENDING_REWRITES, getCollectionConfig, getCollectionStatus } from "../lib/scheduler.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -225,6 +226,57 @@ router.post("/import", async (req, res) => {
   res.status(201).json({ article });
 });
 
+// ─── Collection settings (Configurações da Coleta) ────────────────────────────
+
+/** GET /api/admin/rss/collection-settings — configuração global da coleta + status ao vivo */
+router.get("/collection-settings", async (_req, res) => {
+  const s = store.getSettings();
+  const cfg = getCollectionConfig();
+  let collectedToday = 0;
+  try { collectedToday = await articleService.countAutomatedToday(); } catch { /* mostra 0 */ }
+  res.json({
+    enabled:            cfg.enabled,
+    intervalMinutes:    cfg.intervalMinutes,
+    defaultFetchLimit:  s.collectionDefaultFetchLimit ?? 3,
+    maxPerCycle:        cfg.maxPerCycle,
+    maxPerDay:          cfg.maxPerDay,
+    startHour:          cfg.startHour,
+    endHour:            cfg.endHour,
+    days:               cfg.days,
+    maxPendingRewrites: s.rssMaxPendingRewrites ?? DEFAULT_MAX_PENDING_REWRITES,
+    status: { ...getCollectionStatus(), collectedToday },
+  });
+});
+
+/** PUT /api/admin/rss/collection-settings */
+router.put("/collection-settings", (req, res) => {
+  const b = req.body as {
+    enabled?: boolean; intervalMinutes?: number; defaultFetchLimit?: number;
+    maxPerCycle?: number; maxPerDay?: number;
+    startHour?: number; endHour?: number; days?: number[];
+    maxPendingRewrites?: number;
+  };
+  const clamp = (v: unknown, min: number, max: number): number | undefined => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) ? Math.max(min, Math.min(n, max)) : undefined;
+  };
+  const update: Record<string, unknown> = {};
+  if (b.enabled            !== undefined) update["collectionEnabled"]           = !!b.enabled;
+  if (b.intervalMinutes    !== undefined) update["collectionIntervalMinutes"]   = clamp(b.intervalMinutes, 5, 24 * 60);
+  if (b.defaultFetchLimit  !== undefined) update["collectionDefaultFetchLimit"] = clamp(b.defaultFetchLimit, 1, 20);
+  if (b.maxPerCycle        !== undefined) update["collectionMaxPerCycle"]       = clamp(b.maxPerCycle, 0, 500);
+  if (b.maxPerDay          !== undefined) update["collectionMaxPerDay"]         = clamp(b.maxPerDay, 0, 5000);
+  if (b.startHour          !== undefined) update["collectionStartHour"]         = clamp(b.startHour, 0, 23);
+  if (b.endHour            !== undefined) update["collectionEndHour"]           = clamp(b.endHour, 0, 23);
+  if (b.maxPendingRewrites !== undefined) update["rssMaxPendingRewrites"]       = clamp(b.maxPendingRewrites, 0, 1000);
+  if (Array.isArray(b.days)) {
+    const days = [...new Set(b.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6))];
+    update["collectionDays"] = days.length > 0 ? days : undefined; // vazio = todos os dias
+  }
+  store.updateSettings(update as Parameters<typeof store.updateSettings>[0]);
+  res.json({ ok: true });
+});
+
 // ─── AI settings ──────────────────────────────────────────────────────────────
 
 /** GET /api/admin/rss/ai-settings */
@@ -239,6 +291,7 @@ router.get("/ai-settings", (_req, res) => {
     provider:         s.rssAiProvider ?? "gemini_direct",
     model:            s.rssAiModel ?? "",
     baseUrl:          s.rssAiBaseUrl ?? "",
+    maxPendingRewrites: s.rssMaxPendingRewrites ?? DEFAULT_MAX_PENDING_REWRITES,
     hasKey:           !!s.rssAiApiKey,
     outputPrompt:     s.rssAiOutputPrompt ?? "",
     hasDiffbotKey:    !!s.diffbotApiKey,
@@ -252,13 +305,18 @@ router.get("/ai-settings", (_req, res) => {
 
 /** PUT /api/admin/rss/ai-settings */
 router.put("/ai-settings", (req, res) => {
-  const { provider, model, baseUrl, apiKey, outputPrompt, diffbotApiKey, geminiApiKey, openaiApiKey, youtubeApiKey } = req.body as {
+  const { provider, model, baseUrl, apiKey, outputPrompt, diffbotApiKey, geminiApiKey, openaiApiKey, youtubeApiKey, maxPendingRewrites } = req.body as {
     provider?: string; model?: string; baseUrl?: string; apiKey?: string;
     outputPrompt?: string; diffbotApiKey?: string;
     geminiApiKey?: string; openaiApiKey?: string; youtubeApiKey?: string;
+    maxPendingRewrites?: number;
   };
   const update: Record<string, unknown> = {};
   if (provider) update["rssAiProvider"] = provider;
+  if (maxPendingRewrites !== undefined) {
+    const n = Math.floor(Number(maxPendingRewrites));
+    update["rssMaxPendingRewrites"] = Number.isFinite(n) && n >= 0 ? Math.min(n, 1000) : undefined;
+  }
   if (model !== undefined) update["rssAiModel"] = model;
   if (baseUrl !== undefined) update["rssAiBaseUrl"] = baseUrl || undefined;
   if (apiKey !== undefined) update["rssAiApiKey"] = apiKey || undefined;

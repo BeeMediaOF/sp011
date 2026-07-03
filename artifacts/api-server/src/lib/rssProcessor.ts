@@ -963,6 +963,15 @@ export interface FetchedArticle {
   imageUrl: string; excerpt: string; fullText: string;
 }
 
+/** Padrão de artigos por fonte quando nem a fonte nem as configurações definem um limite. */
+export const DEFAULT_FETCH_LIMIT = 3;
+
+/** Limite de artigos por rodada desta fonte: fonte > configuração global > padrão (3). */
+export function sourceFetchLimit(src: RssSource): number {
+  const n = src.fetchLimit ?? store.getSettings().collectionDefaultFetchLimit ?? DEFAULT_FETCH_LIMIT;
+  return Math.max(1, Math.min(Math.floor(n) || DEFAULT_FETCH_LIMIT, 20));
+}
+
 /** Scrape a news site homepage, extract article links and their content */
 async function scrapeNewsHomepage(src: RssSource): Promise<FetchedArticle[]> {
   const res = await fetch(src.url, {
@@ -1013,7 +1022,7 @@ async function scrapeNewsHomepage(src: RssSource): Promise<FetchedArticle[]> {
     throw new Error("Nenhum link de artigo encontrado na página. Verifique se a URL aponta para um portal de notícias.");
   }
 
-  const toScrape = links.slice(0, 3);
+  const toScrape = links.slice(0, sourceFetchLimit(src));
 
   const results: FetchedArticle[] = [];
   await Promise.allSettled(toScrape.map(async (link) => {
@@ -1084,7 +1093,7 @@ export async function fetchSourceArticles(src: RssSource): Promise<FetchedArticl
     // RSS/Atom parsing failed — fall back to HTML web scraping
     return scrapeNewsHomepage(src);
   }
-  const items = feed.items.slice(0, src.fetchLimit ?? 3);
+  const items = feed.items.slice(0, sourceFetchLimit(src));
 
   const results: FetchedArticle[] = [];
   await Promise.allSettled(items.map(async (item) => {
@@ -1259,14 +1268,18 @@ export async function autoProcessArticle(
   }
 }
 
-/** Full pipeline: fetch source, process each article */
-const MAX_PER_ROUND = 3;
-
-export async function processDueSource(src: RssSource): Promise<number> {
-  const articles = await fetchSourceArticles(src); // already capped at 3 by fetchSourceArticles
+/**
+ * Full pipeline: fetch source, process each article.
+ * `maxArticles` (opcional) permite ao scheduler impor um teto menor que o da fonte
+ * (orçamento global por ciclo/dia); sem ele vale o limite da própria fonte.
+ */
+export async function processDueSource(src: RssSource, maxArticles?: number): Promise<number> {
+  const cap = Math.min(sourceFetchLimit(src), maxArticles ?? Infinity);
+  if (cap <= 0) return 0;
+  const articles = await fetchSourceArticles(src); // já limitado por sourceFetchLimit
   let processed = 0;
   for (const art of articles) {
-    if (processed >= MAX_PER_ROUND) break;
+    if (processed >= cap) break;
     if (await articleService.isDuplicateArticle(art.title, art.link, art.imageUrl)) {
       logger.info({ title: art.title }, "Skipping duplicate RSS article in scheduler");
       continue;

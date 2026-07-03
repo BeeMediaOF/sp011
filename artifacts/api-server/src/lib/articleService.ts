@@ -202,6 +202,54 @@ export const articleService = {
     return rows.map(rowToArticle);
   },
 
+  /** Quantos rascunhos ainda aguardam reescrita (backlog real da fila, direto do banco). */
+  async countPendingRewrites(): Promise<number> {
+    const rows = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(articlesTable)
+      .where(
+        and(
+          eq(articlesTable.status, "draft"),
+          or(
+            isNull(articlesTable.aiRewritten),
+            eq(articlesTable.aiRewritten, false),
+          ),
+        ),
+      );
+    return rows[0]?.n ?? 0;
+  },
+
+  /** Quantos artigos a automação (rss/perplexity) importou hoje (dia no fuso de Brasília). */
+  async countAutomatedToday(): Promise<number> {
+    const rows = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(articlesTable)
+      .where(
+        and(
+          inArray(articlesTable.origin, ["rss", "perplexity"]),
+          sql`${articlesTable.createdAt} >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')`,
+        ),
+      );
+    return rows[0]?.n ?? 0;
+  },
+
+  /** Exclui rascunhos pendentes de reescrita criados pela automação (origem rss/perplexity). */
+  async deletePendingRewrites(): Promise<number> {
+    const result = await db
+      .delete(articlesTable)
+      .where(
+        and(
+          eq(articlesTable.status, "draft"),
+          or(
+            isNull(articlesTable.aiRewritten),
+            eq(articlesTable.aiRewritten, false),
+          ),
+          inArray(articlesTable.origin, ["rss", "perplexity"]),
+        ),
+      );
+    return result.rowCount ?? 0;
+  },
+
   async getArticle(idOrSlug: string): Promise<Article | null> {
     const rows = await db
       .select()
