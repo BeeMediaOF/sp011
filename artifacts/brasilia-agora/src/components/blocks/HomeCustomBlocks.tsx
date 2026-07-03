@@ -251,7 +251,9 @@ export function TickerBlock({ block, articles, preview }: {
   return (
     <section className="py-2">
       <style>{`@keyframes hb-ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }`}</style>
-      <div className="flex items-center overflow-hidden border-y border-gray-200 bg-white">
+      {/* Contido na largura do site (não full-bleed) — mesma faixa dos portais de referência. */}
+      <div className="max-w-[1280px] mx-auto px-4">
+      <div className="flex items-center overflow-hidden border border-gray-200 bg-white">
         <span className="shrink-0 text-[11px] font-black text-white uppercase tracking-wider px-3 py-2"
           style={{ backgroundColor: color }}>
           {block.name || "Últimas"}
@@ -265,6 +267,7 @@ export function TickerBlock({ block, articles, preview }: {
             </Link>
           ))}
         </div>
+      </div>
       </div>
     </section>
   );

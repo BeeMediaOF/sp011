@@ -19,7 +19,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed";
-type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
+type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
@@ -109,6 +109,7 @@ const HERO_FORMATS: { value: string; label: string }[] = [
   { value: "grid",     label: "3 cards + tira" },
   { value: "featured", label: "1 grande + lista" },
   { value: "mosaico",  label: "Mosaico (1 + 4)" },
+  { value: "portal",   label: "Portal (1 grande + 3 laterais)" },
   { value: "manchete", label: "Manchete full" },
 ];
 
@@ -401,10 +402,37 @@ const HOME_STYLE_PRESETS: HomeStylePreset[] = [
 
 // ─── Templates prontos (aba Templates) ────────────────────────────────────────
 // Modelos embutidos no painel: aparecem sempre na aba Templates e não podem ser
-// excluídos. O "KSports" reproduz um portal esportivo (verde/preto): hero em
-// mosaico, ticker de últimas, faixas de publicidade e seções em Big Story.
+// excluídos. O "KSports" reproduz o portal esportivo de referência (verde/preto):
+// hero Portal (1 grande + 3 laterais), barra Trending Now, banners no estilo do
+// exemplo (HTML editável — troque pela arte real em Propagandas quando tiver),
+// Recent News em grade, seções Football/Basketball/NFL/Racing em Big Story,
+// Most Read, Latest Headlines e Newsletter.
 const KSPORTS_GREEN = "#009A3D";
 const KSPORTS_BLACK = "#050806";
+
+// Marca fictícia dos banners do exemplo (bet9ja) — apenas visual, sem link.
+const KSPORTS_AD_BRAND = `<span style="color:#e32626;font-size:26px;font-weight:900;font-style:italic;">bet<span style="color:#25bd62;">9</span>ja</span>`;
+const KSPORTS_AD_BG = `border:1px solid #1f2a23;border-radius:6px;background:radial-gradient(circle at 88% 50%, rgba(0,154,61,.5), transparent 30%), linear-gradient(135deg,#050806,#142018 55%,#020403);`;
+
+const KSPORTS_AD_TOP = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 26px;${KSPORTS_AD_BG}">
+  ${KSPORTS_AD_BRAND}
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:21px;font-weight:900;font-style:italic;">THE BIGGEST ODDS</span><br/><span style="font-size:13px;color:#dfe7dd;">ON ALL SPORTS</span></span>
+  <span style="background:${KSPORTS_GREEN};color:#ffffff;padding:10px 18px;border-radius:4px;font-weight:800;font-size:13px;white-space:nowrap;">BET NOW</span>
+</div>`;
+
+const KSPORTS_AD_LEADERBOARD = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
+  ${KSPORTS_AD_BRAND}
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:22px;font-weight:900;font-style:italic;letter-spacing:.02em;">PLAY. WIN. <span style="color:#f7c948;">REPEAT.</span></span><br/><span style="font-size:14px;font-weight:600;color:#dfe7dd;">JOIN MILLIONS OF WINNERS TODAY!</span></span>
+  <span style="background:${KSPORTS_GREEN};color:#ffffff;padding:10px 18px;border-radius:4px;font-weight:800;font-size:13px;white-space:nowrap;">BET NOW</span>
+</div>`;
+
+const KSPORTS_AD_BOX = `<div style="max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;${KSPORTS_AD_BG}">
+  <div style="margin-bottom:10px;">${KSPORTS_AD_BRAND}</div>
+  <div style="color:#ffffff;font-size:30px;font-weight:900;line-height:1.05;">MORE WAYS<br/>TO WIN</div>
+  <div style="color:#f7c948;font-size:12px;font-weight:700;margin-top:10px;letter-spacing:.04em;">LIVE BETTING. FAST PAYOUTS. BIG BONUSES.</div>
+  <div style="display:inline-block;background:${KSPORTS_GREEN};color:#ffffff;padding:10px 22px;border-radius:4px;font-weight:800;font-size:13px;margin-top:16px;">JOIN NOW</div>
+</div>`;
+
 const STARTER_TEMPLATES: HomeTemplate[] = [
   {
     id: "starter-ksports",
@@ -418,22 +446,29 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
     menuFontSize: 13, menuFontWeight: 800,
     showTickerBar: false, showHeroStrip: true,
     blocks: [
-      { id: "hero",                      name: "Destaques",              visible: true,  order: 0,  layout: "mosaico" },
-      { id: "ticker-ksports",            name: "Trending Now",           visible: true,  order: 1,  custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_GREEN },
-      { id: "advertising-ksports-topo",  name: "Publicidade — Topo",     visible: true,  order: 2,  custom: true, blockType: "advertising", format: "banner_970x90", adSlot: "slot_01", color: KSPORTS_GREEN },
-      { id: "content-ksports-recentes",  name: "Últimas Notícias",       visible: true,  order: 3,  custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 4, color: KSPORTS_BLACK },
-      { id: "esporte",                   name: "Esportes",               visible: true,  order: 4,  layout: "bigstory", color: KSPORTS_GREEN, category: "esportes" },
-      { id: "brasil",                    name: "Brasil",                 visible: true,  order: 5,  layout: "bigstory", color: KSPORTS_GREEN, category: "brasil" },
-      { id: "mais-lidas",                name: "Mais Lidas",             visible: true,  order: 6 },
-      { id: "mundo",                     name: "Mundo",                  visible: true,  order: 7,  layout: "bigstory", color: KSPORTS_GREEN, category: "mundo" },
-      { id: "advertising-ksports-meio",  name: "Publicidade — Central",  visible: true,  order: 8,  custom: true, blockType: "advertising", format: "banner_970x90", adSlot: "slot_02", color: KSPORTS_GREEN },
-      { id: "tecnologia",                name: "Tecnologia",             visible: true,  order: 9,  layout: "bigstory", color: KSPORTS_GREEN, category: "tecnologia" },
-      { id: "newsletter-ksports",        name: "Newsletter",             visible: true,  order: 10, custom: true, blockType: "newsletter", format: "grid", caption: "Assine e receba as principais notícias no seu e-mail.", color: KSPORTS_GREEN },
-      { id: "ultimas",                   name: "Últimas Notícias",       visible: true,  order: 11 },
-      { id: "cultura",                   name: "Cultura",                visible: false, order: 12, layout: "cultura", color: "#0d9488", category: "cultura" },
-      { id: "df",                        name: "DF",                     visible: false, order: 13, layout: "duplo",   color: "#0b3d91", category: "cidade" },
-      { id: "saude",                     name: "Saúde",                  visible: false, order: 14, layout: "grid",    color: "#16a34a", category: "saude" },
-      { id: "colunistas",                name: "Colunistas",             visible: false, order: 15 },
+      { id: "html-ksports-ad-topo",        name: "Publicidade — The Biggest Odds",  visible: true, order: 0,  custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_TOP, color: KSPORTS_BLACK },
+      { id: "hero",                        name: "Destaques",                        visible: true, order: 1,  layout: "portal" },
+      { id: "ticker-ksports",              name: "Trending Now",                     visible: true, order: 2,  custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_BLACK },
+      { id: "html-ksports-ad-leaderboard", name: "Publicidade — Play Win Repeat",    visible: true, order: 3,  custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_LEADERBOARD, color: KSPORTS_GREEN },
+      { id: "content-ksports-recent",      name: "Recent News",                      visible: true, order: 4,  custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 4, color: KSPORTS_GREEN, category: "geral" },
+      { id: "mais-lidas",                  name: "Most Read",                        visible: true, order: 5 },
+      { id: "content-ksports-football",    name: "Football",                         visible: true, order: 6,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "football",   color: KSPORTS_GREEN },
+      { id: "content-ksports-basketball",  name: "Basketball",                       visible: true, order: 7,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "basketball", color: KSPORTS_GREEN },
+      { id: "content-ksports-nfl",         name: "NFL",                              visible: true, order: 8,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "nfl",        color: KSPORTS_GREEN },
+      { id: "content-ksports-racing",      name: "Racing",                           visible: true, order: 9,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "racing",     color: KSPORTS_GREEN },
+      { id: "list-ksports-headlines",      name: "Latest Headlines",                 visible: true, order: 10, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_GREEN },
+      { id: "html-ksports-ad-box",         name: "Publicidade — More Ways to Win",   visible: true, order: 11, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_GREEN },
+      { id: "newsletter-ksports",          name: "Newsletter",                       visible: true, order: 12, custom: true, blockType: "newsletter", format: "grid", caption: "Subscribe to our newsletter for the latest sports updates.", color: KSPORTS_GREEN },
+      // Blocos padrão do portal ficam ocultos (reative na aba Blocos se quiser)
+      { id: "brasil",     name: "Brasil",           visible: false, order: 13, layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "mundo",      name: "Mundo",            visible: false, order: 14, layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: false, order: 15, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: false, order: 16, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: false, order: 17, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: false, order: 18, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 19, layout: "grid",    color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",       visible: false, order: 20 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 21 },
     ],
   },
 ];

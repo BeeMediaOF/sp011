@@ -96,7 +96,7 @@ export interface MenuItem {
 export interface HomeBlock {
   id: string; name: string; visible: boolean; order: number;
   category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
+  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
   color?: string; custom?: boolean; reverse?: boolean;
   /** Tipo do bloco (image, carousel, video, html…). Ausente = content. */
   blockType?: string;

@@ -8,7 +8,7 @@
 
 export type HomeBlockLayout =
   | "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
-  | "mosaico" | "trio" | "compact" | "bigstory" | "timeline";
+  | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
 
 export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"

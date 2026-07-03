@@ -306,6 +306,21 @@ function HeroMosaic({ big, items }: { big?: FeaturedItem; items: SecondaryItem[]
   );
 }
 
+// ─── Variante: portal (1 grande + 3 cards empilhados à direita) ───────────────
+function HeroPortal({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
+  if (!big) return null;
+  return (
+    <div className="grid grid-cols-3 gap-3 h-[420px]">
+      <FeaturedCard item={big} priority className="col-span-2 h-full" />
+      <div className="grid grid-rows-3 gap-3">
+        {items.slice(0, 3).map((item) => (
+          <SmallOverlayCard key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Variante: manchete full-width + 4 chamadas ───────────────────────────────
 function HeroManchete({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
   if (!big) return null;
@@ -367,13 +382,14 @@ function SecondaryCarousel({ items }: { items: SecondaryItem[] }) {
 }
 
 // ─── HeroSection principal ────────────────────────────────────────────────────
-export type HeroVariant = "grid" | "featured" | "mosaico" | "manchete";
+export type HeroVariant = "grid" | "featured" | "mosaico" | "manchete" | "portal";
 
 export default function HeroSection({ variant }: { variant?: string } = {}) {
   const { articles, loading } = useArticles();
   const { settings } = useSite();
   const layout: HeroVariant =
-    variant === "featured" || variant === "mosaico" || variant === "manchete" ? variant : "grid";
+    variant === "featured" || variant === "mosaico" || variant === "manchete" || variant === "portal"
+      ? variant : "grid";
   const isGrid = layout === "grid";
 
   const sorted = [...articles].sort(
@@ -432,6 +448,7 @@ export default function HeroSection({ variant }: { variant?: string } = {}) {
         {layout === "featured"  && <HeroSplit    big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
         {layout === "mosaico"   && <HeroMosaic   big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
         {layout === "manchete"  && <HeroManchete big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
+        {layout === "portal"    && <HeroPortal   big={featured[0]} items={[...featured.slice(1), ...secondary]} />}
         {isGrid && featured.length > 0 && <DesktopGrid items={featured} />}
       </div>
 
