@@ -264,8 +264,8 @@ export interface MenuItem {
   highlight?: boolean;
 }
 
-export type { HomeBlock } from "./homeBlocks";
-import type { HomeBlock } from "./homeBlocks";
+export type { HomeBlock, HomeTemplate } from "./homeBlocks";
+import type { HomeBlock, HomeTemplate } from "./homeBlocks";
 import type { FooterConfig } from "./footerConfig";
 
 export interface SiteSettings {
@@ -287,6 +287,8 @@ export interface SiteSettings {
   ogImageBase64?: string;
   faviconBase64?: string;
   homeBlocks?: HomeBlock[];
+  /** Templates de home salvos no painel (aba Templates de Blocos da Home). */
+  homeTemplates?: HomeTemplate[];
   adminLogoBase64?: string;
   loginLogoBase64?: string;
   adminSidebarColor?: string;

@@ -105,6 +105,24 @@ export interface HomeBlock {
   videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
 }
 
+/** Template de home salvo no painel (aba Templates de Blocos da Home):
+ *  snapshot completo dos blocos + estilos de cabeçalho/rodapé/menu. */
+export interface HomeTemplate {
+  id: string; name: string; createdAt: string;
+  /** Cor de destaque do card na aba Templates. */
+  accentColor?: string;
+  /** Modelos embutidos no painel (não excluíveis) — nunca persistidos aqui. */
+  builtin?: boolean;
+  blocks: HomeBlock[];
+  headerStyle?: "standard" | "compact" | "centered";
+  footerStyle?: "dark" | "light" | "minimal";
+  headerBgColor?: string; footerBgColor?: string;
+  menuTextColor?: string; menuActiveColor?: string;
+  menuFontSize?: number; menuFontWeight?: number;
+  headerPaddingX?: number; headerMarginTop?: number;
+  showTickerBar?: boolean; showHeroStrip?: boolean;
+}
+
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */
 export interface FooterConfig {
   description?: string;
@@ -132,6 +150,8 @@ export interface SiteSettings {
   customHeadCode?: string; customBodyCode?: string;
   ogImageBase64?: string; faviconBase64?: string;
   homeBlocks?: HomeBlock[]; adminLogoBase64?: string; loginLogoBase64?: string;
+  /** Templates de home salvos no painel (aba Templates). */
+  homeTemplates?: HomeTemplate[];
   adminSidebarColor?: string; adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai" | "ollama";
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;

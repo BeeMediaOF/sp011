@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { adminApi, type HomeBlock } from "../../lib/adminApi";
+import { adminApi, type HomeBlock, type HomeTemplate } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl } from "../../lib/homeBlocks";
 import FooterEditor from "./FooterEditor";
@@ -23,7 +23,7 @@ type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
-type Tab = "blocks" | "header" | "footer" | "settings" | "styles";
+type Tab = "blocks" | "templates" | "header" | "footer" | "settings" | "styles";
 type FilterTab = "all" | "visible" | "hidden";
 type ResponsiveMode = "desktop" | "tablet" | "mobile";
 
@@ -399,6 +399,48 @@ const HOME_STYLE_PRESETS: HomeStylePreset[] = [
   },
 ];
 
+// ─── Templates prontos (aba Templates) ────────────────────────────────────────
+// Modelos embutidos no painel: aparecem sempre na aba Templates e não podem ser
+// excluídos. O "KSports" reproduz um portal esportivo (verde/preto): hero em
+// mosaico, ticker de últimas, faixas de publicidade e seções em Big Story.
+const KSPORTS_GREEN = "#009A3D";
+const KSPORTS_BLACK = "#050806";
+const STARTER_TEMPLATES: HomeTemplate[] = [
+  {
+    id: "starter-ksports",
+    name: "KSports — Portal Esportivo",
+    createdAt: "2026-07-03T00:00:00.000Z",
+    accentColor: KSPORTS_GREEN,
+    builtin: true,
+    headerStyle: "standard", footerStyle: "dark",
+    headerBgColor: "#ffffff", footerBgColor: KSPORTS_BLACK,
+    menuTextColor: "#101418", menuActiveColor: KSPORTS_GREEN,
+    menuFontSize: 13, menuFontWeight: 800,
+    showTickerBar: false, showHeroStrip: true,
+    blocks: [
+      { id: "hero",                      name: "Destaques",              visible: true,  order: 0,  layout: "mosaico" },
+      { id: "ticker-ksports",            name: "Trending Now",           visible: true,  order: 1,  custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_GREEN },
+      { id: "advertising-ksports-topo",  name: "Publicidade — Topo",     visible: true,  order: 2,  custom: true, blockType: "advertising", format: "banner_970x90", adSlot: "slot_01", color: KSPORTS_GREEN },
+      { id: "content-ksports-recentes",  name: "Últimas Notícias",       visible: true,  order: 3,  custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 4, color: KSPORTS_BLACK },
+      { id: "esporte",                   name: "Esportes",               visible: true,  order: 4,  layout: "bigstory", color: KSPORTS_GREEN, category: "esportes" },
+      { id: "brasil",                    name: "Brasil",                 visible: true,  order: 5,  layout: "bigstory", color: KSPORTS_GREEN, category: "brasil" },
+      { id: "mais-lidas",                name: "Mais Lidas",             visible: true,  order: 6 },
+      { id: "mundo",                     name: "Mundo",                  visible: true,  order: 7,  layout: "bigstory", color: KSPORTS_GREEN, category: "mundo" },
+      { id: "advertising-ksports-meio",  name: "Publicidade — Central",  visible: true,  order: 8,  custom: true, blockType: "advertising", format: "banner_970x90", adSlot: "slot_02", color: KSPORTS_GREEN },
+      { id: "tecnologia",                name: "Tecnologia",             visible: true,  order: 9,  layout: "bigstory", color: KSPORTS_GREEN, category: "tecnologia" },
+      { id: "newsletter-ksports",        name: "Newsletter",             visible: true,  order: 10, custom: true, blockType: "newsletter", format: "grid", caption: "Assine e receba as principais notícias no seu e-mail.", color: KSPORTS_GREEN },
+      { id: "ultimas",                   name: "Últimas Notícias",       visible: true,  order: 11 },
+      { id: "cultura",                   name: "Cultura",                visible: false, order: 12, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",                        name: "DF",                     visible: false, order: 13, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",                     name: "Saúde",                  visible: false, order: 14, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "colunistas",                name: "Colunistas",             visible: false, order: 15 },
+    ],
+  },
+];
+
+const HEADER_STYLE_LABEL: Record<HeaderStyle, string> = { standard: "Padrão", compact: "Compacto", centered: "Centralizado" };
+const FOOTER_STYLE_LABEL: Record<FooterStyle, string> = { dark: "Escuro", light: "Claro", minimal: "Minimal" };
+
 // ─── Extended block form ──────────────────────────────────────────────────────
 interface BlockForm {
   name: string;
@@ -527,6 +569,89 @@ function PanelSection({ label, icon: Icon, children }: { label: string; icon?: R
         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
       </div>
       {children}
+    </div>
+  );
+}
+
+// ─── Card de template (aba Templates) ─────────────────────────────────────────
+function TemplateCard({ tpl, isPreviewing, busy, onPreview, onConfirm, onCancel, onDelete }: {
+  tpl: HomeTemplate; isPreviewing: boolean; busy: boolean;
+  onPreview: () => void; onConfirm: () => void; onCancel: () => void;
+  onDelete?: () => void;
+}) {
+  const accent = tpl.accentColor ?? "#0B2A66";
+  const visibleBlocks = tpl.blocks.filter((b) => b.visible);
+  return (
+    <div className="rounded-2xl border-2 bg-white overflow-hidden transition-all"
+      style={{
+        borderColor: isPreviewing ? accent : "#E2E8F0",
+        boxShadow: isPreviewing ? `0 0 0 3px ${accent}22` : "0 2px 8px rgba(15,23,42,0.04)",
+      }}>
+      {isPreviewing && (
+        <div className="flex items-center gap-1.5 px-3 py-1.5" style={{ backgroundColor: accent + "12" }}>
+          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
+          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: accent }}>
+            Visualizando agora
+          </span>
+        </div>
+      )}
+      <div className="flex gap-0 min-h-[96px]">
+        {/* Diagrama: uma barra por bloco visível, na cor do próprio bloco */}
+        <div className="w-[72px] shrink-0 flex items-center justify-center p-2.5 self-stretch" style={{ backgroundColor: accent + "18", color: accent }}>
+          <div className="w-full flex flex-col gap-0.5 justify-center">
+            {visibleBlocks.slice(0, 8).map((b, i) => (
+              <div key={b.id} className="w-full rounded-sm"
+                style={{ height: i === 0 ? 14 : 5, backgroundColor: b.color ?? "currentColor", opacity: i === 0 ? 0.55 : 0.35 }} />
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0 p-3 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+              <span className="text-[13px] font-bold text-[#0F172A]">{tpl.name}</span>
+              {tpl.builtin ? (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider" style={{ backgroundColor: accent + "18", color: accent }}>
+                  Modelo
+                </span>
+              ) : (
+                <span className="text-[10px] text-[#94A3B8]">{new Date(tpl.createdAt).toLocaleDateString("pt-BR")}</span>
+              )}
+            </div>
+            <div className="flex gap-1 mt-1 flex-wrap">
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">{visibleBlocks.length} blocos</span>
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">Cabeçalho {HEADER_STYLE_LABEL[tpl.headerStyle ?? "standard"]}</span>
+              <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">Rodapé {FOOTER_STYLE_LABEL[tpl.footerStyle ?? "dark"]}</span>
+            </div>
+          </div>
+          {isPreviewing ? (
+            <div className="flex gap-1.5 mt-2">
+              <button onClick={onCancel} disabled={busy}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-bold border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
+                <Undo2 size={10} /> Desfazer
+              </button>
+              <button onClick={onConfirm} disabled={busy}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-bold text-white rounded-xl transition-colors disabled:opacity-50"
+                style={{ backgroundColor: accent }}>
+                <CheckCircle size={10} /> Aplicar
+              </button>
+            </div>
+          ) : (
+            <div className="flex gap-1.5 mt-2">
+              <button onClick={onPreview} disabled={busy}
+                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-bold rounded-xl border transition-colors disabled:opacity-50"
+                style={{ borderColor: accent + "50", color: accent, backgroundColor: accent + "08" }}>
+                {busy ? <><RefreshCw size={11} className="animate-spin" /> Carregando…</> : <><EyeIcon size={11} /> Visualizar</>}
+              </button>
+              {onDelete && (
+                <button title="Excluir template" onClick={onDelete}
+                  className="w-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors">
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -897,12 +1022,27 @@ export default function HomeBlocksManager() {
   const [logoStatus, setLogoStatus]     = useState<"idle" | "ok" | "err">("idle");
   const [history, setHistory]           = useState<HomeBlock[][]>([]);
   const [historyIdx, setHistoryIdx]     = useState(-1);
-  const [applyingPreset, setApplyingPreset] = useState<string | null>(null);
-  const [appliedPreset, setAppliedPreset]   = useState<string | null>(null);
 
-  type PreviewBackup = { blocks: HomeBlock[]; headerStyle: HeaderStyle; footerStyle: FooterStyle; headerBgColor: string; footerBgColor: string };
-  const [previewingPreset, setPreviewingPreset] = useState<HomeStylePreset | null>(null);
-  const [previewBackup, setPreviewBackup]       = useState<PreviewBackup | null>(null);
+  // ── Templates (aba Templates): snapshots salvos da home ────────────────────
+  const [templates, setTemplates]           = useState<HomeTemplate[]>([]);
+  const [templateName, setTemplateName]     = useState("");
+  const [templateSaving, setTemplateSaving] = useState(false);
+  const [templateStatus, setTemplateStatus] = useState<"idle" | "ok" | "err">("idle");
+
+  /** Snapshot completo da aparência da home — payload de presets/templates e backup do Visualizar. */
+  type HomeSnapshot = {
+    blocks: HomeBlock[];
+    headerStyle: HeaderStyle; footerStyle: FooterStyle;
+    headerBgColor: string; footerBgColor: string;
+    menuTextColor?: string; menuActiveColor?: string;
+    menuFontSize?: number; menuFontWeight?: number;
+    headerPaddingX?: number; headerMarginTop?: number;
+    showTickerBar?: boolean; showHeroStrip?: boolean;
+  };
+  /** O que está em modo Visualizar (preset da aba Estilos ou template da aba Templates). */
+  type PreviewTarget = { id: string; name: string; accentColor: string };
+  const [previewingPreset, setPreviewingPreset] = useState<PreviewTarget | null>(null);
+  const [previewBackup, setPreviewBackup]       = useState<HomeSnapshot | null>(null);
   const [previewApplying, setPreviewApplying]   = useState(false);
 
   const logoInputRef  = useRef<HTMLInputElement>(null);
@@ -942,6 +1082,7 @@ export default function HomeBlocksManager() {
         setShowHeroStrip(r.settings.showHeroStrip ?? true);
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
         if (r.settings.logoSize)   setLogoSize(r.settings.logoSize);
+        setTemplates(r.settings.homeTemplates ?? []);
       })
       .catch(() => { setBlocks(DEFAULT_BLOCKS); setHistory([DEFAULT_BLOCKS]); setHistoryIdx(0); })
       .finally(() => setLoading(false));
@@ -1036,57 +1177,91 @@ export default function HomeBlocksManager() {
     }, delay);
   }, []);
 
-  async function applyPreset(preset: HomeStylePreset) {
-    setApplyingPreset(preset.id);
-    try {
-      const ordered = preset.blocks.map((b, i) => ({ ...b, order: i }));
-      await adminApi.updateSettings({
-        homeBlocks:    ordered,
-        headerStyle:   preset.headerStyle,
-        footerStyle:   preset.footerStyle,
-        headerBgColor: preset.headerBgColor,
-        footerBgColor: preset.footerBgColor,
-      });
-      setBlocks(ordered);
-      setHeaderStyle(preset.headerStyle);
-      setFooterStyle(preset.footerStyle);
-      setHeaderBgColor(preset.headerBgColor);
-      setFooterBgColor(preset.footerBgColor);
-      pushHistory(ordered);
-      invalidateSiteCache();
-      // Preset altera layout de header/footer (não coberto por style:preview) —
-      // remonta o iframe uma vez (ação deliberada e rara).
-      setPreviewKey((k) => k + 1);
-      setAppliedPreset(preset.id);
-      setSaved(true);
-      setTimeout(() => { setSaved(false); setAppliedPreset(null); }, 2500);
-      setTab("blocks");
-    } catch { } finally { setApplyingPreset(null); }
+  /** Snapshot do estado atual da home (tudo que presets/templates podem alterar). */
+  function captureSnapshot(): HomeSnapshot {
+    return {
+      blocks: blocks.map((b) => ({ ...b })),
+      headerStyle, footerStyle, headerBgColor, footerBgColor,
+      menuTextColor, menuActiveColor, menuFontSize, menuFontWeight,
+      headerPaddingX, headerMarginTop, showTickerBar, showHeroStrip,
+    };
   }
 
-  async function startPreviewPreset(preset: HomeStylePreset) {
-    if (previewingPreset?.id === preset.id) return;
+  /** Persiste um snapshot e sincroniza estado local + prévia (campos ausentes ficam como estão). */
+  async function pushSnapshot(snap: HomeSnapshot) {
+    const ordered = snap.blocks.map((b, i) => ({ ...b, order: i }));
+    await adminApi.updateSettings({
+      homeBlocks:    ordered,
+      headerStyle:   snap.headerStyle,
+      footerStyle:   snap.footerStyle,
+      headerBgColor: snap.headerBgColor,
+      footerBgColor: snap.footerBgColor,
+      ...(snap.menuTextColor   !== undefined ? { menuTextColor:   snap.menuTextColor }   : {}),
+      ...(snap.menuActiveColor !== undefined ? { menuActiveColor: snap.menuActiveColor } : {}),
+      ...(snap.menuFontSize    !== undefined ? { menuFontSize:    snap.menuFontSize }    : {}),
+      ...(snap.menuFontWeight  !== undefined ? { menuFontWeight:  snap.menuFontWeight }  : {}),
+      ...(snap.headerPaddingX  !== undefined ? { headerPaddingX:  snap.headerPaddingX }  : {}),
+      ...(snap.headerMarginTop !== undefined ? { headerMarginTop: snap.headerMarginTop } : {}),
+      ...(snap.showTickerBar   !== undefined ? { showTickerBar:   snap.showTickerBar }   : {}),
+      ...(snap.showHeroStrip   !== undefined ? { showHeroStrip:   snap.showHeroStrip }   : {}),
+    });
+    setBlocks(ordered);
+    setHeaderStyle(snap.headerStyle);
+    setFooterStyle(snap.footerStyle);
+    setHeaderBgColor(snap.headerBgColor);
+    setFooterBgColor(snap.footerBgColor);
+    if (snap.menuTextColor   !== undefined) setMenuTextColor(snap.menuTextColor);
+    if (snap.menuActiveColor !== undefined) setMenuActiveColor(snap.menuActiveColor);
+    if (snap.menuFontSize    !== undefined) setMenuFontSize(snap.menuFontSize);
+    if (snap.menuFontWeight  !== undefined) setMenuFontWeight(snap.menuFontWeight);
+    if (snap.headerPaddingX  !== undefined) setHeaderPaddingX(snap.headerPaddingX);
+    if (snap.headerMarginTop !== undefined) setHeaderMarginTop(snap.headerMarginTop);
+    if (snap.showTickerBar   !== undefined) setShowTickerBar(snap.showTickerBar);
+    if (snap.showHeroStrip   !== undefined) setShowHeroStrip(snap.showHeroStrip);
+    invalidateSiteCache();
+    // Snapshots mudam layout de header/footer (não coberto por style:preview) —
+    // remonta o iframe uma vez (ação deliberada e rara).
+    setPreviewKey((k) => k + 1);
+  }
+
+  /** Entra no modo Visualizar com um snapshot (preset ou template), guardando backup p/ Desfazer. */
+  async function startPreviewSnapshot(target: PreviewTarget, snap: HomeSnapshot) {
+    if (previewingPreset?.id === target.id) return;
     setPreviewApplying(true);
     try {
       // Salva backup só na primeira vez (ao trocar de preset ainda em preview, mantém o backup original)
-      const backup: PreviewBackup = previewBackup ?? { blocks, headerStyle, footerStyle, headerBgColor, footerBgColor };
-      if (!previewBackup) setPreviewBackup(backup);
-
-      const ordered = preset.blocks.map((b, i) => ({ ...b, order: i }));
-      await adminApi.updateSettings({
-        homeBlocks: ordered, headerStyle: preset.headerStyle,
-        footerStyle: preset.footerStyle, headerBgColor: preset.headerBgColor,
-        footerBgColor: preset.footerBgColor,
-      });
-      setBlocks(ordered);
-      setHeaderStyle(preset.headerStyle);
-      setFooterStyle(preset.footerStyle);
-      setHeaderBgColor(preset.headerBgColor);
-      setFooterBgColor(preset.footerBgColor);
-      setPreviewingPreset(preset);
-      invalidateSiteCache();
-      setPreviewKey((k) => k + 1);
+      if (!previewBackup) setPreviewBackup(captureSnapshot());
+      await pushSnapshot(snap);
+      setPreviewingPreset(target);
     } catch { } finally { setPreviewApplying(false); }
+  }
+
+  function startPreviewPreset(preset: HomeStylePreset) {
+    return startPreviewSnapshot(
+      { id: preset.id, name: preset.name, accentColor: preset.accentColor },
+      {
+        blocks: preset.blocks.map((b) => ({ ...b })),
+        headerStyle: preset.headerStyle, footerStyle: preset.footerStyle,
+        headerBgColor: preset.headerBgColor, footerBgColor: preset.footerBgColor,
+      },
+    );
+  }
+
+  function startPreviewTemplate(tpl: HomeTemplate) {
+    return startPreviewSnapshot(
+      { id: `tpl-${tpl.id}`, name: tpl.name, accentColor: tpl.accentColor ?? "#0B2A66" },
+      {
+        blocks: tpl.blocks.map((b) => ({ ...b })),
+        headerStyle:   tpl.headerStyle   ?? "standard",
+        footerStyle:   tpl.footerStyle   ?? "dark",
+        headerBgColor: tpl.headerBgColor ?? "#ffffff",
+        footerBgColor: tpl.footerBgColor ?? "#000000",
+        menuTextColor:   tpl.menuTextColor,   menuActiveColor: tpl.menuActiveColor,
+        menuFontSize:    tpl.menuFontSize,    menuFontWeight:  tpl.menuFontWeight,
+        headerPaddingX:  tpl.headerPaddingX,  headerMarginTop: tpl.headerMarginTop,
+        showTickerBar:   tpl.showTickerBar,   showHeroStrip:   tpl.showHeroStrip,
+      },
+    );
   }
 
   async function confirmPreviewPreset() {
@@ -1103,21 +1278,44 @@ export default function HomeBlocksManager() {
     if (!previewBackup) { setPreviewingPreset(null); return; }
     setPreviewApplying(true);
     try {
-      await adminApi.updateSettings({
-        homeBlocks: previewBackup.blocks, headerStyle: previewBackup.headerStyle,
-        footerStyle: previewBackup.footerStyle, headerBgColor: previewBackup.headerBgColor,
-        footerBgColor: previewBackup.footerBgColor,
-      });
-      setBlocks(previewBackup.blocks);
-      setHeaderStyle(previewBackup.headerStyle);
-      setFooterStyle(previewBackup.footerStyle);
-      setHeaderBgColor(previewBackup.headerBgColor);
-      setFooterBgColor(previewBackup.footerBgColor);
-      invalidateSiteCache();
-      setPreviewKey((k) => k + 1);
+      await pushSnapshot(previewBackup);
       setPreviewBackup(null);
       setPreviewingPreset(null);
     } catch { } finally { setPreviewApplying(false); }
+  }
+
+  // ── Templates: salvar/excluir snapshots da home ─────────────────────────────
+  async function saveCurrentAsTemplate() {
+    const name = templateName.trim();
+    if (!name || templateSaving) return;
+    setTemplateSaving(true); setTemplateStatus("idle");
+    try {
+      const tpl: HomeTemplate = {
+        id: `tpl-${Date.now()}`, name, createdAt: new Date().toISOString(),
+        ...captureSnapshot(),
+      };
+      const next = [tpl, ...templates];
+      await adminApi.updateSettings({ homeTemplates: next });
+      setTemplates(next);
+      setTemplateName("");
+      setTemplateStatus("ok");
+      setTimeout(() => setTemplateStatus("idle"), 2500);
+    } catch {
+      setTemplateStatus("err");
+      setTimeout(() => setTemplateStatus("idle"), 4000);
+    } finally { setTemplateSaving(false); }
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!confirm("Excluir este template? Esta ação não pode ser desfeita.")) return;
+    const next = templates.filter((t) => t.id !== id);
+    try {
+      await adminApi.updateSettings({ homeTemplates: next });
+      setTemplates(next);
+    } catch {
+      setSaveError(true);
+      setTimeout(() => setSaveError(false), 4000);
+    }
   }
 
   async function saveAll() {
@@ -1329,6 +1527,31 @@ export default function HomeBlocksManager() {
   const canRedo = historyIdx < history.length - 1;
   const previewWidth = responsive === "desktop" ? "100%" : responsive === "tablet" ? "768px" : "375px";
 
+  // Banner do modo Visualizar (compartilhado pelas abas Estilos e Templates)
+  const previewBanner = previewingPreset ? (
+    <div className="shrink-0 px-4 py-3 border-b border-[#0B2A66]/20" style={{ backgroundColor: previewingPreset.accentColor }}>
+      <div className="flex items-center gap-2 mb-2">
+        <EyeIcon size={13} className="text-white/80 shrink-0" />
+        <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Visualizando</span>
+      </div>
+      <p className="text-[14px] font-black text-white mb-3">{previewingPreset.name}</p>
+      <div className="flex gap-2">
+        <button
+          onClick={cancelPreviewPreset} disabled={previewApplying}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors disabled:opacity-50">
+          {previewApplying ? <RefreshCw size={11} className="animate-spin" /> : <Undo2 size={11} />}
+          Desfazer
+        </button>
+        <button
+          onClick={confirmPreviewPreset} disabled={previewApplying}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white hover:bg-white/90 rounded-xl transition-colors disabled:opacity-50"
+          style={{ color: previewingPreset.accentColor }}>
+          <CheckCircle size={11} /> Aplicar
+        </button>
+      </div>
+    </div>
+  ) : null;
+
   // ─────────────────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title="Blocos da Home" noPadding>
@@ -1369,12 +1592,12 @@ export default function HomeBlocksManager() {
 
         {/* ══ Tabs ════════════════════════════════════════════════════════════ */}
         <div className="shrink-0 flex overflow-x-auto border-b border-[#E2E8F0] bg-white px-4 md:px-6">
-          {(["styles","blocks","header","footer","settings"] as Tab[]).map((t) => (
+          {(["styles","templates","blocks","header","footer","settings"] as Tab[]).map((t) => (
             <button key={t} onClick={() => { setTab(t); setShowAdd(false); }}
               className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t ? "text-[#0B2A66] border-[#0B2A66]" : "text-[#64748B] border-transparent hover:text-[#0F172A]"
               }`}>
-              {t === "styles" ? "Estilos" : t === "blocks" ? "Blocos" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
+              {t === "styles" ? "Estilos" : t === "templates" ? "Templates" : t === "blocks" ? "Blocos" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
             </button>
           ))}
         </div>
@@ -1390,29 +1613,7 @@ export default function HomeBlocksManager() {
             {tab === "styles" && (
               <div className="flex-1 overflow-y-auto flex flex-col">
                 {/* ── Preview mode banner ── */}
-                {previewingPreset ? (
-                  <div className="shrink-0 px-4 py-3 border-b border-[#0B2A66]/20" style={{ backgroundColor: previewingPreset.accentColor }}>
-                    <div className="flex items-center gap-2 mb-2">
-                      <EyeIcon size={13} className="text-white/80 shrink-0" />
-                      <span className="text-[11px] font-bold text-white/80 uppercase tracking-wider">Visualizando</span>
-                    </div>
-                    <p className="text-[14px] font-black text-white mb-3">{previewingPreset.name}</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={cancelPreviewPreset} disabled={previewApplying}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white/20 hover:bg-white/30 text-white rounded-xl transition-colors disabled:opacity-50">
-                        {previewApplying ? <RefreshCw size={11} className="animate-spin" /> : <Undo2 size={11} />}
-                        Desfazer
-                      </button>
-                      <button
-                        onClick={confirmPreviewPreset} disabled={previewApplying}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[12px] font-bold bg-white hover:bg-white/90 rounded-xl transition-colors disabled:opacity-50"
-                        style={{ color: previewingPreset.accentColor }}>
-                        <CheckCircle size={11} /> Aplicar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
+                {previewingPreset ? previewBanner : (
                   <div className="shrink-0 px-4 pt-4 pb-3 border-b border-[#E2E8F0]">
                     <span className="text-[13px] font-bold text-[#0F172A]">Estilos da Home</span>
                     <p className="text-[11px] text-[#64748B] mt-0.5">Escolha um dos 5 estilos prontos. Clique em <strong>Visualizar</strong> para ver no preview ao lado.</p>
@@ -1422,8 +1623,6 @@ export default function HomeBlocksManager() {
                 <div className="flex-1 overflow-y-auto">
                   <div className="px-3 py-3 space-y-2">
                     {HOME_STYLE_PRESETS.map((preset) => {
-                      const isApplying = applyingPreset === preset.id;
-                      const wasApplied = appliedPreset === preset.id;
                       const isPreviewing = previewingPreset?.id === preset.id;
                       return (
                         <div key={preset.id}
@@ -1489,18 +1688,14 @@ export default function HomeBlocksManager() {
                               ) : (
                                 <button
                                   onClick={() => startPreviewPreset(preset)}
-                                  disabled={previewApplying || !!isApplying}
+                                  disabled={previewApplying}
                                   className="mt-1.5 w-full flex items-center justify-center gap-1.5 py-1.5 text-[12px] font-bold rounded-xl border transition-colors disabled:opacity-50"
                                   style={{
-                                    borderColor: wasApplied ? "#16a34a" : preset.accentColor + "50",
-                                    color:       wasApplied ? "#16a34a" : preset.accentColor,
-                                    backgroundColor: wasApplied ? "#f0fdf4" : preset.accentColor + "08",
+                                    borderColor: preset.accentColor + "50",
+                                    color:       preset.accentColor,
+                                    backgroundColor: preset.accentColor + "08",
                                   }}>
-                                  {isApplying ? (
-                                    <><RefreshCw size={11} className="animate-spin" /> Aplicando…</>
-                                  ) : wasApplied ? (
-                                    <><CheckCircle size={11} /> Aplicado!</>
-                                  ) : previewApplying ? (
+                                  {previewApplying ? (
                                     <><RefreshCw size={11} className="animate-spin" /> Carregando…</>
                                   ) : (
                                     <><EyeIcon size={11} /> Visualizar</>
@@ -1523,6 +1718,86 @@ export default function HomeBlocksManager() {
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* ── TEMPLATES tab ── */}
+            {tab === "templates" && (
+              <div className="flex-1 overflow-y-auto flex flex-col">
+                {previewingPreset ? previewBanner : (
+                  <div className="shrink-0 px-4 pt-4 pb-3 border-b border-[#E2E8F0]">
+                    <span className="text-[13px] font-bold text-[#0F172A]">Templates da Home</span>
+                    <p className="text-[11px] text-[#64748B] mt-0.5">Salve a home atual como template e reaplique quando quiser. Use <strong>Visualizar</strong> para ver no preview antes de aplicar.</p>
+                  </div>
+                )}
+
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
+                  {/* ── Salvar home atual ── */}
+                  <div className="rounded-2xl border border-[#E2E8F0] bg-white p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Salvar home atual</p>
+                    <input
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCurrentAsTemplate(); } }}
+                      placeholder="Nome do template (ex.: Home esportes)"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors placeholder:text-slate-400"
+                    />
+                    <button onClick={() => void saveCurrentAsTemplate()} disabled={templateSaving || !templateName.trim()}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-[#0B2A66] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                      {templateSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                      {templateSaving ? "Salvando…" : "Salvar como template"}
+                    </button>
+                    {templateStatus === "ok"  && <p className="flex items-center gap-1.5 text-[11px] text-green-700"><CheckCircle size={11} /> Template salvo!</p>}
+                    {templateStatus === "err" && <p className="text-[11px] text-red-600">Erro ao salvar — tente novamente.</p>}
+                    <p className="text-[10px] text-slate-400 leading-relaxed">Guarda blocos, cabeçalho, rodapé e estilo do menu como estão agora.</p>
+                  </div>
+
+                  {/* ── Meus templates ── */}
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Meus templates ({templates.length})</p>
+                    {templates.length === 0 ? (
+                      <div className="rounded-2xl border border-dashed border-slate-200 py-6 px-4 text-center">
+                        <p className="text-[12px] text-slate-400">Nenhum template salvo ainda. Monte a home na aba Blocos e salve aqui.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {templates.map((t) => (
+                          <TemplateCard key={t.id} tpl={t}
+                            isPreviewing={previewingPreset?.id === `tpl-${t.id}`}
+                            busy={previewApplying}
+                            onPreview={() => void startPreviewTemplate(t)}
+                            onConfirm={() => void confirmPreviewPreset()}
+                            onCancel={() => void cancelPreviewPreset()}
+                            onDelete={() => void deleteTemplate(t.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Modelos prontos ── */}
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Modelos prontos</p>
+                    <div className="space-y-2">
+                      {STARTER_TEMPLATES.map((t) => (
+                        <TemplateCard key={t.id} tpl={t}
+                          isPreviewing={previewingPreset?.id === `tpl-${t.id}`}
+                          busy={previewApplying}
+                          onPreview={() => void startPreviewTemplate(t)}
+                          onConfirm={() => void confirmPreviewPreset()}
+                          onCancel={() => void cancelPreviewPreset()}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2.5 p-3 bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl">
+                    <Info size={13} className="text-[#D97706] mt-0.5 shrink-0" />
+                    <p className="text-[11px] text-[#92400E] leading-relaxed">
+                      Aplicar um template substitui os blocos, cabeçalho e rodapé atuais. Se quiser voltar depois, salve a home atual como template antes.
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

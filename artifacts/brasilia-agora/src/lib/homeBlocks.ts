@@ -49,6 +49,31 @@ export interface HomeBlock {
   adSlot?: string;
 }
 
+/** Template de home salvo no painel (aba Templates de Blocos da Home):
+ *  snapshot completo dos blocos + estilos de cabeçalho/rodapé/menu. */
+export interface HomeTemplate {
+  id: string;
+  name: string;
+  createdAt: string;
+  /** Cor de destaque do card na aba Templates. */
+  accentColor?: string;
+  /** Modelos embutidos no painel (não excluíveis) — nunca persistidos. */
+  builtin?: boolean;
+  blocks: HomeBlock[];
+  headerStyle?: "standard" | "compact" | "centered";
+  footerStyle?: "dark" | "light" | "minimal";
+  headerBgColor?: string;
+  footerBgColor?: string;
+  menuTextColor?: string;
+  menuActiveColor?: string;
+  menuFontSize?: number;
+  menuFontWeight?: number;
+  headerPaddingX?: number;
+  headerMarginTop?: number;
+  showTickerBar?: boolean;
+  showHeroStrip?: boolean;
+}
+
 /** Prefixos de id gerados pelo painel ao adicionar blocos ("<tipo>-<timestamp>"). */
 const TYPE_PREFIXES: readonly string[] = [
   "content", "image", "carousel", "video", "advertising", "list", "ticker",
