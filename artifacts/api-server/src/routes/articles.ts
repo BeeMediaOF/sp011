@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { articleService } from "../lib/articleService.js";
+import { store } from "../lib/store.js";
 
 const router = Router();
 
@@ -35,6 +36,8 @@ router.get("/categories", async (_req, res) => {
 
 /** GET /api/articles — list published articles (public) */
 router.get("/", async (_req, res) => {
+  // Views rastreadas pelo analytics (pageview) — usadas pelos blocos "Mais lidas".
+  const views = store.getArticleViews();
   const articles = (await articleService.getArticles())
     .filter((a) => a.status === "published")
     .map((a) => ({
@@ -49,6 +52,7 @@ router.get("/", async (_req, res) => {
       author: a.author,
       publishedAt: a.publishedAt,
       keywords: a.keywords,
+      views: views[a.id]?.views ?? 0,
     }));
   res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30, stale-while-revalidate=300");
   res.json({ articles });

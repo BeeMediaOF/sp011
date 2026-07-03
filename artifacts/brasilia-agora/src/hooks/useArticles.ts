@@ -18,6 +18,8 @@ export interface Article {
   rssSourceUrl?: string;
   aiRewritten?: boolean;
   canonicalUrl?: string;
+  /** Leituras registradas pelo analytics — ordena os blocos "Mais lidas". */
+  views?: number;
 }
 
 // ─── Singleton module-level cache (2 min TTL) ─────────────────────────────────

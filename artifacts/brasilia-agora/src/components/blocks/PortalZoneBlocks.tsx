@@ -29,6 +29,12 @@ export interface ZoneArticle {
   chapeu: string;
   author: string;
   time: string;
+  views?: number;
+}
+
+/** Ordena por leituras reais ("Most Read"); empate mantém a ordem original. */
+function sortByViews(list: ZoneArticle[]): ZoneArticle[] {
+  return [...list].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
 }
 
 type Zone = "main" | "sidebar" | "half";
@@ -223,15 +229,16 @@ export function ZoneBlock({ block, zone, getArticles, preview, fallback }: {
       return <HeroSection variant={block.layout} contained={false} />;
     }
     if (block.id === "mais-lidas" && zone === "sidebar") {
-      return <SidebarMostRead block={block} articles={getArticles("")} color={color} preview={preview} />;
+      return <SidebarMostRead block={block} articles={sortByViews(getArticles(""))} color={color} preview={preview} />;
     }
     return <>{fallback}</>;
   }
 
   const type = inferBlockType(block);
-  const byCategory = block.source === "latest" || block.source === "most_read"
+  const bySource = block.source === "latest" || block.source === "most_read"
     ? getArticles("")
     : getArticles(cat);
+  const byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
 
   switch (type) {
     case "ticker":

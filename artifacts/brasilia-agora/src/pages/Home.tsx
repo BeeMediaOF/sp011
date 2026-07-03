@@ -65,7 +65,13 @@ const DEFAULT_BLOCKS: HomeBlock[] = [
 type SectionArticle = {
   id: string; slug?: string; title: string; summary: string;
   image: string; chapeu: string; author: string; time: string;
+  views?: number;
 };
+
+/** Ordena por leituras reais (blocos "Mais lidas"); empate mantém a ordem original. */
+function sortByViews(list: SectionArticle[]): SectionArticle[] {
+  return [...list].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
+}
 
 function useArticlesByCategory(category: string): SectionArticle[] {
   const { articles } = useArticles();
@@ -231,11 +237,12 @@ function CustomBlock({ block, getArticles, preview }: {
   const href = `/${cat}`;
 
   // Fonte dos artigos (carrossel/ticker/lista/conteúdo): por categoria ou geral.
-  // getArticles("") devolve todos (mais recentes primeiro) — usado por
-  // "Últimas notícias" e como fallback de "Mais lidas".
-  const byCategory = block.source === "latest" || block.source === "most_read"
+  // getArticles("") devolve todos (mais recentes primeiro); "most_read" reordena
+  // por leituras reais registradas pelo analytics.
+  const bySource = block.source === "latest" || block.source === "most_read"
     ? getArticles("")
     : getArticles(cat);
+  const byCategory = block.source === "most_read" ? sortByViews(bySource) : bySource;
   // itemsLimit só vale para lista/carrossel/ticker — layouts editoriais
   // (featured, duplo, mosaico…) definem as próprias contagens.
   const limited = block.itemsLimit ? byCategory.slice(0, block.itemsLimit) : byCategory;
@@ -532,6 +539,7 @@ export default function Home() {
         time: new Date(a.publishedAt).toLocaleDateString("pt-BR", {
           day: "numeric", month: "short",
         }),
+        views: a.views,
       }));
   }
 
