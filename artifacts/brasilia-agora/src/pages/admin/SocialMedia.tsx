@@ -166,6 +166,8 @@ interface Automation {
   intervalMinutes: number;
   maxPerRun: number;
   spacingMinutes?: number;
+  storiesMax?: number;
+  storiesWindowHours?: number;
   priority?: Priority;
   accountIds: string[];
   templateIds: string[];
@@ -1191,6 +1193,7 @@ export default function SocialMedia() {
   // ── Automação (robô de postagem no Instagram) ──────────────────────────────
   const [automation, setAutomation] = useState<Automation>({
     enabled: false, intervalMinutes: 120, maxPerRun: 3, spacingMinutes: 5,
+    storiesMax: 1, storiesWindowHours: 0,
     accountIds: [], templateIds: [], types: ["feed"], onlyWithImage: true,
     priority: { order: "recent", freshnessHours: 0, preferredCategories: [], categoryRules: [] },
   });
@@ -3247,6 +3250,39 @@ export default function SocialMedia() {
                   </span>
                 </div>
               </label>
+
+              {/* Limite de stories: nem toda notícia do ciclo vira story */}
+              {automation.types.includes("story") && (
+                <div className="ml-9 bg-slate-50 rounded-xl px-3 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span>No máximo</span>
+                    <input
+                      type="number" min={0} max={20}
+                      value={automation.storiesMax ?? 1}
+                      onChange={(e) => patchAutomation({ storiesMax: Math.max(0, Number(e.target.value) || 0) })}
+                      className="w-14 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
+                    <span>story(s)</span>
+                    <select
+                      value={automation.storiesWindowHours ?? 0}
+                      onChange={(e) => patchAutomation({ storiesWindowHours: Number(e.target.value) })}
+                      className="text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white">
+                      <option value={0}>por ciclo</option>
+                      <option value={2}>a cada 2 horas</option>
+                      <option value={4}>a cada 4 horas</option>
+                      <option value={6}>a cada 6 horas</option>
+                      <option value={12}>a cada 12 horas</option>
+                      <option value={24}>a cada 24 horas</option>
+                    </select>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    {(automation.storiesMax ?? 1) === 0
+                      ? "0 = stories pausados (nenhum story será postado)."
+                      : (automation.storiesWindowHours ?? 0) > 0
+                        ? `O robô conta os stories já postados nas últimas ${automation.storiesWindowHours}h antes de criar novos.`
+                        : "As notícias com maior prioridade do ciclo são as que ganham story."}
+                  </p>
+                </div>
+              )}
             </div>
 
             {automation.types.includes("story") &&
@@ -3258,8 +3294,8 @@ export default function SocialMedia() {
             )}
             {automation.types.length === 2 && (
               <p className="text-[11px] text-slate-400">
-                Com os dois formatos ligados, cada notícia gera 2 publicações (contam na cota de 24h) —
-                o intervalo entre posts também se aplica entre elas.
+                Feed e Stories contam na mesma cota de 24h, e o intervalo entre posts
+                também se aplica entre eles.
               </p>
             )}
 

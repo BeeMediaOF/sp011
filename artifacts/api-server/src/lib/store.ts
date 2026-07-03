@@ -212,6 +212,10 @@ export interface SocialAutomation {
   accountIds: string[];        // contas Meta destino (social_accounts)
   templateIds: string[];       // máscaras; o robô alterna entre elas
   types: ("feed" | "story")[]; // default ["feed"]
+  /** Máx. de stories por ciclo/janela (default 1) — nem toda notícia do ciclo vira story. */
+  storiesMax?: number;
+  /** Janela do limite de stories em horas (0 = o limite vale por ciclo). */
+  storiesWindowHours?: number;
   onlyWithImage: boolean;      // só notícias com foto (default true)
   minAgeMinutes?: number;      // esperar X min após publicar o artigo (opcional)
   priority?: SocialPriority;   // prioridade/ordem de escolha das notícias

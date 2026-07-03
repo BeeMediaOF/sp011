@@ -498,6 +498,8 @@ const AUTOMATION_DEFAULTS: SocialAutomation = {
   accountIds: [],
   templateIds: [],
   types: ["feed"],
+  storiesMax: 1,
+  storiesWindowHours: 0,
   onlyWithImage: true,
   priority: PRIORITY_DEFAULT,
 };
@@ -560,6 +562,8 @@ router.put("/automation", (req, res) => {
     types:         Array.isArray(b.types) && b.types.length
                      ? (b.types.filter((t) => t === "feed" || t === "story") as ("feed" | "story")[])
                      : prev.types,
+    storiesMax:        typeof b.storiesMax        === "number" ? Math.max(0, Math.floor(b.storiesMax))        : prev.storiesMax,
+    storiesWindowHours: typeof b.storiesWindowHours === "number" ? Math.max(0, Math.floor(b.storiesWindowHours)) : prev.storiesWindowHours,
     onlyWithImage: typeof b.onlyWithImage === "boolean" ? b.onlyWithImage : prev.onlyWithImage,
     minAgeMinutes: typeof b.minAgeMinutes === "number"  ? Math.max(0, b.minAgeMinutes) : prev.minAgeMinutes,
     priority:      sanitizePriority(b.priority, prev.priority ?? PRIORITY_DEFAULT),

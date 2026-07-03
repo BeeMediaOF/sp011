@@ -15,7 +15,7 @@ import {
   socialPublicationQueueTable,
   socialTemplatesTable,
 } from "@workspace/db";
-import { and, eq, gte, lte, ne, inArray, desc } from "drizzle-orm";
+import { and, eq, gte, lte, ne, inArray, desc, count } from "drizzle-orm";
 import { store } from "../store.js";
 import { logger } from "../logger.js";
 import { processSocialQueue, getPublicBase } from "./queueProcessor.js";
@@ -163,6 +163,33 @@ export async function runAutomationCycle(
       return pool[_rotation++ % pool.length] ?? null;
     };
 
+    // ── Orçamento de stories ───────────────────────────────────────────────
+    // Nem toda notícia do ciclo vira story: no máx. `storiesMax` por ciclo, ou
+    // por janela de `storiesWindowHours` horas (aí desconta o que já foi
+    // enfileirado/publicado na janela). As primeiras notícias do ciclo (as de
+    // maior prioridade) consomem o orçamento.
+    let storyBudget = Number.POSITIVE_INFINITY;
+    if (types.includes("story")) {
+      const storiesMax = Math.max(0, auto.storiesMax ?? 1);
+      const windowHours = Math.max(0, auto.storiesWindowHours ?? 0);
+      if (windowHours > 0) {
+        const since = new Date(now.getTime() - windowHours * 3600 * 1000);
+        const [row] = await db
+          .select({ n: count() })
+          .from(socialPublicationQueueTable)
+          .where(
+            and(
+              eq(socialPublicationQueueTable.type, "story"),
+              inArray(socialPublicationQueueTable.status, ACTIVE_QUEUE_STATUSES),
+              gte(socialPublicationQueueTable.createdAt, since),
+            ),
+          );
+        storyBudget = Math.max(0, storiesMax - Number(row?.n ?? 0));
+      } else {
+        storyBudget = storiesMax;
+      }
+    }
+
     const captionTemplate = cfg.captionTemplate || "";
     const base = getPublicBase();
     const usedArticles: { id: string; title: string }[] = [];
@@ -263,6 +290,7 @@ export async function runAutomationCycle(
       let insertedForArticle = false;
       for (const accountId of accountIds) {
         for (const type of types) {
+          if (type === "story" && storyBudget <= 0) continue; // limite de stories atingido
           const key = `${art.id}::${accountId}::${type}`;
           if (taken.has(key)) continue;
           const templateId = pickTemplate(type);
@@ -284,6 +312,7 @@ export async function runAutomationCycle(
           taken.add(key);
           enqueued++;
           slot++;
+          if (type === "story") storyBudget--;
           insertedForArticle = true;
         }
       }
