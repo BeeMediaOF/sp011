@@ -204,9 +204,12 @@ function DesktopGrid({ items }: { items: FeaturedItem[] }) {
   return (
     /*
       Grid com altura fixa — reserva espaço antes das imagens carregarem.
-      h-[420px] garante CLS=0 nesse bloco.
+      h-[420px] garante CLS=0 nesse bloco. grid-rows-[minmax(0,1fr)] trava a
+      linha na altura do container: sem isso a linha implícita é dimensionada
+      pelo conteúdo e imagens em retrato estouram o bloco (vazando sobre os
+      blocos seguintes).
     */
-    <div className="grid grid-cols-3 gap-3 h-[420px]">
+    <div className="grid grid-cols-3 grid-rows-[minmax(0,1fr)] gap-3 h-[420px]">
       {items.map((item, idx) => (
         <FeaturedCard key={item.id} item={item} priority={idx === 0} className="h-full" />
       ))}
@@ -254,7 +257,7 @@ function SmallOverlayCard({ item, priority = false }: { item: SecondaryItem; pri
 function HeroSplit({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
   if (!big) return null;
   return (
-    <div className="grid grid-cols-3 gap-4 h-[420px]">
+    <div className="grid grid-cols-3 grid-rows-[minmax(0,1fr)] gap-4 h-[420px]">
       <FeaturedCard item={big} priority className="col-span-2 h-full" />
       <div className="flex flex-col justify-between overflow-hidden">
         {items.slice(0, 5).map((item) => {
@@ -295,7 +298,7 @@ function HeroSplit({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] 
 function HeroMosaic({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
   if (!big) return null;
   return (
-    <div className="grid grid-cols-2 gap-3 h-[420px]">
+    <div className="grid grid-cols-2 grid-rows-[minmax(0,1fr)] gap-3 h-[420px]">
       <FeaturedCard item={big} priority className="h-full" />
       <div className="grid grid-cols-2 grid-rows-2 gap-3">
         {items.slice(0, 4).map((item) => (
@@ -310,7 +313,7 @@ function HeroMosaic({ big, items }: { big?: FeaturedItem; items: SecondaryItem[]
 function HeroPortal({ big, items }: { big?: FeaturedItem; items: SecondaryItem[] }) {
   if (!big) return null;
   return (
-    <div className="grid grid-cols-3 gap-3 h-[420px]">
+    <div className="grid grid-cols-3 grid-rows-[minmax(0,1fr)] gap-3 h-[420px]">
       <FeaturedCard item={big} priority className="col-span-2 h-full" />
       <div className="grid grid-rows-3 gap-3">
         {items.slice(0, 3).map((item) => (
@@ -327,7 +330,7 @@ function HeroManchete({ big, items }: { big?: FeaturedItem; items: SecondaryItem
   return (
     <div className="flex flex-col gap-4">
       <FeaturedCard item={big} priority className="h-[360px]" />
-      <div className="grid grid-cols-4 gap-4 h-[150px]">
+      <div className="grid grid-cols-4 grid-rows-[minmax(0,1fr)] gap-4 h-[150px]">
         {items.slice(0, 4).map((item) => (
           <SmallOverlayCard key={item.id} item={item} />
         ))}
