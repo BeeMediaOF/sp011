@@ -135,16 +135,26 @@ export async function runAutomationCycle(
       );
     const taken = new Set(existing.map((e) => `${e.articleId}::${e.socialAccountId}::${e.type}`));
 
-    // Máscaras selecionadas, agrupadas por tipo (feed/story) p/ casar o post.
+    // Máscaras selecionadas, agrupadas por capacidade (feed/story) p/ casar o post.
+    // Um template de feed com variante Story serve para os DOIS formatos.
     const templates = await db
-      .select({ id: socialTemplatesTable.id, type: socialTemplatesTable.type })
+      .select({
+        id: socialTemplatesTable.id,
+        type: socialTemplatesTable.type,
+        story: socialTemplatesTable.story,
+      })
       .from(socialTemplatesTable)
       .where(inArray(socialTemplatesTable.id, templateIds));
     const byType = new Map<string, string[]>();
     for (const t of templates) {
-      const arr = byType.get(t.type) ?? [];
-      arr.push(t.id);
-      byType.set(t.type, arr);
+      const hasStoryVariant = Array.isArray((t.story as { elements?: unknown[] } | null)?.elements)
+        && ((t.story as { elements?: unknown[] }).elements!.length > 0);
+      const capabilities = t.type === "story" ? ["story"] : hasStoryVariant ? ["feed", "story"] : ["feed"];
+      for (const cap of capabilities) {
+        const arr = byType.get(cap) ?? [];
+        arr.push(t.id);
+        byType.set(cap, arr);
+      }
     }
     const allTemplateIds = templates.map((t) => t.id);
     const pickTemplate = (postType: string): string | null => {

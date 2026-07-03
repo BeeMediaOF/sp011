@@ -92,6 +92,15 @@ interface OAuthPage {
 
 export type { TemplateElement };
 
+/** Layout de UM formato (feed ou story) — o canvas de trabalho do editor. */
+interface TemplateVariant {
+  width: number;
+  height: number;
+  backgroundColor: string;
+  backgroundGradient?: Gradient;
+  elements: TemplateElement[];
+}
+
 interface SocialTemplate {
   id: string;
   name: string;
@@ -101,6 +110,13 @@ interface SocialTemplate {
   backgroundColor: string;
   backgroundGradient?: Gradient;
   elements: TemplateElement[];
+  /** Variante Story (1080×1920) quando o layout base é Feed. */
+  story?: { backgroundColor: string; backgroundGradient?: Gradient; elements: TemplateElement[] } | null;
+}
+
+/** Template consegue gerar arte de story? (type story legado OU variante Story) */
+function isStoryCapable(t: SocialTemplate): boolean {
+  return t.type === "story" || ((t.story?.elements?.length ?? 0) > 0);
 }
 
 interface QueueItem {
@@ -1132,6 +1148,10 @@ export default function SocialMedia() {
   const [selectedElId,    setSelectedElId]    = useState<string | null>(null);
   const [templateSaving,  setTemplateSaving]  = useState(false);
   const [templateSaved,   setTemplateSaved]   = useState(false);
+  // Formato em edição no canvas; o layout do OUTRO formato fica guardado em
+  // `inactiveVariant` (null = o outro formato ainda não foi criado).
+  const [editFormat,      setEditFormat]      = useState<"feed" | "story">("feed");
+  const [inactiveVariant, setInactiveVariant] = useState<TemplateVariant | null>(null);
 
   // Artigo real p/ preview WYSIWYG dentro do canvas
   const [editorArticles,   setEditorArticles]   = useState<ArticleOption[]>([]);
@@ -1595,6 +1615,8 @@ export default function SocialMedia() {
       type, width: 1080, height: type === "feed" ? 1350 : 1920,
       backgroundColor: "#1a1a1a", elements: [],
     });
+    setEditFormat(type);
+    setInactiveVariant(null);
     setSelectedElId(null);
     resetHistory();
   }
@@ -1602,19 +1624,110 @@ export default function SocialMedia() {
   async function loadTemplate(id: string) {
     const t = (await apiFetch(`/templates/${id}`)) as SocialTemplate;
     setCurrentTemplate({ ...t, elements: (t.elements ?? []) as TemplateElement[] });
+    // Base = formato primário do template; a variante Story (se houver) fica em stash.
+    setEditFormat(t.type === "story" ? "story" : "feed");
+    setInactiveVariant(
+      t.type !== "story" && t.story?.elements?.length
+        ? {
+            width: 1080, height: 1920,
+            backgroundColor: t.story.backgroundColor,
+            backgroundGradient: t.story.backgroundGradient,
+            elements: t.story.elements as TemplateElement[],
+          }
+        : null,
+    );
     setSelectedElId(null);
     resetHistory();
+  }
+
+  /** Snapshot do canvas ativo como variante. */
+  function activeVariant(t: SocialTemplate): TemplateVariant {
+    return {
+      width: t.width, height: t.height,
+      backgroundColor: t.backgroundColor,
+      backgroundGradient: t.backgroundGradient,
+      elements: t.elements,
+    };
+  }
+
+  /** Payload canônico p/ salvar: base = Feed quando existir; story vai no campo `story`. */
+  function composeTemplatePayload(t: SocialTemplate) {
+    const active = activeVariant(t);
+    const feedV  = editFormat === "feed"  ? active : inactiveVariant;
+    const storyV = editFormat === "story" ? active : inactiveVariant;
+    if (feedV) {
+      return {
+        name: t.name, type: "feed" as const,
+        width: feedV.width, height: feedV.height,
+        backgroundColor: feedV.backgroundColor, elements: feedV.elements,
+        story: storyV
+          ? { backgroundColor: storyV.backgroundColor, backgroundGradient: storyV.backgroundGradient, elements: storyV.elements }
+          : null,
+      };
+    }
+    // Só story (template story "puro" — mesmo shape legado)
+    return {
+      name: t.name, type: "story" as const,
+      width: storyV!.width, height: storyV!.height,
+      backgroundColor: storyV!.backgroundColor, elements: storyV!.elements,
+      story: null,
+    };
+  }
+
+  /**
+   * Alterna o formato em edição. Se o outro formato ainda não existe, cria um
+   * rascunho escalando o layout atual na vertical (bom ponto de partida).
+   */
+  function switchFormat(target: "feed" | "story") {
+    if (!currentTemplate || target === editFormat) return;
+    const active = activeVariant(currentTemplate);
+    let next = inactiveVariant;
+    if (!next) {
+      const newH = target === "story" ? 1920 : 1350;
+      const ratio = newH / Math.max(1, active.height);
+      next = {
+        width: 1080, height: newH,
+        backgroundColor: active.backgroundColor,
+        backgroundGradient: active.backgroundGradient,
+        elements: active.elements.map((el) => ({
+          ...el,
+          y: Math.round(el.y * ratio),
+          height: Math.round(el.height * ratio),
+        })),
+      };
+    }
+    setInactiveVariant(active);
+    setCurrentTemplate((p) => p ? { ...p, ...next } : p);
+    setEditFormat(target);
+    setSelectedElId(null);
+    resetHistory();
+  }
+
+  /** Remove a variante Story de um template Feed (o layout de feed é preservado). */
+  function removeStoryVariant() {
+    if (!currentTemplate) return;
+    if (!window.confirm("Remover o formato Story deste template? O layout de Feed é mantido.")) return;
+    if (editFormat === "story") {
+      // Volta para o feed guardado e descarta o canvas de story.
+      if (!inactiveVariant) return;
+      setCurrentTemplate((p) => p ? { ...p, ...inactiveVariant } : p);
+      setEditFormat("feed");
+      setSelectedElId(null);
+      resetHistory();
+    }
+    setInactiveVariant(null);
   }
 
   async function saveTemplate() {
     if (!currentTemplate) return;
     setTemplateSaving(true);
     try {
+      const payload = composeTemplatePayload(currentTemplate);
       let saved: SocialTemplate;
       if (currentTemplate.id) {
-        saved = (await apiFetch(`/templates/${currentTemplate.id}`, { method: "PUT", body: JSON.stringify(currentTemplate) })) as SocialTemplate;
+        saved = (await apiFetch(`/templates/${currentTemplate.id}`, { method: "PUT", body: JSON.stringify(payload) })) as SocialTemplate;
       } else {
-        saved = (await apiFetch("/templates", { method: "POST", body: JSON.stringify(currentTemplate) })) as SocialTemplate;
+        saved = (await apiFetch("/templates", { method: "POST", body: JSON.stringify(payload) })) as SocialTemplate;
       }
       setCurrentTemplate((prev) => prev ? { ...prev, id: saved.id } : prev);
       setTemplateSaved(true); setTimeout(() => setTemplateSaved(false), 2000);
@@ -1717,12 +1830,8 @@ export default function SocialMedia() {
       const saved = (await apiFetch("/templates", {
         method: "POST",
         body: JSON.stringify({
+          ...composeTemplatePayload(currentTemplate),
           name: `${currentTemplate.name} (cópia)`,
-          type: currentTemplate.type,
-          width: currentTemplate.width,
-          height: currentTemplate.height,
-          backgroundColor: currentTemplate.backgroundColor,
-          elements: currentTemplate.elements,
         }),
       })) as SocialTemplate;
       await fetchTemplates();
@@ -1734,7 +1843,10 @@ export default function SocialMedia() {
 
   function applyPreset(kind: PresetKind) {
     pushHistory(false);
-    setCurrentTemplate(makePreset(kind));
+    const preset = makePreset(kind);
+    setCurrentTemplate(preset);
+    setEditFormat(preset.type === "story" ? "story" : "feed");
+    setInactiveVariant(null);
     setSelectedElId(null);
   }
 
@@ -1884,6 +1996,15 @@ export default function SocialMedia() {
       }));
       setQuotas(Object.fromEntries(entries));
     } finally { setQuotaLoading(false); }
+  }
+
+  /** Liga/desliga um formato (feed/story) na automação — sempre resta ao menos um. */
+  function toggleAutoType(fmt: "feed" | "story") {
+    setAutomation((a) => {
+      const has = a.types.includes(fmt);
+      const next = has ? a.types.filter((t) => t !== fmt) : [...a.types, fmt];
+      return next.length ? { ...a, types: next } : a;
+    });
   }
 
   // ── Prioridade de seleção ──────────────────────────────────────────────────
@@ -2123,7 +2244,7 @@ export default function SocialMedia() {
               onChange={(e) => { if (e.target.value) void loadTemplate(e.target.value); }}
             >
               <option value="">— Selecionar template —</option>
-              {templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.type === "feed" ? "Feed" : "Story"})</option>)}
+              {templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.type === "story" ? "Story" : isStoryCapable(t) ? "Feed + Story" : "Feed"})</option>)}
             </select>
             <button onClick={() => newTemplate("feed")}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: PRIMARY }}>
@@ -2158,15 +2279,28 @@ export default function SocialMedia() {
                   onChange={(e) => setCurrentTemplate((p) => p ? { ...p, name: e.target.value } : p)}
                   className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] min-w-[160px]"
                   placeholder="Nome do template" />
-                <select value={currentTemplate.type}
-                  onChange={(e) => {
-                    const t = e.target.value as "feed" | "story";
-                    setCurrentTemplate((p) => p ? { ...p, type: t, height: t === "feed" ? 1350 : 1920 } : p);
-                  }}
-                  className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-slate-50">
-                  <option value="feed">Feed (1080×1350)</option>
-                  <option value="story">Story (1080×1920)</option>
-                </select>
+                {/* Formato em edição: cada template tem layout de Feed E de Story.
+                    Trocar de formato guarda o atual e abre o outro (cria na 1ª vez). */}
+                <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden" title="Cada template pode ter os dois formatos — edite cada um">
+                  {(["feed", "story"] as const).map((fmt) => {
+                    const active = editFormat === fmt;
+                    const exists = active || inactiveVariant !== null;
+                    return (
+                      <button key={fmt} onClick={() => switchFormat(fmt)}
+                        className={`px-3 py-2 text-xs font-semibold transition-colors ${fmt === "story" ? "border-l border-slate-200" : ""} ${active ? "bg-[#EEF2FF] text-[#0B2A66]" : "text-slate-500 hover:bg-slate-50"}`}>
+                        {fmt === "feed" ? "Feed" : "Story"}
+                        {!exists && <span className="ml-1 text-[10px] text-slate-400">+ criar</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-[11px] text-slate-400">{currentTemplate.width}×{currentTemplate.height}</span>
+                {editFormat === "story" && inactiveVariant !== null && (
+                  <button onClick={removeStoryVariant} title="Remover o formato Story deste template"
+                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <X size={14} />
+                  </button>
+                )}
                 <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title="Duplicar template"
                   className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors disabled:opacity-50">
                   <Copy size={14} />
@@ -2834,10 +2968,9 @@ export default function SocialMedia() {
 
       {/* ══════════ AUTOMAÇÃO ════════════════════════════════════════════════ */}
       {tab === "automation" && (
-        <div className="max-w-4xl xl:max-w-7xl grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
-
-          {/* ── Coluna esquerda ── */}
-          <div className="space-y-5">
+        // Masonry adaptável: 1 coluna no notebook, 2 em telas grandes, 3 em
+        // monitores largos — o navegador distribui os cards pela altura.
+        <div className="max-w-4xl xl:max-w-none columns-1 xl:columns-2 min-[1800px]:columns-3 gap-5 [&>div]:break-inside-avoid [&>div]:mb-5">
 
           {/* Cabeçalho + toggle mestre */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
@@ -3035,7 +3168,7 @@ export default function SocialMedia() {
                       <button key={t.id} type="button" onClick={() => toggleAutoId("templateIds", t.id)}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${on ? "border-[#0B2A66] bg-[#EEF2FF] text-[#0B2A66]" : "border-slate-200 text-slate-500 hover:bg-slate-50"}`}>
                         <Layers size={13} /> {t.name}
-                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${t.type === "story" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"}`}>{t.type === "story" ? "Story" : "Feed"}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] ${t.type === "story" ? "bg-purple-100 text-purple-600" : "bg-blue-100 text-blue-600"}`}>{t.type === "story" ? "Story" : isStoryCapable(t) ? "Feed + Story" : "Feed"}</span>
                         {on && <CheckCircle size={13} className="text-[#16A34A]" />}
                       </button>
                     );
@@ -3072,6 +3205,70 @@ export default function SocialMedia() {
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {autoSaving ? "Salvando…" : "Salvar configuração"}
+              </button>
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+            </div>
+          </div>
+
+          {/* Formatos: Feed e/ou Stories */}
+          <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "#F3E8FF", color: "#9333EA" }}>
+                <Instagram size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slate-700">Onde publicar</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Escolha os formatos que o robô publica para cada notícia do ciclo.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <label className="flex items-center gap-2">
+                <button type="button" onClick={() => toggleAutoType("feed")}
+                  style={{ color: automation.types.includes("feed") ? "#16A34A" : "#94A3B8" }}>
+                  {automation.types.includes("feed") ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                </button>
+                <div>
+                  <span className="text-xs font-semibold text-slate-600 block">Feed</span>
+                  <span className="text-[11px] text-slate-400">Post no feed com a máscara de Feed + legenda completa.</span>
+                </div>
+              </label>
+              <label className="flex items-center gap-2">
+                <button type="button" onClick={() => toggleAutoType("story")}
+                  style={{ color: automation.types.includes("story") ? "#16A34A" : "#94A3B8" }}>
+                  {automation.types.includes("story") ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
+                </button>
+                <div>
+                  <span className="text-xs font-semibold text-slate-600 block">Stories</span>
+                  <span className="text-[11px] text-slate-400">
+                    Story (1080×1920) com o formato Story da máscara. Stories não têm legenda no Instagram.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {automation.types.includes("story") &&
+              !automation.templateIds.some((id) => { const t = templates.find((x) => x.id === id); return t ? isStoryCapable(t) : false; }) && (
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                Nenhuma máscara selecionada tem formato <b>Story</b>. Abra o template na aba
+                <b> Templates</b> e crie o formato Story (botão Feed/Story na barra), ou selecione uma máscara de Story.
+              </p>
+            )}
+            {automation.types.length === 2 && (
+              <p className="text-[11px] text-slate-400">
+                Com os dois formatos ligados, cada notícia gera 2 publicações (contam na cota de 24h) —
+                o intervalo entre posts também se aplica entre elas.
+              </p>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                style={{ background: PRIMARY }}>
+                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {autoSaving ? "Salvando…" : "Salvar formatos"}
               </button>
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
             </div>
@@ -3194,11 +3391,6 @@ export default function SocialMedia() {
             </div>
           </div>
 
-          </div>
-
-          {/* ── Coluna direita ── */}
-          <div className="space-y-5">
-
           {/* Testar automação */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
             <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Testar agora</h3>
@@ -3256,7 +3448,7 @@ export default function SocialMedia() {
                 <span className="text-xs font-semibold text-slate-500">Máscara</span>
                 <select value={manualTemplateId} onChange={(e) => setManualTemplateId(e.target.value)}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {(manualType === "story" ? templates.filter(isStoryCapable) : templates).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </label>
               <label className="block">
@@ -3296,7 +3488,6 @@ export default function SocialMedia() {
                 </span>
               )}
             </div>
-          </div>
           </div>
         </div>
       )}
@@ -3452,7 +3643,7 @@ export default function SocialMedia() {
                     onChange={(e) => setQueueForm((f) => ({ ...f, templateStoryId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
                     <option value="">Sem template (sem arte)</option>
-                    {templates.filter((t) => t.type === "story").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {templates.filter(isStoryCapable).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                 </div>
               )}

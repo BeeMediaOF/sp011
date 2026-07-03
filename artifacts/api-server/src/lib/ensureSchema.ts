@@ -23,6 +23,8 @@ export async function ensureSchema(): Promise<void> {
     // Resumo + hashtags gerados pela IA para a legenda das redes sociais.
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_summary text`,
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_hashtags text`,
+    // Variante Story (1080×1920) do template: { backgroundColor, elements }.
+    sql`ALTER TABLE social_templates ADD COLUMN IF NOT EXISTS story jsonb`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,

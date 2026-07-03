@@ -106,6 +106,20 @@ export interface SocialTemplate {
 }
 
 /**
+ * Variante Story (1080×1920) de um template cujo layout base é Feed.
+ * Persistida na coluna jsonb `story` de social_templates; NULL = sem variante.
+ */
+export interface TemplateStoryVariant {
+  backgroundColor: string;
+  backgroundGradient?: Gradient;
+  elements: TemplateElement[];
+}
+
+/** Dimensões fixas do formato Story do Instagram. */
+export const STORY_WIDTH = 1080;
+export const STORY_HEIGHT = 1920;
+
+/**
  * Dados do artigo injetados nos placeholders do template
  * (`{{title}}`, `{{category}}`, etc.). Campos opcionais degradam para "".
  */

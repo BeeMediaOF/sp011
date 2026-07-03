@@ -8,6 +8,9 @@ export const socialTemplatesTable = pgTable("social_templates", {
   height:          integer("height").notNull().default(1350),
   backgroundColor: text("background_color").notNull().default("#1a1a1a"),
   elements:        jsonb("elements").notNull().default([]),
+  /** Variante Story (1080×1920) do mesmo template: { backgroundColor, elements }.
+   *  NULL = template sem layout de story próprio. */
+  story:           jsonb("story"),
   createdAt:       timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:       timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

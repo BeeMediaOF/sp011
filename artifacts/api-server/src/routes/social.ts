@@ -17,7 +17,7 @@ import { runAutomationCycle } from "../lib/social/autoScheduler.js";
 import { buildArticleCaption } from "../lib/social/caption.js";
 import { renderArt } from "../lib/social/renderTemplate.js";
 import { encryptSecret, decryptSecret } from "../lib/crypto.js";
-import type { TemplateElement, SocialTemplate, ArticleData } from "@workspace/social-template";
+import type { TemplateElement, SocialTemplate, ArticleData, TemplateStoryVariant } from "@workspace/social-template";
 
 const router = Router();
 
@@ -279,7 +279,7 @@ router.get("/templates/:id", async (req, res) => {
 });
 
 router.post("/templates", async (req, res) => {
-  const b = req.body as Partial<SocialTemplate> & { name?: string; type?: string };
+  const b = req.body as Partial<SocialTemplate> & { name?: string; type?: string; story?: TemplateStoryVariant | null };
   const [row] = await db.insert(socialTemplatesTable).values({
     id:              randomUUID(),
     name:            b.name ?? "Novo Template",
@@ -288,19 +288,25 @@ router.post("/templates", async (req, res) => {
     height:          b.height ?? (b.type === "story" ? 1920 : 1350),
     backgroundColor: b.backgroundColor ?? "#1a1a1a",
     elements:        (b.elements ?? []) as unknown as Record<string, unknown>[],
+    story:           (b.story ?? null) as unknown as Record<string, unknown> | null,
   }).returning();
   res.json(row);
 });
 
 router.put("/templates/:id", async (req, res) => {
-  const b = req.body as Partial<SocialTemplate> & { name?: string; type?: string };
-  const updates: Record<string, unknown> = { updated_at: new Date() };
-  if (b.name            !== undefined) updates["name"]             = b.name;
-  if (b.type            !== undefined) updates["type"]             = b.type;
-  if (b.width           !== undefined) updates["width"]            = b.width;
-  if (b.height          !== undefined) updates["height"]           = b.height;
-  if (b.backgroundColor !== undefined) updates["background_color"] = b.backgroundColor;
-  if (b.elements        !== undefined) updates["elements"]         = b.elements as unknown as Record<string, unknown>[];
+  const b = req.body as Partial<SocialTemplate> & { name?: string; type?: string; story?: TemplateStoryVariant | null };
+  // Drizzle .set() mapeia por nome de propriedade camelCase (não pelo nome da coluna).
+  const updates: Partial<typeof socialTemplatesTable.$inferInsert> = { updatedAt: new Date() };
+  if (b.name            !== undefined) updates.name            = b.name;
+  if (b.type            !== undefined) updates.type            = b.type;
+  if (b.width           !== undefined) updates.width           = b.width;
+  if (b.height          !== undefined) updates.height          = b.height;
+  if (b.backgroundColor !== undefined) updates.backgroundColor = b.backgroundColor;
+  if (b.elements        !== undefined) updates.elements        = b.elements as unknown as Record<string, unknown>[];
+  // `story: null` explícito REMOVE a variante; ausente = não mexe.
+  if ("story" in (req.body as Record<string, unknown>)) {
+    updates.story = (b.story ?? null) as unknown as Record<string, unknown> | null;
+  }
   await db.update(socialTemplatesTable).set(updates).where(eq(socialTemplatesTable.id, req.params["id"]!));
   const [row] = await db.select().from(socialTemplatesTable).where(eq(socialTemplatesTable.id, req.params["id"]!)).limit(1);
   res.json(row ?? { error: "Not found" });

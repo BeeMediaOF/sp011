@@ -123,13 +123,31 @@ async function publishItem(queueId: string): Promise<void> {
         .limit(1);
 
       if (template) {
+        // Story usa a variante Story do template (1080×1920) quando existir;
+        // templates "type=story" legados já têm o layout de story no campo base.
+        const storyVariant = template.story as
+          | { backgroundColor?: string; elements?: unknown[] }
+          | null;
+        const useStoryVariant =
+          item.type === "story" &&
+          template.type !== "story" &&
+          Array.isArray(storyVariant?.elements) &&
+          storyVariant.elements.length > 0;
+        const spec = useStoryVariant
+          ? {
+              width: 1080,
+              height: 1920,
+              backgroundColor: storyVariant.backgroundColor ?? template.backgroundColor,
+              elements: (storyVariant.elements as unknown[]) as TemplateElement[],
+            }
+          : {
+              width: template.width,
+              height: template.height,
+              backgroundColor: template.backgroundColor,
+              elements: (template.elements as unknown[]) as TemplateElement[],
+            };
         const imgBuf = await renderArt(
-          {
-            width: template.width,
-            height: template.height,
-            backgroundColor: template.backgroundColor,
-            elements: (template.elements as unknown[]) as TemplateElement[],
-          },
+          spec,
           {
             // Imagem usa o título compacto da IA (se houver); o blog mantém o longo.
             title: article.socialTitle || article.title,
