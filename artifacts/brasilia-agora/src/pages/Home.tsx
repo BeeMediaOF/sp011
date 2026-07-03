@@ -225,6 +225,111 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
   );
 }
 
+function SectionHeaderClassic({ title, color, href }: { title: string; color: string; href: string }) {
+  return (
+    <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center gap-3">
+        <div className="w-1 h-5" style={{ backgroundColor: color }} />
+        <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+      </div>
+      <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+    </div>
+  );
+}
+
+/** Card com título sobre a imagem (usado por overlay/mosaico/magazine). */
+function OverlayCardClassic({ a, color, big = false, className = "" }: {
+  a: SectionArticle; color: string; big?: boolean; className?: string;
+}) {
+  return (
+    <Link href={`/artigo/${a.slug ?? a.id}`}
+      className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${className}`}>
+      {a.image && (
+        <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+          sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px"}
+          alt={a.title} width={640} height={400} loading="lazy" decoding="async"
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />
+      <div className={`absolute bottom-0 left-0 right-0 ${big ? "p-5" : "p-3"}`}>
+        <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-white px-1.5 py-0.5 mb-1.5"
+          style={{ backgroundColor: color }}>{a.chapeu}</span>
+        <p className={`${big ? "text-[22px] leading-tight line-clamp-3" : "text-[14px] leading-snug line-clamp-2"} font-black text-white`}>{a.title}</p>
+      </div>
+    </Link>
+  );
+}
+
+function SectionBlockMosaico({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const [big, ...tiles] = articles.slice(0, 5);
+  if (!big) return null;
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <SectionHeaderClassic title={title} color={color} href={href} />
+        {/* Altura travada em md+; a linha implícita precisa de minmax(0,1fr)
+            para imagens verticais não estourarem o bloco. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)] gap-3 md:h-[420px]">
+          <OverlayCardClassic a={big} color={color} big className="aspect-[16/10] md:aspect-auto md:h-full min-h-0" />
+          <div className="grid grid-cols-2 grid-rows-2 gap-3 min-h-0">
+            {tiles.slice(0, 4).map((a) => (
+              <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[16/10] md:aspect-auto md:h-full min-h-0" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionBlockOverlay({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const items = articles.slice(0, 4);
+  if (items.length === 0) return null;
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <SectionHeaderClassic title={title} color={color} href={href} />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {items.map((a) => (
+            <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[3/4]" />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SectionBlockMagazine({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const [main, ...rest] = articles;
+  if (!main) return null;
+  const grid = rest.slice(0, 4);
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        <SectionHeaderClassic title={title} color={color} href={href} />
+        <OverlayCardClassic a={main} color={color} big className="aspect-[16/9] md:aspect-[16/6]" />
+        {grid.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
+            {grid.map((a) => (
+              <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="group flex flex-col min-w-0">
+                {a.image && (
+                  <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+                    sizes="(max-width: 768px) 50vw, 25vw" alt={a.title} width={460} height={307}
+                    loading="lazy" decoding="async"
+                    className="w-full aspect-[3/2] object-cover rounded-lg mb-2 group-hover:brightness-95 transition-all" />
+                )}
+                <span className="text-[10px] font-bold uppercase tracking-wider mb-1" style={{ color }}>{a.chapeu}</span>
+                <p className="text-[14px] font-bold text-[#1a1a1a] leading-snug line-clamp-2 group-hover:underline">{a.title}</p>
+                <p className="text-[11px] text-gray-400 mt-1">{a.time}</p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Custom block renderer ────────────────────────────────────────────────────
 function CustomBlock({ block, getArticles, preview }: {
   block: HomeBlock;
@@ -298,6 +403,12 @@ function CustomBlock({ block, getArticles, preview }: {
       return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} />;
     case "manchete":
       return <SectionBlockManchete title={block.name} color={color} href={href} articles={articles} />;
+    case "mosaico":
+      return <SectionBlockMosaico title={block.name} color={color} href={href} articles={articles} />;
+    case "overlay":
+      return <SectionBlockOverlay title={block.name} color={color} href={href} articles={articles} />;
+    case "magazine":
+      return <SectionBlockMagazine title={block.name} color={color} href={href} articles={articles} />;
     case "trio":
       return <SectionBlockTrio title={block.name} color={color} href={href} articles={articles} />;
     case "compact":
@@ -361,6 +472,12 @@ function ConfigurableBlock({ block, getArticles, preview }: {
       return <SectionBlockLista title={title} color={color} href={href} articles={articles} />;
     case "manchete":
       return <SectionBlockManchete title={title} color={color} href={href} articles={articles} />;
+    case "mosaico":
+      return <SectionBlockMosaico title={title} color={color} href={href} articles={articles} />;
+    case "overlay":
+      return <SectionBlockOverlay title={title} color={color} href={href} articles={articles} />;
+    case "magazine":
+      return <SectionBlockMagazine title={title} color={color} href={href} articles={articles} />;
     case "trio":
       return <SectionBlockTrio title={title} color={color} href={href} articles={articles} />;
     case "compact":

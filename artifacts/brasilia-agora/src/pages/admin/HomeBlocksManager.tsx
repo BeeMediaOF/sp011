@@ -20,7 +20,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed";
-type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
+type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine";
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
@@ -154,6 +154,8 @@ const LAYOUTS: { id: LayoutId; label: string; desc: string; mini: React.ReactNod
   { id: "compact",  label: "Compacto",  desc: "6 mini itens",   mini: <div className="grid grid-cols-2 gap-0.5 w-full">{[0,1,2,3,4,5].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-2 h-2 bg-current rounded-sm opacity-40 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
   { id: "bigstory", label: "Big Story", desc: "1 hero + lateral", mini: <div className="flex gap-0.5 w-full"><div className="flex-[3] h-4 bg-current rounded-sm opacity-40"/><div className="flex-1 flex flex-col gap-0.5">{[0,1,2].map(i=><div key={i} className="h-1 bg-current rounded opacity-25"/>)}</div></div> },
   { id: "timeline", label: "Timeline",  desc: "Lista com linha", mini: <div className="flex flex-col gap-0.5 w-full pl-1 border-l border-current opacity-60">{[0,1,2,3].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
+  { id: "overlay",  label: "Overlay",   desc: "Título sobre a foto", mini: <div className="flex gap-0.5 w-full">{[0,1,2,3].map(i=><div key={i} className="flex-1 h-4 bg-current rounded-sm opacity-40 flex flex-col justify-end p-0.5"><div className="h-1 bg-current rounded-sm opacity-60"/></div>)}</div> },
+  { id: "magazine", label: "Magazine",  desc: "1 capa + 4 cards", mini: <div className="flex flex-col gap-0.5 w-full"><div className="w-full h-2.5 bg-current rounded-sm opacity-40"/><div className="flex gap-0.5">{[0,1,2,3].map(i=><div key={i} className="flex-1 h-1.5 bg-current rounded-sm opacity-25"/>)}</div></div> },
 ];
 
 // ─── Block defaults ───────────────────────────────────────────────────────────
@@ -523,7 +525,7 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
       { id: "hero",                        name: "Destaques",                      visible: true, order: 0, layout: "portal", area: "main" },
       { id: "ticker-ksports",              name: "Trending Now",                   visible: true, order: 1, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_BLACK, area: "main" },
       { id: "html-ksports-ad-leaderboard", name: "Publicidade — Play Win Repeat",  visible: true, order: 2, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_LEADERBOARD, color: KSPORTS_GREEN, area: "main" },
-      { id: "content-ksports-recent",      name: "Recent News",                    visible: true, order: 3, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 4, color: KSPORTS_GREEN, category: "geral", area: "main" },
+      { id: "content-ksports-recent",      name: "Recent News",                    visible: true, order: 3, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_GREEN, category: "geral", area: "main" },
       // ── Zona 2 colunas: barra lateral (Most Read → Headlines → banner) ──
       { id: "mais-lidas",                  name: "Most Read",                      visible: true, order: 4, color: KSPORTS_GREEN, area: "sidebar" },
       { id: "list-ksports-headlines",      name: "Latest Headlines",               visible: true, order: 5, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_GREEN, area: "sidebar" },

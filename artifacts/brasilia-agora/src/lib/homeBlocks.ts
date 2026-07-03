@@ -10,7 +10,8 @@ import type { FooterConfig } from "./footerConfig";
 
 export type HomeBlockLayout =
   | "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
-  | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal";
+  | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal"
+  | "overlay" | "magazine";
 
 export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"
