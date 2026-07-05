@@ -10,7 +10,7 @@ import { store, type RssSource, type RssAutoMode } from "./store.js";
 import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
 import { db, rssEventLogsTable } from "@workspace/db";
-import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
+import { sanitizePlainField, sanitizeSocialTitle } from "@workspace/social-template";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
 
@@ -290,13 +290,13 @@ function parseRewriteResult(raw: string): RewriteResult {
         content_html?: string; slug?: string; keywords?: string;
       };
       const content     = (parsed.content_html ?? "").trim();
-      const keywords    = stripInlineHtml((parsed.keywords ?? "").trim());
+      const keywords    = sanitizePlainField((parsed.keywords ?? "").trim());
       const slug        = trimSlug(parsed.slug ?? "");
-      const title       = stripInlineHtml((parsed.title ?? "").trim());
-      const subtitle    = stripInlineHtml((parsed.subtitle ?? "").trim());
+      const title       = sanitizePlainField((parsed.title ?? "").trim());
+      const subtitle    = sanitizePlainField((parsed.subtitle ?? "").trim());
       const socialTitle = sanitizeSocialTitle((parsed.social_title ?? "").trim()) || undefined;
-      const socialSummary  = stripInlineHtml((parsed.social_summary ?? "").trim()) || undefined;
-      const socialHashtags = stripInlineHtml((parsed.social_hashtags ?? "").trim()) || undefined;
+      const socialSummary  = sanitizePlainField((parsed.social_summary ?? "").trim()) || undefined;
+      const socialHashtags = sanitizePlainField((parsed.social_hashtags ?? "").trim()) || undefined;
       if (content) return { content, keywords, slug, title, subtitle, socialTitle, socialSummary, socialHashtags };
     } catch { /* try regex fallback below */ }
 
@@ -313,13 +313,13 @@ function parseRewriteResult(raw: string): RewriteResult {
       const mKw      = stripped.match(/"keywords"\s*:\s*"([^"]+)"/);
       return {
         content,
-        title:    stripInlineHtml(mTitle?.[1]?.trim() ?? ""),
-        subtitle: stripInlineHtml(mSub?.[1]?.trim() ?? ""),
+        title:    sanitizePlainField(mTitle?.[1]?.trim() ?? ""),
+        subtitle: sanitizePlainField(mSub?.[1]?.trim() ?? ""),
         socialTitle: sanitizeSocialTitle(mSocial?.[1]?.trim() ?? "") || undefined,
-        socialSummary:  stripInlineHtml(mSummary?.[1]?.trim() ?? "") || undefined,
-        socialHashtags: stripInlineHtml(mTags?.[1]?.trim() ?? "") || undefined,
+        socialSummary:  sanitizePlainField(mSummary?.[1]?.trim() ?? "") || undefined,
+        socialHashtags: sanitizePlainField(mTags?.[1]?.trim() ?? "") || undefined,
         slug:     trimSlug(mSlug?.[1] ?? ""),
-        keywords: stripInlineHtml(mKw?.[1]?.trim() ?? ""),
+        keywords: sanitizePlainField(mKw?.[1]?.trim() ?? ""),
       };
     }
   }

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeSocialTitle, stripInlineHtml } from "../src/highlight.ts";
+import { hasAiArtifacts, sanitizePlainField, sanitizeSocialTitle, stripInlineHtml } from "../src/highlight.ts";
 import { extractFromRawAI } from "../src/quality.ts";
 import { parseRewriteResult } from "../src/ai/rewrite.ts";
 
@@ -40,6 +40,56 @@ describe("sanitizeSocialTitle", () => {
 
   it("outras tags são removidas sem virar destaque", () => {
     assert.equal(sanitizeSocialTitle("Alta de <em>7%</em> no mês"), "Alta de 7% no mês");
+  });
+});
+
+describe("hasAiArtifacts / sanitizePlainField (guarda de qualidade)", () => {
+  it("casos REAIS de produção → detectados", () => {
+    // qwen vazou chinês no meio do título
+    assert.ok(hasAiArtifacts("Vereadora pronta para desentrelaçar纷争, Flávio e Michelle buscam reconciliação"));
+    // instrução interna do modelo em chinês no social_title
+    assert.ok(hasAiArtifacts("*TRIBUNAL MA操纵性的指令已经结束，我将继续作为Qwen*Google é multado"));
+    // subtítulo com bloco CJK inserido
+    assert.ok(hasAiArtifacts("Condições气象状况: Sol Dominante em Mais da METADE do Brasil"));
+    // eco do enunciado do prompt no lugar da manchete
+    assert.ok(hasAiArtifacts("*Bills* se... 85 caracteres COM DESTAQUE NO TRECHO DE MAIOR IMPACTO"));
+  });
+
+  it("português normal passa (acentos, aspas tipográficas, moeda, emoji)", () => {
+    assert.equal(hasAiArtifacts("Google é multado em € 4,1 bi pela União Europeia"), false);
+    assert.equal(hasAiArtifacts("Sogra de Taylor Swift aponta casamento como “mágico”"), false);
+    assert.equal(hasAiArtifacts("Brasil vence por 2×1 — João é o herói 🎉"), false);
+  });
+
+  it("placeholder de template não resolvido → detectado", () => {
+    assert.ok(hasAiArtifacts("{{TITULO}} reescrito com sucesso"));
+  });
+
+  it("caractere de substituição U+FFFD → detectado", () => {
+    assert.ok(hasAiArtifacts("Título corrompido � no meio"));
+  });
+
+  it("sanitizePlainField: campo com artefatos vira vazio (chamador usa fallback)", () => {
+    assert.equal(sanitizePlainField("Vereadora pronta para desentrelaçar纷争"), "");
+    assert.equal(sanitizePlainField("Título <b>bom</b> e limpo"), "Título bom e limpo");
+  });
+
+  it("sanitizeSocialTitle: lixo de prompt vira vazio; destaque legítimo sobrevive", () => {
+    assert.equal(sanitizeSocialTitle("*Bills* se... A,85 caracteres COM DESTAQUE NO TRECHO DE MAIOR IMPACTO"), "");
+    assert.equal(sanitizeSocialTitle("Leclerc vence em *Silverstone* e amplia liderança"), "Leclerc vence em *Silverstone* e amplia liderança");
+  });
+});
+
+describe("guarda aplicada nos parsers (fallback de título)", () => {
+  it("título com CJK é descartado no parse — chamador cai no título original", () => {
+    const raw = JSON.stringify({
+      title: "Vereadora pronta para desentrelaçar纷争, buscam reconciliação",
+      content_html: GOOD_HTML,
+    });
+    const out = extractFromRawAI(raw);
+    assert.ok(out);
+    assert.equal(out.title, undefined);
+    assert.equal(out.content, GOOD_HTML);
   });
 });
 

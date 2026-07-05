@@ -23,7 +23,7 @@ import {
 } from "./rssProcessor.js";
 import { logger } from "./logger.js";
 import { store } from "./store.js";
-import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
+import { sanitizePlainField, sanitizeSocialTitle } from "@workspace/social-template";
 
 // ── Content quality guard & JSON recovery ────────────────────────────────────
 
@@ -76,12 +76,12 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
     if (content.length > 20) {
       return {
         content,
-        title:       stripInlineHtml(((parsed["title"]    as string | undefined) ?? "").trim()) || undefined,
-        subtitle:    stripInlineHtml(((parsed["subtitle"] as string | undefined) ?? "").trim()) || undefined,
+        title:       sanitizePlainField(((parsed["title"]    as string | undefined) ?? "").trim()) || undefined,
+        subtitle:    sanitizePlainField(((parsed["subtitle"] as string | undefined) ?? "").trim()) || undefined,
         socialTitle: sanitizeSocialTitle(((parsed["social_title"] as string | undefined) ?? "").trim()) || undefined,
-        socialSummary:  stripInlineHtml(((parsed["social_summary"]  as string | undefined) ?? "").trim()) || undefined,
-        socialHashtags: stripInlineHtml(((parsed["social_hashtags"] as string | undefined) ?? "").trim()) || undefined,
-        keywords:    stripInlineHtml(((parsed["keywords"] as string | undefined) ?? "").trim()) || undefined,
+        socialSummary:  sanitizePlainField(((parsed["social_summary"]  as string | undefined) ?? "").trim()) || undefined,
+        socialHashtags: sanitizePlainField(((parsed["social_hashtags"] as string | undefined) ?? "").trim()) || undefined,
+        keywords:    sanitizePlainField(((parsed["keywords"] as string | undefined) ?? "").trim()) || undefined,
         slug:        ((parsed["slug"]     as string | undefined) ?? "").trim() || undefined,
       };
     }
@@ -102,12 +102,12 @@ function extractFromRawAI(raw: string): ExtractedAI | null {
       const mSlug   = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       return {
         content,
-        title:       stripInlineHtml(mTitle?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
-        subtitle:    stripInlineHtml(mSub?.[1]?.replace(/\\"/g, '"').trim() ?? "")   || undefined,
+        title:       sanitizePlainField(mTitle?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        subtitle:    sanitizePlainField(mSub?.[1]?.replace(/\\"/g, '"').trim() ?? "")   || undefined,
         socialTitle: sanitizeSocialTitle(mSocial?.[1]?.replace(/\\"/g, '"').trim() || "") || undefined,
-        socialSummary:  stripInlineHtml(mSummary?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
-        socialHashtags: stripInlineHtml(mTags?.[1]?.replace(/\\"/g, '"').trim() ?? "")   || undefined,
-        keywords:    stripInlineHtml(mKw?.[1]?.replace(/\\"/g, '"').trim() ?? "")    || undefined,
+        socialSummary:  sanitizePlainField(mSummary?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        socialHashtags: sanitizePlainField(mTags?.[1]?.replace(/\\"/g, '"').trim() ?? "")   || undefined,
+        keywords:    sanitizePlainField(mKw?.[1]?.replace(/\\"/g, '"').trim() ?? "")    || undefined,
         slug:        mSlug?.[1]?.replace(/\\"/g, '"').trim()  || undefined,
       };
     }

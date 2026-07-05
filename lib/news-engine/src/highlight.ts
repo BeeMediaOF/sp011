@@ -60,12 +60,47 @@ export function stripInlineHtml(input: string): string {
   return s.replace(/\s{2,}/g, " ").trim();
 }
 
+// Scripts não latinos: modelos locais (qwen) às vezes vazam chinês/coreano/etc.
+// no meio de campos em português. Grego, cirílico, árabe, hebraico, devanágari,
+// tailandês, kana, hangul e blocos CJK. Emojis NÃO entram (são permitidos).
+const NON_LATIN_SCRIPTS =
+  /[\u0370-\u03FF\u0400-\u04FF\u0530-\u058F\u0590-\u05FF\u0600-\u06FF\u0900-\u097F\u0E00-\u0E7F\u1100-\u11FF\u2E80-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF\uFF66-\uFF9F]/;
+
+// Eco de instruções do prompt de reescrita (o modelo repete o enunciado no
+// lugar da manchete) e placeholders de template não resolvidos.
+const PROMPT_ECHO =
+  /\{\{[A-Z_]+\}\}|\btrecho de maior impacto\b|\bmanchete de \d+\b|\b\d{2}\s*a\s*\d{2}\s*caracteres\b|\bsocial_title\b|\bcontent_html\b/i;
+
+/**
+ * True quando um campo de TEXTO PURO contém artefatos de IA: caracteres de
+ * outro alfabeto (ex.: 纷争), o caractere de substituição U+FFFD ou eco do
+ * prompt. Nesses casos o campo deve ser DESCARTADO — o chamador cai no
+ * fallback (título original da matéria / sem social_title).
+ */
+export function hasAiArtifacts(input: string): boolean {
+  const s = input ?? "";
+  if (!s) return false;
+  return s.includes("�") || NON_LATIN_SCRIPTS.test(s) || PROMPT_ECHO.test(s);
+}
+
+/**
+ * Sanitiza um campo de texto puro vindo da IA: remove HTML vazado e, se ainda
+ * restarem artefatos de IA (outro idioma, eco de prompt), devolve "" para o
+ * chamador usar o fallback em vez de publicar lixo.
+ */
+export function sanitizePlainField(input: string): string {
+  const s = stripInlineHtml(input);
+  return hasAiArtifacts(s) ? "" : s;
+}
+
 /**
  * social_title: preserva o destaque quando a IA usa `<b>`/`<strong>` no lugar
  * dos asteriscos — o par de tags vira o marcador `*…*` antes da limpeza, e o
- * sanitizador garante no máximo um par válido.
+ * sanitizador garante no máximo um par válido. Com artefatos de IA no texto,
+ * devolve "" (melhor ficar sem manchete social do que publicar lixo).
  */
 export function sanitizeSocialTitle(input: string): string {
   const withMarkers = (input ?? "").replace(/<\/?(?:b|strong)\b[^>]*>/gi, "*");
-  return sanitizeHighlightMarkers(stripInlineHtml(withMarkers));
+  const clean = sanitizeHighlightMarkers(stripInlineHtml(withMarkers));
+  return hasAiArtifacts(clean) ? "" : clean;
 }
