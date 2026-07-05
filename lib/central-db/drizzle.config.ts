@@ -13,7 +13,8 @@ if (!connectionString) {
 }
 
 export default defineConfig({
-  schema: path.join(__dirname, "./src/schema/index.ts"),
+  // replace: path.join usa "\" no Windows e o glob do drizzle-kit trata "\" como escape
+  schema: path.join(__dirname, "./src/schema/index.ts").replace(/\\/g, "/"),
   dialect: "postgresql",
   dbCredentials: {
     url: connectionString,
