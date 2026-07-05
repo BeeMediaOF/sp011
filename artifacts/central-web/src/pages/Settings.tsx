@@ -102,7 +102,6 @@ export default function Settings() {
 
   return (
     <>
-      <h2>Configurações</h2>
       {msg && <div className="card">{msg}</div>}
 
       <div className="card">

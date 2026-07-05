@@ -100,7 +100,6 @@ export default function Blogs() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Blogs conectados</h2>
         <div className="grow" />
         <button onClick={openNew}>+ Novo blog</button>
       </div>

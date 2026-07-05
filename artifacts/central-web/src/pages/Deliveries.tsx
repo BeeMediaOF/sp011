@@ -49,7 +49,6 @@ export default function Deliveries() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Entregas</h2>
         <div className="grow" />
         <select style={{ maxWidth: 200 }} value={blogId} onChange={(e) => setBlogId(e.target.value)}>
           <option value="">Todos os blogs</option>

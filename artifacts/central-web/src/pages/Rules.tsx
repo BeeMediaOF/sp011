@@ -105,7 +105,6 @@ export default function Rules() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Regras de distribuição</h2>
         <div className="grow" />
         <select style={{ maxWidth: 260 }} value={blogId} onChange={(e) => setBlogId(e.target.value)}>
           <option value="">Selecione um blog…</option>

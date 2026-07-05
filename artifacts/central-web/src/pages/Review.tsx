@@ -32,7 +32,6 @@ export default function Review() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Fila de revisão</h2>
         <div className="grow" />
         <button className="secondary small" onClick={reload}>Atualizar</button>
       </div>

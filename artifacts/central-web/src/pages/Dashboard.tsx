@@ -22,7 +22,6 @@ export default function Dashboard() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Dashboard</h2>
         <div className="grow" />
         <button className="secondary small" onClick={reload}>Atualizar</button>
       </div>

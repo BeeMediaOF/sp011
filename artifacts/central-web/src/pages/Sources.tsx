@@ -82,7 +82,6 @@ export default function Sources() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Fontes RSS</h2>
         <div className="grow" />
         <button className="secondary" onClick={runCycle}>Rodar ciclo agora</button>
         <button onClick={openNew}>+ Nova fonte</button>

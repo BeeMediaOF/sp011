@@ -37,7 +37,6 @@ export default function News() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Notícias</h2>
         <div className="grow" />
         <input style={{ maxWidth: 220 }} placeholder="Buscar título…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select style={{ maxWidth: 200 }} value={status} onChange={(e) => setStatus(e.target.value)}>

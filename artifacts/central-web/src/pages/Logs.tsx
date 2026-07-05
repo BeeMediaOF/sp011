@@ -25,7 +25,6 @@ export default function Logs() {
   return (
     <>
       <div className="toolbar">
-        <h2 style={{ margin: 0 }}>Logs de eventos</h2>
         <div className="grow" />
         <select style={{ maxWidth: 170 }} value={module_} onChange={(e) => setModule(e.target.value)}>
           {MODULES.map((m) => <option key={m} value={m}>{m || "Todos os módulos"}</option>)}
