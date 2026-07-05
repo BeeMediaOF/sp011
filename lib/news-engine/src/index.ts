@@ -9,3 +9,4 @@ export * from "./crypto.ts";
 export * from "./signing.ts";
 export * from "./ai/geminiPool.ts";
 export * from "./ai/rewrite.ts";
+export * from "./ai/perplexity.ts";

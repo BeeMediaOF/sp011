@@ -16,6 +16,7 @@ import { Router, type Request, type Response, type NextFunction } from "express"
 import { db, articlesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { verifyIngestSignature } from "@workspace/news-engine/signing";
+import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
 import { articleService } from "../lib/articleService.js";
 import { store } from "../lib/store.js";
 import { TAG_MAP } from "../lib/rssProcessor.js";
@@ -151,11 +152,13 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
 
   const category = article.category?.trim() || "geral";
   const saved = await articleService.createArticle({
-    title: article.title.trim(),
-    socialTitle: article.socialTitle?.trim() || undefined,
-    socialSummary: article.socialSummary?.trim() || undefined,
-    socialHashtags: article.socialHashtags?.trim() || undefined,
-    subtitle: article.subtitle?.trim() ?? "",
+    // Campos de texto puro: nunca aceitar HTML vindo de fora (título com <b>
+    // literal quebra card, notificação, legenda social e SEO)
+    title: stripInlineHtml(article.title.trim()),
+    socialTitle: sanitizeSocialTitle(article.socialTitle?.trim() ?? "") || undefined,
+    socialSummary: stripInlineHtml(article.socialSummary?.trim() ?? "") || undefined,
+    socialHashtags: stripInlineHtml(article.socialHashtags?.trim() ?? "") || undefined,
+    subtitle: stripInlineHtml(article.subtitle?.trim() ?? ""),
     content: article.contentHtml.trim(),
     category,
     tag: article.tag?.trim() || TAG_MAP[category] || "GERAL",

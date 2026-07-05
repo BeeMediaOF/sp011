@@ -10,11 +10,12 @@ router.use(authMiddleware);
 
 /** Resposta pública: nunca devolve segredos, só flags/hints. */
 function maskSettings(s: HubSettings) {
-  const { openaiApiKey, geminiApiKeys, ...rest } = s;
+  const { openaiApiKey, geminiApiKeys, perplexityApiKey, ...rest } = s;
   return {
     ...rest,
     hasOpenaiKey: !!openaiApiKey,
     geminiKeyHints: (geminiApiKeys ?? []).map((k) => `...${k.slice(-4)}`),
+    hasPerplexityKey: !!(perplexityApiKey || process.env["PERPLEXITY_API_KEY"]),
   };
 }
 
@@ -23,14 +24,16 @@ router.get("/", (_req, res) => {
 });
 
 router.put("/", async (req, res) => {
-  const body = (req.body ?? {}) as Partial<HubSettings> & { hasOpenaiKey?: unknown; geminiKeyHints?: unknown };
+  const body = (req.body ?? {}) as Partial<HubSettings> & { hasOpenaiKey?: unknown; geminiKeyHints?: unknown; hasPerplexityKey?: unknown };
   // Campos derivados/mascarados nunca entram no merge
   delete body.hasOpenaiKey;
   delete body.geminiKeyHints;
+  delete body.hasPerplexityKey;
   // Chaves Gemini só mudam pelas rotas dedicadas
   delete (body as Record<string, unknown>)["geminiApiKeys"];
-  // openaiApiKey: só sobrescreve quando enviada não-vazia
+  // Chaves secretas: só sobrescrevem quando enviadas não-vazias
   if (!body.openaiApiKey) delete body.openaiApiKey;
+  if (!body.perplexityApiKey) delete body.perplexityApiKey;
 
   const updated = await saveSettings(body);
   logEvent({ module: "api", message: "Configurações do hub atualizadas" });

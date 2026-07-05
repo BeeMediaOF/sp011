@@ -2,7 +2,7 @@
  * Quality gate e recuperação de JSON bruto — cópia direta de
  * `api-server/src/lib/rewriteQueue.ts` (funções puras).
  */
-import { sanitizeHighlightMarkers } from "./highlight.ts";
+import { sanitizeSocialTitle, stripInlineHtml } from "./highlight.ts";
 
 export interface ExtractedAI {
   content: string;
@@ -52,12 +52,12 @@ export function extractFromRawAI(raw: string): ExtractedAI | null {
     if (content.length > 20) {
       return {
         content,
-        title: ((parsed["title"] as string | undefined) ?? "").trim() || undefined,
-        subtitle: ((parsed["subtitle"] as string | undefined) ?? "").trim() || undefined,
-        socialTitle: sanitizeHighlightMarkers(((parsed["social_title"] as string | undefined) ?? "").trim()) || undefined,
-        socialSummary: ((parsed["social_summary"] as string | undefined) ?? "").trim() || undefined,
-        socialHashtags: ((parsed["social_hashtags"] as string | undefined) ?? "").trim() || undefined,
-        keywords: ((parsed["keywords"] as string | undefined) ?? "").trim() || undefined,
+        title: stripInlineHtml(((parsed["title"] as string | undefined) ?? "").trim()) || undefined,
+        subtitle: stripInlineHtml(((parsed["subtitle"] as string | undefined) ?? "").trim()) || undefined,
+        socialTitle: sanitizeSocialTitle(((parsed["social_title"] as string | undefined) ?? "").trim()) || undefined,
+        socialSummary: stripInlineHtml(((parsed["social_summary"] as string | undefined) ?? "").trim()) || undefined,
+        socialHashtags: stripInlineHtml(((parsed["social_hashtags"] as string | undefined) ?? "").trim()) || undefined,
+        keywords: stripInlineHtml(((parsed["keywords"] as string | undefined) ?? "").trim()) || undefined,
         slug: ((parsed["slug"] as string | undefined) ?? "").trim() || undefined,
       };
     }
@@ -78,12 +78,12 @@ export function extractFromRawAI(raw: string): ExtractedAI | null {
       const mSlug = stripped.match(/"slug"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       return {
         content,
-        title: mTitle?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-        subtitle: mSub?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-        socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.replace(/\\"/g, '"').trim() || "") || undefined,
-        socialSummary: mSummary?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-        socialHashtags: mTags?.[1]?.replace(/\\"/g, '"').trim() || undefined,
-        keywords: mKw?.[1]?.replace(/\\"/g, '"').trim() || undefined,
+        title: stripInlineHtml(mTitle?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        subtitle: stripInlineHtml(mSub?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        socialTitle: sanitizeSocialTitle(mSocial?.[1]?.replace(/\\"/g, '"').trim() || "") || undefined,
+        socialSummary: stripInlineHtml(mSummary?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        socialHashtags: stripInlineHtml(mTags?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
+        keywords: stripInlineHtml(mKw?.[1]?.replace(/\\"/g, '"').trim() ?? "") || undefined,
         slug: mSlug?.[1]?.replace(/\\"/g, '"').trim() || undefined,
       };
     }

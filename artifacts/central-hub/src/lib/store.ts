@@ -23,6 +23,25 @@ export interface HubSettings {
   /** Limite diário de REQUISIÇÕES de IA (não tokens). */
   aiDailyLimit?: number;
 
+  // ── IAs de Apoio (mesmo card do blog) ──────────────────────────────────────
+  /** Chave da Perplexity (painel tem prioridade sobre env PERPLEXITY_API_KEY). */
+  perplexityApiKey?: string;
+  /** Modelo Perplexity (padrão "sonar"). */
+  perplexityModel?: string;
+  /** Perplexity assume quando o Gemini está sem cota/chave (padrão true). */
+  fallbackPerplexityEnabled?: boolean;
+  /** Reforço: IAs de apoio drenam a fila em paralelo, sem esperar o Ollama falhar. */
+  aiBoostEnabled?: boolean;
+  aiBoostProvider?: "gemini" | "perplexity" | "both";
+  /** Rajadas agendadas por dia (ex.: 2 = a cada 12h; 0 = desligado). */
+  aiBoostTimesPerDay?: number;
+  /** Artigos processados por rajada (padrão 10). */
+  aiBoostBatchSize?: number;
+  /** Reforço contínuo enquanto a fila ≥ N (0 = desligado). */
+  aiBoostQueueThreshold?: number;
+  /** Teto diário de reescritas via apoio (0 = sem teto). */
+  aiBoostMaxPerDay?: number;
+
   collectionEnabled: boolean;
   collectionIntervalMinutes: number;
   collectionMaxPerCycle?: number;
@@ -54,7 +73,7 @@ const DEFAULT_SETTINGS: HubSettings = {
 };
 
 /** Campos secretos do blob hub_settings (criptografados at-rest). */
-const SECRET_STRING_FIELDS = ["openaiApiKey"] as const;
+const SECRET_STRING_FIELDS = ["openaiApiKey", "perplexityApiKey"] as const;
 
 const SETTINGS_KEY = "hub_settings";
 const PROMPTS_KEY = "rss_prompts";

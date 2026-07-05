@@ -10,7 +10,7 @@ import { store, type RssSource, type RssAutoMode } from "./store.js";
 import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
 import { db, rssEventLogsTable } from "@workspace/db";
-import { sanitizeHighlightMarkers } from "@workspace/social-template";
+import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
 
@@ -290,13 +290,13 @@ function parseRewriteResult(raw: string): RewriteResult {
         content_html?: string; slug?: string; keywords?: string;
       };
       const content     = (parsed.content_html ?? "").trim();
-      const keywords    = (parsed.keywords ?? "").trim();
+      const keywords    = stripInlineHtml((parsed.keywords ?? "").trim());
       const slug        = trimSlug(parsed.slug ?? "");
-      const title       = (parsed.title ?? "").trim();
-      const subtitle    = (parsed.subtitle ?? "").trim();
-      const socialTitle = sanitizeHighlightMarkers((parsed.social_title ?? "").trim()) || undefined;
-      const socialSummary  = (parsed.social_summary ?? "").trim() || undefined;
-      const socialHashtags = (parsed.social_hashtags ?? "").trim() || undefined;
+      const title       = stripInlineHtml((parsed.title ?? "").trim());
+      const subtitle    = stripInlineHtml((parsed.subtitle ?? "").trim());
+      const socialTitle = sanitizeSocialTitle((parsed.social_title ?? "").trim()) || undefined;
+      const socialSummary  = stripInlineHtml((parsed.social_summary ?? "").trim()) || undefined;
+      const socialHashtags = stripInlineHtml((parsed.social_hashtags ?? "").trim()) || undefined;
       if (content) return { content, keywords, slug, title, subtitle, socialTitle, socialSummary, socialHashtags };
     } catch { /* try regex fallback below */ }
 
@@ -313,13 +313,13 @@ function parseRewriteResult(raw: string): RewriteResult {
       const mKw      = stripped.match(/"keywords"\s*:\s*"([^"]+)"/);
       return {
         content,
-        title:    mTitle?.[1]?.trim() ?? "",
-        subtitle: mSub?.[1]?.trim() ?? "",
-        socialTitle: sanitizeHighlightMarkers(mSocial?.[1]?.trim() ?? "") || undefined,
-        socialSummary:  mSummary?.[1]?.trim() || undefined,
-        socialHashtags: mTags?.[1]?.trim() || undefined,
+        title:    stripInlineHtml(mTitle?.[1]?.trim() ?? ""),
+        subtitle: stripInlineHtml(mSub?.[1]?.trim() ?? ""),
+        socialTitle: sanitizeSocialTitle(mSocial?.[1]?.trim() ?? "") || undefined,
+        socialSummary:  stripInlineHtml(mSummary?.[1]?.trim() ?? "") || undefined,
+        socialHashtags: stripInlineHtml(mTags?.[1]?.trim() ?? "") || undefined,
         slug:     trimSlug(mSlug?.[1] ?? ""),
-        keywords: mKw?.[1]?.trim() ?? "",
+        keywords: stripInlineHtml(mKw?.[1]?.trim() ?? ""),
       };
     }
   }

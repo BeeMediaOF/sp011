@@ -10,6 +10,15 @@ interface MaskedSettings {
   aiDailyLimit?: number;
   hasOpenaiKey: boolean;
   geminiKeyHints: string[];
+  hasPerplexityKey: boolean;
+  perplexityModel?: string;
+  fallbackPerplexityEnabled?: boolean;
+  aiBoostEnabled?: boolean;
+  aiBoostProvider?: string;
+  aiBoostTimesPerDay?: number;
+  aiBoostBatchSize?: number;
+  aiBoostQueueThreshold?: number;
+  aiBoostMaxPerDay?: number;
   collectionEnabled: boolean;
   collectionIntervalMinutes: number;
   collectionMaxPerCycle?: number;
@@ -34,7 +43,7 @@ export default function Settings() {
   const { data: quota } = useLoad(() => api<Quota>("/settings/ai-quota"));
   const { data: prompts, reload: reloadPrompts } = useLoad(() => api<Prompts>("/settings/prompts"));
 
-  const [form, setForm] = useState<Partial<MaskedSettings> & { openaiApiKey?: string }>({});
+  const [form, setForm] = useState<Partial<MaskedSettings> & { openaiApiKey?: string; perplexityApiKey?: string }>({});
   const [newKey, setNewKey] = useState("");
   const [globalPrompt, setGlobalPrompt] = useState("");
   const [msg, setMsg] = useState("");
@@ -56,6 +65,15 @@ export default function Settings() {
           fallbackToGemini: form.fallbackToGemini,
           aiDailyLimit: num(form.aiDailyLimit),
           openaiApiKey: form.openaiApiKey || undefined,
+          perplexityApiKey: form.perplexityApiKey || undefined,
+          perplexityModel: form.perplexityModel || undefined,
+          fallbackPerplexityEnabled: form.fallbackPerplexityEnabled,
+          aiBoostEnabled: form.aiBoostEnabled,
+          aiBoostProvider: form.aiBoostProvider,
+          aiBoostTimesPerDay: num(form.aiBoostTimesPerDay),
+          aiBoostBatchSize: num(form.aiBoostBatchSize),
+          aiBoostQueueThreshold: num(form.aiBoostQueueThreshold),
+          aiBoostMaxPerDay: num(form.aiBoostMaxPerDay),
           collectionEnabled: form.collectionEnabled,
           collectionIntervalMinutes: num(form.collectionIntervalMinutes) ?? 20,
           collectionMaxPerCycle: num(form.collectionMaxPerCycle),
@@ -69,7 +87,7 @@ export default function Settings() {
         },
       });
       setMsg("✔ Configurações salvas");
-      setForm({ ...form, openaiApiKey: "" });
+      setForm({ ...form, openaiApiKey: "", perplexityApiKey: "" });
       reload();
     } catch (err) {
       setMsg(String((err as Error).message));
@@ -160,6 +178,62 @@ export default function Settings() {
             Ollama caiu → usar Gemini
           </label>
         </div>
+      </div>
+
+      <div className="card">
+        <h3>IAs de Apoio</h3>
+        <p className="muted">
+          Mesmo funcionamento do blog: a Perplexity assume quando o Gemini fica sem cota, e o
+          reforço automático usa Gemini/Perplexity para drenar a fila sem esperar o Ollama.
+        </p>
+        <div className="row">
+          <div>
+            <label>Chave da Perplexity {settings.hasPerplexityKey ? "✓ configurada (preencha p/ substituir)" : ""}</label>
+            <input type="password" value={form.perplexityApiKey ?? ""} onChange={(e) => setForm({ ...form, perplexityApiKey: e.target.value })} placeholder={settings.hasPerplexityKey ? "••••••••" : "pplx-…"} />
+          </div>
+          <div>
+            <label>Modelo Perplexity</label>
+            <input value={form.perplexityModel ?? ""} onChange={(e) => setForm({ ...form, perplexityModel: e.target.value })} placeholder="sonar" />
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <label className="fit row" style={{ margin: 0 }}>
+            <input className="fit" style={{ width: "auto" }} type="checkbox" checked={form.fallbackPerplexityEnabled ?? true} onChange={(e) => setForm({ ...form, fallbackPerplexityEnabled: e.target.checked })} />
+            Perplexity assume se o Gemini ficar sem cota
+          </label>
+          <label className="fit row" style={{ margin: 0 }}>
+            <input className="fit" style={{ width: "auto" }} type="checkbox" checked={form.aiBoostEnabled ?? false} onChange={(e) => setForm({ ...form, aiBoostEnabled: e.target.checked })} />
+            Reforço automático da fila
+          </label>
+        </div>
+        {(form.aiBoostEnabled ?? false) && (
+          <div className="row" style={{ marginTop: 10 }}>
+            <div>
+              <label>IA usada no reforço</label>
+              <select value={form.aiBoostProvider ?? "both"} onChange={(e) => setForm({ ...form, aiBoostProvider: e.target.value })}>
+                <option value="both">Ambas (alterna Gemini e Perplexity)</option>
+                <option value="gemini">Somente Gemini</option>
+                <option value="perplexity">Somente Perplexity</option>
+              </select>
+            </div>
+            <div>
+              <label>Rajadas por dia (0 = off)</label>
+              <input type="number" min={0} max={48} value={form.aiBoostTimesPerDay ?? 0} onChange={(e) => setForm({ ...form, aiBoostTimesPerDay: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label>Artigos por rajada</label>
+              <input type="number" min={1} value={form.aiBoostBatchSize ?? 10} onChange={(e) => setForm({ ...form, aiBoostBatchSize: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label>Reforçar c/ fila ≥ (0 = off)</label>
+              <input type="number" min={0} value={form.aiBoostQueueThreshold ?? 0} onChange={(e) => setForm({ ...form, aiBoostQueueThreshold: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label>Máx. de apoio por dia (0 = ∞)</label>
+              <input type="number" min={0} value={form.aiBoostMaxPerDay ?? 0} onChange={(e) => setForm({ ...form, aiBoostMaxPerDay: Number(e.target.value) })} />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
