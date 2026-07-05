@@ -23,11 +23,15 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
 COPY artifacts/api-server/package.json     artifacts/api-server/
 COPY artifacts/brasilia-agora/package.json artifacts/brasilia-agora/
+COPY artifacts/central-hub/package.json    artifacts/central-hub/
+COPY artifacts/central-web/package.json    artifacts/central-web/
 COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
 COPY lib/api-client-react/package.json     lib/api-client-react/
 COPY lib/api-spec/package.json             lib/api-spec/
 COPY lib/api-zod/package.json              lib/api-zod/
+COPY lib/central-db/package.json           lib/central-db/
 COPY lib/db/package.json                   lib/db/
+COPY lib/news-engine/package.json          lib/news-engine/
 COPY lib/social-template/package.json      lib/social-template/
 COPY scripts/package.json                  scripts/
 

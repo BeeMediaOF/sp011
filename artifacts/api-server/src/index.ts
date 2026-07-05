@@ -10,6 +10,23 @@ import { ensureSchema } from "./lib/ensureSchema.js";
 import { db, articlesTable } from "@workspace/db";
 import { desc, isNotNull } from "drizzle-orm";
 import { warmImageCache } from "./routes/image.js";
+import { flushAnalyticsBuffer } from "./routes/analytics.js";
+
+// ── Shutdown gracioso ─────────────────────────────────────────────────────────
+// O buffer de analytics vive em memória entre flushes; sem drenar aqui, cada
+// deploy/restart descartava até 30s de eventos coletados.
+async function shutdown(signal: string): Promise<void> {
+  try {
+    await flushAnalyticsBuffer();
+    logger.info({ signal }, "Analytics buffer drenado — encerrando");
+  } catch (err) {
+    logger.warn({ err, signal }, "Falha ao drenar o buffer de analytics no shutdown");
+  } finally {
+    process.exit(0);
+  }
+}
+process.once("SIGTERM", () => { void shutdown("SIGTERM"); });
+process.once("SIGINT",  () => { void shutdown("SIGINT"); });
 
 const rawPort = process.env["PORT"];
 

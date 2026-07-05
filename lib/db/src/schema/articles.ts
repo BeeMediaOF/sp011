@@ -33,6 +33,12 @@ export const articlesTable = pgTable("articles", {
   keywords:      text("keywords"),
   draftReason:   text("draft_reason"),
   canonicalUrl:  text("canonical_url"),
+  /**
+   * id da notícia no painel central quando o artigo chegou via /api/ingest.
+   * Âncora de idempotência (reenvio do central → replay, nunca duplica).
+   * Nulo para artigos locais (manuais, RSS local, Perplexity).
+   */
+  centralId:     text("central_id"),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({

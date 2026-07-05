@@ -40,6 +40,37 @@ services:
     depends_on:
       - api
 
+  # ── Painel Central de Notícias (coleta/reescrita/distribuição multi-blog) ──
+  # Banco próprio (CENTRAL_DATABASE_URL) e segredos PRÓPRIOS (SESSION_SECRET/
+  # SETTINGS_ENCRYPTION_KEY diferentes dos do blog). Instância única: os
+  # schedulers rodam in-process, igual à api do blog.
+  central-api:
+    build:
+      context: .
+      dockerfile: artifacts/central-hub/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - path: .env.central
+        required: false
+    environment:
+      OLLAMA_BASE_URL: "http://ollama:11434"
+    expose:
+      - "8090"          # interno (somente o Caddy acessa)
+    depends_on:
+      - ollama
+
+  central-web:
+    build:
+      context: .
+      dockerfile: artifacts/central-web/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    expose:
+      - "3001"
+    depends_on:
+      - central-api
+
   # LLM local para reescrita de artigos (grátis, roda na própria VPS via CPU).
   # Não publica porta no host — só a api acessa pela rede interna do compose.
   # Baixe o modelo uma vez após subir: docker compose exec ollama ollama pull qwen2.5:7b-instruct
@@ -60,6 +91,8 @@ services:
       - "443:443"
     environment:
       SITE_DOMAIN: "${SITE_DOMAIN:-sp011.com.br}"
+      # Host do painel central (pode ser um domínio totalmente diferente do blog)
+      CENTRAL_DOMAIN: "${CENTRAL_DOMAIN:-central.${SITE_DOMAIN:-sp011.com.br}}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data       # certificados Let's Encrypt (persistente)

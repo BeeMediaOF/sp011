@@ -350,6 +350,11 @@ export interface RetentionOptions {
 
 export interface AnalyticsStats {
   totals: { today: number; week: number; month: number; allTime: number };
+  /** Variação real vs a janela anterior de mesmo tamanho (null = sem base). */
+  trends?: {
+    today: number | null; week: number | null; month: number | null;
+    uniqueSessions: number | null; avgReadTime: number | null; bounceRate: number | null;
+  };
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
   topArticles: { id: string; title: string; views: number }[];

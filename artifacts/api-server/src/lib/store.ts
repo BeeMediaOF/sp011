@@ -35,7 +35,7 @@ const SECRET_FIELDS: Record<string, string[]> = {
   site_settings: [
     "rssAiApiKey", "diffbotApiKey", "geminiApiKey",
     "openaiApiKey", "youtubeApiKey", "webhookApiKey",
-    "perplexityApiKey",
+    "perplexityApiKey", "centralIngestSecret",
   ],
   social_config: ["pageAccessToken", "metaAppSecret"],
 };
@@ -205,6 +205,8 @@ export interface SiteSettings {
   diffbotApiKey?: string; geminiApiKey?: string; geminiApiKeys?: string[];
   openaiApiKey?: string; youtubeApiKey?: string; bylineName?: string;
   bylineLogoBase64?: string; webhookApiKey?: string; siteUrl?: string;
+  /** Segredo HMAC do painel central (só vale p/ /api/ingest; nunca dá admin). */
+  centralIngestSecret?: string;
   // ── Retenção automática de artigos (limpeza do banco) ──
   articleRetentionEnabled?: boolean;                    // liga/desliga a exclusão automática diária
   articleRetentionDays?: number;                        // idade máxima em dias (ex.: 180)
@@ -734,6 +736,7 @@ export const store = {
       hasGeminiKey:   !!s.geminiApiKey || allGeminiKeys.length > 0,
       hasOpenaiKey:   !!s.openaiApiKey,
       hasYoutubeKey:  !!s.youtubeApiKey,
+      hasCentralIngestSecret: !!s.centralIngestSecret,
     };
     delete out["rssAiApiKey"];
     delete out["diffbotApiKey"];
@@ -742,9 +745,10 @@ export const store = {
     delete out["openaiApiKey"];
     delete out["youtubeApiKey"];
     delete out["webhookApiKey"];
-    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"|"webhookApiKey"> & {
+    delete out["centralIngestSecret"];
+    return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"|"webhookApiKey"|"centralIngestSecret"> & {
       hasRssAiKey: boolean; hasDiffbotKey: boolean; hasGeminiKey: boolean;
-      hasOpenaiKey: boolean; hasYoutubeKey: boolean;
+      hasOpenaiKey: boolean; hasYoutubeKey: boolean; hasCentralIngestSecret: boolean;
     };
   },
 

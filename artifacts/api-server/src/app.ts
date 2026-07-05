@@ -154,7 +154,13 @@ app.use((req, _res, next) => {
     req.path.includes("/ads") ||
     req.path.endsWith("/me") ||
     req.path.endsWith("/settings");
-  express.json({ limit: isUploadRoute ? "10mb" : "512kb" })(req, _res, next);
+  express.json({
+    limit: isUploadRoute ? "10mb" : "512kb",
+    // Bytes crus do corpo p/ verificação HMAC do /api/ingest (painel central).
+    verify: (rawReq, _rawRes, buf) => {
+      (rawReq as unknown as { rawBody?: Buffer }).rawBody = buf;
+    },
+  })(req, _res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
 

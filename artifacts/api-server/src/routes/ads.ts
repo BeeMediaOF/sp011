@@ -2,11 +2,13 @@ import { Router } from "express";
 import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
+import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
 
 const router = Router();
 
 function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
+  // Dia calendário de Brasília (UTC-3 fixo — sem horário de verão desde 2019).
+  return new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
 }
 
 async function upsertDailyStat(adId: string, field: "impressions" | "clicks") {
@@ -117,6 +119,12 @@ router.get("/", async (_req, res) => {
 router.post("/:id/click", async (req, res) => {
   const id = req.params.id ?? "";
 
+  // Bots e flood não viram métrica de cobrança — descarte silencioso.
+  if (isBotRequest(req) || overRateLimit(`adclick:${req.ip ?? ""}`, 30)) {
+    res.json({ ok: true });
+    return;
+  }
+
   const [row] = await db
     .select({ id: adsTable.id, active: adsTable.active })
     .from(adsTable)
@@ -142,13 +150,22 @@ router.post("/:id/click", async (req, res) => {
 router.post("/:id/impression", async (req, res) => {
   const id = req.params.id ?? "";
 
+  if (isBotRequest(req) || overRateLimit(`adimp:${req.ip ?? ""}`, 60)) {
+    res.json({ ok: true });
+    return;
+  }
+
+  // Só anúncio ativo e não expirado gera impressão (clique já checava active).
   const [row] = await db
-    .select({ id: adsTable.id })
+    .select({ id: adsTable.id, active: adsTable.active, expiresAt: adsTable.expiresAt })
     .from(adsTable)
     .where(eq(adsTable.id, id))
     .limit(1);
 
-  if (!row) { res.json({ ok: true }); return; }
+  if (!row || !row.active || (row.expiresAt && row.expiresAt < new Date())) {
+    res.json({ ok: true });
+    return;
+  }
 
   await db
     .update(adsTable)

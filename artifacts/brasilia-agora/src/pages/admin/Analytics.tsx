@@ -21,11 +21,17 @@ interface AdStat {
 interface Stats {
   totals: { today: number; week: number; month: number; allTime: number };
   engagement?: { uniqueSessions: number; avgReadTime: number; bounceRate: number; readCompletions: number };
+  /** Variação real vs a janela anterior de mesmo tamanho (null = sem base de comparação).
+   *  bounceRate vem em pontos percentuais; os demais em %. */
+  trends?: {
+    today: number | null; week: number | null; month: number | null;
+    uniqueSessions: number | null; avgReadTime: number | null; bounceRate: number | null;
+  };
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
-  peakHour?: number;
+  peakHour?: number | null;
   dayOfWeekChart?: { day: string; views: number }[];
-  peakDay?: string;
+  peakDay?: string | null;
   topArticles: { id: string; title: string; views: number; avgTime?: number }[];
   topCategories: { name: string; views: number; clicks: number; articles: number }[];
   topCities?: { name: string; views: number }[];
@@ -66,16 +72,14 @@ const CAT_COLORS_ARR = ["#2563EB","#E71D36","#F97316","#16A34A","#7C3AED","#6474
 
 const REFERRER_LABELS: Record<string, string> = {
   direto: "Direto",
-  busca:  "Google",
+  busca:  "Busca (Google, Bing…)",
   social: "Redes Sociais",
-  rss:    "RSS",
   outro:  "Referência",
 };
 const REFERRER_COLORS: Record<string, string> = {
   direto: "#2563EB",
-  busca:  "#2563EB",
+  busca:  "#F97316",
   social: "#7C3AED",
-  rss:    "#F97316",
   outro:  "#16A34A",
 };
 
@@ -86,6 +90,13 @@ function fmtSecs(s: number): string {
   const m = Math.floor(s / 60);
   const rem = s % 60;
   return `${String(m).padStart(2,"0")}:${String(rem).padStart(2,"0")}`;
+}
+
+/** Formata a variação calculada pelo servidor; null = sem base de comparação. */
+function fmtDelta(v: number | null | undefined, suffix: string): string | null {
+  if (v === null || v === undefined) return null;
+  const s = v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  return `${v > 0 ? "+" : ""}${s}${suffix}`;
 }
 
 function fmtDate(d: string) {
@@ -177,7 +188,7 @@ export default function Analytics() {
     <div class="kpi"><div class="kpi-val">${stats.totals.today.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Hoje</div></div>
     <div class="kpi"><div class="kpi-val">${stats.totals.week.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 7 dias</div></div>
     <div class="kpi"><div class="kpi-val">${stats.totals.month.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 30 dias</div></div>
-    <div class="kpi"><div class="kpi-val">${(stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR")}</div><div class="kpi-lbl">Usuários únicos</div></div>
+    <div class="kpi"><div class="kpi-val">${(stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR")}</div><div class="kpi-lbl">Sessões únicas</div></div>
     <div class="kpi"><div class="kpi-val">${stats.engagement?.bounceRate ?? 0}%</div><div class="kpi-lbl">Taxa de rejeição</div></div>
   </div>
 
@@ -254,33 +265,43 @@ export default function Analytics() {
 
   const topArts = stats.topArticles ?? [];
 
+  // Tendências REAIS calculadas pelo servidor (janela atual vs 30 dias
+  // anteriores). null = sem base de comparação → badge não aparece.
+  const tr = stats.trends ?? {
+    today: null, week: null, month: null,
+    uniqueSessions: null, avgReadTime: null, bounceRate: null,
+  };
+
   const kpis = [
     {
       label:   "Visualizações de página",
       value:   (stats.totals?.month ?? 0).toLocaleString("pt-BR"),
-      pct:     "+14,3%",
-      trend:   "up",
-      sub:     "vs últimos 30 dias",
+      delta:   tr.month,
+      deltaTxt: fmtDelta(tr.month, "%"),
+      goodWhenUp: true,
+      sub:     "vs 30 dias anteriores",
       icon:    Eye,
       iconBg:  "#EEF4FF",
       iconClr: "#2563EB",
     },
     {
-      label:   "Usuários únicos",
+      label:   "Sessões únicas",
       value:   (stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR"),
-      pct:     "+12,7%",
-      trend:   "up",
-      sub:     "vs últimos 30 dias",
+      delta:   tr.uniqueSessions,
+      deltaTxt: fmtDelta(tr.uniqueSessions, "%"),
+      goodWhenUp: true,
+      sub:     "vs 30 dias anteriores",
       icon:    Users,
       iconBg:  "#ECFDF5",
       iconClr: "#16A34A",
     },
     {
-      label:   "Tempo médio de sessão",
+      label:   "Tempo médio por página",
       value:   fmtSecs(stats.engagement?.avgReadTime ?? 0),
-      pct:     "+8,6%",
-      trend:   "up",
-      sub:     "vs últimos 30 dias",
+      delta:   tr.avgReadTime,
+      deltaTxt: fmtDelta(tr.avgReadTime, "%"),
+      goodWhenUp: true,
+      sub:     "vs 30 dias anteriores",
       icon:    Clock,
       iconBg:  "#FFF7ED",
       iconClr: "#F97316",
@@ -288,9 +309,10 @@ export default function Analytics() {
     {
       label:   "Taxa de rejeição",
       value:   `${stats.engagement?.bounceRate ?? 0}%`,
-      pct:     "-6,2%",
-      trend:   "down",
-      sub:     "vs últimos 30 dias",
+      delta:   tr.bounceRate,
+      deltaTxt: fmtDelta(tr.bounceRate, " pp"),
+      goodWhenUp: false,
+      sub:     "vs 30 dias anteriores",
       icon:    TrendingDown,
       iconBg:  "#FEF2F2",
       iconClr: "#EF4444",
@@ -335,22 +357,28 @@ export default function Analytics() {
 
         {/* ── KPI cards ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {kpis.map(({ label, value, pct, trend, sub, icon: Icon, iconBg, iconClr }) => (
+          {kpis.map(({ label, value, delta, deltaTxt, goodWhenUp, sub, icon: Icon, iconBg, iconClr }) => (
             <div key={label} className="bg-white rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: CARD_SHADOW }}>
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
                   <Icon size={18} style={{ color: iconClr }} />
                 </div>
-                <span
-                  className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                    trend === "up" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-500"
-                  }`}
-                >
-                  {trend === "up"
-                    ? <ArrowUpRight size={11} />
-                    : <ArrowDownRight size={11} />}
-                  {pct}
-                </span>
+                {deltaTxt !== null && delta !== null && (
+                  <span
+                    className={`flex items-center gap-0.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                      delta === 0
+                        ? "bg-slate-50 text-slate-500"
+                        : (delta > 0) === goodWhenUp
+                          ? "bg-green-50 text-green-600"
+                          : "bg-red-50 text-red-500"
+                    }`}
+                  >
+                    {delta >= 0
+                      ? <ArrowUpRight size={11} />
+                      : <ArrowDownRight size={11} />}
+                    {deltaTxt}
+                  </span>
+                )}
               </div>
               <div>
                 <p className="text-2xl font-bold text-[#0F172A] leading-none">{value}</p>
@@ -702,7 +730,7 @@ export default function Analytics() {
           {/* Pico por hora */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por hora</h2>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por hora (Brasília)</h2>
               {stats.peakHour !== undefined && (stats.hourlyChart ?? []).some(h => h.views > 0) && (
                 <span className="text-[11px] font-semibold bg-blue-50 text-[#2563EB] px-2 py-0.5 rounded-full">
                   Pico: {String(stats.peakHour).padStart(2,"0")}h
@@ -1078,7 +1106,7 @@ export default function Analytics() {
                     icon: ExternalLink, color: "#16A34A", bg: "#ECFDF5",
                   },
                   {
-                    label: "Newsletters enviadas",
+                    label: "Inscrições na newsletter",
                     value: (stats.behaviorStats?.newsletterSignups ?? 0).toLocaleString("pt-BR"),
                     icon: Mail, color: "#F97316", bg: "#FFF7ED",
                   },

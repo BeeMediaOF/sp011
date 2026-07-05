@@ -3,6 +3,14 @@ import { useLocation } from "wouter";
 import { getConsent } from "../components/LGPDConsent";
 
 const SESSION_KEY = "bee_session_id";
+const REF_KEY     = "bee_ref_done";
+/** Teto de duração de leitura — aba esquecida aberta não vira "leitura" de horas. */
+const MAX_READ_SECONDS = 1800;
+/** Painel admin não é audiência do site. */
+const ADMIN_RE   = /^\/admin(\/|$)/;
+/** Páginas de artigo: o pageview sai de trackArticle (com id/categoria/título) —
+ *  enviar também o pageview genérico contaria cada visita em dobro. */
+const ARTICLE_RE = /^\/artigo\//;
 
 function getSessionId(): string {
   try {
@@ -24,8 +32,23 @@ function classifyReferrer(ref: string): string {
   return "outro";
 }
 
-function send(payload: Record<string, unknown>) {
-  if (getConsent() !== "accepted") return;
+/** Origem é atribuída por SESSÃO: só o primeiro pageview enviado carrega referrer.
+ *  document.referrer não muda em navegação SPA — reenviar a cada página
+ *  multiplicaria a origem pelo nº de páginas vistas na sessão. */
+function takeReferrer(): string | null {
+  try {
+    if (sessionStorage.getItem(REF_KEY)) return null;
+  } catch { /* ignore */ }
+  return classifyReferrer(document.referrer);
+}
+
+function markReferrerDone(): void {
+  try { sessionStorage.setItem(REF_KEY, "1"); } catch { /* ignore */ }
+}
+
+/** Retorna true se o evento foi de fato despachado (consentimento aceito). */
+function send(payload: Record<string, unknown>): boolean {
+  if (getConsent() !== "accepted") return false;
   const data = { ...payload, sessionId: getSessionId() };
   if (navigator.sendBeacon) {
     navigator.sendBeacon(
@@ -40,6 +63,15 @@ function send(payload: Record<string, unknown>) {
       keepalive: true,
     }).catch(() => {});
   }
+  return true;
+}
+
+/** Pageview com referrer de sessão: marca como consumido só se o envio passou
+ *  pelo gate de consentimento (senão a origem se perderia para sempre). */
+function sendPageview(extra: Record<string, unknown>): void {
+  const ref = takeReferrer();
+  const ok = send({ type: "pageview", ...(ref ? { referrer: ref } : {}), ...extra });
+  if (ok && ref) markReferrerDone();
 }
 
 export function useAnalytics() {
@@ -48,12 +80,11 @@ export function useAnalytics() {
   const prevPathRef = useRef<string>("");
   const articleIdRef = useRef<string | undefined>(undefined);
 
+  // Consentimento aceito no meio da navegação: registra a página atual.
   useEffect(() => {
     const handler = () => {
-      if (getConsent() === "accepted") {
-        send({ type: "pageview", path: location, title: document.title,
-               referrer: classifyReferrer(document.referrer) });
-      }
+      if (ADMIN_RE.test(location)) return;
+      sendPageview({ path: location, title: document.title, articleId: articleIdRef.current });
     };
     window.addEventListener("bee_consent_change", handler);
     return () => window.removeEventListener("bee_consent_change", handler);
@@ -62,26 +93,37 @@ export function useAnalytics() {
   useEffect(() => {
     const prev    = prevPathRef.current;
     const elapsed = Math.round((Date.now() - enterRef.current) / 1000);
-    if (prev && elapsed > 2) {
-      send({ type: "read", path: prev, duration: elapsed,
+    if (prev && !ADMIN_RE.test(prev) && elapsed > 2) {
+      send({ type: "read", path: prev, duration: Math.min(elapsed, MAX_READ_SECONDS),
              articleId: articleIdRef.current });
     }
 
     articleIdRef.current = undefined;
     prevPathRef.current  = location;
     enterRef.current     = Date.now();
-    send({ type: "pageview", path: location, title: document.title,
-           referrer: classifyReferrer(document.referrer) });
+    if (!ADMIN_RE.test(location) && !ARTICLE_RE.test(location)) {
+      sendPageview({ path: location, title: document.title });
+    }
 
     const onUnload = () => {
+      if (ADMIN_RE.test(location)) return;
       const dur = Math.round((Date.now() - enterRef.current) / 1000);
       if (dur > 2) {
-        send({ type: "read", path: location, duration: dur,
+        send({ type: "read", path: location, duration: Math.min(dur, MAX_READ_SECONDS),
                articleId: articleIdRef.current });
       }
     };
+    // Volta do bfcache: zera o relógio — o read até o pagehide já foi enviado;
+    // sem isso o tempo fora da página contaria de novo na próxima navegação.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) enterRef.current = Date.now();
+    };
     window.addEventListener("pagehide", onUnload);
-    return () => window.removeEventListener("pagehide", onUnload);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pagehide", onUnload);
+      window.removeEventListener("pageshow", onPageShow);
+    };
   }, [location]);
 
   function trackCategory(category: string) {
@@ -90,8 +132,7 @@ export function useAnalytics() {
 
   function trackArticle(articleId: string, title: string, category: string) {
     articleIdRef.current = articleId;
-    send({ type: "pageview", path: location, title, articleId, category,
-           referrer: classifyReferrer(document.referrer) });
+    sendPageview({ path: location, title, articleId, category });
   }
 
   function trackShare(platform: string) {
@@ -129,19 +170,36 @@ export function useScrollDepth(articleId: string | undefined) {
 
   useEffect(() => {
     milestones.current.clear();
+    const fire = (m: number) => {
+      milestones.current.add(m);
+      send({ type: "scroll", path: location, scrollDepth: m, articleId });
+    };
     const onScroll = () => {
       const el = document.documentElement;
       const total = el.scrollHeight - el.clientHeight;
       if (total <= 0) return;
       const pct = Math.floor((el.scrollTop / total) * 100);
       for (const m of [25, 50, 75, 100]) {
-        if (pct >= m && !milestones.current.has(m)) {
-          milestones.current.add(m);
-          send({ type: "scroll", path: location, scrollDepth: m, articleId });
-        }
+        if (pct >= m && !milestones.current.has(m)) fire(m);
       }
     };
+    // Artigo mais curto que a viewport nunca dispara scroll: se depois do
+    // conteúdo renderizar não há o que rolar, o leitor já viu 100%.
+    let shortTimer: number | undefined;
+    if (articleId) {
+      shortTimer = window.setTimeout(() => {
+        const el = document.documentElement;
+        if (el.scrollHeight - el.clientHeight <= 0) {
+          for (const m of [25, 50, 75, 100]) {
+            if (!milestones.current.has(m)) fire(m);
+          }
+        }
+      }, 3000);
+    }
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (shortTimer !== undefined) window.clearTimeout(shortTimer);
+    };
   }, [location, articleId]);
 }

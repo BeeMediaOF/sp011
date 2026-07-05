@@ -1,5 +1,5 @@
 import React from "react";
-import { useAds, trackClick } from "./useAds";
+import { useAds, trackClick, useAdImpression } from "./useAds";
 
 interface AdSidebarProps {
   className?: string;
@@ -21,10 +21,11 @@ export default function AdSidebar({ className = "" }: AdSidebarProps) {
   const { sidebars, loading } = useAds();
 
   const ad = sidebars[0] ?? null;
+  const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   return (
     <div className={`hidden lg:flex flex-col gap-4 w-36 shrink-0 ${className}`}>
-      <div className="sticky top-24">
+      <div ref={impressionRef} className="sticky top-24">
         {loading || !ad ? (
           <Placeholder />
         ) : (

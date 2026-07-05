@@ -1,9 +1,10 @@
 import React from "react";
-import { useAds, trackClick } from "./useAds";
+import { useAds, trackClick, useAdImpression } from "./useAds";
 
 export default function AdCentral() {
   const { ads, centrals, loading } = useAds();
   const ad = centrals[0] ?? ads[0] ?? null;
+  const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   if (loading) {
     return (
@@ -18,7 +19,7 @@ export default function AdCentral() {
   }
 
   return (
-    <div className="w-full flex justify-center">
+    <div ref={impressionRef} className="w-full flex justify-center">
       <a
         href={ad.link}
         target="_blank"

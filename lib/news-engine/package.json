@@ -1,0 +1,24 @@
+{
+  "name": "@workspace/news-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./signing": "./src/signing.ts",
+    "./dedup": "./src/dedup.ts",
+    "./crypto": "./src/crypto.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test \"test/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@google/genai": "^2.8.0",
+    "cheerio": "^1.2.0",
+    "rss-parser": "^3.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:"
+  }
+}

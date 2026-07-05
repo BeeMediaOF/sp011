@@ -95,7 +95,9 @@ export default function Artigo() {
   const { article, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
   const { trackArticle, trackShare } = useAnalytics();
-  useScrollDepth(slug);
+  // article.id (não o slug): pageview/read usam o id — com o slug seria
+  // impossível cruzar profundidade de leitura com as views do artigo.
+  useScrollDepth(article?.id);
 
   /* Track article once resolved */
   useEffect(() => {

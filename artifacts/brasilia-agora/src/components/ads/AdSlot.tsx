@@ -1,5 +1,5 @@
 import React from "react";
-import { useAds, trackClick } from "./useAds";
+import { useAds, trackClick, useAdImpression } from "./useAds";
 
 interface AdSlotProps {
   size?: "sm" | "md" | "lg" | "xl";
@@ -19,12 +19,13 @@ const SIZE_STYLES = {
 export default function AdSlot({ size = "sm", className = "", sticky = false, children }: AdSlotProps) {
   const { banners, loading } = useAds();
   const ad = banners[0] ?? null;
+  const impressionRef = useAdImpression(ad?.id);
 
   // Hide completely while loading or when there are no ads
   if (loading || !ad) return null;
 
   return (
-    <div className={`flex flex-col items-center ${sticky ? "sticky top-28" : ""} ${className}`}>
+    <div ref={impressionRef} className={`flex flex-col items-center ${sticky ? "sticky top-28" : ""} ${className}`}>
       <a href={ad.link} target="_blank" rel="noreferrer"
         onClick={() => trackClick(ad.id)}
         className={`block ${SIZE_STYLES[size]} rounded-lg border border-gray-100 overflow-hidden group relative`}

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useAds, trackClick, trackImpression, type AdSlotKey, SLOT_CONFIG } from "./useAds";
+import { useAds, trackClick, useAdImpression, type AdSlotKey, SLOT_CONFIG } from "./useAds";
 
 interface Props {
   slot: AdSlotKey;
@@ -64,14 +64,9 @@ export default function AdBanner({
     if (index >= items.length && items.length > 0) setIndex(0);
   }, [index, items.length]);
 
-  const trackedRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const ad = items[index];
-    if (ad && !trackedRef.current.has(ad.id)) {
-      trackedRef.current.add(ad.id);
-      void trackImpression(ad.id);
-    }
-  }, [index, items]);
+  // Impressão viewável: conta o anúncio corrente do carrossel quando o bloco
+  // está de fato visível (≥50% na viewport), uma vez por anúncio.
+  const impressionRef = useAdImpression(items[index]?.id);
 
   if (loading) {
     return (
@@ -104,6 +99,7 @@ export default function AdBanner({
 
       <div className="w-full flex justify-center">
         <div
+          ref={impressionRef}
           className="relative w-full group"
           style={{ aspectRatio }}
         >

@@ -10,7 +10,7 @@ import politicaFeatImg from "../assets/images/politica_feat.webp";
 import heroImg from "../assets/images/hero.webp";
 import hospitalImg from "../assets/images/hospital.webp";
 import studentsImg from "../assets/images/students.webp";
-import { useAds, trackClick } from "./ads/useAds";
+import { useAds, trackClick, useAdImpression } from "./ads/useAds";
 import { safeTitleHtml } from "@/lib/sanitize";
 
 const artigos = [
@@ -87,9 +87,10 @@ const maisLidas = [
 function AdSidebarInline() {
   const { sidebars, loading } = useAds();
   const ad = sidebars[0] ?? null;
+  const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   return (
-    <div className="mt-6">
+    <div ref={impressionRef} className="mt-6">
       <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
       {!loading && ad && (
         <a

@@ -3,6 +3,7 @@ import { eq, count, sql } from "drizzle-orm";
 import { db, articlesTable, adsTable, usersTable, articleViewsTable, categoryViewsTable, analyticsEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
+import { getPendingAnalyticsEvents } from "./analytics.js";
 import process from "process";
 
 const router = Router();
@@ -101,11 +102,20 @@ router.get("/", authMiddleware, async (_req, res) => {
     activeUsers,
     topArticleViews: topArticleViews.map((r) => ({ id: r.articleId, title: r.title, views: r.views })),
     topCategoryViews: topCategoryViews.map((r) => ({ category: r.category, views: r.views })),
-    recentAnalyticsEvents: recentEvents.map((r) => ({
-      type: r.type, path: r.path, title: r.title,
-      sessionId: r.sessionId, device: r.device,
-      ts: r.ts?.toISOString(),
-    })),
+    // Buffer em memória primeiro (eventos dos últimos ~30s ainda não persistidos),
+    // depois os já gravados — sem isso a lista atrasava um ciclo de flush.
+    recentAnalyticsEvents: [
+      ...getPendingAnalyticsEvents().slice(-20).reverse().map((ev) => ({
+        type: ev.type, path: ev.path, title: ev.title ?? null,
+        sessionId: ev.sessionId, device: ev.device,
+        ts: new Date(ev.ts).toISOString(),
+      })),
+      ...recentEvents.map((r) => ({
+        type: r.type, path: r.path, title: r.title,
+        sessionId: r.sessionId, device: r.device,
+        ts: r.ts?.toISOString(),
+      })),
+    ].slice(0, 20),
     rssSourcesCount,
     perplexityTopicsCount,
     serverUptime: process.uptime(),

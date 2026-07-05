@@ -1,5 +1,5 @@
 import React from "react";
-import { useAds, trackClick } from "./useAds";
+import { useAds, trackClick, useAdImpression } from "./useAds";
 
 interface AdInFeedProps {
   className?: string;
@@ -25,9 +25,11 @@ function Placeholder() {
 export default function AdInFeed({ className = "" }: AdInFeedProps) {
   const { banners, loading } = useAds();
   const ad = banners[0] ?? null;
+  // Placeholder não conta impressão (id undefined) — só anúncio real visível.
+  const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   return (
-    <div className={`col-span-1 md:col-span-2 lg:col-span-1 ${className}`}>
+    <div ref={impressionRef} className={`col-span-1 md:col-span-2 lg:col-span-1 ${className}`}>
       {loading || !ad ? (
         <Placeholder />
       ) : (

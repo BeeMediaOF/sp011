@@ -26,3 +26,30 @@
 		reverse_proxy web:3000
 	}
 }
+
+# ── Painel Central de Notícias (coleta/reescrita/distribuição multi-blog) ──
+# Host do painel vem de CENTRAL_DOMAIN (default: central.<SITE_DOMAIN>, definido
+# no docker-compose). Requer registro DNS apontando esse host para o IP da VPS.
+{$CENTRAL_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# API do painel central → container central-api:8090
+	handle /api/* {
+		reverse_proxy central-api:8090
+	}
+
+	# SPA do painel → central-web:3001
+	handle {
+		reverse_proxy central-web:3001
+	}
+}

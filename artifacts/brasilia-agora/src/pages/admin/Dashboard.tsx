@@ -102,6 +102,12 @@ export default function Dashboard() {
   const totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
   const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0,00";
 
+  // Tendências reais vindas do servidor (null = sem base de comparação → sem badge).
+  const fmtDelta = (v: number | null | undefined): string | null =>
+    v === null || v === undefined
+      ? null
+      : `${v > 0 ? "+" : ""}${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
+
   const kpis = [
     {
       label: "Publicados",
@@ -109,8 +115,8 @@ export default function Dashboard() {
       icon: FileText,
       iconBg: "#DCFCE7",
       iconColor: "#16A34A",
-      pct: "+12,4%",
-      sub: "vs últimos 7 dias",
+      delta: null as number | null,
+      sub: "total no portal",
     },
     {
       label: "Rascunhos",
@@ -118,8 +124,8 @@ export default function Dashboard() {
       icon: FileText,
       iconBg: "#FEF3C7",
       iconColor: "#F59E0B",
-      pct: "+8,7%",
-      sub: "vs últimos 7 dias",
+      delta: null as number | null,
+      sub: "aguardando revisão",
     },
     {
       label: "Views hoje",
@@ -127,17 +133,17 @@ export default function Dashboard() {
       icon: Eye,
       iconBg: "#FEE2E2",
       iconColor: "#E71D36",
-      pct: "+14,3%",
+      delta: stats?.trends?.today ?? null,
       sub: "vs ontem",
     },
     {
-      label: "Views esta semana",
+      label: "Views · 7 dias",
       value: weekViews,
       icon: TrendingUp,
       iconBg: "#DBEAFE",
       iconColor: "#2563EB",
-      pct: "+9,8%",
-      sub: "vs semana passada",
+      delta: stats?.trends?.week ?? null,
+      sub: "vs 7 dias anteriores",
     },
   ];
 
@@ -179,7 +185,7 @@ export default function Dashboard() {
 
         {/* ── KPI cards ────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {kpis.map(({ label, value, icon: Icon, iconBg, iconColor, pct, sub }) => (
+          {kpis.map(({ label, value, icon: Icon, iconBg, iconColor, delta, sub }) => (
             <div
               key={label}
               className="bg-white rounded-2xl p-5 flex flex-col gap-3"
@@ -189,9 +195,17 @@ export default function Dashboard() {
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: iconBg }}>
                   <Icon size={18} style={{ color: iconColor }} />
                 </div>
-                <span className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                  {pct}
-                </span>
+                {fmtDelta(delta) !== null && (
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                    (delta ?? 0) > 0
+                      ? "text-green-600 bg-green-50"
+                      : (delta ?? 0) < 0
+                        ? "text-red-500 bg-red-50"
+                        : "text-slate-500 bg-slate-50"
+                  }`}>
+                    {fmtDelta(delta)}
+                  </span>
+                )}
               </div>
               <div>
                 <p className="text-2xl font-bold text-[#0B2A66] leading-none">
@@ -369,10 +383,12 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-4 gap-4">
               {[
-                { label: "Ativas",      value: activeAds.length.toString(),                   up: null },
-                { label: "Impressões",  value: totalImpressions.toLocaleString("pt-BR"),       up: "+16,4%" },
-                { label: "Cliques",     value: totalClicks.toLocaleString("pt-BR"),            up: "+9,5%" },
-                { label: "CTR",         value: `${ctr}%`,                                      up: "+1,1%" },
+                // Sem % fake aqui: totais de anúncio são acumulados (all-time),
+                // não há janela anterior comparável neste card.
+                { label: "Ativas",      value: activeAds.length.toString(),              up: null },
+                { label: "Impressões",  value: totalImpressions.toLocaleString("pt-BR"), up: null },
+                { label: "Cliques",     value: totalClicks.toLocaleString("pt-BR"),      up: null },
+                { label: "CTR",         value: `${ctr}%`,                                up: null },
               ].map(({ label, value, up }) => (
                 <div key={label} className="text-center">
                   <p className="text-xl font-bold text-[#0B2A66]">{loading ? "—" : value}</p>

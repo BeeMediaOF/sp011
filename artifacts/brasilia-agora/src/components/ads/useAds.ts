@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07" | "slot_08" | "slot_09" | "slot_10" | "slot_11";
 
@@ -109,4 +109,36 @@ export function trackClick(adId: string) {
 
 export function trackImpression(adId: string) {
   return fetch(`/api/ads/${adId}/impression`, { method: "POST" }).catch(() => {});
+}
+
+/**
+ * Impressão "viewável": conta quando ≥50% do anúncio entra na viewport
+ * (IntersectionObserver), uma vez por anúncio por montagem — nunca no render,
+ * senão banner abaixo da dobra que ninguém viu contaria impressão.
+ * Uso: `const adRef = useAdImpression(ad?.id)` e `ref={adRef}` no contêiner.
+ */
+export function useAdImpression(adId: string | null | undefined): (el: HTMLElement | null) => void {
+  const seen = useRef<Set<string>>(new Set());
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (!el) { setVisible(false); return; }
+    if (typeof IntersectionObserver === "undefined") { setVisible(true); return; }
+    const obs = new IntersectionObserver(
+      (entries) => { setVisible(entries.some((e) => e.isIntersecting)); },
+      { threshold: 0.5 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [el]);
+
+  useEffect(() => {
+    if (visible && adId && !seen.current.has(adId)) {
+      seen.current.add(adId);
+      void trackImpression(adId);
+    }
+  }, [visible, adId]);
+
+  return setEl;
 }
