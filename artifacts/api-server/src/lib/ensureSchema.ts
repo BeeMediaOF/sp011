@@ -12,11 +12,15 @@
  *
  * É seguro rodar a cada boot: `IF NOT EXISTS` é no-op quando a coluna já existe.
  */
-import { db } from "@workspace/db";
+import { db, type Db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 
-export async function ensureSchema(): Promise<void> {
+/**
+ * `target` permite rodar as mesmas migrações num banco CANDIDATO (assistente de
+ * instalação/troca de banco) sem tocar na conexão corrente do processo.
+ */
+export async function ensureSchema(target: Db = db): Promise<void> {
   const statements = [
     // Título compacto para as artes sociais (não afeta o blog).
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_title text`,
@@ -48,7 +52,7 @@ export async function ensureSchema(): Promise<void> {
   ];
   for (const stmt of statements) {
     try {
-      await db.execute(stmt);
+      await target.execute(stmt);
     } catch (err) {
       logger.warn({ err }, "ensureSchema: falha ao aplicar ALTER TABLE (não-fatal)");
     }

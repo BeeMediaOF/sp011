@@ -45,31 +45,38 @@ const LOCAL_UPLOADS_DIR = join(__dirname, "../../data/uploads");
 if (!existsSync(LOCAL_UPLOADS_DIR)) mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
 
 // ── Supabase Storage (REST API) ────────────────────────────────────────────────
-const SUPABASE_URL = (process.env["SUPABASE_URL"] ?? "").replace(/\/+$/, "");
-const SERVICE_KEY = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
-const BUCKET = process.env["SUPABASE_STORAGE_BUCKET"] ?? "uploads";
 const STORAGE_PREFIX = "uploads"; // objects stored at <bucket>/uploads/<filename>
 
-const storageConfigured = !!(SUPABASE_URL && SERVICE_KEY);
+// Lido sob demanda (não no import): quando a conexão vem do arquivo do
+// assistente de instalação, o boot injeta SUPABASE_URL/SERVICE_ROLE_KEY em
+// process.env DEPOIS deste módulo carregar. A env explícita continua mandando.
+function storageEnv(): { url: string; key: string; bucket: string; configured: boolean } {
+  const url = (process.env["SUPABASE_URL"] ?? "").replace(/\/+$/, "");
+  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
+  const bucket = process.env["SUPABASE_STORAGE_BUCKET"] ?? "uploads";
+  return { url, key, bucket, configured: !!(url && key) };
+}
 
-// In production we require object storage — silently writing to local disk would
-// scatter files across ephemeral instances and lose them on redeploy.
-if (isProd && !storageConfigured) {
-  logger.error(
-    "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas — uploads ficarão indisponíveis em produção. " +
-      "Configure o Supabase Storage para habilitar o envio de imagens/vídeos.",
-  );
+/** Aviso de produção sem object storage — chamado no boot, após resolver a conexão. */
+export function warnIfStorageUnconfigured(): void {
+  if (isProd && !storageEnv().configured) {
+    logger.error(
+      "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas — uploads ficarão indisponíveis em produção. " +
+        "Configure o Supabase Storage para habilitar o envio de imagens/vídeos.",
+    );
+  }
 }
 
 function objectUrl(filename: string): string {
-  return `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${STORAGE_PREFIX}/${encodeURIComponent(filename)}`;
+  const { url, bucket } = storageEnv();
+  return `${url}/storage/v1/object/${bucket}/${STORAGE_PREFIX}/${encodeURIComponent(filename)}`;
 }
 
 async function storageUpload(filename: string, buffer: Buffer, contentType: string): Promise<void> {
   const res = await fetch(objectUrl(filename), {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${SERVICE_KEY}`,
+      Authorization: `Bearer ${storageEnv().key}`,
       "Content-Type": contentType,
       "x-upsert": "true",
       "cache-control": "31536000",
@@ -85,7 +92,7 @@ async function storageDownload(
 ): Promise<{ stream: ReadableStream<Uint8Array>; contentType: string; contentLength: string | null } | null> {
   try {
     const res = await fetch(objectUrl(filename), {
-      headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+      headers: { Authorization: `Bearer ${storageEnv().key}` },
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok || !res.body) return null;
@@ -104,10 +111,10 @@ async function storageDownload(
 async function loadRawBuffer(
   filename: string,
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
-  if (storageConfigured) {
+  if (storageEnv().configured) {
     try {
       const res = await fetch(objectUrl(filename), {
-        headers: { Authorization: `Bearer ${SERVICE_KEY}` },
+        headers: { Authorization: `Bearer ${storageEnv().key}` },
         signal: AbortSignal.timeout(30_000),
       });
       if (res.ok) {
@@ -191,7 +198,7 @@ router.post("/image", authMiddleware, requirePermission("upload.images"), upload
     return;
   }
 
-  if (isProd && !storageConfigured) {
+  if (isProd && !storageEnv().configured) {
     res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
     return;
   }
@@ -199,7 +206,7 @@ router.post("/image", authMiddleware, requirePermission("upload.images"), upload
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (storageConfigured) {
+    if (storageEnv().configured) {
       await storageUpload(filename, req.file.buffer, req.file.mimetype);
       logger.info({ filename, size: req.file.size, storage: "supabase" }, "Image uploaded to Supabase Storage");
     } else {
@@ -235,7 +242,7 @@ router.post("/media", authMiddleware, requirePermission("upload.images"), upload
     return;
   }
 
-  if (isProd && !storageConfigured) {
+  if (isProd && !storageEnv().configured) {
     res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
     return;
   }
@@ -243,7 +250,7 @@ router.post("/media", authMiddleware, requirePermission("upload.images"), upload
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (storageConfigured) {
+    if (storageEnv().configured) {
       await storageUpload(filename, req.file.buffer, req.file.mimetype);
       logger.info({ filename, size: req.file.size, mediaType, storage: "supabase" }, "Media uploaded to Supabase Storage");
     } else {
@@ -324,7 +331,7 @@ router.get("/:filename", async (req, res) => {
   }
 
   // 1. Try Supabase Storage first — stream the object straight through.
-  if (storageConfigured) {
+  if (storageEnv().configured) {
     const result = await storageDownload(filename);
     if (result) {
       res.setHeader("Content-Type", result.contentType);

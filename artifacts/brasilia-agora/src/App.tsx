@@ -51,6 +51,7 @@ function lazyWithPreload<T extends React.ComponentType<never>>(
 
 /* ─── Lazy — páginas admin (jamais carregadas por visitantes) ─── */
 const Login            = lazy(() => import("@/pages/admin/Login"));
+const Setup            = lazy(() => import("@/pages/admin/Setup"));
 /* Shell persistente do painel: sidebar + topbar montados uma única vez acima
    das rotas admin — trocar de aba não remonta o layout ("flash" de reload). */
 const loadAdminShell   = () => import("@/components/admin/AdminLayout").then((m) => ({ default: m.AdminShell }));
@@ -166,7 +167,8 @@ function AnalyticsProvider() {
 
 function Router() {
   const [location] = useLocation();
-  const isAdminArea = /^\/admin(\/|$)/.test(location) && location !== "/admin/login";
+  const isAdminArea =
+    /^\/admin(\/|$)/.test(location) && location !== "/admin/login" && location !== "/admin/setup";
 
   // Ao entrar no admin, pré-carrega os chunks das demais abas em segundo plano
   // para que a navegação entre elas fique instantânea.
@@ -180,6 +182,8 @@ function Router() {
       <Switch>
         {/* ── Admin routes ── */}
         <Route path="/admin/login" component={Login} />
+        {/* Assistente de instalação — instância nova sem banco (sem auth) */}
+        <Route path="/admin/setup" component={Setup} />
 
         <Route path="/admin/artigos/novo">
           <RequireAdmin><ArticleEdit /></RequireAdmin>

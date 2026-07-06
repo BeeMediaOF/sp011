@@ -3,8 +3,9 @@ import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import router from "./routes";
+import setupRouter from "./routes/setup";
 import { logger } from "./lib/logger";
-import { startScheduler } from "./lib/scheduler";
+import { isDbReady } from "./lib/setupState";
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -164,8 +165,21 @@ app.use((req, _res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: "512kb" }));
 
+// Assistente de instalação: única superfície viva sem banco configurado.
+app.use("/api/setup", setupRouter);
+
+// Modo instalação: todo o resto responde 503 e o frontend redireciona para o
+// assistente (/admin/setup). Instalado, o gate é um no-op por requisição.
+app.use("/api", (_req, res, next) => {
+  if (!isDbReady()) {
+    res.status(503).json({ error: "setup_required", setupRequired: true });
+    return;
+  }
+  next();
+});
+
 app.use("/api", router);
 
-startScheduler();
+// startScheduler() saiu do import: roda no index.ts, após o banco inicializar.
 
 export default app;

@@ -17,6 +17,12 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
+    // Instância sem banco configurado: toda a API responde 503 setupRequired —
+    // leva o operador direto ao assistente de instalação.
+    if (res.status === 503 && (err as { setupRequired?: boolean }).setupRequired) {
+      if (window.location.pathname !== "/admin/setup") window.location.href = "/admin/setup";
+      throw new Error("Instalação necessária. Redirecionando para o assistente…");
+    }
     if (res.status === 401) {
       localStorage.removeItem("admin_token");
       localStorage.removeItem("admin_role");

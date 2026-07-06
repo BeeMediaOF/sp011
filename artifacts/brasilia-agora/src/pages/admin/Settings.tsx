@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { BRAND } from "../../brand";
 import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
+import DatabaseCard from "../../components/admin/DatabaseCard";
 import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission, type RetentionOptions } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
@@ -1028,6 +1029,7 @@ export default function Settings() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             {/* ── Coluna esquerda ── */}
             <div className="space-y-5">
+            <DatabaseCard/>
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<Link2 size={15}/>} label="Google Tag Manager"/>
               <p className="text-xs text-[#94A3B8]">
