@@ -1,0 +1,52 @@
+# Instância de blog replicado — usa as imagens pré-buildadas no /opt/sp011
+# (docker compose build api web → blog-api:vN / blog-web:vN). Cada blog é um
+# projeto compose próprio (COMPOSE_PROJECT_NAME no .env), com rede privada
+# entre api↔web e presença na rede compartilhada blogs_shared (Caddy/pg-blogs).
+#
+# Uso: copie este arquivo + .env.example para /opt/blogs/<id>/ e preencha o
+# .env. Guia completo: deploy/README.md
+services:
+  api:
+    image: blog-api:${BLOG_IMAGE_TAG:-v1}
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      # db-config.enc do assistente de instalação (/admin/setup)
+      - api_data:/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks:
+      default: {}
+      blogs:
+        # Alias ÚNICO na rede compartilhada — é o nome que o Caddy usa.
+        aliases: ["${BLOG_ID}-api"]
+
+  web:
+    image: blog-web:${BLOG_IMAGE_TAG:-v1}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      BASE_PATH: "/"
+      # ALIAS ÚNICO obrigatório: "http://api:8080" é ambíguo na blogs_shared
+      # (todo blog ganha o alias automático "api" lá — o SSR/OG poderia buscar
+      # dados de OUTRO blog). O vite preview lê API_URL em runtime.
+      API_URL: "http://${BLOG_ID}-api:8080"
+    depends_on:
+      - api
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    networks:
+      default: {}
+      blogs:
+        aliases: ["${BLOG_ID}-web"]
+
+networks:
+  blogs:
+    external: true
+    name: blogs_shared
+
+volumes:
+  api_data:

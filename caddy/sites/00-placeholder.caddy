@@ -1,0 +1,12 @@
+# Placeholder: garante que o glob `import /etc/caddy/sites/*.caddy` do
+# Caddyfile nunca fique vazio (glob sem match quebra o import em versões
+# antigas do Caddy). Não remova.
+#
+# Cada blog replicado é um arquivo <id>.caddy neste diretório, com 3 linhas:
+#
+#   cliente-a.seudominio.com.br {
+#       import blog cliente-a
+#   }
+#
+# Depois de criar/remover um arquivo:
+#   docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile

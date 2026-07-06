@@ -6,6 +6,10 @@
 
 services:
   api:
+    # O build tagueia a imagem compartilhada pelos blogs replicados
+    # (/opt/blogs/* usam blog-api:<tag> sem rebuildar). Atenção: incluir
+    # "image:" muda o config-hash — um `up -d` recria o container.
+    image: blog-api:${BLOG_IMAGE_VERSION:-v1}
     build:
       context: .
       dockerfile: artifacts/api-server/Dockerfile
@@ -30,6 +34,7 @@ services:
       - ollama
 
   web:
+    image: blog-web:${BLOG_IMAGE_VERSION:-v1}
     build:
       context: .
       dockerfile: artifacts/brasilia-agora/Dockerfile
@@ -75,6 +80,22 @@ services:
     depends_on:
       - central-api
 
+  # ── Postgres dos blogs replicados (um DATABASE + uma ROLE por blog) ────────
+  # Sem porta no host: alcançável só pela rede blogs_shared (pg-blogs:5432).
+  # Criação de banco por blog: ver deploy/README.md. Backup externo é
+  # responsabilidade nossa (Fase 1 do plano de replicação).
+  pg-blogs:
+    image: postgres:16
+    restart: unless-stopped
+    shm_size: 256mb
+    environment:
+      # Defina no .env da raiz: PG_BLOGS_SUPERPASS=$(openssl rand -hex 24)
+      POSTGRES_PASSWORD: "${PG_BLOGS_SUPERPASS:-}"
+    volumes:
+      - pgblogs_data:/var/lib/postgresql/data
+    networks:
+      - blogs
+
   # LLM local para reescrita de artigos (grátis, roda na própria VPS via CPU).
   # Não publica porta no host — só a api acessa pela rede interna do compose.
   # Baixe o modelo uma vez após subir: docker compose exec ollama ollama pull qwen2.5:7b-instruct
@@ -99,14 +120,26 @@ services:
       CENTRAL_DOMAIN: "${CENTRAL_DOMAIN:-central.${SITE_DOMAIN:-sp011.com.br}}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/sites:/etc/caddy/sites:ro   # 1 arquivo .caddy por blog replicado
       - caddy_data:/data       # certificados Let's Encrypt (persistente)
       - caddy_config:/config
     depends_on:
       - web
       - api
+    networks:
+      - default        # sp011 + central (api/web/central-*)
+      - blogs          # blogs replicados (aliases <id>-api/<id>-web)
+
+# Rede compartilhada entre o caddy/pg-blogs e os blogs replicados. O projeto
+# raiz é o dono; os compose dos blogs (/opt/blogs/*) a referenciam como
+# external (name: blogs_shared).
+networks:
+  blogs:
+    name: blogs_shared
 
 volumes:
   caddy_data:
   caddy_config:
   ollama_models:     # modelos do Ollama (persistem entre deploys/reinícios)
   api_data:          # db-config.enc do assistente de instalação (blog instalável)
+  pgblogs_data:      # dados do Postgres dos blogs replicados

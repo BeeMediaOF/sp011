@@ -1,6 +1,33 @@
 # Proxy reverso com HTTPS automático (Let's Encrypt).
 # Requer: domínio (SITE_DOMAIN) apontando para o IP da VPS e portas 80/443 abertas.
 # Para incluir o www, troque a 1ª linha por:  {$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
+
+# ── Blogs replicados (/opt/blogs/<id>) ──────────────────────────────────────
+# Cada blog é um arquivo de 3 linhas em caddy/sites/<id>.caddy:
+#   dominio.com.br { import blog <id> }
+# O snippet SEMPRE aponta para os aliases únicos <id>-api/<id>-web da rede
+# blogs_shared — nunca para "api"/"web" (ambíguos entre instâncias lá).
+(blog) {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy {args[0]}-api:8080
+	}
+
+	handle {
+		reverse_proxy {args[0]}-web:3000
+	}
+}
+
 {$SITE_DOMAIN} {
 	encode gzip zstd
 
@@ -53,3 +80,6 @@
 		reverse_proxy central-web:3001
 	}
 }
+
+# ── Blogs replicados: um arquivo <id>.caddy por blog (montado do host) ──────
+import /etc/caddy/sites/*.caddy
