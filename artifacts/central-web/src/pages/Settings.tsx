@@ -282,9 +282,6 @@ export default function Settings() {
             <input type="number" value={form.maxPendingRewrites ?? 30} onChange={(e) => setForm({ ...form, maxPendingRewrites: Number(e.target.value) })} />
           </div>
         </div>
-        <div style={{ marginTop: 14 }}>
-          <button onClick={save}>Salvar configurações</button>
-        </div>
       </div>
 
       <div className="card">
@@ -294,6 +291,12 @@ export default function Settings() {
         <div style={{ marginTop: 10 }}>
           <button onClick={savePrompt}>Salvar prompt</button>
         </div>
+      </div>
+
+      {/* Sempre visível (sticky): salva os cards de IA, IAs de Apoio e Coleta. */}
+      <div className="savebar">
+        {msg && <span className="savebar-msg">{msg}</span>}
+        <button onClick={save}>Salvar configurações</button>
       </div>
     </>
   );
