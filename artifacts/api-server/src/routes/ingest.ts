@@ -161,7 +161,9 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
     subtitle: stripInlineHtml(article.subtitle?.trim() ?? ""),
     content: article.contentHtml.trim(),
     category,
-    tag: article.tag?.trim() || TAG_MAP[category] || "GERAL",
+    // Categoria fora do mapa PT (ex.: slugs EN "world-cup"/"formula-1") vira
+    // tag derivada dela mesma — nunca o rótulo "GERAL" em blog não-PT.
+    tag: article.tag?.trim() || TAG_MAP[category] || category.replace(/-/g, " ").toUpperCase(),
     imageUrl: article.imageUrl?.trim() ?? "",
     // Assinatura padrão configurável (blog EN não pode nascer com "Redação")
     author: store.getSettings().bylineName?.trim() || "Redação",
