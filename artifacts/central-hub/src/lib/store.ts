@@ -17,6 +17,10 @@ export interface HubSettings {
   aiModel?: string;
   geminiApiKeys: string[];
   openaiApiKey?: string;
+  /** Pool adicional de chaves OpenAI-compatíveis (rodízio; soma com a única). */
+  openaiApiKeys?: string[];
+  /** Endpoint compatível com OpenAI (Groq/OpenRouter/DeepSeek…). Vazio = api.openai.com. */
+  openaiBaseUrl?: string;
   ollamaBaseUrl?: string;
   /** Fallback Ollama→Gemini ligado (padrão true). */
   fallbackToGemini?: boolean;
@@ -26,6 +30,8 @@ export interface HubSettings {
   // ── IAs de Apoio (mesmo card do blog) ──────────────────────────────────────
   /** Chave da Perplexity (painel tem prioridade sobre env PERPLEXITY_API_KEY). */
   perplexityApiKey?: string;
+  /** Pool adicional de chaves Perplexity (rodízio; soma com a única/env). */
+  perplexityApiKeys?: string[];
   /** Modelo Perplexity (padrão "sonar"). */
   perplexityModel?: string;
   /** Perplexity assume quando o Gemini está sem cota/chave (padrão true). */
@@ -93,12 +99,18 @@ let _settings: HubSettings = { ...DEFAULT_SETTINGS };
 let _prompts: PromptsBlob = {};
 let _initialized = false;
 
+/** Campos-array de chaves secretas (criptografados item a item). */
+const SECRET_ARRAY_FIELDS = ["geminiApiKeys", "openaiApiKeys", "perplexityApiKeys"] as const;
+
 function decryptSettings(raw: HubSettings): HubSettings {
   const out: HubSettings = { ...raw };
   for (const f of SECRET_STRING_FIELDS) {
     if (out[f]) out[f] = decryptSecret(out[f]!);
   }
-  out.geminiApiKeys = (out.geminiApiKeys ?? []).map((k) => decryptSecret(k));
+  for (const f of SECRET_ARRAY_FIELDS) {
+    if (out[f]) out[f] = out[f]!.map((k) => decryptSecret(k));
+  }
+  out.geminiApiKeys = out.geminiApiKeys ?? [];
   return out;
 }
 
@@ -107,7 +119,10 @@ function encryptSettings(plain: HubSettings): HubSettings {
   for (const f of SECRET_STRING_FIELDS) {
     if (out[f]) out[f] = encryptSecret(out[f]!);
   }
-  out.geminiApiKeys = (out.geminiApiKeys ?? []).map((k) => encryptSecret(k));
+  for (const f of SECRET_ARRAY_FIELDS) {
+    if (out[f]) out[f] = out[f]!.map((k) => encryptSecret(k));
+  }
+  out.geminiApiKeys = out.geminiApiKeys ?? [];
   return out;
 }
 

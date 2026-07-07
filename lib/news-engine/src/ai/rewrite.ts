@@ -160,12 +160,16 @@ async function callOpenAI(
   apiKey: string,
   model: string,
   prompt: string,
+  baseUrl?: string,
 ): Promise<{ text: string; usage?: OpenAiLikeUsage }> {
+  // Endpoint compatível com OpenAI: permite Groq, OpenRouter, DeepSeek,
+  // Mistral etc. só trocando a base URL nas configurações.
+  const url = `${(baseUrl || "https://api.openai.com").replace(/\/+$/, "")}/v1/chat/completions`;
   const maxAttempts = 3;
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
@@ -206,6 +210,8 @@ export interface RewriteEngineConfig {
   /** Obrigatório para provider "gemini" (e para o fallback do Ollama). */
   geminiPool?: GeminiPool;
   openaiApiKey?: string;
+  /** Endpoint compatível com OpenAI (Groq/OpenRouter/DeepSeek…). Default: api.openai.com. */
+  openaiBaseUrl?: string;
   ollamaBaseUrl?: string;
   /** Ollama indisponível → cai para o Gemini (requer geminiPool). Default true. */
   fallbackToGemini?: boolean;
@@ -253,7 +259,7 @@ export async function rewriteNews(input: RewriteInput, cfg: RewriteEngineConfig)
   if (cfg.provider === "openai") {
     if (!cfg.openaiApiKey) throw new Error("API key da OpenAI não configurada");
     const model = cfg.model || "gpt-4o-mini";
-    const { text, usage } = await callOpenAI(cfg.openaiApiKey, model, prompt);
+    const { text, usage } = await callOpenAI(cfg.openaiApiKey, model, prompt, cfg.openaiBaseUrl);
     return {
       ...parseRewriteResult(text),
       usage: {
@@ -307,7 +313,7 @@ async function callTextModel(
   if (cfg.provider === "openai") {
     if (!cfg.openaiApiKey) throw new Error("API key da OpenAI não configurada");
     const model = cfg.model || "gpt-4o-mini";
-    const { text, usage } = await callOpenAI(cfg.openaiApiKey, model, prompt);
+    const { text, usage } = await callOpenAI(cfg.openaiApiKey, model, prompt, cfg.openaiBaseUrl);
     return {
       text,
       usage: {

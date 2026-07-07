@@ -87,15 +87,34 @@ function burstIntervalMs(cfg: BoostConfig): number {
   return Math.floor((24 * 3600 * 1000) / Math.max(1, cfg.timesPerDay));
 }
 
-function perplexityKey(s: HubSettings): string | undefined {
-  return s.perplexityApiKey || process.env["PERPLEXITY_API_KEY"] || undefined;
+/** Pool de chaves Perplexity: única do painel + adicionais + env (dedup). */
+function perplexityKeys(s: HubSettings): string[] {
+  const keys = [s.perplexityApiKey, ...(s.perplexityApiKeys ?? []), process.env["PERPLEXITY_API_KEY"]]
+    .map((k) => k?.trim())
+    .filter((k): k is string => !!k);
+  return [...new Set(keys)];
+}
+
+/** Pool de chaves OpenAI-compatíveis: única do painel + adicionais (dedup). */
+function openaiKeys(s: HubSettings): string[] {
+  const keys = [s.openaiApiKey, ...(s.openaiApiKeys ?? [])]
+    .map((k) => k?.trim())
+    .filter((k): k is string => !!k);
+  return [...new Set(keys)];
+}
+
+let _openaiIdx = 0;
+function nextOpenaiKey(s: HubSettings): string | undefined {
+  const keys = openaiKeys(s);
+  if (keys.length === 0) return undefined;
+  return keys[_openaiIdx++ % keys.length];
 }
 
 /** Escolhe a IA de apoio do próximo item. Com "both", alterna — e se o Gemini
  *  estiver sem chave disponível, manda tudo para a Perplexity. */
 function pickHelperProvider(cfg: BoostConfig, s: HubSettings): HelperProvider {
   if (cfg.provider !== "both") return cfg.provider;
-  if (!perplexityKey(s)) return "gemini";
+  if (perplexityKeys(s).length === 0) return "gemini";
   if (getGeminiPool().availableKeyCount() === 0) return "perplexity";
   return _helperFlip++ % 2 === 0 ? "gemini" : "perplexity";
 }
@@ -103,7 +122,12 @@ function pickHelperProvider(cfg: BoostConfig, s: HubSettings): HelperProvider {
 function engineConfig(s: HubSettings): RewriteEngineConfig {
   const pool = getGeminiPool();
   if (s.aiProvider === "openai") {
-    return { provider: "openai", model: s.aiModel, openaiApiKey: s.openaiApiKey, logger };
+    // Rodízio simples entre as chaves do pool: falha de chave/cota devolve o
+    // item à fila e a tentativa seguinte já sai com a próxima chave.
+    return {
+      provider: "openai", model: s.aiModel,
+      openaiApiKey: nextOpenaiKey(s), openaiBaseUrl: s.openaiBaseUrl, logger,
+    };
   }
   if (s.aiProvider === "ollama") {
     return {
@@ -154,19 +178,33 @@ async function loadSourceCtx(item: NewsItemRow): Promise<SourceCtx> {
   };
 }
 
+let _pplxIdx = 0;
+
 async function runPerplexity(item: NewsItemRow, src: SourceCtx, s: HubSettings): Promise<RewriteOutput> {
-  const apiKey = perplexityKey(s);
-  if (!apiKey) throw new Error("PERPLEXITY_UNAVAILABLE: chave não configurada");
-  const out = await rewriteWithPerplexity(
-    {
-      title: item.title,
-      text: item.contentRaw ?? item.description ?? "",
-      sourceName: item.sourceName,
-      giveCredit: src.giveCredit,
-    },
-    { apiKey, model: s.perplexityModel },
-  );
-  return { content: out.raw, usage: out.usage };
+  const keys = perplexityKeys(s);
+  if (keys.length === 0) throw new Error("PERPLEXITY_UNAVAILABLE: chave não configurada");
+  const input = {
+    title: item.title,
+    text: item.contentRaw ?? item.description ?? "",
+    sourceName: item.sourceName,
+    giveCredit: src.giveCredit,
+  };
+  // Rodízio com failover: erro de chave/cota (401/402/403/429) tenta a próxima
+  // chave do pool na hora; outros erros (conteúdo, rede) não trocam de chave.
+  const start = _pplxIdx++;
+  let lastErr: unknown;
+  for (let i = 0; i < keys.length; i++) {
+    const apiKey = keys[(start + i) % keys.length]!;
+    try {
+      const out = await rewriteWithPerplexity(input, { apiKey, model: s.perplexityModel });
+      return { content: out.raw, usage: out.usage };
+    } catch (err) {
+      lastErr = err;
+      if (!/Perplexity (401|402|403|429)/.test(String(err))) throw err;
+      logger.warn({ keyHint: apiKey.slice(-4), newsItemId: item.id }, "Chave Perplexity sem cota/inválida — tentando a próxima do pool");
+    }
+  }
+  throw lastErr;
 }
 
 /**
@@ -330,7 +368,7 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
     const isProviderError = isQuota || msg.includes("não configurada") || isKeyAuthError(msg);
 
     if (isProviderError) {
-      if ((s.fallbackPerplexityEnabled ?? true) && perplexityKey(s)) {
+      if ((s.fallbackPerplexityEnabled ?? true) && perplexityKeys(s).length > 0) {
         try {
           const src = await loadSourceCtx(item);
           const out = await runPerplexity(item, src, s);
@@ -375,7 +413,7 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
 async function dispatchBoost(s: HubSettings, excludeIds: string[]): Promise<void> {
   const cfg = getBoostConfig(s);
   if (!cfg.enabled) return;
-  if (cfg.provider === "perplexity" && !perplexityKey(s)) return;
+  if (cfg.provider === "perplexity" && perplexityKeys(s).length === 0) return;
   refreshBoostDay();
   if (cfg.maxPerDay > 0 && _boostUsedToday >= cfg.maxPerDay) return;
 

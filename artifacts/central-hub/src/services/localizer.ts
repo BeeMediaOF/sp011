@@ -59,10 +59,24 @@ let _running = false;
 /** Tentativas de TRADUÇÃO por entrega (memória, padrão do rewriter). */
 const _attempts = new Map<string, number>();
 
+let _openaiIdx = 0;
+
+/** Pool de chaves OpenAI-compatíveis (única + adicionais, rodízio por chamada). */
+function nextOpenaiKey(s: HubSettings): string | undefined {
+  const keys = [...new Set(
+    [s.openaiApiKey, ...(s.openaiApiKeys ?? [])].map((k) => k?.trim()).filter((k): k is string => !!k),
+  )];
+  if (keys.length === 0) return undefined;
+  return keys[_openaiIdx++ % keys.length];
+}
+
 function engineConfig(s: HubSettings): RewriteEngineConfig {
   const provider = s.translationProvider ?? "gemini";
   if (provider === "openai") {
-    return { provider, model: s.translationModel, openaiApiKey: s.openaiApiKey, logger };
+    return {
+      provider, model: s.translationModel,
+      openaiApiKey: nextOpenaiKey(s), openaiBaseUrl: s.openaiBaseUrl, logger,
+    };
   }
   if (provider === "ollama") {
     return {

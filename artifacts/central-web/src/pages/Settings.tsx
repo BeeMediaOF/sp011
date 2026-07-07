@@ -10,6 +10,9 @@ interface MaskedSettings {
   aiDailyLimit?: number;
   hasOpenaiKey: boolean;
   geminiKeyHints: string[];
+  openaiKeyHints: string[];
+  perplexityKeyHints: string[];
+  openaiBaseUrl?: string;
   hasPerplexityKey: boolean;
   perplexityModel?: string;
   fallbackPerplexityEnabled?: boolean;
@@ -49,6 +52,8 @@ export default function Settings() {
 
   const [form, setForm] = useState<Partial<MaskedSettings> & { openaiApiKey?: string; perplexityApiKey?: string }>({});
   const [newKey, setNewKey] = useState("");
+  const [newOpenaiKey, setNewOpenaiKey] = useState("");
+  const [newPplxKey, setNewPplxKey] = useState("");
   const [globalPrompt, setGlobalPrompt] = useState("");
   const [msg, setMsg] = useState("");
 
@@ -69,6 +74,7 @@ export default function Settings() {
           fallbackToGemini: form.fallbackToGemini,
           aiDailyLimit: num(form.aiDailyLimit),
           openaiApiKey: form.openaiApiKey || undefined,
+          openaiBaseUrl: form.openaiBaseUrl || undefined,
           perplexityApiKey: form.perplexityApiKey || undefined,
           perplexityModel: form.perplexityModel || undefined,
           fallbackPerplexityEnabled: form.fallbackPerplexityEnabled,
@@ -102,18 +108,37 @@ export default function Settings() {
     }
   };
 
-  const addKey = async () => {
-    if (!newKey.trim()) return;
-    await api("/settings/gemini-keys", { method: "POST", body: { key: newKey.trim() } });
-    setNewKey("");
+  const addPoolKey = async (pool: string, key: string, clear: () => void) => {
+    if (!key.trim()) return;
+    await api(`/settings/${pool}`, { method: "POST", body: { key: key.trim() } });
+    clear();
     reload();
   };
 
-  const removeKey = async (hint: string) => {
+  const removePoolKey = async (pool: string, hint: string) => {
     if (!confirm(`Remover a chave ${hint}?`)) return;
-    await api(`/settings/gemini-keys/${hint.replace(/^\.+/, "")}`, { method: "DELETE" });
+    await api(`/settings/${pool}/${hint.replace(/^\.+/, "")}`, { method: "DELETE" });
     reload();
   };
+
+  /** Badges de um pool de chaves + campo de adicionar (mesma UI p/ os 3 provedores). */
+  const keyPool = (pool: string, hints: string[], value: string, setValue: (v: string) => void, placeholder: string, empty: string) => (
+    <>
+      <div className="row">
+        {hints.map((hint) => (
+          <span key={hint} className="badge fit">
+            {hint}{" "}
+            <a href="#remover" onClick={(e) => { e.preventDefault(); void removePoolKey(pool, hint); }}>×</a>
+          </span>
+        ))}
+        {hints.length === 0 && <span className="muted fit">{empty}</span>}
+      </div>
+      <div className="row" style={{ marginTop: 8 }}>
+        <input placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} />
+        <button className="fit secondary" onClick={() => void addPoolKey(pool, value, () => setValue(""))}>Adicionar chave</button>
+      </div>
+    </>
+  );
 
   const savePrompt = async () => {
     await api("/settings/prompts", {
@@ -158,24 +183,17 @@ export default function Settings() {
         </div>
 
         <label>Chaves Gemini</label>
-        <div className="row">
-          {settings.geminiKeyHints.map((hint) => (
-            <span key={hint} className="badge fit">
-              {hint}{" "}
-              <a href="#remover" onClick={(e) => { e.preventDefault(); void removeKey(hint); }}>×</a>
-            </span>
-          ))}
-          {settings.geminiKeyHints.length === 0 && <span className="muted fit">nenhuma chave no painel (env GEMINI_API_KEY ainda vale)</span>}
-        </div>
-        <div className="row" style={{ marginTop: 8 }}>
-          <input placeholder="Nova chave Gemini (AIza…)" value={newKey} onChange={(e) => setNewKey(e.target.value)} />
-          <button className="fit secondary" onClick={addKey}>Adicionar chave</button>
-        </div>
+        {keyPool("gemini-keys", settings.geminiKeyHints, newKey, setNewKey,
+          "Nova chave Gemini (AIza…)", "nenhuma chave no painel (env GEMINI_API_KEY ainda vale)")}
 
         <div className="row" style={{ marginTop: 10 }}>
           <div>
             <label>OpenAI API key {settings.hasOpenaiKey ? "(já configurada — preencha p/ trocar)" : ""}</label>
             <input type="password" value={form.openaiApiKey ?? ""} onChange={(e) => setForm({ ...form, openaiApiKey: e.target.value })} />
+          </div>
+          <div>
+            <label>Base URL OpenAI-compatível (vazio = api.openai.com)</label>
+            <input value={form.openaiBaseUrl ?? ""} onChange={(e) => setForm({ ...form, openaiBaseUrl: e.target.value })} placeholder="https://api.groq.com/openai — Groq/OpenRouter/DeepSeek…" />
           </div>
           <div>
             <label>Ollama base URL</label>
@@ -186,6 +204,10 @@ export default function Settings() {
             Ollama caiu → usar Gemini
           </label>
         </div>
+
+        <label style={{ marginTop: 10 }}>Chaves OpenAI adicionais (rodízio entre elas + a principal)</label>
+        {keyPool("openai-keys", settings.openaiKeyHints ?? [], newOpenaiKey, setNewOpenaiKey,
+          "Nova chave OpenAI/compatível (sk-…)", "nenhuma chave adicional")}
       </div>
 
       <div className="card">
@@ -204,6 +226,9 @@ export default function Settings() {
             <input value={form.perplexityModel ?? ""} onChange={(e) => setForm({ ...form, perplexityModel: e.target.value })} placeholder="sonar" />
           </div>
         </div>
+        <label style={{ marginTop: 10 }}>Chaves Perplexity adicionais (rodízio; erro de cota pula p/ a próxima)</label>
+        {keyPool("perplexity-keys", settings.perplexityKeyHints ?? [], newPplxKey, setNewPplxKey,
+          "Nova chave Perplexity (pplx-…)", "nenhuma chave adicional")}
         <div className="row" style={{ marginTop: 10 }}>
           <label className="fit row" style={{ margin: 0 }}>
             <input className="fit" style={{ width: "auto" }} type="checkbox" checked={form.fallbackPerplexityEnabled ?? true} onChange={(e) => setForm({ ...form, fallbackPerplexityEnabled: e.target.checked })} />
