@@ -7,17 +7,19 @@ import { type Article } from "../lib/adminApi";
 import { Search, Calendar } from "lucide-react";
 import { useCategories, categoryColor } from "../hooks/useCategories";
 import { safeTitleHtml } from "@/lib/sanitize";
+import { useT, formatShortDate } from "../lib/i18n";
 
-function imgFallback(url: string) {
-  return url || "https://placehold.co/400x260/e5e7eb/9ca3af?text=Sem+imagem";
+function imgFallback(url: string, placeholderText: string) {
+  return url || `https://placehold.co/400x260/e5e7eb/9ca3af?text=${placeholderText}`;
 }
 
 function FeaturedCard({ article, color }: { article: Article; color: string }) {
+  const { t, lang, tz } = useT();
   return (
     <Link href={`/artigo/${article.slug || article.id}`} className="group block">
       <div className="relative overflow-hidden bg-gray-100 aspect-[16/10]">
         <img
-          src={imgFallback(article.imageUrl || "")}
+          src={imgFallback(article.imageUrl || "", t("category.imgNone"))}
           alt={article.title.replace(/<[^>]*>/g, "")}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
@@ -34,7 +36,7 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
             dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.title) }}
           />
           <p className="text-white/50 text-[11px] mt-1">
-            {new Date(article.publishedAt).toLocaleDateString("pt-BR")}
+            {formatShortDate(article.publishedAt, lang, tz)}
           </p>
         </div>
       </div>
@@ -43,11 +45,12 @@ function FeaturedCard({ article, color }: { article: Article; color: string }) {
 }
 
 function ListCard({ article, color }: { article: Article; color: string }) {
+  const { t, lang, tz } = useT();
   return (
     <Link href={`/artigo/${article.slug || article.id}`} className="group flex gap-4 py-3 items-start border-b border-gray-100 last:border-0">
       <div className="w-[96px] h-[64px] shrink-0 overflow-hidden bg-gray-100">
         <img
-          src={imgFallback(article.imageUrl || "")}
+          src={imgFallback(article.imageUrl || "", t("category.imgNone"))}
           alt={article.title.replace(/<[^>]*>/g, "")}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-400"
           loading="lazy"
@@ -64,7 +67,7 @@ function ListCard({ article, color }: { article: Article; color: string }) {
           dangerouslySetInnerHTML={{ __html: safeTitleHtml(article.title) }}
         />
         <p className="text-[11px] text-gray-400 mt-1">
-          {new Date(article.publishedAt).toLocaleDateString("pt-BR")}
+          {formatShortDate(article.publishedAt, lang, tz)}
         </p>
       </div>
     </Link>
@@ -72,6 +75,7 @@ function ListCard({ article, color }: { article: Article; color: string }) {
 }
 
 export default function Archive() {
+  const { t } = useT();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
   const [location] = useLocation();
@@ -128,10 +132,10 @@ export default function Archive() {
               className="text-[32px] font-black text-white uppercase tracking-tight"
              
             >
-              Arquivo de Notícias
+              {t("archive.title")}
             </h1>
             <p className="text-white/50 text-[13px] mt-1">
-              Todas as notícias publicadas no portal
+              {t("archive.subtitle")}
             </p>
           </div>
         </div>
@@ -145,7 +149,7 @@ export default function Archive() {
               <input
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                placeholder="Buscar por título ou categoria..."
+                placeholder={t("archive.searchPlaceholder")}
                 className="w-full pl-9 pr-4 py-2 border border-gray-200 text-[13px] focus:outline-none focus:border-[#c8102e] transition-colors"
               />
             </div>
@@ -159,7 +163,7 @@ export default function Archive() {
               />
               {dateFilter && (
                 <button onClick={() => setDateFilter("")} className="text-[11px] text-[#c8102e] hover:underline font-bold">
-                  Limpar
+                  {t("archive.clear")}
                 </button>
               )}
             </div>
@@ -175,7 +179,7 @@ export default function Archive() {
                   : "text-gray-500 border-gray-200 hover:border-gray-400"
               }`}
             >
-              Todas
+              {t("archive.all")}
             </button>
             {categories.map((cat) => {
               const color = categoryColor(cat.value);
@@ -198,13 +202,13 @@ export default function Archive() {
 
           {loading ? (
             <div className="flex items-center justify-center py-24 text-gray-400 text-sm">
-              Carregando...
+              {t("common.loadingDots")}
             </div>
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 text-gray-400 gap-2">
               <Search size={32} className="text-gray-200" />
-              <p className="text-sm">Nenhuma notícia encontrada.</p>
-              <button onClick={() => { setFilter(""); setDateFilter(""); setActiveCategory(null); }} className="text-[11px] text-[#c8102e] hover:underline font-bold mt-1">Limpar filtros</button>
+              <p className="text-sm">{t("archive.empty")}</p>
+              <button onClick={() => { setFilter(""); setDateFilter(""); setActiveCategory(null); }} className="text-[11px] text-[#c8102e] hover:underline font-bold mt-1">{t("archive.clearFilters")}</button>
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-10">
@@ -217,7 +221,7 @@ export default function Archive() {
                   <section>
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-1 h-5 bg-[#c8102e]" />
-                      <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">Mais Recentes</h2>
+                      <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{t("archive.recent")}</h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
                       {recent.map((a) => (
@@ -233,9 +237,9 @@ export default function Archive() {
                     <div className="flex items-center gap-3 mb-6">
                       <div className="w-1 h-5 bg-[#0b3d91]" />
                       <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
-                        Resultados
+                        {t("archive.results")}
                         <span className="text-[13px] font-normal text-gray-400 ml-2 normal-case tracking-normal">
-                          {filtered.length} notícia{filtered.length !== 1 ? "s" : ""}
+                          {filtered.length} {filtered.length !== 1 ? t("archive.newsPlural") : t("archive.newsSingular")}
                         </span>
                       </h2>
                     </div>
@@ -262,7 +266,7 @@ export default function Archive() {
                         className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider hover:underline"
                         style={{ color: mod.color }}
                       >
-                        Ver mais →
+                        {t("common.seeMoreArrow")}
                       </button>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
@@ -282,7 +286,7 @@ export default function Archive() {
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-1 h-5 bg-[#1a1a1a]" />
-                    <h3 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">Categorias</h3>
+                    <h3 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">{t("archive.categories")}</h3>
                   </div>
                   <div className="flex flex-col divide-y divide-gray-100">
                     {categories.map((cat) => {
@@ -320,7 +324,7 @@ export default function Archive() {
                 <div>
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-1 h-5 bg-[#c8102e]" />
-                    <h3 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">Busca por data</h3>
+                    <h3 className="text-[15px] font-bold text-[#1a1a1a] uppercase tracking-wider">{t("archive.byDate")}</h3>
                   </div>
                   <input
                     type="date"
@@ -330,7 +334,7 @@ export default function Archive() {
                   />
                   {dateFilter && (
                     <button onClick={() => setDateFilter("")} className="text-[11px] text-[#c8102e] hover:underline font-bold mt-2 block">
-                      Limpar data
+                      {t("archive.clearDate")}
                     </button>
                   )}
                 </div>

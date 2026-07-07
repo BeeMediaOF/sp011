@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "wouter";
 import ArticleCard from "./ArticleCard";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import avatar1 from "../assets/images/avatar1.png";
 import avatar2 from "../assets/images/avatar2.png";
 import avatar3 from "../assets/images/avatar3.png";
@@ -35,7 +36,8 @@ export default function CategoryPage({
   featuredArticle2,
 }: CategoryPageProps) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const second = featuredArticle2 ?? articles[0];
 
   return (
@@ -45,7 +47,7 @@ export default function CategoryPage({
         <div style={{ backgroundColor: color }} className="h-[3px] w-full" />
         <div className="max-w-[1280px] mx-auto px-4 py-3">
           <div className="text-gray-400 text-[11px] font-medium flex items-center gap-1">
-            <Link href="/" className="hover:text-gray-600 transition-colors">Início</Link>
+            <Link href="/" className="hover:text-gray-600 transition-colors">{t("common.home")}</Link>
             <span className="text-gray-300">›</span>
             <span style={{ color }}>{category}</span>
           </div>
@@ -104,7 +106,7 @@ export default function CategoryPage({
           {/* Divider */}
           <div className="flex items-center mb-6">
             <div className="w-1.5 h-6 mr-3" style={{ backgroundColor: color }} />
-            <h2 className="text-xl font-bold text-[#1a2448]">MAIS NOTÍCIAS</h2>
+            <h2 className="text-xl font-bold text-[#1a2448]">{t("category.moreNews")}</h2>
           </div>
 
           {/* 2-Column Grid */}
@@ -117,7 +119,7 @@ export default function CategoryPage({
                 ))}
               </div>
               <button className="w-full mt-8 py-3 border border-gray-300 text-[#1a2448] font-bold text-sm hover:bg-[#1a2448] hover:text-white transition-colors">
-                CARREGAR MAIS
+                {t("category.loadMore")}
               </button>
             </div>
 
@@ -132,7 +134,7 @@ export default function CategoryPage({
               <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
                 <h3 className="font-bold text-[#1a2448] text-lg mb-4 flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-red-600" />
-                  MAIS LIDAS
+                  {t("category.mostRead")}
                 </h3>
                 <div className="flex flex-col space-y-4">
                   {[

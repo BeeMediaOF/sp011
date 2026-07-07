@@ -2,8 +2,83 @@ import TopBar from "../components/TopBar";
 import { BRAND } from "../brand";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 
 export default function Termos() {
+  const { settings } = useSite();
+  const { lang } = useT();
+  const siteName = settings?.siteName || BRAND.name;
+
+  // Versão EN genérica (site público em inglês); pt-BR mantém o texto original.
+  if (lang === "en") {
+    return (
+      <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
+        <TopBar />
+        <Header />
+
+        <main className="flex-1 bg-white py-12">
+          <div className="max-w-[860px] mx-auto px-4">
+            <div style={{ borderColor: "#c8102e" }} className="border-l-4 pl-5 mb-8">
+              <h1 className="text-3xl md:text-4xl font-black text-[#1a2448] uppercase tracking-tight">
+                Terms of Use
+              </h1>
+            </div>
+
+            <div className="prose prose-lg max-w-none text-[#1a1a1a] space-y-6">
+              <p>
+                By accessing and using <strong>{siteName}</strong>, you agree to these Terms of
+                Use. If you do not agree with any provision, please do not use this site.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">1. Use of content</h2>
+              <p>
+                All content published on {siteName} — texts, photos, videos and infographics — is
+                protected by copyright. Reproduction, in whole or in part, without express
+                authorization from the newsroom is prohibited, except for sharing on social media
+                with attribution.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">2. Editorial responsibility</h2>
+              <p>
+                {siteName} strives for the accuracy of the information it publishes. In case of
+                error, a correction will be issued promptly. Opinions expressed in columns are the
+                sole responsibility of their authors.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">3. Comments and participation</h2>
+              <p>
+                Reader-submitted content must comply with applicable law. Posting offensive,
+                discriminatory, illegal content or content that violates third-party rights is
+                prohibited. The newsroom reserves the right to remove inappropriate content.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">4. External links</h2>
+              <p>
+                This site may contain links to third-party websites. {siteName} is not responsible
+                for the content or privacy practices of those sites.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">5. Changes</h2>
+              <p>
+                These Terms of Use may be updated at any time. We recommend reviewing this page
+                periodically to stay informed about changes.
+              </p>
+
+              <h2 className="text-xl font-bold text-[#1a2448] mt-8">6. Contact</h2>
+              <p>
+                For questions about these terms, reach us through our{" "}
+                <a href="/contato" className="text-[#1d4ed8] hover:underline">contact form</a>.
+              </p>
+            </div>
+          </div>
+        </main>
+
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
       <TopBar />

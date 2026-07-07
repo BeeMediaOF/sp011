@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { safeTitleHtml } from "@/lib/sanitize";
+import { useT, formatDayMonth } from "../lib/i18n";
 
 interface RelatedArticle {
   id: string;
@@ -39,6 +40,7 @@ function Skeleton() {
 }
 
 export default function ArtigosRelacionados({ currentSlug }: Props) {
+  const { t, lang, tz } = useT();
   const [articles, setArticles] = useState<RelatedArticle[]>([]);
   const [loading, setLoading]   = useState(true);
 
@@ -60,16 +62,14 @@ export default function ArtigosRelacionados({ currentSlug }: Props) {
       <div className="flex items-center gap-2 mb-5">
         <div className="w-1 h-5 bg-[#c8102e]" />
         <h2 className="text-[15px] font-black text-[#1a2448] uppercase tracking-wider">
-          Relacionadas
+          {t("article.related")}
         </h2>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {articles.map((a) => {
           const href  = `/artigo/${a.slug || a.id}`;
           const color = categoryColor[(a.category ?? "").toLowerCase()] ?? "#c8102e";
-          const time  = a.publishedAt
-            ? new Date(a.publishedAt).toLocaleDateString("pt-BR", { day: "numeric", month: "short" })
-            : "";
+          const time  = a.publishedAt ? formatDayMonth(a.publishedAt, lang, tz) : "";
           return (
             <Link key={a.id} href={href} className="group block">
               <div className="overflow-hidden bg-gray-100 rounded-sm mb-2 aspect-[16/9]">

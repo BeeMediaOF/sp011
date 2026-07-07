@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Link } from "wouter";
 import { useArticles } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
+import { useT, relativeTime } from "../lib/i18n";
 import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import heroImg        from "../assets/images/hero.webp";
 import trafficImg     from "../assets/images/traffic.webp";
@@ -61,18 +62,6 @@ function chapeuColor(category: string): string {
   return CHAPEU_COLORS[category.toLowerCase()] ?? "#6b7280";
 }
 
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins  = Math.floor(diff / 60000);
-  const hours = Math.floor(diff / 3600000);
-  const days  = Math.floor(diff / 86400000);
-  if (mins  <  1) return "agora";
-  if (mins  < 60) return `${mins} min atrás`;
-  if (hours < 24) return `${hours} hora${hours > 1 ? "s" : ""} atrás`;
-  return `${days} dia${days > 1 ? "s" : ""} atrás`;
-}
-
-
 // ─── Card de destaque ─────────────────────────────────────────────────────────
 function FeaturedCard({
   item,
@@ -84,7 +73,8 @@ function FeaturedCard({
   className?: string;
 }) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
 
   // Gera srcset para imagens metroimg — browser escolhe a menor versão adequada
@@ -133,6 +123,7 @@ function FeaturedCard({
 
 // ─── Carrossel mobile ─────────────────────────────────────────────────────────
 function MobileCarousel({ items }: { items: FeaturedItem[] }) {
+  const { t } = useT();
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -191,10 +182,10 @@ function MobileCarousel({ items }: { items: FeaturedItem[] }) {
 
       <button onClick={() => { prev(); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
         className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-colors z-10 hidden sm:flex"
-        aria-label="Anterior">‹</button>
+        aria-label={t("common.previous")}>‹</button>
       <button onClick={() => { next(); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
         className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/30 hover:bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm transition-colors z-10 hidden sm:flex"
-        aria-label="Próximo">›</button>
+        aria-label={t("common.next")}>›</button>
     </div>
   );
 }
@@ -394,6 +385,7 @@ export default function HeroSection({ variant, contained = true }: {
 } = {}) {
   const { articles, loading } = useArticles();
   const { settings } = useSite();
+  const { lang } = useT();
   const sectionClass = contained ? "max-w-[1280px] mx-auto px-4 py-6" : "";
   const layout: HeroVariant =
     variant === "featured" || variant === "mosaico" || variant === "manchete" || variant === "portal"
@@ -412,7 +404,7 @@ export default function HeroSection({ variant, contained = true }: {
     chapeuColor: chapeuColor(a.category),
     title:       a.title,
     summary:     a.subtitle,
-    time:        relativeTime(a.publishedAt),
+    time:        relativeTime(a.publishedAt, lang),
     author:      a.author,
   }));
 

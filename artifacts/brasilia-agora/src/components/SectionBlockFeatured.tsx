@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "@/lib/sanitize";
 
@@ -24,7 +25,8 @@ interface Props {
 
 export default function SectionBlockFeatured({ title, color, href, articles }: Props) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
 
   const [featured, ...rest] = articles;
@@ -56,7 +58,7 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
             className="text-[11px] font-bold hover:underline uppercase tracking-wider"
             style={{ color }}
           >
-            Ver mais →
+            {t("common.seeMoreArrow")}
           </Link>
         </div>
 

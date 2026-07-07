@@ -10,6 +10,7 @@ import Footer from "../components/Footer";
 import { useArticle, useArticles } from "../hooks/useArticles";
 import ArtigosRelacionados from "../components/ArtigosRelacionados";
 import { useSite } from "../hooks/useSite";
+import { useT, formatDateTime } from "../lib/i18n";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
 import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
@@ -27,6 +28,7 @@ const editoriaColor: Record<string, string> = {
 };
 
 function ArticleSidebar() {
+  const { t } = useT();
   const { articles } = useArticles();
   const maisLidas = articles.slice(0, 8);
 
@@ -38,7 +40,7 @@ function ArticleSidebar() {
           <div className="flex items-center gap-2 bg-[#1a1a1a] px-4 py-3">
             <div className="w-1 h-4 bg-[#c8102e]" />
             <h3 className="text-white text-[13px] font-bold uppercase tracking-wider">
-              Mais Lidas
+              {t("article.mostRead")}
             </h3>
           </div>
           <div className="divide-y divide-gray-100">
@@ -94,6 +96,7 @@ export default function Artigo() {
 
   const { article, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
+  const { t, lang, tz } = useT();
   const { trackArticle, trackShare } = useAnalytics();
   // article.id (não o slug): pageview/read usam o id — com o slug seria
   // impossível cruzar profundidade de leitura com as views do artigo.
@@ -107,7 +110,7 @@ export default function Artigo() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id]);
 
-  /* Dynamic OG meta tags + AMP link */
+  /* Dynamic OG meta tags + AMP link (lang nas deps: hreflang segue o idioma) */
   useEffect(() => {
     if (!article) return;
     const articleSlug = article.slug || article.id;
@@ -178,7 +181,7 @@ export default function Artigo() {
 
     const hreflangLinks: HTMLLinkElement[] = [];
     [
-      { hreflang: "pt-BR", href: canonical },
+      { hreflang: lang, href: canonical },
       { hreflang: "x-default", href: canonical },
     ].forEach(({ hreflang, href }) => {
       let el = document.head.querySelector<HTMLLinkElement>(`link[rel="alternate"][hreflang="${hreflang}"]`);
@@ -201,7 +204,7 @@ export default function Artigo() {
       hreflangLinks.forEach((el) => el.parentNode?.removeChild(el));
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [article?.id]);
+  }, [article?.id, lang]);
 
   const showSkeleton = loading;
 
@@ -447,6 +450,7 @@ export default function Artigo() {
         "@context": "https://schema.org",
         "@type": "NewsArticle",
         headline: article.title,
+        inLanguage: lang,
         description: article.subtitle ?? "",
         image: article.imageUrl ? [article.imageUrl] : [],
         datePublished: article.publishedAt,
@@ -478,7 +482,7 @@ export default function Artigo() {
           {
             "@type": "ListItem",
             position: 1,
-            name: "Início",
+            name: t("common.home"),
             item: "https://sbcagora.com.br/",
           },
           {
@@ -523,16 +527,16 @@ export default function Artigo() {
                 <ArticleSkeleton />
               ) : !article ? (
                 <div className="flex flex-col items-center justify-center py-24 text-gray-400">
-                  <p className="text-2xl font-bold mb-2">Artigo não encontrado</p>
+                  <p className="text-2xl font-bold mb-2">{t("article.notFound")}</p>
                   <Link href="/" className="text-[#1d4ed8] text-sm hover:underline">
-                    Voltar à página inicial
+                    {t("article.backHome")}
                   </Link>
                 </div>
               ) : (
                 <>
                   {/* Breadcrumb */}
                   <nav className="text-gray-400 text-xs mb-4 flex items-center gap-1.5 flex-wrap">
-                    <Link href="/" className="hover:text-[#1d4ed8]">Início</Link>
+                    <Link href="/" className="hover:text-[#1d4ed8]">{t("common.home")}</Link>
                     <span>/</span>
                     <Link
                       href={categoryRoute(article.category)}
@@ -578,22 +582,16 @@ export default function Artigo() {
                       />
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          {settings?.bylineName || settings?.siteName || "Redação"}
+                          {settings?.bylineName || settings?.siteName || t("common.newsroom")}
                         </div>
                         <div className="text-xs text-gray-400">
-                          {new Date(article.publishedAt).toLocaleDateString("pt-BR", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                          {formatDateTime(article.publishedAt, lang, tz)}
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
-                        Compartilhe:
+                        {t("article.share")}
                       </span>
                       <button
                         onClick={() => {
@@ -602,7 +600,7 @@ export default function Artigo() {
                           trackShare("facebook");
                         }}
                         className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title="Compartilhar no Facebook"
+                        title={t("article.shareFacebook")}
                       >
                         <FaFacebook size={13} />
                       </button>
@@ -614,7 +612,7 @@ export default function Artigo() {
                           trackShare("twitter");
                         }}
                         className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title="Compartilhar no Twitter/X"
+                        title={t("article.shareTwitter")}
                       >
                         <FaTwitter size={13} />
                       </button>
@@ -626,7 +624,7 @@ export default function Artigo() {
                           trackShare("whatsapp");
                         }}
                         className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title="Compartilhar no WhatsApp"
+                        title={t("article.shareWhatsApp")}
                       >
                         <FaWhatsapp size={13} />
                       </button>
@@ -636,7 +634,7 @@ export default function Artigo() {
                           trackShare("copy");
                         }}
                         className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
-                        title="Copiar link"
+                        title={t("article.copyLink")}
                       >
                         <FaLink size={12} />
                       </button>
@@ -675,7 +673,7 @@ export default function Artigo() {
                   {article.origin === "rss" && !article.aiRewritten && article.rssSourceName && (
                     <div className="mt-6 pt-4 border-t border-gray-100">
                       <p className="text-[12px] text-gray-400 italic">
-                        Conteúdo originalmente publicado por{" "}
+                        {t("article.sourcePrefix")}{" "}
                         {article.rssSourceUrl ? (
                           <a
                             href={article.rssSourceUrl}
@@ -689,7 +687,7 @@ export default function Artigo() {
                         ) : (
                           <span className="font-medium text-gray-500">{article.rssSourceName}</span>
                         )}
-                        . Reproduzido com fins informativos.
+                        {t("article.sourceSuffix")}
                       </p>
                     </div>
                   )}
@@ -699,7 +697,7 @@ export default function Artigo() {
                   {/* Tags + compartilhamento inferior */}
                   <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
                     <div className="flex flex-wrap gap-2">
-                      {[article.tag, "Brasília", "Notícias"].map((tag) => (
+                      {(lang === "en" ? [article.tag] : [article.tag, "Brasília", "Notícias"]).map((tag) => (
                         <span
                           key={tag}
                           className="text-[11px] font-semibold text-gray-500 border border-gray-200 px-3 py-1 rounded-full hover:border-gray-400 cursor-pointer transition-colors"
@@ -710,7 +708,7 @@ export default function Artigo() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
-                        Compartilhe:
+                        {t("article.share")}
                       </span>
                       <button className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
                         <FaFacebook size={13} />

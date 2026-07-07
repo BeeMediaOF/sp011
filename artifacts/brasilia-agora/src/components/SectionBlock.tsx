@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import NewsCard from "./NewsCard";
+import { useT } from "../lib/i18n";
 
 interface SectionArticle {
   id: string;
@@ -22,6 +23,7 @@ interface SectionBlockProps {
 }
 
 export default function SectionBlock({ title, color, href, articles, pageSize = 3 }: SectionBlockProps) {
+  const { t } = useT();
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(articles.length / pageSize);
   const visible = articles.slice(page * pageSize, page * pageSize + pageSize);
@@ -42,7 +44,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   disabled={page === 0}
                   className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-gray-500 hover:text-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Anterior"
+                  aria-label={t("common.previous")}
                 >
                   <ChevronLeft size={15} />
                 </button>
@@ -50,7 +52,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   disabled={page === totalPages - 1}
                   className="w-7 h-7 flex items-center justify-center border border-gray-300 text-gray-500 hover:border-gray-500 hover:text-[#1a1a1a] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  aria-label="Próximo"
+                  aria-label={t("common.next")}
                 >
                   <ChevronRight size={15} />
                 </button>
@@ -61,7 +63,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
               className="text-[11px] font-bold hover:underline uppercase tracking-wider"
               style={{ color }}
             >
-              Ver mais →
+              {t("common.seeMoreArrow")}
             </Link>
           </div>
         </div>
@@ -110,7 +112,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
                 onClick={() => setPage(i)}
                 className="w-1.5 h-1.5 rounded-full transition-all"
                 style={{ backgroundColor: i === page ? color : "#d1d5db" }}
-                aria-label={`Página ${i + 1}`}
+                aria-label={`${t("common.page")} ${i + 1}`}
               />
             ))}
           </div>

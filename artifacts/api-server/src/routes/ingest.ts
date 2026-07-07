@@ -163,7 +163,8 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
     category,
     tag: article.tag?.trim() || TAG_MAP[category] || "GERAL",
     imageUrl: article.imageUrl?.trim() ?? "",
-    author: "Redação",
+    // Assinatura padrão configurável (blog EN não pode nascer com "Redação")
+    author: store.getSettings().bylineName?.trim() || "Redação",
     publishedAt: new Date().toISOString(),
     status,
     origin: "rss",

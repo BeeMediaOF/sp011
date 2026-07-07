@@ -11,6 +11,7 @@ import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { useSite } from "../hooks/useSite";
+import { useT, formatLongDate } from "../lib/i18n";
 import { useArticles } from "../hooks/useArticles";
 import { safeTitleHtml } from "../lib/sanitize";
 import { resolveFooterConfig, type FooterSocialKey } from "../lib/footerConfig";
@@ -29,6 +30,7 @@ export default function TopBar() {
 
 function TopBarInner() {
   const { settings } = useSite();
+  const { lang, tz } = useT();
   const { articles } = useArticles();
 
   const top = [...articles].sort(
@@ -42,9 +44,7 @@ function TopBarInner() {
     siteName: settings?.siteName,
     tagline: settings?.tagline,
   }).social;
-  const dateStr = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long", day: "numeric", month: "long", year: "numeric",
-  });
+  const dateStr = formatLongDate(new Date(), lang, tz);
 
   return (
     <div style={{ backgroundColor: settings?.topBarBgColor || "#0b0d0c" }}>

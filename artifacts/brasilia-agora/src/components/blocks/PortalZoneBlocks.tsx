@@ -19,6 +19,7 @@ import AdBanner from "../ads/AdBanner";
 import type { AdSlotKey } from "../ads/useAds";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "../../lib/sanitize";
+import { useT } from "../../lib/i18n";
 import { inferBlockType, sampleForPreview, type HomeBlock } from "../../lib/homeBlocks";
 import { AD_SLOTS, BlockPlaceholder, HtmlBlock, TickerBlock } from "./HomeCustomBlocks";
 
@@ -48,6 +49,7 @@ type Zone = "main" | "sidebar" | "half";
 function ZoneSectionHeader({ title, color, href, linkLabel }: {
   title: string; color: string; href?: string; linkLabel?: string;
 }) {
+  const { t } = useT();
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -57,7 +59,7 @@ function ZoneSectionHeader({ title, color, href, linkLabel }: {
       {href && (
         <Link href={href}
           className="text-[11px] font-bold uppercase tracking-wider text-gray-400 hover:text-gray-600 hover:underline shrink-0 ml-3">
-          {linkLabel ?? "Ver mais"}
+          {linkLabel ?? t("common.seeMore")}
         </Link>
       )}
     </div>

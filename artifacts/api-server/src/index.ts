@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
-import { initStore, seedDefaultRssSources, startSettingsSync } from "./lib/store.js";
+import { initStore, isStoreHydrated, seedDefaultRssSources, startSettingsSync } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
@@ -118,12 +118,37 @@ app.listen(port, async (err) => {
   // pois o arquivo do assistente pode ter injetado as envs de Storage).
   warnIfStorageUnconfigured();
 
+  try {
+    await bootWithDb();
+  } catch (bootErr) {
+    // Banco configurado (env ou arquivo) mas inacessível no boot: sem este
+    // catch o processo subia "instalado" servindo os DEFAULTs (site
+    // errado/vazio) em silêncio — agora /api responde 503 até reconectar.
+    logger.warn(
+      { err: bootErr },
+      "Banco inacessível no boot — /api responde 503 db_unavailable até reconectar (nova tentativa a cada 15s)",
+    );
+    scheduleBootRetry();
+  }
+});
+
+/**
+ * Cadeia de boot dependente do banco (schema → hidratação do store → seeds →
+ * jobs). Lança se o banco estiver inacessível ou a hidratação falhar; o
+ * chamador agenda o retry e o gate de /api (app.ts) segura 503 db_unavailable
+ * até uma execução completar. Idempotente: pode rodar de novo após falha
+ * parcial (schema/seeds toleram re-execução; startSettingsSync tem guard).
+ */
+async function bootWithDb(): Promise<void> {
   // Garante colunas novas/opcionais ANTES de qualquer SELECT em articles
   // (o schema do Drizzle já referencia social_title).
   await ensureSchema();
 
   // Initialize store from PostgreSQL (migrates store.json data if needed)
   await initStore();
+  if (!isStoreHydrated()) {
+    throw new Error("initStore não conseguiu hidratar o cache a partir do banco");
+  }
   // Re-read editable settings from DB periodically so multiple processes
   // (Replit + VPS sharing one database) stay in sync without a restart.
   startSettingsSync();
@@ -192,4 +217,23 @@ app.listen(port, async (err) => {
       logger.warn({ err: warmErr }, "Image cache warming failed (non-fatal)");
     }
   });
-});
+}
+
+/** Re-tenta o bootWithDb a cada 15s até o banco voltar (o site volta sozinho, sem restart). */
+function scheduleBootRetry(): void {
+  let running = false;
+  const timer = setInterval(() => {
+    if (running) return;
+    running = true;
+    void bootWithDb()
+      .then(() => {
+        clearInterval(timer);
+        logger.info("Banco reconectou — cache hidratado, /api voltou a servir o site");
+      })
+      .catch((err: unknown) => {
+        logger.warn({ err }, "Banco ainda inacessível — /api segue em 503 db_unavailable");
+      })
+      .finally(() => { running = false; });
+  }, 15000);
+  if (typeof timer.unref === "function") timer.unref();
+}

@@ -151,6 +151,10 @@ export interface FooterConfig {
 
 export interface SiteSettings {
   siteName: string; tagline: string; logoBase64?: string; logoSize?: number;
+  /** Idioma do SITE PÚBLICO (chrome/datas/SEO). O admin continua pt-BR. */
+  siteLanguage?: "pt-BR" | "en";
+  /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
+  siteTimezone?: string;
   mobileEnabled: boolean; desktopEnabled: boolean;
   showTickerBar?: boolean; showHeroStrip?: boolean;
   headerStyle?: "standard" | "compact" | "centered";
@@ -494,6 +498,16 @@ function slugify(text: string): string {
 
 // ─── initStore — call once at startup ────────────────────────────────────────
 
+// Enquanto a hidratação inicial não completar, o gate de /api (app.ts) responde
+// 503 db_unavailable — sem isso, um banco via env inacessível no boot deixaria
+// a api "instalada" servindo os DEFAULTs (site errado/vazio) em silêncio.
+let _hydrated = false;
+
+/** True após o primeiro initStore() bem-sucedido (dados reais em memória). */
+export function isStoreHydrated(): boolean {
+  return _hydrated;
+}
+
 export async function initStore(): Promise<void> {
   try {
     // 1. Load JSON blobs from settings table
@@ -560,12 +574,13 @@ export async function initStore(): Promise<void> {
     // 6. Encrypt any secrets still stored in plaintext (one-time, idempotent)
     await encryptExistingSecrets();
 
+    _hydrated = true;
     logger.info({
       rssSources: _cache.rssSources.length,
       perplexityTopics: _cache.perplexityTopics.length,
     }, "store: initialized from PostgreSQL");
   } catch (err) {
-    logger.error({ err }, "store: failed to initialize from DB — using defaults");
+    logger.error({ err }, "store: failed to initialize from DB — /api fica em 503 db_unavailable até uma nova tentativa hidratar");
   }
 }
 

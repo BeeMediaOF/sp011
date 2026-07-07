@@ -5,6 +5,7 @@
  */
 import { Router } from "express";
 import { BRAND } from "../lib/brand.js";
+import { store } from "../lib/store.js";
 import { eq, or, sql } from "drizzle-orm";
 import { db, articlesTable } from "@workspace/db";
 import { logger } from "../lib/logger.js";
@@ -53,6 +54,10 @@ const AMP_BOILERPLATE_NOSCRIPT = `body{-webkit-animation:none;-moz-animation:non
 
 router.get("/amp/artigos/:slug", async (req, res) => {
   const slug = req.params.slug ?? "";
+  // Idioma/fuso do site público (store é síncrono no server).
+  const siteCfg = store.getSettings();
+  const en = siteCfg.siteLanguage === "en";
+  const tz = siteCfg.siteTimezone?.trim() || "America/Sao_Paulo";
   try {
     const [article] = await db
       .select()
@@ -66,7 +71,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
       .limit(1);
 
     if (!article || article.status !== "published") {
-      res.status(404).send("<!DOCTYPE html><html><body>Artigo não encontrado.</body></html>");
+      res.status(404).send(`<!DOCTYPE html><html><body>${en ? "Article not found." : "Artigo não encontrado."}</body></html>`);
       return;
     }
 
@@ -78,14 +83,15 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     const description   = escHtml(stripHtml(article.subtitle || article.title).slice(0, 160));
     const publishedIso  = article.publishedAt ? new Date(article.publishedAt).toISOString() : "";
     const modifiedIso   = article.updatedAt   ? new Date(article.updatedAt).toISOString()   : publishedIso;
-    const authorName    = escHtml(article.author || "Redação");
+    const defaultAuthor = siteCfg.bylineName?.trim() || (en ? "Newsroom" : "Redação");
+    const authorName    = escHtml(article.author || defaultAuthor);
     const imageUrl      = article.imageUrl || "";
 
     const bodyHtml = toAmpHtml(article.content || "");
 
     const dateStr = article.publishedAt
-      ? new Date(article.publishedAt).toLocaleDateString("pt-BR", {
-          day: "numeric", month: "long", year: "numeric",
+      ? new Date(article.publishedAt).toLocaleDateString(en ? "en" : "pt-BR", {
+          day: "numeric", month: "long", year: "numeric", timeZone: tz,
         })
       : "";
 
@@ -93,11 +99,12 @@ router.get("/amp/artigos/:slug", async (req, res) => {
       "@context": "https://schema.org",
       "@type": "NewsArticle",
       headline: article.title.replace(/<[^>]*>/g, ""),
+      inLanguage: en ? "en" : "pt-BR",
       description: article.subtitle || "",
       image: imageUrl ? [imageUrl] : [],
       datePublished: publishedIso,
       dateModified: modifiedIso,
-      author: { "@type": "Person", name: article.author || "Redação" },
+      author: { "@type": "Person", name: article.author || defaultAuthor },
       publisher: {
         "@type": "Organization",
         name: BRAND.name,
@@ -106,7 +113,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     });
 
     const html = `<!DOCTYPE html>
-<html ⚡ lang="pt-BR">
+<html ⚡ lang="${en ? "en" : "pt-BR"}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,minimum-scale=1,initial-scale=1">
@@ -144,14 +151,14 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     <a href="${escHtml(base)}">${BRAND.name}</a>
   </header>
   <main>
-    <span class="chapeu">${escHtml(article.tag || article.category || "NOTÍCIA")}</span>
+    <span class="chapeu">${escHtml(article.tag || article.category || (en ? "NEWS" : "NOTÍCIA"))}</span>
     <h1>${title}</h1>
     ${article.subtitle ? `<p class="subtitle">${escHtml(stripHtml(article.subtitle))}</p>` : ""}
     <div class="meta">${authorName}${dateStr ? ` · ${dateStr}` : ""}</div>
     ${imageUrl ? `<amp-img src="${escHtml(imageUrl)}" alt="${title}" width="800" height="450" layout="responsive"></amp-img>` : ""}
     <div>${bodyHtml}</div>
-    ${article.rssSourceName ? `<p class="source">Fonte: ${escHtml(article.rssSourceName)}</p>` : ""}
-    <a class="back" href="${escHtml(canonicalUrl)}">← Ver versão completa</a>
+    ${article.rssSourceName ? `<p class="source">${en ? "Source" : "Fonte"}: ${escHtml(article.rssSourceName)}</p>` : ""}
+    <a class="back" href="${escHtml(canonicalUrl)}">${en ? "← View full version" : "← Ver versão completa"}</a>
   </main>
 </body>
 </html>`;

@@ -16,6 +16,7 @@ import { useArticles } from "../hooks/useArticles";
 
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
+import { useT, formatDayMonth } from "../lib/i18n";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import { inferBlockType, segmentBlocks, sampleForPreview, type SegmentEntry } from "../lib/homeBlocks";
 import {
@@ -75,6 +76,7 @@ function sortByViews(list: SectionArticle[]): SectionArticle[] {
 
 function useArticlesByCategory(category: string): SectionArticle[] {
   const { articles } = useArticles();
+  const { lang, tz } = useT();
   return articles
     .filter((a) => a.category.toLowerCase().includes(category.toLowerCase()))
     .map((a) => ({
@@ -85,14 +87,13 @@ function useArticlesByCategory(category: string): SectionArticle[] {
       image: a.imageUrl || "",
       chapeu: a.tag || category.toUpperCase(),
       author: a.author,
-      time: new Date(a.publishedAt).toLocaleDateString("pt-BR", {
-        day: "numeric", month: "short",
-      }),
+      time: formatDayMonth(a.publishedAt, lang, tz),
     }));
 }
 
 // ─── Extra layout components ──────────────────────────────────────────────────
 function SectionBlockTrio({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const { t } = useT();
   const items = articles.slice(0, 3);
   if (items.length === 0) return null;
   return (
@@ -103,7 +104,7 @@ function SectionBlockTrio({ title, color, href, articles }: { title: string; col
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {items.map((a) => (
@@ -121,6 +122,7 @@ function SectionBlockTrio({ title, color, href, articles }: { title: string; col
 }
 
 function SectionBlockCompact({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const { t } = useT();
   const items = articles.slice(0, 6);
   if (items.length === 0) return null;
   return (
@@ -131,7 +133,7 @@ function SectionBlockCompact({ title, color, href, articles }: { title: string; 
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
           {items.map((a) => (
@@ -151,6 +153,7 @@ function SectionBlockCompact({ title, color, href, articles }: { title: string; 
 }
 
 function SectionBlockBigStory({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const { t } = useT();
   const [main, ...rest] = articles;
   if (!main) return null;
   return (
@@ -161,7 +164,7 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
         <div className="flex flex-col lg:flex-row gap-6">
           <Link href={`/artigo/${main.slug ?? main.id}`} className="flex-[3] relative group overflow-hidden rounded-xl">
@@ -196,6 +199,7 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
 }
 
 function SectionBlockTimeline({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+  const { t } = useT();
   const items = articles.slice(0, 6);
   if (items.length === 0) return null;
   return (
@@ -206,7 +210,7 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
         <div className="relative pl-6 border-l-2" style={{ borderColor: color + "40" }}>
           {items.map((a, i) => (
@@ -226,13 +230,14 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
 }
 
 function SectionHeaderClassic({ title, color, href }: { title: string; color: string; href: string }) {
+  const { t } = useT();
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-3">
         <div className="w-1 h-5" style={{ backgroundColor: color }} />
         <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
       </div>
-      <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>Ver mais</Link>
+      <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
     </div>
   );
 }
@@ -584,6 +589,7 @@ function AdminBlockWrapper({
 export default function Home() {
   const { articles } = useArticles();
   const { settings } = useSite();
+  const { t, lang, tz } = useT();
 
   const isAdminPreview = typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).get("adminPreview") === "1";
@@ -664,9 +670,7 @@ export default function Home() {
         image: a.imageUrl || "",
         chapeu: a.tag || cat.toUpperCase(),
         author: a.author,
-        time: new Date(a.publishedAt).toLocaleDateString("pt-BR", {
-          day: "numeric", month: "short",
-        }),
+        time: formatDayMonth(a.publishedAt, lang, tz),
         views: a.views,
       }));
   }
@@ -795,7 +799,9 @@ export default function Home() {
       )}
 
       <main className="flex-1">
-        <h1 className="sr-only">Últimas notícias de Brasília e do Distrito Federal</h1>
+        <h1 className="sr-only">{lang === "en" && settings?.siteName
+          ? `${settings.siteName} — ${t("home.h1")}`
+          : t("home.h1")}</h1>
 
         {segmentBlocks(visibleBlocks).map((seg) => {
           if (seg.kind === "flow") return renderFlowBlock(seg.block, seg.idx);

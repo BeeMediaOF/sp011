@@ -6,6 +6,7 @@ import { FaXTwitter } from "react-icons/fa6";
 import logoImg from "../assets/images/logo_sbc_negativo.png";
 import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import {
   resolveFooterConfig, type FooterLink, type FooterSocialKey, type ResolvedFooter,
 } from "../lib/footerConfig";
@@ -55,6 +56,7 @@ function getSessionId(): string {
 
 /** Formulário de newsletter funcional: registra a adesão via analytics. */
 function NewsletterForm({ dark, accent }: { dark: boolean; accent: string }) {
+  const { t } = useT();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "ok">("idle");
 
@@ -75,13 +77,13 @@ function NewsletterForm({ dark, accent }: { dark: boolean; accent: string }) {
   }
 
   if (status === "ok") {
-    return <p className={`text-xs font-bold ${dark ? "text-white" : "text-gray-800"}`}>Inscrição registrada. Obrigado!</p>;
+    return <p className={`text-xs font-bold ${dark ? "text-white" : "text-gray-800"}`}>{t("newsletter.thanks")}</p>;
   }
   return (
     <form onSubmit={submit} className="flex max-w-[320px]">
-      <input type="email" placeholder="Seu e-mail" required value={email}
+      <input type="email" placeholder={t("newsletter.email")} required value={email}
         onChange={(e) => setEmail(e.target.value)}
-        aria-label="Seu e-mail para newsletter"
+        aria-label={t("newsletter.emailAria")}
         className={dark
           ? "flex-1 min-w-0 bg-white/10 border border-white/20 text-white placeholder-white/40 px-3 py-2 text-xs focus:outline-none focus:border-[#c8102e]"
           : "flex-1 min-w-0 bg-white border border-gray-300 text-gray-800 placeholder-gray-400 px-3 py-2 text-xs focus:outline-none focus:border-[#c8102e]"} />
@@ -111,6 +113,7 @@ function LegalRow({ links, className, sepClassName }: {
 
 export default function Footer() {
   const { settings } = useSite();
+  const { t, lang } = useT();
   const style = settings?.footerStyle ?? "dark";
   const bgColor = settings?.footerBgColor;
   // Logo configurada no painel tem prioridade; as imagens do bundle (variante
@@ -125,6 +128,7 @@ export default function Footer() {
     menuItems: settings?.menuItems,
     siteName: settings?.siteName || BRAND.name,
     tagline: settings?.tagline,
+    lang,
   });
 
   // ── Minimal ────────────────────────────────────────────────────────────────
@@ -183,7 +187,7 @@ export default function Footer() {
             {(f.showContact || f.showNewsletter) && (
               <div className="col-span-2">
                 <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">
-                  {f.showContact && f.showNewsletter ? "Contato & Newsletter" : f.showContact ? "Contato" : "Newsletter"}
+                  {f.showContact && f.showNewsletter ? t("footer.contactNewsletter") : f.showContact ? t("footer.contact") : t("footer.newsletter")}
                 </h3>
                 {f.showContact && (
                   <div className="text-gray-600 text-xs space-y-1 mb-4">
@@ -247,7 +251,7 @@ export default function Footer() {
           {(f.showContact || f.showNewsletter) && (
             <div className="col-span-2 md:col-span-2">
               <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: accent ?? "#ffd300" }}>
-                {f.showContact && f.showNewsletter ? "Contato & Newsletter" : f.showContact ? "Contato" : "Newsletter"}
+                {f.showContact && f.showNewsletter ? t("footer.contactNewsletter") : f.showContact ? t("footer.contact") : t("footer.newsletter")}
               </h3>
               {f.showContact && (
                 <div className="text-gray-400 text-xs space-y-1 mb-4">

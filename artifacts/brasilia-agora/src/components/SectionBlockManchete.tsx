@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "@/lib/sanitize";
+import { useT } from "../lib/i18n";
 
 interface Article {
   id: string;
@@ -26,6 +27,7 @@ function imgSrc(img: unknown): string {
 }
 
 export default function SectionBlockManchete({ title, color, href, articles }: Props) {
+  const { t } = useT();
   const [hero, ...rest] = articles;
   const secondary = rest.slice(0, 3);
   if (!hero) return null;
@@ -43,7 +45,7 @@ export default function SectionBlockManchete({ title, color, href, articles }: P
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
           <Link href={href} className="text-[11px] font-bold hover:underline uppercase tracking-wider" style={{ color }}>
-            Ver mais →
+            {t("common.seeMoreArrow")}
           </Link>
         </div>
 

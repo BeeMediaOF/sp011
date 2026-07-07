@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import { safeTitleHtml } from "@/lib/sanitize";
 
 interface Article {
@@ -29,7 +30,8 @@ function imgSrc(img: unknown): string {
 
 export default function SectionBlockCulturaLayout({ title, color, href, articles, reverse = false }: Props) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const [featured, ...rest] = articles;
   const listItems = rest.slice(0, 5);
 
@@ -46,7 +48,7 @@ export default function SectionBlockCulturaLayout({ title, color, href, articles
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
           <Link href={href} className="text-[11px] font-bold hover:underline uppercase tracking-wider" style={{ color }}>
-            Ver mais →
+            {t("common.seeMoreArrow")}
           </Link>
         </div>
 

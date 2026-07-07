@@ -90,6 +90,22 @@ export const DEFAULT_LEGAL_LINKS: FooterLink[] = [
   { id: "contato",     label: "Contato",     href: "/contato" },
 ];
 
+// Defaults quando o site público é EN e o rodapé não foi customizado no painel
+// (mesmas rotas; um footerConfig salvo sempre tem prioridade sobre isto).
+const DEFAULT_INSTITUTIONAL_LINKS_EN: FooterLink[] = [
+  { id: "sobre",       label: "About us",       href: "/contato" },
+  { id: "fale",        label: "Contact us",     href: "/contato" },
+  { id: "anuncie",     label: "Advertise",      href: "/contato" },
+  { id: "privacidade", label: "Privacy Policy", href: "/privacidade" },
+  { id: "termos",      label: "Terms of Use",   href: "/termos" },
+];
+
+const DEFAULT_LEGAL_LINKS_EN: FooterLink[] = [
+  { id: "privacidade", label: "Privacy", href: "/privacidade" },
+  { id: "termos",      label: "Terms",   href: "/termos" },
+  { id: "contato",     label: "Contact", href: "/contato" },
+];
+
 const SOCIAL_KEYS: FooterSocialKey[] = ["instagram", "facebook", "x", "youtube", "tiktok", "whatsapp"];
 
 /** Normaliza URL de rede social: aceita "@user"/"user" e completa com https. */
@@ -120,10 +136,13 @@ export function resolveFooterConfig(opts: {
   menuItems?: { label: string; path: string }[] | null;
   siteName?: string;
   tagline?: string;
+  /** Idioma do site público — só troca os DEFAULTS (config salva prevalece). */
+  lang?: "pt-BR" | "en";
 }): ResolvedFooter {
   const cfg = opts.config ?? {};
   const contact = opts.contact ?? {};
   const siteName = opts.siteName ?? "";
+  const en = opts.lang === "en";
 
   // Redes: config do rodapé tem prioridade; senão, hub de Contato.
   const socialSource: FooterSocial = { ...contact, ...(cfg.social ?? {}) };
@@ -136,14 +155,19 @@ export function resolveFooterConfig(opts: {
     .slice(0, 8)
     .map((m, i) => ({ id: `menu-${i}`, label: m.label, href: m.path }));
   const defaultColumns: FooterColumn[] = [
-    { id: "secoes", title: "Seções", links: menuLinks },
-    { id: "institucional", title: "Institucional", links: DEFAULT_INSTITUTIONAL_LINKS },
+    { id: "secoes", title: en ? "Sections" : "Seções", links: menuLinks },
+    {
+      id: "institucional", title: en ? "Institutional" : "Institucional",
+      links: en ? DEFAULT_INSTITUTIONAL_LINKS_EN : DEFAULT_INSTITUTIONAL_LINKS,
+    },
   ];
 
   return {
     description: cfg.description
       ?? opts.tagline
-      ?? "Informação com credibilidade e compromisso com a verdade.",
+      ?? (en
+        ? "Credible information, committed to the truth."
+        : "Informação com credibilidade e compromisso com a verdade."),
     showSocial: cfg.showSocial ?? true,
     social,
     columns: (cfg.columns && cfg.columns.length > 0 ? cfg.columns : defaultColumns)
@@ -152,11 +176,15 @@ export function resolveFooterConfig(opts: {
     phone: cfg.phone ?? contact.phone ?? "",
     email: cfg.email ?? contact.displayEmail ?? "",
     showNewsletter: cfg.showNewsletter ?? true,
-    newsletterTitle: cfg.newsletterTitle ?? "Receba nossas notícias",
+    newsletterTitle: cfg.newsletterTitle
+      ?? (en ? "Get our news" : "Receba nossas notícias"),
     copyright: renderCopyright(
-      cfg.copyright ?? "© {year} {site}. Todos os direitos reservados.",
+      cfg.copyright
+        ?? (en
+          ? "© {year} {site}. All rights reserved."
+          : "© {year} {site}. Todos os direitos reservados."),
       siteName,
     ),
-    legalLinks: cfg.legalLinks ?? DEFAULT_LEGAL_LINKS,
+    legalLinks: cfg.legalLinks ?? (en ? DEFAULT_LEGAL_LINKS_EN : DEFAULT_LEGAL_LINKS),
   };
 }

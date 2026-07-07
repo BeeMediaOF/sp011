@@ -6,6 +6,7 @@ import router from "./routes";
 import setupRouter from "./routes/setup";
 import { logger } from "./lib/logger";
 import { isDbReady } from "./lib/setupState";
+import { isStoreHydrated } from "./lib/store";
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -173,6 +174,13 @@ app.use("/api/setup", setupRouter);
 app.use("/api", (_req, res, next) => {
   if (!isDbReady()) {
     res.status(503).json({ error: "setup_required", setupRequired: true });
+    return;
+  }
+  // Banco configurado mas hidratação inicial falhou (ex.: Postgres fora do ar
+  // no boot com conexão via env): melhor 503 explícito do que servir os
+  // DEFAULTs como se fossem o site. O boot retry (index.ts) destrava sozinho.
+  if (!isStoreHydrated()) {
+    res.status(503).json({ error: "db_unavailable" });
     return;
   }
   next();

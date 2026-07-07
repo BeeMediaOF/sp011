@@ -547,6 +547,35 @@ export default function Settings() {
                     <input value={settings.tagline} onChange={e => setField("tagline", e.target.value)}
                       className={INPUT} placeholder="Ex: Notícia. Agora. Sempre."/>
                   </Field>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <Field label="Idioma do site público" hint="o painel continua em português">
+                      <select value={settings.siteLanguage ?? "pt-BR"}
+                        onChange={e => setField("siteLanguage", e.target.value as SiteSettings["siteLanguage"])}
+                        className={INPUT}>
+                        <option value="pt-BR">Português (Brasil)</option>
+                        <option value="en">English</option>
+                      </select>
+                    </Field>
+                    <Field label="Fuso horário das datas" hint="IANA">
+                      <select
+                        value={TZ_OPTIONS.includes(settings.siteTimezone ?? "America/Sao_Paulo")
+                          ? (settings.siteTimezone ?? "America/Sao_Paulo") : "custom"}
+                        onChange={e => setField("siteTimezone", e.target.value === "custom" ? "" : e.target.value)}
+                        className={INPUT}>
+                        <option value="America/Sao_Paulo">America/Sao_Paulo (Brasília)</option>
+                        <option value="UTC">UTC</option>
+                        <option value="Europe/London">Europe/London</option>
+                        <option value="America/New_York">America/New_York</option>
+                        <option value="custom">Outro…</option>
+                      </select>
+                    </Field>
+                  </div>
+                  {!TZ_OPTIONS.includes(settings.siteTimezone ?? "America/Sao_Paulo") && (
+                    <Field label="Fuso IANA personalizado" hint="ex.: Europe/Lisbon">
+                      <input value={settings.siteTimezone ?? ""} onChange={e => setField("siteTimezone", e.target.value)}
+                        className={INPUT} placeholder="Continente/Cidade"/>
+                    </Field>
+                  )}
                 </div>
 
                 {/* SEO */}
@@ -2119,6 +2148,9 @@ function SectionHeader({ icon, label }: { icon: React.ReactNode; label: string }
     </div>
   );
 }
+
+/** Fusos oferecidos no select de Configurações (fora da lista → campo livre). */
+const TZ_OPTIONS = ["America/Sao_Paulo", "UTC", "Europe/London", "America/New_York"];
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (

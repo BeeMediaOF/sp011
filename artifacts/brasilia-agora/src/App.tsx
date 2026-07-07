@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useT } from "@/lib/i18n";
 import { lazy, Suspense, useState, useEffect } from "react";
 
 /* ─── Eager — crítico para o carregamento inicial ─── */
@@ -165,6 +166,16 @@ function AnalyticsProvider() {
   return null;
 }
 
+/** Mantém <html lang> sincronizado com settings.siteLanguage nas rotas SPA
+    (o HTML SSR da home já sai com o lang certo via ssrHomePlugin). */
+function LangSync() {
+  const { lang } = useT();
+  useEffect(() => {
+    if (typeof document !== "undefined") document.documentElement.lang = lang;
+  }, [lang]);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   const isAdminArea =
@@ -287,6 +298,7 @@ function App({ ssrPath }: { ssrPath?: string } = {}) {
       <TooltipProvider>
         <WouterRouter ssrPath={ssrPath} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AnalyticsProvider />
+          <LangSync />
           <SEOHead />
           <Router />
           <Suspense fallback={null}><LGPDConsent /></Suspense>

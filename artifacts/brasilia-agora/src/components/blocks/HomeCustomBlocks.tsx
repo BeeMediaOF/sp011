@@ -17,6 +17,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import AdBanner from "../ads/AdBanner";
 import CotacaoWidget from "../CotacaoWidget";
 import { useSite } from "../../hooks/useSite";
+import { useT } from "../../lib/i18n";
 import { safeTitleHtml, sanitizeArticleHtml } from "../../lib/sanitize";
 import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
@@ -126,6 +127,7 @@ export function ImageBlock({ block, preview }: { block: HomeBlock; preview?: boo
 export function CarouselBlock({ block, articles, preview }: {
   block: HomeBlock; articles: BlockArticle[]; preview?: boolean;
 }) {
+  const { t } = useT();
   const scrollRef = useRef<HTMLDivElement>(null);
   const color = block.color ?? "#0B2A66";
   const items = articles.slice(0, block.itemsLimit ?? 8);
@@ -145,11 +147,11 @@ export function CarouselBlock({ block, articles, preview }: {
         <div className="flex items-center justify-between mb-4">
           <SectionHeading title={block.name} color={color} />
           <div className="hidden md:flex gap-1">
-            <button type="button" aria-label="Anterior" onClick={() => scrollBy(-1)}
+            <button type="button" aria-label={t("common.previous")} onClick={() => scrollBy(-1)}
               className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors">
               <ChevronLeft size={16} />
             </button>
-            <button type="button" aria-label="Próximo" onClick={() => scrollBy(1)}
+            <button type="button" aria-label={t("common.next")} onClick={() => scrollBy(1)}
               className="w-8 h-8 rounded-full border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-colors">
               <ChevronRight size={16} />
             </button>
@@ -246,6 +248,7 @@ export function TickerBlock({ block, articles, preview, contained = true }: {
   /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas da home). */
   contained?: boolean;
 }) {
+  const { t } = useT();
   const color = block.color ?? "#E71D36";
   const items = articles.slice(0, block.itemsLimit ?? 10);
   if (items.length === 0) {
@@ -262,7 +265,7 @@ export function TickerBlock({ block, articles, preview, contained = true }: {
       <div className="flex items-center border border-gray-200 bg-white">
         <span className="shrink-0 text-[11px] font-black text-white uppercase tracking-wider px-3 py-2"
           style={{ backgroundColor: color }}>
-          {block.name || "Últimas"}
+          {block.name || t("home.latest")}
         </span>
         {/* Área de rolagem com clipping próprio — sem ela a faixa animada
             desliza por cima do rótulo e vaza pela borda esquerda. */}
@@ -296,6 +299,7 @@ function getSessionId(): string {
 }
 
 export function NewsletterBlock({ block }: { block: HomeBlock }) {
+  const { t, lang } = useT();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
   const color = block.color ?? "#0B2A66";
@@ -321,23 +325,24 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <div className="flex-1">
           <p className="text-lg font-black text-white">{block.name || "Newsletter"}</p>
-          <p className="text-sm text-white/80 mt-1">{block.caption || "Receba as principais notícias no seu e-mail."}</p>
+          <p className="text-sm text-white/80 mt-1">{block.caption
+            || (lang === "en" ? "Get the top stories in your inbox." : "Receba as principais notícias no seu e-mail.")}</p>
         </div>
         {status === "ok" ? (
-          <p className="text-sm font-bold text-white bg-white/15 rounded-lg px-4 py-3">Inscrição registrada. Obrigado!</p>
+          <p className="text-sm font-bold text-white bg-white/15 rounded-lg px-4 py-3">{t("newsletter.thanks")}</p>
         ) : (
           <form onSubmit={submit} className="flex w-full md:w-auto md:min-w-[380px]">
             <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (status === "err") setStatus("idle"); }}
-              placeholder="Seu e-mail" aria-label="Seu e-mail para a newsletter" required
+              placeholder={t("newsletter.email")} aria-label={t("newsletter.emailAria")} required
               className="flex-1 bg-white/10 border border-white/25 text-white placeholder-white/50 px-4 py-2.5 text-sm rounded-l-lg focus:outline-none focus:border-white" />
             <button type="submit" disabled={status === "sending"}
               className="bg-white text-sm font-bold px-5 py-2.5 rounded-r-lg hover:bg-white/90 disabled:opacity-60 transition-colors"
               style={{ color }}>
-              {status === "sending" ? "Enviando…" : "Assinar"}
+              {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
             </button>
           </form>
         )}
-        {status === "err" && <p className="text-xs text-white/90 md:ml-2">Informe um e-mail válido.</p>}
+        {status === "err" && <p className="text-xs text-white/90 md:ml-2">{lang === "en" ? "Enter a valid email." : "Informe um e-mail válido."}</p>}
       </div>
     </section>
   );

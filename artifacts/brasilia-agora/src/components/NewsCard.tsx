@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import { buildSrcSet, CARD_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "@/lib/sanitize";
 
@@ -17,7 +18,8 @@ interface NewsCardProps {
 
 export default function NewsCard({ id, slug, title, summary, image, chapeu, chapeuColor, author, time }: NewsCardProps) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const bylineLogo = settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
   const href = `/artigo/${slug || id}`;
   const srcset = buildSrcSet(image, CARD_WIDTHS);

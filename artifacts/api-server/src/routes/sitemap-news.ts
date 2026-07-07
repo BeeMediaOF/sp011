@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { BRAND } from "../lib/brand.js";
+import { store } from "../lib/store.js";
 import { db, articlesTable } from "@workspace/db";
 import { eq, gte, and, desc } from "drizzle-orm";
 
@@ -18,6 +19,9 @@ function escapeXml(s: string): string {
 router.get("/sitemap-news.xml", async (req, res) => {
   const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const base   = `${req.protocol}://${req.get("host")}`;
+  const s      = store.getSettings();
+  const pubName = escapeXml(s.siteName?.trim() || BRAND.name);
+  const newsLang = s.siteLanguage === "en" ? "en" : "pt";
 
   const articles = await db
     .select({
@@ -39,8 +43,8 @@ router.get("/sitemap-news.xml", async (req, res) => {
     <loc>${escapeXml(`${base}/artigo/${slug}`)}</loc>
     <news:news>
       <news:publication>
-        <news:name>${BRAND.name}</news:name>
-        <news:language>pt</news:language>
+        <news:name>${pubName}</news:name>
+        <news:language>${newsLang}</news:language>
       </news:publication>
       <news:publication_date>${pubDate}</news:publication_date>
       <news:title>${title}</news:title>

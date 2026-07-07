@@ -45,6 +45,31 @@ function stripHtml(s: string): string {
   return s.replace(/<[^>]*>/g, "").trim();
 }
 
+type SiteLang = "pt-BR" | "en";
+
+/**
+ * Idioma público do site com cache (~5min), para o socialOgPlugin decidir
+ * lang/og:locale/sufixo sem pagar 1 fetch por crawler hit. Qualquer falha →
+ * pt-BR (comportamento anterior).
+ */
+function makeSiteLangResolver(apiBase: string): () => Promise<SiteLang> {
+  const TTL_MS = 5 * 60_000;
+  let cached: { lang: SiteLang; at: number } | null = null;
+  return async () => {
+    const now = Date.now();
+    if (cached && now - cached.at < TTL_MS) return cached.lang;
+    try {
+      const r = await fetch(`${apiBase}/api/site`);
+      const s = r.ok ? ((await r.json()) as { siteLanguage?: string }) : null;
+      const lang: SiteLang = s?.siteLanguage === "en" ? "en" : "pt-BR";
+      cached = { lang, at: now };
+      return lang;
+    } catch {
+      return cached?.lang ?? "pt-BR";
+    }
+  };
+}
+
 function buildOgHtml(params: {
   title: string;
   description: string;
@@ -52,11 +77,12 @@ function buildOgHtml(params: {
   canonicalUrl: string;
   category: string;
   publishedAt: string;
+  lang: SiteLang;
 }): string {
-  const { title, description, imageUrl, canonicalUrl, category, publishedAt } =
+  const { title, description, imageUrl, canonicalUrl, category, publishedAt, lang } =
     params;
   return `<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="${lang}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -64,7 +90,7 @@ function buildOgHtml(params: {
 <meta name="description" content="${esc(description)}">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="${BRAND.name}">
-<meta property="og:locale" content="pt_BR">
+<meta property="og:locale" content="${lang === "en" ? "en_US" : "pt_BR"}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(canonicalUrl)}">
@@ -164,6 +190,8 @@ function staticCachePlugin(): Plugin {
 }
 
 function socialOgPlugin(apiBase: string): Plugin {
+  const resolveSiteLang = makeSiteLangResolver(apiBase);
+
   async function handleCrawler(
     req: IncomingMessage,
     res: ServerResponse,
@@ -210,12 +238,13 @@ function socialOgPlugin(apiBase: string): Plugin {
       const artSlug = article.slug ?? article.id ?? slug;
       const canonicalUrl = `${proto}://${host}/artigo/${artSlug}`;
 
+      const lang = await resolveSiteLang();
       const rawTitle = stripHtml(article.title);
       const rawSubtitle = stripHtml(article.subtitle ?? "");
       const baseDesc = rawSubtitle || rawTitle;
       const description =
         baseDesc.slice(0, 200) + (baseDesc.length > 200 ? "…" : "") +
-        " — Leia mais em nosso site";
+        (lang === "en" ? " — Read more on our site" : " — Leia mais em nosso site");
 
       const html = buildOgHtml({
         title: rawTitle,
@@ -224,6 +253,7 @@ function socialOgPlugin(apiBase: string): Plugin {
         canonicalUrl,
         category: article.category ?? "",
         publishedAt: article.publishedAt ?? "",
+        lang,
       });
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -340,7 +370,10 @@ function ssrHomePlugin(apiBase: string): Plugin {
 
       const appHtml = renderFn("/", data);
       const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
+      // <html lang> segue o idioma do site (o template buildado traz pt-BR fixo).
+      const lang = site?.["siteLanguage"] === "en" ? "en" : "pt-BR";
       const html = template
+        .replace(/<html lang="[^"]*"/, `<html lang="${lang}"`)
         .replace("<head>", `<head>\n    <script>window.__SSR_DATA__=${serialized}</script>`)
         .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
 

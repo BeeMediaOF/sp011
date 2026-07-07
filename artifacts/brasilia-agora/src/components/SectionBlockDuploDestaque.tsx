@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import { buildSrcSet, HERO_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 
 interface Article {
@@ -28,7 +29,8 @@ function imgSrc(img: unknown): string {
 
 export default function SectionBlockDuploDestaque({ title, color, href, articles }: Props) {
   const { settings } = useSite();
-  const bylineName = settings?.bylineName || settings?.siteName || "Redação";
+  const { t } = useT();
+  const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
   const featured = articles.slice(0, 2);
   const strip = articles.slice(2, 6);
 
@@ -43,7 +45,7 @@ export default function SectionBlockDuploDestaque({ title, color, href, articles
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
           <Link href={href} className="text-[11px] font-bold hover:underline uppercase tracking-wider" style={{ color }}>
-            Ver mais →
+            {t("common.seeMoreArrow")}
           </Link>
         </div>
 

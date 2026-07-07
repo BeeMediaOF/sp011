@@ -3,6 +3,7 @@ import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
 import { Search, Menu, X, House, ChevronDown } from "lucide-react";
 import { useSite } from "../hooks/useSite";
+import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import PushSubscribeButton from "./PushSubscribeButton";
@@ -19,6 +20,21 @@ const FALLBACK_NAV: NavEntry[] = [
   { label: "CULTURA",    path: "/cultura" },
   { label: "ESPORTES",   path: "/esportes" },
   { label: "COLUNAS",    path: "/colunas" },
+];
+
+// Fallback quando o site é EN e o menu ainda não foi configurado no painel
+// (mesmas rotas de categoria; num blog real o menu vem de settings.menuItems).
+const FALLBACK_NAV_EN: NavEntry[] = [
+  { label: "HOME",      path: "/" },
+  { label: "POLITICS",  path: "/politica" },
+  { label: "CITY",      path: "/cidade" },
+  { label: "SECURITY",  path: "/seguranca" },
+  { label: "TRANSPORT", path: "/transporte" },
+  { label: "HEALTH",    path: "/saude" },
+  { label: "EDUCATION", path: "/educacao" },
+  { label: "CULTURE",   path: "/cultura" },
+  { label: "SPORTS",    path: "/esportes" },
+  { label: "COLUMNS",   path: "/colunas" },
 ];
 
 // ─── Submenu (1 nível) ────────────────────────────────────────────────────────
@@ -132,6 +148,7 @@ interface MobileNavProps {
 }
 
 function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, siteName }: MobileNavProps) {
+  const { t } = useT();
   // Submenus abertos no drawer (acordeão por path do item pai).
   const [openSub, setOpenSub] = useState<Record<string, boolean>>({});
   useEffect(() => {
@@ -157,12 +174,12 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label="Menu de navegação"
+        aria-label={t("menu.nav")}
         className={`fixed top-0 left-0 z-50 h-full w-[84%] max-w-[330px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-2 px-4 h-14 border-b border-gray-200 shrink-0">
           <img src={logoSrc} alt={siteName} className="h-7 w-auto object-contain" />
-          <button onClick={onClose} aria-label="Fechar menu" className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label={t("menu.close")} className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
             <X size={22} />
           </button>
         </div>
@@ -187,7 +204,7 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
                     {kids.length > 0 && (
                       <button
                         onClick={() => setOpenSub((p) => ({ ...p, [path]: !p[path] }))}
-                        aria-label={openSub[path] ? "Fechar submenu" : "Abrir submenu"}
+                        aria-label={openSub[path] ? t("menu.subClose") : t("menu.subOpen")}
                         className="p-2 mr-1 text-gray-400 hover:text-gray-700 rounded-lg transition-colors"
                       >
                         <ChevronDown size={16} className={`transition-transform ${openSub[path] ? "rotate-180" : ""}`} />
@@ -220,6 +237,7 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
   const { settings }            = useSite();
+  const { t, lang }             = useT();
   // Logo configurada no painel (Configurações → logo) tem prioridade; a imagem
   // empacotada no bundle é só fallback quando nenhuma logo foi enviada.
   const logoSrc = settings?.logoBase64 || logoImg;
@@ -247,7 +265,7 @@ export default function Header() {
   const navItems =
     settings?.menuItems && settings.menuItems.length > 0
       ? settings.menuItems
-      : FALLBACK_NAV;
+      : (lang === "en" ? FALLBACK_NAV_EN : FALLBACK_NAV);
 
   const isActive = (path: string) =>
     path === "/" ? location === "/" : location === path || location.startsWith(path + "/");
@@ -319,22 +337,22 @@ export default function Header() {
         <div className="flex items-center pl-2 shrink-0">
           {searchOpen ? (
             <div className="flex items-center gap-1">
-              <input autoFocus type="text" placeholder="Pesquisar..."
-                aria-label="Pesquisar no site"
+              <input autoFocus type="text" placeholder={t("search.placeholder")}
+                aria-label={t("search.site")}
                 value={searchQuery}
                 onChange={(e) => setSearchQ(e.target.value)}
                 onKeyDown={handleSearchKey}
                 className="bg-white/15 border border-white/30 text-white placeholder-white/60 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-white w-[180px]"
               />
-              <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-white/80 hover:text-white p-1">
+              <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-white/80 hover:text-white p-1">
                 <Search size={14} />
               </button>
-              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-white/60 hover:text-white p-1">
+              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-white/60 hover:text-white p-1">
                 <X size={14} />
               </button>
             </div>
           ) : (
-            <button onClick={() => setSearch(true)} aria-label="Abrir busca" className="text-white/80 hover:text-white p-1.5 transition-colors">
+            <button onClick={() => setSearch(true)} aria-label={t("search.open")} className="text-white/80 hover:text-white p-1.5 transition-colors">
               <Search size={15} />
             </button>
           )}
@@ -397,22 +415,22 @@ export default function Header() {
               <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
               {searchOpen ? (
                 <>
-                  <input autoFocus type="text" placeholder="Pesquisar..."
-                    aria-label="Pesquisar no site"
+                  <input autoFocus type="text" placeholder={t("search.placeholder")}
+                    aria-label={t("search.site")}
                     value={searchQuery}
                     onChange={(e) => setSearchQ(e.target.value)}
                     onKeyDown={handleSearchKey}
                     className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
                   />
-                  <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-gray-500 hover:text-gray-900 p-1">
+                  <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-gray-500 hover:text-gray-900 p-1">
                     <Search size={14} />
                   </button>
-                  <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
+                  <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-gray-400 hover:text-gray-800 p-1">
                     <X size={14} />
                   </button>
                 </>
               ) : (
-                <button onClick={() => setSearch(true)} aria-label="Abrir busca" className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
+                <button onClick={() => setSearch(true)} aria-label={t("search.open")} className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
                   <Search size={15} />
                 </button>
               )}
@@ -437,7 +455,7 @@ export default function Header() {
           <div className="max-w-[1280px] mx-auto py-3 flex items-center justify-center relative" style={padStyle}>
             <button
               onClick={() => setMenu(v => !v)}
-              aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+              aria-label={menuOpen ? t("menu.close") : t("menu.open")}
               className="absolute left-4 text-gray-500 hover:text-gray-900 p-1.5 rounded lg:hidden"
             >
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -454,7 +472,7 @@ export default function Header() {
 
             <button
               onClick={() => setSearch(v => !v)}
-              aria-label={searchOpen ? "Fechar busca" : "Abrir busca"}
+              aria-label={searchOpen ? t("search.close") : t("search.open")}
               className="absolute right-4 text-gray-500 hover:text-gray-900 p-1.5 rounded"
             >
               <Search size={17} />
@@ -494,17 +512,17 @@ export default function Header() {
 
           {searchOpen && (
             <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
-              <input autoFocus type="text" placeholder="Pesquisar..."
-                aria-label="Pesquisar no site"
+              <input autoFocus type="text" placeholder={t("search.placeholder")}
+                aria-label={t("search.site")}
                 value={searchQuery}
                 onChange={(e) => setSearchQ(e.target.value)}
                 onKeyDown={handleSearchKey}
                 className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
               />
-              <button onClick={() => submitSearch(searchQuery)} aria-label="Buscar" className="text-gray-500 hover:text-gray-900 p-1">
+              <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-gray-500 hover:text-gray-900 p-1">
                 <Search size={16} />
               </button>
-              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label="Fechar busca" className="text-gray-400 hover:text-gray-800 p-1">
+              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-gray-400 hover:text-gray-800 p-1">
                 <X size={16} />
               </button>
             </div>
@@ -527,7 +545,7 @@ export default function Header() {
           <button
             onClick={() => setMenu(v => !v)}
             className="text-gray-500 hover:text-gray-900 transition-colors p-1.5 shrink-0 rounded lg:hidden"
-            aria-label={menuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-label={menuOpen ? t("menu.close") : t("menu.open")}
           >
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -576,8 +594,8 @@ export default function Header() {
                 <input
                   autoFocus
                   type="text"
-                  placeholder="Pesquisar..."
-                  aria-label="Pesquisar no site"
+                  placeholder={t("search.placeholder")}
+                  aria-label={t("search.site")}
                   value={searchQuery}
                   onChange={(e) => setSearchQ(e.target.value)}
                   onKeyDown={handleSearchKey}
@@ -585,14 +603,14 @@ export default function Header() {
                 />
                 <button
                   onClick={() => submitSearch(searchQuery)}
-                  aria-label="Buscar"
+                  aria-label={t("search.submit")}
                   className="text-gray-500 hover:text-gray-900 p-1 transition-colors"
                 >
                   <Search size={15} />
                 </button>
                 <button
                   onClick={() => { setSearch(false); setSearchQ(""); }}
-                  aria-label="Fechar busca"
+                  aria-label={t("search.close")}
                   className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
                 >
                   <X size={15} />
@@ -601,7 +619,7 @@ export default function Header() {
             ) : (
               <button
                 onClick={() => setSearch(true)}
-                aria-label="Abrir busca"
+                aria-label={t("search.open")}
                 className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
               >
                 <Search size={17} />

@@ -6,19 +6,7 @@ import CategoryPage from "../components/CategoryPage";
 import type { Article as CategoryArticle } from "../components/CategoryPage";
 import type { Article as ApiArticle } from "../lib/adminApi";
 import { useAnalytics } from "../hooks/useAnalytics";
-
-function relativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  if (isNaN(then)) return "—";
-  const diff = Math.floor((now - then) / 1000);
-  if (diff < 60)     return "agora mesmo";
-  if (diff < 3600)   return `${Math.floor(diff / 60)} min atrás`;
-  if (diff < 86400)  return `${Math.floor(diff / 3600)} h atrás`;
-  if (diff < 172800) return "ontem";
-  if (diff < 604800) return `${Math.floor(diff / 86400)} dias atrás`;
-  return new Date(dateStr).toLocaleDateString("pt-BR");
-}
+import { useT, relativeTimeOrDate } from "../lib/i18n";
 
 interface Props {
   category: string;
@@ -30,6 +18,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
   const [articles, setArticles] = useState<CategoryArticle[]>([]);
   const [loading, setLoading]   = useState(true);
   const { trackCategory } = useAnalytics();
+  const { t, lang, tz } = useT();
 
   // Track category view when user lands on this page
   useEffect(() => {
@@ -55,8 +44,8 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
             slug:     a.slug || a.id,
             title:    a.title,
             subtitle: a.subtitle,
-            time:     relativeTime(a.publishedAt),
-            imageUrl: a.imageUrl || "https://placehold.co/640x380/e5e7eb/9ca3af?text=Sem+imagem",
+            time:     relativeTimeOrDate(a.publishedAt, lang, tz),
+            imageUrl: a.imageUrl || `https://placehold.co/640x380/e5e7eb/9ca3af?text=${t("category.imgNone")}`,
             tag:      a.tag || category,
             tagColor: color,
             author:   a.author,
@@ -65,13 +54,16 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [slug, category, color]);
+  // t é recriada a cada render (deixá-la nas deps loopar ia o fetch); lang/tz
+  // são strings estáveis e já forçam o refetch quando o idioma/fuso muda.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, category, color, lang, tz]);
 
   const placeholder: CategoryArticle = {
     id:       "__placeholder__",
-    title:    "Nenhuma notícia publicada nesta categoria ainda.",
+    title:    t("category.empty"),
     time:     "—",
-    imageUrl: "https://placehold.co/640x380/e5e7eb/9ca3af?text=Em+breve",
+    imageUrl: `https://placehold.co/640x380/e5e7eb/9ca3af?text=${t("category.imgSoon")}`,
     tag:      category,
     tagColor: color,
   };
@@ -86,7 +78,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
       <main className="flex-1 bg-white">
         {loading ? (
           <div className="flex items-center justify-center py-24 text-gray-300 text-sm">
-            Carregando…
+            {t("common.loading")}
           </div>
         ) : (
           <CategoryPage
