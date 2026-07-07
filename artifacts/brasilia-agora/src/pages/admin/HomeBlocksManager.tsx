@@ -405,99 +405,93 @@ const HOME_STYLE_PRESETS: HomeStylePreset[] = [
 
 // ─── Templates prontos (aba Templates) ────────────────────────────────────────
 // Modelos embutidos no painel: aparecem sempre na aba Templates e não podem ser
-// excluídos. O "KSports" reproduz o portal esportivo de referência (verde/preto):
-// barra do topo preta (data + trending + redes), banner bet9ja ao lado do logo,
-// menu em faixa verde, zona de 2 colunas (hero Portal + ticker + banner + Recent
-// News | Most Read + Latest Headlines + banner), pares Football|Basketball e
-// NFL|Racing em meia largura, e rodapé preto/verde com colunas + newsletter.
-// Aplicar também instala o menu e o rodapé do exemplo (Desfazer restaura tudo).
-// Banners são HTML editável — troque pela arte real em Propagandas quando tiver.
-const KSPORTS_GREEN = "#009A3D";
-const KSPORTS_BLACK = "#050806";
+// excluídos. O "KSports" segue o mockup do portal esportivo EN + o brandbook do
+// KBET (parceiro dos banners): dark blue #0e0d2a como base (top bar/hero/footer),
+// K-Pink #ff2b74 como acento (menu ativo, badges, TRENDING, botões) e gradientes
+// rosa→roxo→azul nos banners (CSS puro — troque pela arte real quando tiver).
+// Arranjo: top bar escura (data + trending + redes) → banner KBET → zona hero
+// (portal | Most Read + Latest News + partner card) → ticker TRENDING NOW →
+// banner de bônus → Recent News em grade → pares Football|NFL e Formula 1|
+// e-Sports em meia largura → rodapé dark blue com Navigation/Institutional +
+// newsletter. Aplicar instala menu/rodapé E configura o site em EN/UTC
+// (Desfazer restaura tudo, inclusive o idioma).
+const KSPORTS_DARK   = "#0e0d2a"; // Dark blue (base do brandbook)
+const KSPORTS_PINK   = "#ff2b74"; // K-Pink (acento principal)
+const KSPORTS_PURPLE = "#6600b8"; // K-Purple (badges secundárias/gradiente)
+const KSPORTS_BLUE2  = "#060062"; // Blue Secondary (gradientes)
 
-// Marca fictícia dos banners do exemplo (bet9ja) — apenas visual, sem link.
-const KSPORTS_AD_BRAND = `<span style="color:#e32626;font-size:26px;font-weight:900;font-style:italic;">bet<span style="color:#25bd62;">9</span>ja</span>`;
-const KSPORTS_AD_BG = `border:1px solid #1f2a23;border-radius:6px;background:radial-gradient(circle at 88% 50%, rgba(0,154,61,.5), transparent 30%), linear-gradient(135deg,#050806,#142018 55%,#020403);`;
+// Marca do parceiro (KBET) em texto puro — o PNG branco oficial pode substituir
+// depois (upload no Storage e editar o HTML do bloco).
+const KSPORTS_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;">K<span style="color:${KSPORTS_PINK};">BET</span></span>`;
+const KSPORTS_AD_BG = `border:1px solid #232145;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(255,43,116,.42), transparent 42%), radial-gradient(circle at 10% 60%, rgba(102,0,184,.55), transparent 46%), linear-gradient(135deg, ${KSPORTS_DARK}, ${KSPORTS_BLUE2} 60%, ${KSPORTS_DARK});`;
 
-// Banner compacto exibido ao lado do logo (settings.headerBannerHtml).
-const KSPORTS_AD_HEADER = `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;max-width:728px;width:100%;margin-left:auto;padding:12px 22px;${KSPORTS_AD_BG}">
-  ${KSPORTS_AD_BRAND}
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:17px;font-weight:900;font-style:italic;">THE BIGGEST ODDS</span><br/><span style="font-size:11px;color:#dfe7dd;">ON ALL SPORTS</span></span>
-  <span style="background:${KSPORTS_GREEN};color:#ffffff;padding:8px 14px;border-radius:4px;font-weight:800;font-size:12px;white-space:nowrap;">BET NOW</span>
-</div>`;
-
+// Banner principal do parceiro (largura total, acima do hero).
 const KSPORTS_AD_LEADERBOARD = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
   ${KSPORTS_AD_BRAND}
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:22px;font-weight:900;font-style:italic;letter-spacing:.02em;">PLAY. WIN. <span style="color:#f7c948;">REPEAT.</span></span><br/><span style="font-size:14px;font-weight:600;color:#dfe7dd;">JOIN MILLIONS OF WINNERS TODAY!</span></span>
-  <span style="background:${KSPORTS_GREEN};color:#ffffff;padding:10px 18px;border-radius:4px;font-weight:800;font-size:13px;white-space:nowrap;">BET NOW</span>
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:22px;font-weight:900;font-style:italic;letter-spacing:.02em;">BET. WIN. <span style="color:${KSPORTS_PINK};">REPEAT.</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">THE OFFICIAL PARTNER OF KSPORTS</span></span>
+  <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">BET NOW</span>
 </div>`;
 
+// Banner de bônus (largura total, entre o ticker e o Recent News).
+const KSPORTS_AD_BONUS = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
+  ${KSPORTS_AD_BRAND}
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">EXCLUSIVE <span style="color:${KSPORTS_PINK};">BONUSES</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">FOR THE KSPORTS COMMUNITY</span></span>
+  <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">GET STARTED</span>
+</div>`;
+
+// Card lateral do parceiro (barra lateral da zona hero).
 const KSPORTS_AD_BOX = `<div style="max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;${KSPORTS_AD_BG}">
-  <div style="margin-bottom:10px;">${KSPORTS_AD_BRAND}</div>
-  <div style="color:#ffffff;font-size:30px;font-weight:900;line-height:1.05;">MORE WAYS<br/>TO WIN</div>
-  <div style="color:#f7c948;font-size:12px;font-weight:700;margin-top:10px;letter-spacing:.04em;">LIVE BETTING. FAST PAYOUTS. BIG BONUSES.</div>
-  <div style="display:inline-block;background:${KSPORTS_GREEN};color:#ffffff;padding:10px 22px;border-radius:4px;font-weight:800;font-size:13px;margin-top:16px;">JOIN NOW</div>
+  <div style="color:#c9c7e8;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;">OFFICIAL PARTNER</div>
+  <div style="margin-bottom:12px;">${KSPORTS_AD_BRAND}</div>
+  <div style="color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;">THE BEST ODDS<br/>ON ALL SPORTS</div>
+  <div style="display:inline-block;background:${KSPORTS_PINK};color:#ffffff;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;">BET NOW</div>
 </div>`;
 
-// Menu do exemplo (instalado ao aplicar o template; Desfazer restaura o anterior).
+// Menu do KSports (decidido com o usuário) — os paths são os slugs de categoria
+// usados também no targetCategory das regras do painel central (F4/F5).
 const KSPORTS_MENU: TemplateMenuItem[] = [
-  { id: "ks-menu-home",       label: "HOME",           path: "/",               order: 0, visible: true },
-  { id: "ks-menu-football",   label: "FOOTBALL",       path: "/football",       order: 1, visible: true, children: [
-    { id: "ks-menu-npfl", label: "NPFL", path: "/npfl", order: 0, visible: true },
-    { id: "ks-menu-epl",  label: "PREMIER LEAGUE", path: "/premier-league", order: 1, visible: true },
-    { id: "ks-menu-ucl",  label: "CHAMPIONS LEAGUE", path: "/champions-league", order: 2, visible: true },
-  ] },
-  { id: "ks-menu-basketball", label: "BASKETBALL",     path: "/basketball",     order: 2, visible: true, children: [
-    { id: "ks-menu-nba", label: "NBA", path: "/nba", order: 0, visible: true },
-  ] },
-  { id: "ks-menu-nfl",        label: "NFL",            path: "/nfl",            order: 3, visible: true },
-  { id: "ks-menu-athletics",  label: "ATHLETICS",      path: "/athletics",      order: 4, visible: true },
-  { id: "ks-menu-racing",     label: "RACING",         path: "/racing",         order: 5, visible: true, children: [
-    { id: "ks-menu-f1", label: "FORMULA 1", path: "/formula-1", order: 0, visible: true },
-  ] },
-  { id: "ks-menu-nigeria",    label: "NIGERIA SPORTS", path: "/nigeria-sports", order: 6, visible: true },
-  { id: "ks-menu-world",      label: "WORLD SPORTS",   path: "/world-sports",   order: 7, visible: true },
-  { id: "ks-menu-esports",    label: "E-SPORTS",       path: "/e-sports",       order: 8, visible: true },
+  { id: "ks-menu-home",       label: "HOME",       path: "/",           order: 0, visible: true },
+  { id: "ks-menu-worldcup",   label: "WORLD CUP",  path: "/world-cup",  order: 1, visible: true },
+  { id: "ks-menu-football",   label: "FOOTBALL",   path: "/football",   order: 2, visible: true },
+  { id: "ks-menu-volleyball", label: "VOLLEYBALL", path: "/volleyball", order: 3, visible: true },
+  { id: "ks-menu-tennis",     label: "TENNIS",     path: "/tennis",     order: 4, visible: true },
+  { id: "ks-menu-f1",         label: "FORMULA 1",  path: "/formula-1",  order: 5, visible: true },
+  { id: "ks-menu-nfl",        label: "NFL",        path: "/nfl",        order: 6, visible: true },
+  { id: "ks-menu-esports",    label: "E-SPORTS",   path: "/esports",    order: 7, visible: true },
+  { id: "ks-menu-others",     label: "OTHERS",     path: "/others",     order: 8, visible: true },
 ];
 
-// Rodapé do exemplo (colunas + newsletter verde).
+// Rodapé dark blue do mockup: tagline + Navigation/Institutional + newsletter.
 const KSPORTS_FOOTER: FooterConfig = {
-  description: "Nigeria's premier sports news platform delivering the latest updates, insights, and stories from around the world.",
+  description: "News. Analysis. Passion for Sports.",
   showSocial: true,
   columns: [
-    { id: "ks-quick", title: "Quick Links", links: [
-      { id: "ks-q-home", label: "Home", href: "/" },
-      { id: "ks-q-about", label: "About Us", href: "/contato" },
-      { id: "ks-q-advertise", label: "Advertise", href: "/contato" },
-      { id: "ks-q-contact", label: "Contact Us", href: "/contato" },
+    { id: "ks-nav", title: "Navigation", links: [
+      { id: "ks-nav-home",       label: "Home",       href: "/" },
+      { id: "ks-nav-worldcup",   label: "World Cup",  href: "/world-cup" },
+      { id: "ks-nav-football",   label: "Football",   href: "/football" },
+      { id: "ks-nav-volleyball", label: "Volleyball", href: "/volleyball" },
+      { id: "ks-nav-tennis",     label: "Tennis",     href: "/tennis" },
+      { id: "ks-nav-f1",         label: "Formula 1",  href: "/formula-1" },
+      { id: "ks-nav-nfl",        label: "NFL",        href: "/nfl" },
+      { id: "ks-nav-esports",    label: "e-Sports",   href: "/esports" },
     ] },
-    { id: "ks-categories", title: "Categories", links: [
-      { id: "ks-c-football", label: "Football", href: "/football" },
-      { id: "ks-c-basketball", label: "Basketball", href: "/basketball" },
-      { id: "ks-c-nfl", label: "NFL", href: "/nfl" },
-      { id: "ks-c-racing", label: "Racing", href: "/racing" },
-      { id: "ks-c-esports", label: "E-sports", href: "/e-sports" },
-    ] },
-    { id: "ks-nigeria", title: "Nigeria Sports", links: [
-      { id: "ks-n-npfl", label: "NPFL", href: "/npfl" },
-      { id: "ks-n-teams", label: "National Teams", href: "/nigeria-sports" },
-      { id: "ks-n-athletics", label: "Athletics", href: "/athletics" },
-      { id: "ks-n-more", label: "More Sports", href: "/nigeria-sports" },
-    ] },
-    { id: "ks-support", title: "Support", links: [
-      { id: "ks-s-privacy", label: "Privacy Policy", href: "/privacidade" },
-      { id: "ks-s-terms", label: "Terms of Use", href: "/termos" },
-      { id: "ks-s-cookies", label: "Cookie Policy", href: "/privacidade" },
+    { id: "ks-inst", title: "Institutional", links: [
+      { id: "ks-i-about",     label: "About us",       href: "/contato" },
+      { id: "ks-i-advertise", label: "Advertise",      href: "/contato" },
+      { id: "ks-i-privacy",   label: "Privacy Policy", href: "/privacidade" },
+      { id: "ks-i-terms",     label: "Terms of Use",   href: "/termos" },
+      { id: "ks-i-contact",   label: "Contact",        href: "/contato" },
     ] },
   ],
   showContact: false,
   showNewsletter: true,
-  newsletterTitle: "Subscribe to our newsletter for the latest sports updates.",
-  copyright: "© {year} {site}. All Rights Reserved.",
+  newsletterTitle: "Get the top sports stories in your inbox",
+  copyright: "© {year} {site}. All rights reserved.",
   legalLinks: [
     { id: "ks-l-privacy", label: "Privacy Policy", href: "/privacidade" },
-    { id: "ks-l-terms", label: "Terms of Use", href: "/termos" },
-    { id: "ks-l-cookies", label: "Cookie Policy", href: "/privacidade" },
+    { id: "ks-l-terms",   label: "Terms of Use",   href: "/termos" },
+    { id: "ks-l-contact", label: "Contact",        href: "/contato" },
   ],
 };
 
@@ -506,45 +500,49 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
     id: "starter-ksports",
     name: "KSports — Portal Esportivo",
     createdAt: "2026-07-03T00:00:00.000Z",
-    accentColor: KSPORTS_GREEN,
+    accentColor: KSPORTS_PINK,
     builtin: true,
     headerStyle: "standard", footerStyle: "dark",
-    headerBgColor: "#ffffff", footerBgColor: KSPORTS_BLACK,
-    menuTextColor: "#101418", menuActiveColor: KSPORTS_GREEN,
+    headerBgColor: "#ffffff", footerBgColor: KSPORTS_DARK,
+    menuTextColor: "#101418", menuActiveColor: KSPORTS_PINK,
     menuFontSize: 13, menuFontWeight: 800,
     showTickerBar: false, showHeroStrip: true,
-    // Estilo portal: barra do topo preta, banner ao lado do logo, menu em faixa verde
-    showTopBar: true, topBarBgColor: "#0b0d0c",
-    headerBannerHtml: KSPORTS_AD_HEADER,
-    menuBarStyle: "bar", menuBarBgColor: KSPORTS_GREEN,
-    footerAccentColor: KSPORTS_GREEN,
+    // Estilo portal: barra do topo dark blue, menu em faixa dark blue (item
+    // ativo destaca em K-Pink via menuActiveColor na top bar/mobile).
+    showTopBar: true, topBarBgColor: KSPORTS_DARK,
+    menuBarStyle: "bar", menuBarBgColor: KSPORTS_DARK,
+    footerAccentColor: KSPORTS_PINK,
+    // Site público em inglês, datas em UTC (aplicado junto com o template).
+    siteLanguage: "en", siteTimezone: "UTC",
     menuItems: KSPORTS_MENU,
     footerConfig: KSPORTS_FOOTER,
     blocks: [
-      // ── Zona 2 colunas: principal (hero → ticker → banner → Recent News) ──
-      { id: "hero",                        name: "Destaques",                      visible: true, order: 0, layout: "portal", area: "main" },
-      { id: "ticker-ksports",              name: "Trending Now",                   visible: true, order: 1, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_BLACK, area: "main" },
-      { id: "html-ksports-ad-leaderboard", name: "Publicidade — Play Win Repeat",  visible: true, order: 2, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_LEADERBOARD, color: KSPORTS_GREEN, area: "main" },
-      { id: "content-ksports-recent",      name: "Recent News",                    visible: true, order: 3, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_GREEN, category: "geral", area: "main" },
-      // ── Zona 2 colunas: barra lateral (Most Read → Headlines → banner) ──
-      { id: "mais-lidas",                  name: "Most Read",                      visible: true, order: 4, color: KSPORTS_GREEN, area: "sidebar" },
-      { id: "list-ksports-headlines",      name: "Latest Headlines",               visible: true, order: 5, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_GREEN, area: "sidebar" },
-      { id: "html-ksports-ad-box",         name: "Publicidade — More Ways to Win", visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_GREEN, area: "sidebar" },
-      // ── Pares de meia largura: Football|Basketball e NFL|Racing ──
-      { id: "content-ksports-football",    name: "Football",   visible: true, order: 7,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "football",   color: KSPORTS_GREEN, width: "half", linkLabel: "View all", caption: "Featured" },
-      { id: "content-ksports-basketball",  name: "Basketball", visible: true, order: 8,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "basketball", color: KSPORTS_GREEN, width: "half", linkLabel: "View all", caption: "Featured" },
-      { id: "content-ksports-nfl",         name: "NFL",        visible: true, order: 9,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "nfl",        color: KSPORTS_GREEN, width: "half", linkLabel: "View all", caption: "Featured" },
-      { id: "content-ksports-racing",      name: "Racing",     visible: true, order: 10, custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "racing",     color: KSPORTS_GREEN, width: "half", linkLabel: "View all", caption: "Featured" },
+      // ── Banner do parceiro (largura total, acima do hero) ──
+      { id: "html-ksports-ad-top",     name: "KBET — Bet Win Repeat",     visible: true, order: 0, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_LEADERBOARD, color: KSPORTS_PINK },
+      // ── Zona 2 colunas: principal (hero portal) + lateral ──
+      { id: "hero",                    name: "Top Stories",               visible: true, order: 1, layout: "portal", area: "main" },
+      { id: "mais-lidas",              name: "Most Read",                 visible: true, order: 2, color: KSPORTS_PINK, area: "sidebar" },
+      { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 3, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
+      { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 4, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar" },
+      // ── Faixa TRENDING NOW + banner de bônus + recentes em grade ──
+      { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 5, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
+      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
+      { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 7, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, category: "geral" },
+      // ── Seções por modalidade (categorias = slugs do menu/targetCategory) ──
+      { id: "content-ksports-football", name: "Football",  visible: true, order: 8,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "football",  color: KSPORTS_PINK, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
+      { id: "content-ksports-nfl",      name: "NFL",       visible: true, order: 9,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "nfl",       color: KSPORTS_PURPLE, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
+      { id: "content-ksports-f1",       name: "Formula 1", visible: true, order: 10, custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "formula-1", color: KSPORTS_PINK, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
+      { id: "content-ksports-esports",  name: "e-Sports",  visible: true, order: 11, custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "esports",   color: KSPORTS_PURPLE, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
       // Blocos padrão do portal ficam ocultos (reative na aba Blocos se quiser)
-      { id: "brasil",     name: "Brasil",           visible: false, order: 11, layout: "grid",    color: "#16a34a", category: "brasil" },
-      { id: "mundo",      name: "Mundo",            visible: false, order: 12, layout: "grid",    color: "#6b21a8", category: "mundo" },
-      { id: "esporte",    name: "Esporte",          visible: false, order: 13, layout: "cultura", color: "#dc2626", category: "esportes" },
-      { id: "cultura",    name: "Cultura",          visible: false, order: 14, layout: "cultura", color: "#0d9488", category: "cultura" },
-      { id: "df",         name: "DF",               visible: false, order: 15, layout: "duplo",   color: "#0b3d91", category: "cidade" },
-      { id: "saude",      name: "Saúde",            visible: false, order: 16, layout: "grid",    color: "#16a34a", category: "saude" },
-      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 17, layout: "grid",    color: "#0284c7", category: "tecnologia" },
-      { id: "colunistas", name: "Colunistas",       visible: false, order: 18 },
-      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 19 },
+      { id: "brasil",     name: "Brasil",           visible: false, order: 12, layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "mundo",      name: "Mundo",            visible: false, order: 13, layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: false, order: 14, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: false, order: 15, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: false, order: 16, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: false, order: 17, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 18, layout: "grid",    color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",       visible: false, order: 19 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 20 },
     ],
   },
 ];
@@ -1173,6 +1171,10 @@ export default function HomeBlocksManager() {
   const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
   const [menuBarBgColor, setMenuBarBgColor]       = useState("");
   const [footerAccentColor, setFooterAccentColor] = useState("");
+  // Idioma/fuso do site público — entram no snapshot para o Desfazer restaurar
+  // quando um template EN (KSports) os altera.
+  const [siteLanguage, setSiteLanguage] = useState<"pt-BR" | "en">("pt-BR");
+  const [siteTimezone, setSiteTimezone] = useState("");
   const [logoBase64, setLogoBase64]     = useState<string | null>(null);
   const [logoPreview, setLogoPreview]   = useState<string | null>(null);
   const [logoSize, setLogoSize]         = useState(48);
@@ -1207,6 +1209,8 @@ export default function HomeBlocksManager() {
     headerBannerHtml?: string;
     menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
     footerAccentColor?: string;
+    /** Idioma/fuso do site público (aplicados/restaurados só quando definidos). */
+    siteLanguage?: "pt-BR" | "en"; siteTimezone?: string;
   };
   /** O que está em modo Visualizar (preset da aba Estilos ou template da aba Templates). */
   type PreviewTarget = { id: string; name: string; accentColor: string };
@@ -1255,6 +1259,8 @@ export default function HomeBlocksManager() {
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
         setFooterAccentColor(r.settings.footerAccentColor ?? "");
+        setSiteLanguage(r.settings.siteLanguage === "en" ? "en" : "pt-BR");
+        setSiteTimezone(r.settings.siteTimezone ?? "");
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
         if (r.settings.logoSize)   setLogoSize(r.settings.logoSize);
         setTemplates(r.settings.homeTemplates ?? []);
@@ -1366,6 +1372,7 @@ export default function HomeBlocksManager() {
       headerPaddingX, headerMarginTop, showTickerBar, showHeroStrip,
       showTopBar, topBarBgColor, headerBannerHtml, menuBarStyle, menuBarBgColor,
       footerAccentColor,
+      siteLanguage, siteTimezone,
       ...(menuItems ? { menuItems: menuItems.map((m) => ({ ...m, children: m.children?.map((c) => ({ ...c })) })) } : {}),
       ...(footerConfig !== undefined ? { footerConfig: JSON.parse(JSON.stringify(footerConfig)) as FooterConfig } : {}),
     };
@@ -1395,6 +1402,8 @@ export default function HomeBlocksManager() {
       ...(snap.menuBarBgColor    !== undefined ? { menuBarBgColor:    snap.menuBarBgColor }    : {}),
       ...(snap.footerAccentColor !== undefined ? { footerAccentColor: snap.footerAccentColor } : {}),
       ...(snap.footerConfig      !== undefined ? { footerConfig:      snap.footerConfig }      : {}),
+      ...(snap.siteLanguage      !== undefined ? { siteLanguage:      snap.siteLanguage }      : {}),
+      ...(snap.siteTimezone      !== undefined ? { siteTimezone:      snap.siteTimezone }      : {}),
     });
     // Menu vai por endpoint próprio (blob menu_items) — só quando o snapshot o define.
     if (snap.menuItems) await adminApi.updateMenu(snap.menuItems);
@@ -1418,6 +1427,8 @@ export default function HomeBlocksManager() {
     if (snap.menuBarBgColor    !== undefined) setMenuBarBgColor(snap.menuBarBgColor);
     if (snap.footerAccentColor !== undefined) setFooterAccentColor(snap.footerAccentColor);
     if (snap.footerConfig      !== undefined) setFooterConfig(snap.footerConfig);
+    if (snap.siteLanguage      !== undefined) setSiteLanguage(snap.siteLanguage);
+    if (snap.siteTimezone      !== undefined) setSiteTimezone(snap.siteTimezone);
     if (snap.menuItems) setMenuItems(snap.menuItems);
     invalidateSiteCache();
     // Snapshots mudam layout de header/footer (não coberto por style:preview) —
@@ -1478,9 +1489,11 @@ export default function HomeBlocksManager() {
         headerPaddingX:  tpl.headerPaddingX,  headerMarginTop: tpl.headerMarginTop,
         showTickerBar:   tpl.showTickerBar,   showHeroStrip:   tpl.showHeroStrip,
         ...portalFieldsOf(tpl),
-        // Menu e rodapé: só quando o template os carrega (nunca inventa/zera).
+        // Menu, rodapé e idioma/fuso: só quando o template os carrega (nunca inventa/zera).
         ...(tpl.menuItems ? { menuItems: tpl.menuItems.map((m) => ({ ...m, children: m.children?.map((c) => ({ ...c })) })) } : {}),
         ...(tpl.footerConfig ? { footerConfig: JSON.parse(JSON.stringify(tpl.footerConfig)) as FooterConfig } : {}),
+        ...(tpl.siteLanguage ? { siteLanguage: tpl.siteLanguage } : {}),
+        ...(tpl.siteTimezone ? { siteTimezone: tpl.siteTimezone } : {}),
       },
     );
   }

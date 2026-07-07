@@ -107,6 +107,10 @@ export interface HomeTemplate {
   menuBarStyle?: "attached" | "bar";
   menuBarBgColor?: string;
   footerAccentColor?: string;
+  /** Idioma/fuso do site público aplicados junto (ausente = settings intocadas).
+   *  Permite que um starter EN (ex.: KSports) já configure o site em inglês. */
+  siteLanguage?: "pt-BR" | "en";
+  siteTimezone?: string;
 }
 
 /** Prefixos de id gerados pelo painel ao adicionar blocos ("<tipo>-<timestamp>"). */
