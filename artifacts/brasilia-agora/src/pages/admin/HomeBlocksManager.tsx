@@ -425,13 +425,6 @@ const KSPORTS_BLUE2  = "#060062"; // Blue Secondary (gradientes)
 const KSPORTS_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;">K<span style="color:${KSPORTS_PINK};">BET</span></span>`;
 const KSPORTS_AD_BG = `border:1px solid #232145;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(255,43,116,.42), transparent 42%), radial-gradient(circle at 10% 60%, rgba(102,0,184,.55), transparent 46%), linear-gradient(135deg, ${KSPORTS_DARK}, ${KSPORTS_BLUE2} 60%, ${KSPORTS_DARK});`;
 
-// Banner principal do parceiro (largura total, acima do hero).
-const KSPORTS_AD_LEADERBOARD = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
-  ${KSPORTS_AD_BRAND}
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:22px;font-weight:900;font-style:italic;letter-spacing:.02em;">BET. WIN. <span style="color:${KSPORTS_PINK};">REPEAT.</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">THE OFFICIAL PARTNER OF KSPORTS</span></span>
-  <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">BET NOW</span>
-</div>`;
-
 // Banner de bônus (largura total, entre o ticker e o Recent News).
 const KSPORTS_AD_BONUS = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
   ${KSPORTS_AD_BRAND}
@@ -439,7 +432,15 @@ const KSPORTS_AD_BONUS = `<div style="display:flex;align-items:center;justify-co
   <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">GET STARTED</span>
 </div>`;
 
-// Card lateral do parceiro (barra lateral da zona hero).
+// Banner compacto do parceiro ao lado da logo no cabeçalho (linha de ~64px,
+// como no mockup). Só aparece em telas lg+ (o Header esconde no mobile).
+const KSPORTS_AD_HEADER = `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;${KSPORTS_AD_BG}">
+  <span style="font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;">K<span style="color:${KSPORTS_PINK};">BET</span></span>
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">BET. WIN. <span style="color:${KSPORTS_PINK};">REPEAT.</span></span><br/><span style="font-size:10px;font-weight:600;color:#c9c7e8;">THE OFFICIAL PARTNER OF KSPORTS</span></span>
+  <span style="background:${KSPORTS_PINK};color:#ffffff;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;">BET NOW</span>
+</div>`;
+
+// Card lateral do parceiro (ao lado do grid "Recent News", como no mockup).
 const KSPORTS_AD_BOX = `<div style="max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;${KSPORTS_AD_BG}">
   <div style="color:#c9c7e8;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;">OFFICIAL PARTNER</div>
   <div style="margin-bottom:12px;">${KSPORTS_AD_BRAND}</div>
@@ -514,35 +515,38 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
     footerAccentColor: KSPORTS_PINK,
     // Site público em inglês, datas em UTC (aplicado junto com o template).
     siteLanguage: "en", siteTimezone: "UTC",
+    // Banner do parceiro AO LADO da logo (linha do cabeçalho, como no mockup).
+    headerBannerHtml: KSPORTS_AD_HEADER,
     menuItems: KSPORTS_MENU,
     footerConfig: KSPORTS_FOOTER,
     blocks: [
-      // ── Banner do parceiro (largura total, acima do hero) ──
-      { id: "html-ksports-ad-top",     name: "KBET — Bet Win Repeat",     visible: true, order: 0, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_LEADERBOARD, color: KSPORTS_PINK },
-      // ── Zona 2 colunas: principal (hero portal) + lateral ──
-      { id: "hero",                    name: "Top Stories",               visible: true, order: 1, layout: "portal", area: "main" },
-      { id: "mais-lidas",              name: "Most Read",                 visible: true, order: 2, color: KSPORTS_PINK, area: "sidebar" },
-      { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 3, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
-      { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 4, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar" },
-      // ── Faixa TRENDING NOW + banner de bônus + recentes em grade ──
-      { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 5, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
-      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
-      { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 7, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, category: "geral" },
-      // ── Seções por modalidade (categorias = slugs do menu/targetCategory) ──
-      { id: "content-ksports-football", name: "Football",  visible: true, order: 8,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "football",  color: KSPORTS_PINK, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
-      { id: "content-ksports-nfl",      name: "NFL",       visible: true, order: 9,  custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "nfl",       color: KSPORTS_PURPLE, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
-      { id: "content-ksports-f1",       name: "Formula 1", visible: true, order: 10, custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "formula-1", color: KSPORTS_PINK, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
-      { id: "content-ksports-esports",  name: "e-Sports",  visible: true, order: 11, custom: true, blockType: "content", format: "bigstory", layout: "bigstory", source: "automatic_by_category", category: "esports",   color: KSPORTS_PURPLE, width: "half", linkLabel: "VIEW ALL →", caption: "Featured" },
+      // ── Zona 2 colunas: hero portal + lateral (Most Read/Latest — só os dois,
+      //    para a lateral não ficar mais alta que a coluna principal) ──
+      { id: "hero",                    name: "Top Stories",               visible: true, order: 0, layout: "portal", area: "main" },
+      { id: "mais-lidas",              name: "Most Read",                 visible: true, order: 1, color: KSPORTS_PINK, area: "sidebar" },
+      { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 2, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
+      // ── Faixa TRENDING NOW + banner de bônus ──
+      { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 3, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
+      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 4, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
+      // ── Zona 2 colunas: Recent News em grade + card do parceiro ao lado
+      //    (posição do box KBET no mockup) ──
+      { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 5, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, area: "main" },
+      { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar" },
+      // ── Seções por modalidade em fileira de 4 (imagem + lista, como no mockup) ──
+      { id: "content-ksports-football", name: "Football",  visible: true, order: 7,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "football",  color: KSPORTS_PINK, width: "quarter", linkLabel: "VIEW ALL →" },
+      { id: "content-ksports-nfl",      name: "NFL",       visible: true, order: 8,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "nfl",       color: KSPORTS_PURPLE, width: "quarter", linkLabel: "VIEW ALL →" },
+      { id: "content-ksports-f1",       name: "Formula 1", visible: true, order: 9,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "formula-1", color: KSPORTS_PINK, width: "quarter", linkLabel: "VIEW ALL →" },
+      { id: "content-ksports-esports",  name: "e-Sports",  visible: true, order: 10, custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "esports",   color: KSPORTS_PURPLE, width: "quarter", linkLabel: "VIEW ALL →" },
       // Blocos padrão do portal ficam ocultos (reative na aba Blocos se quiser)
-      { id: "brasil",     name: "Brasil",           visible: false, order: 12, layout: "grid",    color: "#16a34a", category: "brasil" },
-      { id: "mundo",      name: "Mundo",            visible: false, order: 13, layout: "grid",    color: "#6b21a8", category: "mundo" },
-      { id: "esporte",    name: "Esporte",          visible: false, order: 14, layout: "cultura", color: "#dc2626", category: "esportes" },
-      { id: "cultura",    name: "Cultura",          visible: false, order: 15, layout: "cultura", color: "#0d9488", category: "cultura" },
-      { id: "df",         name: "DF",               visible: false, order: 16, layout: "duplo",   color: "#0b3d91", category: "cidade" },
-      { id: "saude",      name: "Saúde",            visible: false, order: 17, layout: "grid",    color: "#16a34a", category: "saude" },
-      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 18, layout: "grid",    color: "#0284c7", category: "tecnologia" },
-      { id: "colunistas", name: "Colunistas",       visible: false, order: 19 },
-      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 20 },
+      { id: "brasil",     name: "Brasil",           visible: false, order: 11, layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "mundo",      name: "Mundo",            visible: false, order: 12, layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: false, order: 13, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: false, order: 14, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: false, order: 15, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: false, order: 16, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 17, layout: "grid",    color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",       visible: false, order: 18 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 19 },
     ],
   },
 ];
@@ -570,7 +574,7 @@ interface BlockForm {
   embedUrl: string;
   adSlot: string;
   area: "" | "main" | "sidebar";
-  width: "" | "full" | "half";
+  width: "" | "full" | "half" | "quarter";
   linkLabel: string;
 }
 
@@ -1057,21 +1061,22 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
       {/* Posicionamento na home (zona de 2 colunas / meia largura) */}
       <PanelSection label="Posicionamento na home" icon={Layers}>
         <select
-          value={form.area ? `area:${form.area}` : form.width === "half" ? "half" : ""}
+          value={form.area ? `area:${form.area}` : form.width || ""}
           onChange={(e) => {
             const v = e.target.value;
             onChange("area", v === "area:main" ? "main" : v === "area:sidebar" ? "sidebar" : "");
-            onChange("width", v === "half" ? "half" : "");
+            onChange("width", v === "half" || v === "quarter" ? v : "");
           }}
           className={INPUT}>
           <option value="">Fluxo normal (largura inteira)</option>
           <option value="area:main">Coluna principal (zona 2 colunas)</option>
           <option value="area:sidebar">Barra lateral (zona 2 colunas)</option>
           <option value="half">Meia largura (pares lado a lado)</option>
+          <option value="quarter">1/4 de largura (fileira de 4 colunas)</option>
         </select>
         <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
           Blocos consecutivos marcados como coluna principal/lateral formam a zona de 2 colunas;
-          blocos consecutivos de meia largura formam pares lado a lado.
+          blocos consecutivos de meia largura formam pares e os de 1/4 formam fileiras de 4.
         </p>
       </PanelSection>
 

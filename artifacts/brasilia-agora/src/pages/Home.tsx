@@ -833,10 +833,13 @@ export default function Home() {
             );
           }
 
+          // Run inteiro de blocos 1/4 abre para 4 colunas no desktop largo
+          // (seções por modalidade do portal); misto/half mantém os pares.
+          const allQuarter = seg.items.every((e) => e.block.width === "quarter");
           return (
             <div key={`half-${firstId}`} className={belowFold ? "cv-auto" : undefined}>
               <div className="max-w-[1280px] mx-auto px-4 py-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                <div className={`grid grid-cols-1 md:grid-cols-2 ${allQuarter ? "xl:grid-cols-4" : ""} gap-x-6 gap-y-8`}>
                   {seg.items.map((e) => renderZoneItem(e, "half"))}
                 </div>
               </div>

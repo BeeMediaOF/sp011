@@ -53,8 +53,9 @@ export interface HomeBlock {
   /** Zona da home: blocos consecutivos com area formam a zona de 2 colunas
    *  (coluna principal + lateral de 320px). Ausente = fluxo clássico. */
   area?: "main" | "sidebar";
-  /** Meia largura: blocos consecutivos "half" (sem area) formam pares lado a lado. */
-  width?: "full" | "half";
+  /** Largura parcial: blocos consecutivos "half"/"quarter" (sem area) formam
+   *  fileiras lado a lado (2 ou 4 colunas no desktop). */
+  width?: "full" | "half" | "quarter";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona (padrão "Ver mais"). */
   linkLabel?: string;
 }
@@ -212,10 +213,12 @@ export function segmentBlocks(visible: HomeBlock[]): HomeSegment[] {
       segments.push({ kind: "zone", main, sidebar, startIdx });
       continue;
     }
-    if (block.width === "half") {
+    if (block.width === "half" || block.width === "quarter") {
       const items: SegmentEntry[] = [];
       const startIdx = i;
-      while (i < visible.length && visible[i]!.width === "half" && !visible[i]!.area) {
+      while (i < visible.length
+        && (visible[i]!.width === "half" || visible[i]!.width === "quarter")
+        && !visible[i]!.area) {
         items.push({ block: visible[i]!, idx: i });
         i++;
       }
