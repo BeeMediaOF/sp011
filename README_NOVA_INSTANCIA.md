@@ -11,8 +11,9 @@ assinada (`/api/ingest`).
 - Domínio do cliente apontando (DNS A) para o IP da VPS.
 - Banco PostgreSQL 14+ vazio do cliente (recomendado: projeto Supabase próprio —
   use a connection string do **Session Pooler**, IPv4).
-- (Opcional, recomendado em produção) bucket no Supabase Storage do cliente para
-  uploads de mídia + `service_role key`.
+- Uploads de mídia: nada a criar — são gravados no disco da VPS (volume
+  `api_data`, em `/data/uploads`). Supabase Storage não é necessário (fica
+  apenas como fallback de leitura de arquivos legados, se configurado).
 
 ## Passo a passo
 

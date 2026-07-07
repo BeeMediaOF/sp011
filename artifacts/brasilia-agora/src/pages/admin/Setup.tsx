@@ -473,8 +473,8 @@ export default function Setup() {
                 Armazenamento de mídia (opcional) {showStorage ? "▾" : "▸"}
               </button>
               <p className="text-xs text-gray-500 mt-1">
-                Supabase Storage para uploads de imagens/vídeos. Sem ele, uploads ficam indisponíveis em
-                produção (pode configurar depois via variáveis de ambiente).
+                Os uploads de imagens/vídeos são gravados no disco do servidor (volume persistente).
+                Supabase Storage é opcional: usado apenas para ler arquivos legados.
               </p>
               {showStorage && (
                 <div className="grid grid-cols-2 gap-3 mt-3">

@@ -11,7 +11,7 @@ import { ensureSchema } from "./lib/ensureSchema.js";
 import { db, pool, articlesTable, initDb, isDbInitialized } from "@workspace/db";
 import { desc, isNotNull } from "drizzle-orm";
 import { warmImageCache } from "./routes/image.js";
-import { warnIfStorageUnconfigured } from "./routes/uploads.js";
+import { logUploadsStorage } from "./routes/uploads.js";
 import { flushAnalyticsBuffer } from "./routes/analytics.js";
 import { resolveDbBoot, describeDbError, dbConfigPath } from "./lib/dbConfig.js";
 import { ensureSetupToken, isDbReady, setSetupMode } from "./lib/setupState.js";
@@ -114,9 +114,9 @@ app.listen(port, async (err) => {
     return;
   }
 
-  // Aviso de produção sem object storage (checado após resolver a conexão,
-  // pois o arquivo do assistente pode ter injetado as envs de Storage).
-  warnIfStorageUnconfigured();
+  // Loga o destino dos uploads (checado após resolver a conexão, pois o
+  // arquivo do assistente pode ter injetado as envs do fallback legado).
+  logUploadsStorage();
 
   try {
     await bootWithDb();

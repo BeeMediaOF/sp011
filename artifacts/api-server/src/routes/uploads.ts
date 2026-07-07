@@ -1,19 +1,24 @@
 /**
- * Upload routes — backed by Supabase Storage (S3-compatible object store).
+ * Upload routes — disco local (volume persistente) como armazenamento primário.
  *
- * Files are received via multipart (multer memoryStorage) and uploaded
- * directly to a Supabase Storage bucket via its REST API using the
- * service-role key (server-side only, bypasses RLS).
+ * Files are received via multipart (multer memoryStorage) and gravados em
+ * UPLOADS_DIR (produção: /data/uploads — volume api_data do compose, presente
+ * também no template de blog replicado).
  *
  * Serving: GET /api/uploads/:filename
- *   → fetches the object from Supabase Storage and streams it to the client
- *   → client receives Cache-Control: immutable (browser caches for 1 year)
- *   → falls back to local disk when Supabase Storage is not configured (dev)
+ *   → serve do disco local (Cache-Control: immutable, 1 ano)
+ *   → se não existir localmente e o Supabase Storage estiver configurado,
+ *     cai para o bucket (SOMENTE LEITURA — arquivos legados da migração)
  *
- * Required env:
- *   SUPABASE_URL                — e.g. https://<ref>.supabase.co
- *   SUPABASE_SERVICE_ROLE_KEY   — service_role key (Settings → API)
- *   SUPABASE_STORAGE_BUCKET     — bucket name (default: "uploads")
+ * Por que local e não Supabase Storage: os poucos arquivos (logos/artes de
+ * template) eram baixados do Supabase a cada pageview e estouraram a cota de
+ * egress do plano free — o Storage passou a responder 402 e o upload quebrava
+ * com 500 (jul/2026). Servindo do disco da VPS o egress de arquivos é zero.
+ *
+ * Env opcional:
+ *   UPLOADS_DIR                 — diretório dos uploads (padrão em produção: /data/uploads)
+ *   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_STORAGE_BUCKET
+ *                               — usados apenas como fallback de leitura (legado)
  */
 
 import { Router } from "express";
@@ -21,9 +26,8 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { extname, join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { existsSync, mkdirSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { Readable } from "stream";
-import { readFileSync } from "fs";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { logger } from "../lib/logger.js";
@@ -40,11 +44,13 @@ import {
 const isProd = process.env["NODE_ENV"] === "production";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-// Local dir — used as fallback when Supabase Storage is not configured (dev only).
-const LOCAL_UPLOADS_DIR = join(__dirname, "../../data/uploads");
+// Armazenamento primário. Produção: /data/uploads (volume api_data — sobrevive
+// a rebuilds do container). Dev: pasta local do pacote. UPLOADS_DIR sobrepõe.
+const LOCAL_UPLOADS_DIR =
+  process.env["UPLOADS_DIR"] ?? (isProd ? "/data/uploads" : join(__dirname, "../../data/uploads"));
 if (!existsSync(LOCAL_UPLOADS_DIR)) mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
 
-// ── Supabase Storage (REST API) ────────────────────────────────────────────────
+// ── Supabase Storage (REST API) — apenas leitura de arquivos legados ──────────
 const STORAGE_PREFIX = "uploads"; // objects stored at <bucket>/uploads/<filename>
 
 // Lido sob demanda (não no import): quando a conexão vem do arquivo do
@@ -57,34 +63,17 @@ function storageEnv(): { url: string; key: string; bucket: string; configured: b
   return { url, key, bucket, configured: !!(url && key) };
 }
 
-/** Aviso de produção sem object storage — chamado no boot, após resolver a conexão. */
-export function warnIfStorageUnconfigured(): void {
-  if (isProd && !storageEnv().configured) {
-    logger.error(
-      "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY não configuradas — uploads ficarão indisponíveis em produção. " +
-        "Configure o Supabase Storage para habilitar o envio de imagens/vídeos.",
-    );
-  }
+/** Log de boot: onde os uploads são gravados — chamado após resolver a conexão. */
+export function logUploadsStorage(): void {
+  logger.info(
+    { dir: LOCAL_UPLOADS_DIR, legacyFallback: storageEnv().configured },
+    "Uploads em disco local (Supabase Storage apenas como fallback de leitura de legados)",
+  );
 }
 
 function objectUrl(filename: string): string {
   const { url, bucket } = storageEnv();
   return `${url}/storage/v1/object/${bucket}/${STORAGE_PREFIX}/${encodeURIComponent(filename)}`;
-}
-
-async function storageUpload(filename: string, buffer: Buffer, contentType: string): Promise<void> {
-  const res = await fetch(objectUrl(filename), {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${storageEnv().key}`,
-      "Content-Type": contentType,
-      "x-upsert": "true",
-      "cache-control": "31536000",
-    },
-    body: buffer,
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!res.ok) throw new Error(`Supabase Storage upload failed: ${res.status} ${await res.text()}`);
 }
 
 async function storageDownload(
@@ -105,26 +94,12 @@ async function storageDownload(
 }
 
 /**
- * Carrega o arquivo inteiro em memória (Supabase Storage → fallback disco local).
+ * Carrega o arquivo inteiro em memória (disco local → fallback Supabase Storage).
  * Usado pelo caminho de transformação (sharp precisa do buffer completo).
  */
 async function loadRawBuffer(
   filename: string,
 ): Promise<{ buffer: Buffer; contentType: string } | null> {
-  if (storageEnv().configured) {
-    try {
-      const res = await fetch(objectUrl(filename), {
-        headers: { Authorization: `Bearer ${storageEnv().key}` },
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (res.ok) {
-        const contentType = res.headers.get("content-type") ?? "application/octet-stream";
-        return { buffer: Buffer.from(await res.arrayBuffer()), contentType };
-      }
-    } catch {
-      // cai para o disco local
-    }
-  }
   const localPath = join(LOCAL_UPLOADS_DIR, filename);
   if (existsSync(localPath)) {
     const ext = extname(filename).toLowerCase();
@@ -136,6 +111,20 @@ async function loadRawBuffer(
       (ext === ".jpg" || ext === ".jpeg") ? "image/jpeg" :
       "application/octet-stream";
     return { buffer: readFileSync(localPath), contentType };
+  }
+  if (storageEnv().configured) {
+    try {
+      const res = await fetch(objectUrl(filename), {
+        headers: { Authorization: `Bearer ${storageEnv().key}` },
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (res.ok) {
+        const contentType = res.headers.get("content-type") ?? "application/octet-stream";
+        return { buffer: Buffer.from(await res.arrayBuffer()), contentType };
+      }
+    } catch {
+      // legado indisponível — segue para o 404
+    }
   }
   return null;
 }
@@ -198,23 +187,11 @@ router.post("/image", authMiddleware, requirePermission("upload.images"), upload
     return;
   }
 
-  if (isProd && !storageEnv().configured) {
-    res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
-    return;
-  }
-
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (storageEnv().configured) {
-      await storageUpload(filename, req.file.buffer, req.file.mimetype);
-      logger.info({ filename, size: req.file.size, storage: "supabase" }, "Image uploaded to Supabase Storage");
-    } else {
-      // Storage not configured — fall back to local disk (dev only)
-      const { writeFileSync } = await import("fs");
-      writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
-      logger.warn({ filename }, "Supabase Storage not configured — image saved to local disk");
-    }
+    writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
+    logger.info({ filename, size: req.file.size }, "Image uploaded (disco local)");
   } catch (err) {
     logger.error({ err, filename }, "Image upload failed");
     res.status(500).json({ error: "Falha ao salvar a imagem. Tente novamente." });
@@ -242,22 +219,11 @@ router.post("/media", authMiddleware, requirePermission("upload.images"), upload
     return;
   }
 
-  if (isProd && !storageEnv().configured) {
-    res.status(503).json({ error: "Armazenamento de arquivos indisponível. Configure o Supabase Storage." });
-    return;
-  }
-
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
   try {
-    if (storageEnv().configured) {
-      await storageUpload(filename, req.file.buffer, req.file.mimetype);
-      logger.info({ filename, size: req.file.size, mediaType, storage: "supabase" }, "Media uploaded to Supabase Storage");
-    } else {
-      const { writeFileSync } = await import("fs");
-      writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
-      logger.warn({ filename, mediaType }, "Supabase Storage not configured — media saved to local disk");
-    }
+    writeFileSync(join(LOCAL_UPLOADS_DIR, filename), req.file.buffer);
+    logger.info({ filename, size: req.file.size, mediaType }, "Media uploaded (disco local)");
   } catch (err) {
     logger.error({ err, filename }, "Media upload failed");
     res.status(500).json({ error: "Falha ao salvar o arquivo. Tente novamente." });
@@ -270,7 +236,7 @@ router.post("/media", authMiddleware, requirePermission("upload.images"), upload
 
 /**
  * GET /api/uploads/:filename
- * Serves files from Supabase Storage (primary) or local disk (fallback).
+ * Serves files from local disk (primary) or Supabase Storage (legacy fallback).
  * Browser cache: 1 year immutable (file URL never changes once uploaded).
  *
  * Query opcional de otimização (apenas para imagens estáticas):
@@ -330,7 +296,15 @@ router.get("/:filename", async (req, res) => {
     }
   }
 
-  // 1. Try Supabase Storage first — stream the object straight through.
+  // 1. Disco local — armazenamento primário.
+  const localPath = join(LOCAL_UPLOADS_DIR, filename);
+  if (existsSync(localPath)) {
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.sendFile(localPath);
+    return;
+  }
+
+  // 2. Fallback: Supabase Storage (arquivos legados de antes da migração).
   if (storageEnv().configured) {
     const result = await storageDownload(filename);
     if (result) {
@@ -342,14 +316,6 @@ router.get("/:filename", async (req, res) => {
       nodeStream.pipe(res);
       return;
     }
-  }
-
-  // 2. Fallback to local disk
-  const localPath = join(LOCAL_UPLOADS_DIR, filename);
-  if (existsSync(localPath)) {
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-    res.sendFile(localPath);
-    return;
   }
 
   res.status(404).json({ error: "Arquivo não encontrado" });

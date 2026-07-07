@@ -4,7 +4,7 @@
  *
  * Compartilhado entre:
  *   - routes/image.ts    — proxy de imagens de domínios externos (allowlist)
- *   - routes/uploads.ts  — imagens enviadas pelo portal (Supabase Storage / disco)
+ *   - routes/uploads.ts  — imagens enviadas pelo portal (disco local / legado Supabase)
  *
  * A camada de cache guarda sempre o buffer JÁ processado (resized + encodado),
  * indexado por uma chave que cobre origem + largura + qualidade + formato.

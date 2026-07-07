@@ -22,7 +22,7 @@ Guia para publicar o portal numa **VPS Hostinger** (Ubuntu) usando o banco e o s
      localhost:3000              localhost:8080
             │                        │
             │                        ├── Postgres → Supabase (Session Pooler, SP011)
-            │                        └── Uploads  → Supabase Storage (bucket "uploads")
+            │                        └── Uploads  → disco local (/data/uploads; legado no Supabase)
 ```
 
 - **API** (`@workspace/api-server`): Node/Express na porta **8080**.
@@ -160,16 +160,18 @@ ALTER TABLE public.behavior_events           ENABLE ROW LEVEL SECURITY;
 
 ## 5. Storage de uploads (imagens/vídeos)
 
-As URLs `/api/uploads/...` são servidas pela API a partir do **Supabase Storage**.
+> **Atualizado (jul/2026):** as URLs `/api/uploads/...` são gravadas e servidas do **disco
+> local do servidor** (produção: `/data/uploads` — no deploy Docker é o volume `api_data`;
+> `UPLOADS_DIR` sobrepõe o diretório). Servir do Supabase Storage estourava a cota de egress
+> do plano free (HTTP 402) e derrubava os uploads.
 
-1. No Supabase → **Storage** → crie o bucket **`uploads`** (pode ser **privado** — o app usa a
-   `service_role` para ler/gravar).
-2. **Migre os arquivos antigos:** os uploads manuais que ficavam no Object Storage do Replit
-   precisam ser copiados para o bucket `uploads`, senão as mídias antigas retornam **404**.
-   (Imagens de fontes RSS são externas, servidas via `/api/image` por proxy, e **não** são afetadas.)
-
-> Em produção, sem `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` configuradas, qualquer upload
-> retorna **503** — não há fallback para disco.
+- Supabase Storage é **opcional e somente leitura**: se `SUPABASE_URL` +
+  `SUPABASE_SERVICE_ROLE_KEY` (+ `SUPABASE_STORAGE_BUCKET`) estiverem configuradas, arquivos
+  que não existirem no disco são buscados no bucket (legado da época Replit/Supabase).
+- Imagens de fontes RSS são externas, servidas via `/api/image` por proxy, e **não** passam
+  por aqui.
+- **Backup:** os uploads agora vivem no volume da VPS — inclua `/data/uploads` na rotina de
+  backup (mesma responsabilidade do `pg-blogs`).
 
 ---
 
@@ -312,8 +314,8 @@ Admin → **Segurança → Checkup**:
 
 ```
 [ ] .env preenchido (SUPABASE_DATABASE_URL = Session Pooler do SP011)
-[ ] SUPABASE_URL + SERVICE_ROLE_KEY + bucket "uploads" criados
-[ ] Arquivos de mídia antigos migrados do Replit p/ o bucket
+[ ] Diretório de uploads persistente (volume api_data → /data/uploads) e no backup
+[ ] (Opcional) SUPABASE_URL + SERVICE_ROLE_KEY p/ ler mídias legadas do bucket
 [ ] RLS habilitado (ou Data API desligada) no Supabase
 [ ] pnpm install (com devDeps) + build API + build front
 [ ] PM2 rodando 2 apps (api :8080, web :3000) + pm2 save/startup
@@ -329,8 +331,8 @@ Admin → **Segurança → Checkup**:
 
 | Sintoma | Causa provável |
 |---------|----------------|
-| Upload retorna **503** | `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` ausentes no `.env` |
-| Imagens antigas dão **404** | arquivos de mídia não migrados p/ o bucket `uploads` |
+| Upload retorna **500** | disco cheio ou diretório de uploads sem permissão de escrita |
+| Imagens antigas dão **404** | arquivo não está no disco nem no bucket legado (ou envs do fallback ausentes) |
 | App não sobe: *"SESSION_SECRET not set"* | falta `SESSION_SECRET` (obrigatória em prod) |
 | App não enxerga variáveis | `--env-file=.env` ausente no comando do PM2 (não há dotenv) |
 | IA falha: *"AI_INTEGRATIONS_GEMINI_BASE_URL"* | provedor está em `gemini_free`; troque p/ `gemini_direct` |
