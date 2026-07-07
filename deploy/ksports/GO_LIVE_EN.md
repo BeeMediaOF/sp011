@@ -3,7 +3,7 @@
 Passo a passo operacional depois do deploy de F0–F3 (blog) e F5 (central).
 Nada aqui exige código: é tudo painel admin + painel central.
 
-## F4 — Blog (ksports.bebee.me/admin)
+## F4 — Blog (ksports.midia.run/admin)
 
 1. **Aplicar o template**: Blocos da Home → aba **Templates** → "KSports — Portal
    Esportivo" → Visualizar → Aplicar. Isso instala blocos, menu EN
@@ -20,9 +20,14 @@ Nada aqui exige código: é tudo painel admin + painel central.
 5. Conferir a home pública: chrome todo EN, datas EN/UTC, consent de cookies
    genérico (sem LGPD), `view-source:` com `<html lang="en">`.
 
-## F4 — Central (suzanoagora.com.br)
+## F4 — Central (central.midia.run)
 
-1. **Fontes EN** (Fontes → Nova): BBC Sport, ESPN, Sky Sports, The Athletic etc.
+> Atalho: `deploy/ksports/sources_en.sql` faz os passos 1 e 2 (33 fontes EN
+> validadas + regras por categoria + idioma/taxonomia do blog) direto no banco
+> central — uso no cabeçalho do arquivo. O manual abaixo segue valendo para
+> ajustes pontuais no painel.
+
+1. **Fontes EN** (Fontes → Nova): BBC Sport, Sky Sports, The Guardian etc.
    - `Categoria` = slug do menu correspondente (`football`, `nfl`, `formula-1`,
      `tennis`, `volleyball`, `world-cup`, `esports`)
    - `Idioma do conteúdo` = **Inglês** (evita traduzir EN→EN)
