@@ -520,17 +520,18 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
     menuItems: KSPORTS_MENU,
     footerConfig: KSPORTS_FOOTER,
     blocks: [
-      // ── Zona 2 colunas: hero portal + lateral (Most Read/Latest — só os dois,
-      //    para a lateral não ficar mais alta que a coluna principal) ──
+      // ── Zona 2 colunas: hero portal + Most Read na lateral (SÓ ele: a altura
+      //    do Most Read ≈ hero; qualquer bloco a mais deixa um buraco em branco
+      //    na coluna principal, porque a zona estica até o fim da lateral) ──
       { id: "hero",                    name: "Top Stories",               visible: true, order: 0, layout: "portal", area: "main" },
       { id: "mais-lidas",              name: "Most Read",                 visible: true, order: 1, color: KSPORTS_PINK, area: "sidebar" },
-      { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 2, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
       // ── Faixa TRENDING NOW + banner de bônus ──
-      { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 3, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
-      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 4, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
-      // ── Zona 2 colunas: Recent News em grade + card do parceiro ao lado
-      //    (posição do box KBET no mockup) ──
-      { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 5, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, area: "main" },
+      { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 2, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
+      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 3, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
+      // ── Zona 2 colunas: Recent News em grade + lateral Latest/box do parceiro
+      //    (a grade de 8 é mais alta que os dois juntos — sem buraco no main) ──
+      { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 4, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, area: "main" },
+      { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 5, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
       { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar" },
       // ── Seções por modalidade em fileira de 4 (imagem + lista, como no mockup) ──
       { id: "content-ksports-football", name: "Football",  visible: true, order: 7,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "football",  color: KSPORTS_PINK, width: "quarter", linkLabel: "VIEW ALL →" },
