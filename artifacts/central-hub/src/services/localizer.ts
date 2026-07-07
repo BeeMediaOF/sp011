@@ -35,7 +35,7 @@ import {
   type RewriteEngineConfig,
   type TokenUsage,
 } from "@workspace/news-engine";
-import { and, asc, count, eq, gte, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { getSettings, type HubSettings } from "../lib/store.js";
 import { getGeminiPool } from "../lib/aiPool.js";
 import { logger } from "../lib/logger.js";
@@ -210,7 +210,14 @@ async function ensureTranslatedRewrite(
       model: out.usage?.model ?? s.translationModel ?? null,
       status: "ok",
     })
-    .onConflictDoNothing({ target: [rewritesTable.newsItemId, rewritesTable.blogId] })
+    // rewrites_variant_uniq é um índice PARCIAL (WHERE blog_id IS NOT NULL):
+    // sem o predicado no conflict target o Postgres rejeita a query inteira
+    // (42P10) — era isso que derrubava TODA tradução com "translation: Failed
+    // query: insert into rewrites".
+    .onConflictDoNothing({
+      target: [rewritesTable.newsItemId, rewritesTable.blogId],
+      where: isNotNull(rewritesTable.blogId),
+    })
     .returning();
 
   await logUsage(out.usage, "translate", delivery.newsItemId, inserted[0]?.id ?? null);
