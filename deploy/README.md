@@ -112,6 +112,20 @@ docker compose logs --tail 100 api | grep -i "setup token"
 - `docker stats --no-stream` → anotar RAM/CPU (calibração da Fase 1)
 - `docker compose logs --tail 50` sem erros recorrentes
 
+### ⚠️ Alterou o `Caddyfile` (via git pull)? Recrie o caddy
+
+O `Caddyfile` é montado como bind de **arquivo único** — e o `git pull` troca o
+arquivo por um novo (novo inode), então o container continua preso à versão
+antiga. `caddy reload`/`restart` releem o arquivo VELHO. Sempre que um pull
+mudar o `Caddyfile`:
+
+```bash
+docker compose up -d --force-recreate caddy   # blip ~3s; certificados persistem
+```
+
+O diretório `caddy/sites/` NÃO sofre disso (montagem de diretório) — para os
+arquivos por blog, o `caddy reload` continua sendo o caminho.
+
 ### Remover um blog (rollback)
 
 ```bash
