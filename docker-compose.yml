@@ -30,6 +30,12 @@ services:
       # Arquivo de conexão do assistente de instalação (/data/db-config.enc).
       # Instâncias com SUPABASE_DATABASE_URL no .env não usam este volume.
       - api_data:/data
+    networks:
+      default:
+        # Alias ÚNICO para o Caddy: como o caddy também participa da rede
+        # blogs_shared, o nome curto "api" ficou ambíguo (todo blog replicado
+        # atende por "api" lá) — o Caddyfile aponta para sp011-api.
+        aliases: ["sp011-api"]
     depends_on:
       - ollama
 
@@ -46,6 +52,9 @@ services:
       API_URL: "http://api:8080"   # usado pelo prerender de OG (server-to-server)
     expose:
       - "3000"
+    networks:
+      default:
+        aliases: ["sp011-web"]   # alias único p/ o Caddy (mesmo motivo do api)
     depends_on:
       - api
 

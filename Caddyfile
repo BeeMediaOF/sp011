@@ -43,14 +43,16 @@
 		-Server
 	}
 
-	# API → container api:8080
+	# API → container do sp011 (alias único sp011-api; o nome curto "api" é
+	# ambíguo porque o caddy também está na blogs_shared, onde todo blog
+	# replicado atende pelo alias automático "api").
 	handle /api/* {
-		reverse_proxy api:8080
+		reverse_proxy sp011-api:8080
 	}
 
-	# Demais rotas → frontend (vite preview) web:3000
+	# Demais rotas → frontend (vite preview) do sp011
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy sp011-web:3000
 	}
 }
 

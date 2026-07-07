@@ -19,7 +19,11 @@ com projeto compose, `.env`, banco e volume próprios. Complementa o
 - Cada blog mantém os serviços internos `api`/`web` (projetos compose não
   colidem entre si) e entra na `blogs_shared` com aliases únicos
   `<id>-api`/`<id>-web` — **os únicos nomes que o Caddy e o `API_URL` usam**
-  (o alias automático `api` é ambíguo na rede compartilhada).
+  (o alias automático `api` é ambíguo na rede compartilhada). Vale para o
+  Caddy INTEIRO: até o sp011 usa aliases únicos (`sp011-api`/`sp011-web`) no
+  Caddyfile — apontar para `api`/`web` curtos fez o tráfego do sp011 cair no
+  container de outro blog (incidente 2026-07-07). IDs reservados: `sp011`,
+  `central`.
 - Banco: um `DATABASE` + uma `ROLE` por blog no `pg-blogs`; configurado pelo
   assistente `/admin/setup` (fica criptografado em `db-config.enc`).
 - Uploads: um projeto Supabase dedicado só a Storage, um bucket por blog.
