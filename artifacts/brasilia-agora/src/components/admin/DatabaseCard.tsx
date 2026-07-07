@@ -31,6 +31,9 @@ interface TestResult {
   canCreate?: boolean;
   tableCount?: number;
   hasExistingInstall?: boolean;
+  existingSiteName?: string | null;
+  existingUsers?: number;
+  existingArticles?: number;
 }
 
 function authHeaders(): Record<string, string> {
@@ -48,6 +51,8 @@ export default function DatabaseCard() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+  // Banco de destino já pertence a outra instalação → exige confirmação explícita.
+  const [adoptExisting, setAdoptExisting] = useState(false);
   const [applying, setApplying] = useState(false);
   const [waiting, setWaiting] = useState(false);
   const [error, setError] = useState("");
@@ -62,6 +67,7 @@ export default function DatabaseCard() {
   async function handleTest() {
     setError("");
     setTestResult(null);
+    setAdoptExisting(false);
     setTesting(true);
     try {
       const r = await fetch("/api/admin/db-config/test", {
@@ -88,7 +94,7 @@ export default function DatabaseCard() {
       return;
     }
     const warning = testResult.hasExistingInstall
-      ? "O banco de destino JÁ CONTÉM uma instalação — o painel passará a usar os dados dele. Continuar?"
+      ? `O banco de destino JÁ PERTENCE a uma instalação em uso${testResult.existingSiteName ? ` (site "${testResult.existingSiteName}")` : ""} — o painel passará a usar os dados dele. Continuar?`
       : "O banco de destino está VAZIO — o site ficará sem artigos/usuários atuais até você restaurar um backup nele. O admin logado será copiado para não perder o acesso. Continuar mesmo assim?";
     if (!window.confirm(`${warning}\n\nO servidor será reiniciado ao aplicar.`)) return;
 
@@ -98,7 +104,11 @@ export default function DatabaseCard() {
       const r = await fetch("/api/admin/db-config/apply", {
         method: "POST",
         headers: authHeaders(),
-        body: JSON.stringify({ connectionString: connectionString.trim(), currentPassword }),
+        body: JSON.stringify({
+          connectionString: connectionString.trim(),
+          currentPassword,
+          ...(adoptExisting ? { adoptExistingInstall: true } : {}),
+        }),
       });
       const data = (await r.json()) as { ok: boolean; error?: string };
       if (!data.ok) {
@@ -211,12 +221,9 @@ export default function DatabaseCard() {
                 >
                   {testing ? "Testando…" : "Testar conexão"}
                 </button>
-                {testResult?.ok && (
+                {testResult?.ok && !testResult.hasExistingInstall && (
                   <span className="flex items-center gap-1 text-xs text-green-700">
-                    <CheckCircle2 size={14} /> PostgreSQL {testResult.version} ·{" "}
-                    {testResult.hasExistingInstall
-                      ? "instalação existente (dados serão usados)"
-                      : "banco VAZIO"}
+                    <CheckCircle2 size={14} /> PostgreSQL {testResult.version} · banco VAZIO
                   </span>
                 )}
                 {testResult && !testResult.ok && (
@@ -225,6 +232,32 @@ export default function DatabaseCard() {
                   </span>
                 )}
               </div>
+
+              {/* Anti-mistura: banco de destino já pertence a outra instalação */}
+              {testResult?.ok && testResult.hasExistingInstall && (
+                <div className="p-3 bg-red-50 border-2 border-red-300 rounded-xl space-y-2">
+                  <div className="flex gap-2">
+                    <ShieldAlert size={16} className="text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-700">
+                      <strong>
+                        Este banco JÁ pertence a uma instalação em uso
+                        {testResult.existingSiteName ? ` — site "${testResult.existingSiteName}"` : ""}
+                      </strong>{" "}
+                      ({testResult.existingUsers ?? 0} usuário(s), {testResult.existingArticles ?? 0}{" "}
+                      artigo(s)). Trocar para ele fará ESTA instância editar o mesmo conteúdo daquele site.
+                    </p>
+                  </div>
+                  <label className="flex items-start gap-2 text-xs font-semibold text-red-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={adoptExisting}
+                      onChange={(e) => setAdoptExisting(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    Entendo e é isso mesmo que eu quero (ex.: restaurei um dump deste site neste banco).
+                  </label>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-[#0F172A] mb-1.5">
                   Sua senha atual (reautenticação)
@@ -245,7 +278,13 @@ export default function DatabaseCard() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleApply}
-                  disabled={applying || waiting || !testResult?.ok || !currentPassword}
+                  disabled={
+                    applying ||
+                    waiting ||
+                    !testResult?.ok ||
+                    !currentPassword ||
+                    (testResult.hasExistingInstall === true && !adoptExisting)
+                  }
                   className="px-4 py-2 text-xs font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 disabled:opacity-50 flex items-center gap-1.5"
                 >
                   {waiting ? (

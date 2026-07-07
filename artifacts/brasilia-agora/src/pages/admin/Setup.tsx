@@ -33,6 +33,9 @@ interface TestResult {
   canCreate?: boolean;
   tableCount?: number;
   hasExistingInstall?: boolean;
+  existingSiteName?: string | null;
+  existingUsers?: number;
+  existingArticles?: number;
 }
 
 const NAVY = "#0B2A66";
@@ -71,9 +74,22 @@ export default function Setup() {
 
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<TestResult | null>(null);
+  // Banco candidato já pertence a outra instalação → exige confirmação explícita.
+  const [adoptExisting, setAdoptExisting] = useState(false);
   const [applying, setApplying] = useState(false);
   const [waitingRestart, setWaitingRestart] = useState(false);
   const [error, setError] = useState("");
+
+  /** Qualquer edição na conexão invalida o teste e a confirmação anterior. */
+  function resetProbe() {
+    setTestResult(null);
+    setAdoptExisting(false);
+  }
+
+  function updateField(patch: Partial<typeof fields>) {
+    setFields((f) => ({ ...f, ...patch }));
+    resetProbe();
+  }
 
   useEffect(() => {
     getStatus().then((s) => {
@@ -137,7 +153,11 @@ export default function Setup() {
     setError("");
     setApplying(true);
     try {
-      const body: Record<string, unknown> = { ...connectionBody(), admin };
+      const body: Record<string, unknown> = {
+        ...connectionBody(),
+        admin,
+        ...(adoptExisting ? { adoptExistingInstall: true } : {}),
+      };
       if (storage.supabaseUrl.trim() && storage.serviceRoleKey.trim()) {
         body["storage"] = {
           supabaseUrl: storage.supabaseUrl.trim(),
@@ -150,8 +170,27 @@ export default function Setup() {
         headers: { "Content-Type": "application/json", "X-Setup-Token": token.trim() },
         body: JSON.stringify(body),
       });
-      const data = (await r.json()) as { ok: boolean; error?: string; restarting?: boolean };
+      const data = (await r.json()) as {
+        ok: boolean;
+        error?: string;
+        restarting?: boolean;
+        code?: string;
+        existingSiteName?: string | null;
+        existingUsers?: number;
+        existingArticles?: number;
+      };
       if (!data.ok) {
+        // Banco pertence a outra instalação: mostra o aviso + checkbox de
+        // confirmação (mesmo quando o usuário aplicou sem testar antes).
+        if (data.code === "existing_install") {
+          setTestResult({
+            ok: true,
+            hasExistingInstall: true,
+            existingSiteName: data.existingSiteName ?? null,
+            existingUsers: data.existingUsers ?? 0,
+            existingArticles: data.existingArticles ?? 0,
+          });
+        }
         setError(data.error ?? `Erro ${r.status}`);
         return;
       }
@@ -256,7 +295,10 @@ export default function Setup() {
                   <input
                     type="radio"
                     checked={connMode === "string"}
-                    onChange={() => setConnMode("string")}
+                    onChange={() => {
+                      setConnMode("string");
+                      resetProbe();
+                    }}
                   />
                   Connection string
                 </label>
@@ -264,7 +306,10 @@ export default function Setup() {
                   <input
                     type="radio"
                     checked={connMode === "fields"}
-                    onChange={() => setConnMode("fields")}
+                    onChange={() => {
+                      setConnMode("fields");
+                      resetProbe();
+                    }}
                   />
                   Campos separados
                 </label>
@@ -275,7 +320,10 @@ export default function Setup() {
                   <input
                     type="password"
                     value={connectionString}
-                    onChange={(e) => setConnectionString(e.target.value)}
+                    onChange={(e) => {
+                      setConnectionString(e.target.value);
+                      resetProbe();
+                    }}
                     className={`${inputCls} font-mono`}
                     placeholder="postgresql://usuario:senha@host:5432/postgres"
                     required={connMode === "string"}
@@ -294,7 +342,7 @@ export default function Setup() {
                     <input
                       type="text"
                       value={fields.host}
-                      onChange={(e) => setFields({ ...fields, host: e.target.value })}
+                      onChange={(e) => updateField({ host: e.target.value })}
                       className={inputCls}
                       placeholder="aws-0-sa-east-1.pooler.supabase.com"
                       required={connMode === "fields"}
@@ -305,7 +353,7 @@ export default function Setup() {
                     <input
                       type="number"
                       value={fields.port}
-                      onChange={(e) => setFields({ ...fields, port: e.target.value })}
+                      onChange={(e) => updateField({ port: e.target.value })}
                       className={inputCls}
                     />
                   </div>
@@ -314,7 +362,7 @@ export default function Setup() {
                     <input
                       type="text"
                       value={fields.database}
-                      onChange={(e) => setFields({ ...fields, database: e.target.value })}
+                      onChange={(e) => updateField({ database: e.target.value })}
                       className={inputCls}
                       required={connMode === "fields"}
                     />
@@ -324,7 +372,7 @@ export default function Setup() {
                     <input
                       type="text"
                       value={fields.user}
-                      onChange={(e) => setFields({ ...fields, user: e.target.value })}
+                      onChange={(e) => updateField({ user: e.target.value })}
                       className={inputCls}
                       placeholder="postgres.abcdefghij"
                       required={connMode === "fields"}
@@ -336,7 +384,7 @@ export default function Setup() {
                     <input
                       type="password"
                       value={fields.password}
-                      onChange={(e) => setFields({ ...fields, password: e.target.value })}
+                      onChange={(e) => updateField({ password: e.target.value })}
                       className={inputCls}
                       required={connMode === "fields"}
                       autoComplete="new-password"
@@ -346,7 +394,7 @@ export default function Setup() {
                     <label className={labelCls}>SSL</label>
                     <select
                       value={fields.ssl}
-                      onChange={(e) => setFields({ ...fields, ssl: e.target.value })}
+                      onChange={(e) => updateField({ ssl: e.target.value })}
                       className={inputCls}
                     >
                       <option value="no-verify">SSL sem verificação de certificado (Supabase/pooler)</option>
@@ -367,13 +415,11 @@ export default function Setup() {
                 >
                   {testing ? "Testando…" : "Testar conexão"}
                 </button>
-                {testResult?.ok && (
+                {testResult?.ok && !testResult.hasExistingInstall && (
                   <span className="flex items-center gap-1 text-xs text-green-700">
                     <CheckCircle2 size={14} /> PostgreSQL {testResult.version} · CREATE{" "}
                     {testResult.canCreate ? "ok" : "NEGADO"} ·{" "}
-                    {testResult.hasExistingInstall
-                      ? "instalação existente detectada (será reaproveitada)"
-                      : `${testResult.tableCount ?? 0} tabelas no schema public`}
+                    {`${testResult.tableCount ?? 0} tabelas no schema public`}
                   </span>
                 )}
                 {testResult && !testResult.ok && (
@@ -382,6 +428,38 @@ export default function Setup() {
                   </span>
                 )}
               </div>
+
+              {/* Anti-mistura: banco que já pertence a outra instalação viva */}
+              {testResult?.ok && testResult.hasExistingInstall && (
+                <div className="mt-3 p-3 bg-red-50 border-2 border-red-300 rounded-lg space-y-2">
+                  <div className="flex gap-2">
+                    <ShieldAlert size={18} className="text-red-600 shrink-0 mt-0.5" />
+                    <div className="text-xs text-red-700 space-y-1">
+                      <p className="font-bold">
+                        Este banco JÁ pertence a uma instalação em uso
+                        {testResult.existingSiteName ? ` — site "${testResult.existingSiteName}"` : ""}.
+                      </p>
+                      <p>
+                        Encontrados {testResult.existingUsers ?? 0} usuário(s) e{" "}
+                        {testResult.existingArticles ?? 0} artigo(s). Se você está instalando um blog{" "}
+                        <strong>novo</strong>, esta connection string é do banco de <strong>outro site</strong> —
+                        cada blog precisa do próprio banco. Conectar aqui faria as duas instâncias editarem o{" "}
+                        <strong>mesmo</strong> conteúdo.
+                      </p>
+                    </div>
+                  </div>
+                  <label className="flex items-start gap-2 text-xs font-semibold text-red-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={adoptExisting}
+                      onChange={(e) => setAdoptExisting(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    Esta instância é a dona legítima deste banco (ex.: reinstalação da própria instância) —
+                    quero conectá-la mesmo assim.
+                  </label>
+                </div>
+              )}
             </section>
 
             {/* Storage (opcional) */}
@@ -486,7 +564,12 @@ export default function Setup() {
 
             <button
               type="submit"
-              disabled={applying || !token.trim() || status?.encryptionAvailable === false}
+              disabled={
+                applying ||
+                !token.trim() ||
+                status?.encryptionAvailable === false ||
+                (testResult?.hasExistingInstall === true && !adoptExisting)
+              }
               className="w-full py-3 text-sm font-semibold text-white rounded-lg disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ backgroundColor: NAVY }}
             >

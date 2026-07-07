@@ -61,6 +61,10 @@ export interface ProbeResult {
   canCreate: boolean;
   tableCount: number;
   hasExistingInstall: boolean;
+  /** Identificação do dono quando o banco JÁ tem uma instalação (anti-mistura). */
+  existingSiteName: string | null;
+  existingUsers: number;
+  existingArticles: number;
 }
 
 export async function probeCandidate(pool: StandalonePool): Promise<ProbeResult> {
@@ -79,11 +83,71 @@ export async function probeCandidate(pool: StandalonePool): Promise<ProbeResult>
     "SELECT count(*)::int AS n FROM pg_catalog.pg_tables WHERE schemaname = 'public'",
   );
   const installed = await pool.query("SELECT to_regclass('public.users') IS NOT NULL AS has_users");
+  const hasExistingInstall = !!installed.rows[0]?.has_users;
+
+  // Banco já instalado: identifica DE QUEM ele é, para o wizard/troca poder
+  // avisar "este banco pertence ao site X" antes de qualquer gravação.
+  // Consultas best-effort — falha em qualquer uma não derruba o probe.
+  let existingSiteName: string | null = null;
+  let existingUsers = 0;
+  let existingArticles = 0;
+  if (hasExistingInstall) {
+    try {
+      const u = await pool.query("SELECT count(*)::int AS n FROM public.users");
+      existingUsers = Number(u.rows[0]?.n ?? 0);
+    } catch {
+      /* segue sem o número */
+    }
+    try {
+      const a = await pool.query("SELECT count(*)::int AS n FROM public.articles");
+      existingArticles = Number(a.rows[0]?.n ?? 0);
+    } catch {
+      /* tabela pode não existir */
+    }
+    try {
+      const s = await pool.query(
+        "SELECT value::jsonb->>'siteName' AS name FROM public.settings WHERE key = 'site_settings'",
+      );
+      const name = s.rows[0]?.name;
+      existingSiteName = typeof name === "string" && name.trim() ? name.trim() : null;
+    } catch {
+      /* settings ausente/ilegível */
+    }
+  }
+
   return {
     version: label,
     canCreate: !!priv.rows[0]?.can_create,
     tableCount: Number(tables.rows[0]?.n ?? 0),
-    hasExistingInstall: !!installed.rows[0]?.has_users,
+    hasExistingInstall,
+    existingSiteName,
+    existingUsers,
+    existingArticles,
+  };
+}
+
+/** Mensagem/payload do bloqueio anti-mistura (wizard e troca de banco). */
+export function existingInstallRefusal(probe: ProbeResult): {
+  ok: false;
+  code: "existing_install";
+  error: string;
+  existingSiteName: string | null;
+  existingUsers: number;
+  existingArticles: number;
+} {
+  const dono = probe.existingSiteName ? ` do site "${probe.existingSiteName}"` : "";
+  return {
+    ok: false,
+    code: "existing_install",
+    error:
+      `Este banco JÁ contém uma instalação em uso${dono} — ` +
+      `${probe.existingUsers} usuário(s), ${probe.existingArticles} artigo(s). ` +
+      `Se esta é uma instância NOVA, a connection string está ERRADA: cada blog precisa do próprio banco. ` +
+      `Conectar aqui faria as duas instâncias editarem o MESMO site. ` +
+      `Marque a confirmação explícita apenas se esta instância for a dona legítima deste banco (ex.: reinstalação).`,
+    existingSiteName: probe.existingSiteName,
+    existingUsers: probe.existingUsers,
+    existingArticles: probe.existingArticles,
   };
 }
 
@@ -213,6 +277,14 @@ router.post("/apply", setupGuard, async (req, res) => {
     const probe = await probeCandidate(pool);
     if (!probe.canCreate) {
       res.json({ ok: false, error: "O usuário do banco não tem permissão de CREATE no schema public." });
+      return;
+    }
+
+    // 1b) Anti-mistura: banco que já pertence a uma instalação viva só é aceito
+    // com confirmação explícita — sem ela, instalar aqui faria duas instâncias
+    // editarem o mesmo site (incidente ksports×sp011, 2026-07-07).
+    if (probe.hasExistingInstall && body["adoptExistingInstall"] !== true) {
+      res.status(409).json(existingInstallRefusal(probe));
       return;
     }
 

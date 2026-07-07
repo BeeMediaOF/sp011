@@ -29,6 +29,7 @@ import { logger } from "../lib/logger.js";
 import {
   applyBaseline,
   connectionFromBody,
+  existingInstallRefusal,
   probeCandidate,
   verifyTables,
 } from "./setup.js";
@@ -137,6 +138,13 @@ router.post("/apply", async (req, res) => {
     const probe = await probeCandidate(pool);
     if (!probe.canCreate) {
       res.json({ ok: false, error: "O usuário do banco não tem permissão de CREATE no schema public." });
+      return;
+    }
+
+    // Anti-mistura: trocar para um banco que já pertence a outra instalação
+    // viva exige confirmação explícita (mesma trava do wizard).
+    if (probe.hasExistingInstall && body["adoptExistingInstall"] !== true) {
+      res.status(409).json(existingInstallRefusal(probe));
       return;
     }
 
