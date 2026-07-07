@@ -59,6 +59,15 @@ export interface HubSettings {
   deliveryEnabled: boolean;
   /** User-Agent usado na coleta/scraping. */
   userAgent?: string;
+
+  // ── Tradução & Classificação (localizer — entregas p/ blogs em outro idioma) ─
+  /** Provider da tradução/classificação (default: gemini). */
+  translationProvider?: "gemini" | "openai" | "ollama";
+  translationModel?: string;
+  /** Template custom do prompt de tradução (vazio = TRANSLATION_PROMPT_TEMPLATE). */
+  translationPromptTemplate?: string;
+  /** Teto diário de traduções (0/ausente = sem teto) — guarda de quota. */
+  translationMaxPerDay?: number;
 }
 
 const DEFAULT_SETTINGS: HubSettings = {

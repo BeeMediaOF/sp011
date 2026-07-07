@@ -8,6 +8,7 @@ interface Delivery {
   title: string | null;
   blogId: string;
   blogName: string | null;
+  targetCategory: string | null;
   status: string;
   attempts: number;
   scheduledAt: string | null;
@@ -29,7 +30,7 @@ interface Attempt {
   createdAt: string;
 }
 
-const STATUSES = ["", "pending", "awaiting_approval", "delivering", "delivered", "duplicate", "failed", "dead", "cancelled"];
+const STATUSES = ["", "awaiting_localization", "localizing", "pending", "awaiting_approval", "delivering", "delivered", "duplicate", "failed", "dead", "cancelled"];
 
 export default function Deliveries() {
   const [status, setStatus] = useState("");
@@ -74,7 +75,10 @@ export default function Deliveries() {
                   {d.remoteUrl ? <a href={d.remoteUrl} target="_blank" rel="noreferrer">{d.title} ↗</a> : d.title}
                   {d.lastError && <div className="muted" title={d.lastError}>{d.lastError.slice(0, 70)}</div>}
                 </td>
-                <td>{d.blogName}</td>
+                <td>
+                  {d.blogName}
+                  {d.targetCategory && <div className="muted">→ {d.targetCategory}</div>}
+                </td>
                 <td><span className={`badge ${statusClass(d.status)}`}>{statusLabel(d.status)}</span></td>
                 <td>
                   <a href="#tentativas" onClick={(e) => { e.preventDefault(); void showAttempts(d); }}>
@@ -91,7 +95,7 @@ export default function Deliveries() {
                   {["dead", "failed", "cancelled"].includes(d.status) && (
                     <button className="secondary small" onClick={() => retry(d)}>Reenviar</button>
                   )}{" "}
-                  {d.status === "pending" && (
+                  {["pending", "awaiting_localization"].includes(d.status) && (
                     <button className="danger small" onClick={() => cancel(d)}>Cancelar</button>
                   )}
                 </td>

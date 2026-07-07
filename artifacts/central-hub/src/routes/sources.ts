@@ -32,6 +32,7 @@ router.post("/", async (req, res) => {
       fetchLimit: body.fetchLimit ?? null,
       giveCredit: body.giveCredit ?? false,
       customPrompt: body.customPrompt ?? null,
+      language: body.language === "en" ? "en" : "pt-BR",
     })
     .returning();
   logEvent({ module: "api", refType: "source", refId: row!.id, message: `Fonte cadastrada: ${row!.name}` });
@@ -41,6 +42,7 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   const body = (req.body ?? {}) as Partial<CentralSourceRow>;
   delete (body as Record<string, unknown>)["id"];
+  if (body.language !== undefined) body.language = body.language === "en" ? "en" : "pt-BR";
   const [row] = await db
     .update(centralSourcesTable)
     .set(body)

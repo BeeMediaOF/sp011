@@ -133,15 +133,25 @@ interface RewriteOutput {
 interface SourceCtx {
   customPrompt?: string;
   giveCredit: boolean;
+  /** Idioma do conteúdo da fonte ("pt-BR" | "en") — carimbado na reescrita. */
+  language: string;
 }
 
 async function loadSourceCtx(item: NewsItemRow): Promise<SourceCtx> {
   const rows = await db
-    .select({ customPrompt: centralSourcesTable.customPrompt, giveCredit: centralSourcesTable.giveCredit })
+    .select({
+      customPrompt: centralSourcesTable.customPrompt,
+      giveCredit: centralSourcesTable.giveCredit,
+      language: centralSourcesTable.language,
+    })
     .from(centralSourcesTable)
     .where(eq(centralSourcesTable.id, item.sourceId))
     .limit(1);
-  return { customPrompt: rows[0]?.customPrompt ?? undefined, giveCredit: rows[0]?.giveCredit ?? false };
+  return {
+    customPrompt: rows[0]?.customPrompt ?? undefined,
+    giveCredit: rows[0]?.giveCredit ?? false,
+    language: rows[0]?.language ?? "pt-BR",
+  };
 }
 
 async function runPerplexity(item: NewsItemRow, src: SourceCtx, s: HubSettings): Promise<RewriteOutput> {
@@ -169,6 +179,8 @@ async function saveRewrite(
   out: RewriteOutput,
   s: HubSettings,
   via?: string,
+  /** Idioma do texto reescrito = idioma da fonte (o prompt não traduz). */
+  language = "pt-BR",
 ): Promise<"ok" | "unrenderable"> {
   const extracted = extractFromRawAI(out.content);
   if (!extracted) return "unrenderable";
@@ -178,6 +190,7 @@ async function saveRewrite(
     id: rewriteId,
     newsItemId: item.id,
     blogId: null, // reescrita compartilhada (MVP)
+    language,
     title: out.title || extracted.title || item.title,
     subtitle: out.subtitle || extracted.subtitle || null,
     socialTitle: out.socialTitle ?? extracted.socialTitle ?? null,
@@ -277,7 +290,7 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
       );
     }
 
-    const saved = await saveRewrite(item, out, s, isHelper ? `apoio: ${helperProvider}` : undefined);
+    const saved = await saveRewrite(item, out, s, isHelper ? `apoio: ${helperProvider}` : undefined, src.language);
     if (saved === "unrenderable") {
       if (isHelper) {
         // Falha da IA de apoio não pune o artigo: volta à fila para a lane principal
@@ -321,7 +334,7 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
         try {
           const src = await loadSourceCtx(item);
           const out = await runPerplexity(item, src, s);
-          const saved = await saveRewrite(item, out, s, "fallback: perplexity");
+          const saved = await saveRewrite(item, out, s, "fallback: perplexity", src.language);
           if (saved === "ok") return;
         } catch (pErr) {
           logger.warn({ err: pErr, newsItemId: item.id }, "Fallback Perplexity falhou — item volta à fila");

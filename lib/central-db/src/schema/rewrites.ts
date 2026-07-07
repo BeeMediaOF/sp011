@@ -20,6 +20,8 @@ export const rewritesTable = pgTable("rewrites", {
   keywords:       text("keywords"),
   provider:       text("provider"),
   model:          text("model"),
+  /** Idioma do texto desta reescrita ("pt-BR" | "en"; null = legado pt-BR). */
+  language:       text("language"),
   attempts:       integer("attempts").notNull().default(0),
   status:         text("status").notNull().default("ok"), // 'ok' | 'failed'
   errorMessage:   text("error_message"),
@@ -27,6 +29,8 @@ export const rewritesTable = pgTable("rewrites", {
 }, (t) => [
   // No máximo UMA reescrita compartilhada por notícia
   uniqueIndex("rewrites_shared_uniq").on(t.newsItemId).where(sql`blog_id is null`),
+  // No máximo UMA variação por (notícia, blog) — guarda de concorrência do localizer
+  uniqueIndex("rewrites_variant_uniq").on(t.newsItemId, t.blogId).where(sql`blog_id is not null`),
 ]);
 
 export type RewriteRow    = typeof rewritesTable.$inferSelect;

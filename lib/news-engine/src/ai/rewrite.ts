@@ -8,7 +8,11 @@
  * responsabilidade do chamador.
  */
 import { sanitizePlainField, sanitizeSocialTitle } from "../highlight.ts";
-import { applyPromptTemplate, DEFAULT_PROMPT_TEMPLATE } from "../prompts.ts";
+import {
+  applyPromptTemplate, DEFAULT_PROMPT_TEMPLATE,
+  TRANSLATION_PROMPT_TEMPLATE, CLASSIFY_PROMPT_TEMPLATE,
+  formatCategoriesForPrompt, languageLabel,
+} from "../prompts.ts";
 import { consoleLogger, type EngineLogger, type TokenUsage } from "../types.ts";
 import type { GeminiPool } from "./geminiPool.ts";
 
@@ -266,4 +270,156 @@ export async function rewriteNews(input: RewriteInput, cfg: RewriteEngineConfig)
   const model = cfg.model || "gemini-2.5-flash";
   const { text, usage } = await cfg.geminiPool.call(model, prompt);
   return { ...parseRewriteResult(text), usage };
+}
+
+// ─── Localizer: tradução + classificação por entrega ─────────────────────────
+
+/**
+ * Despacho de UMA chamada de texto pelo provider configurado (mesmo contrato
+ * do rewriteNews, sem o parse) — usado por translateRewrite/classifyArticle.
+ */
+async function callTextModel(
+  prompt: string, cfg: RewriteEngineConfig,
+): Promise<{ text: string; usage?: TokenUsage }> {
+  const logger = cfg.logger ?? consoleLogger;
+
+  if (cfg.provider === "ollama") {
+    const baseUrl = cfg.ollamaBaseUrl || "http://ollama:11434";
+    const model = cfg.model || "qwen2.5:7b-instruct";
+    try {
+      const { text, usage } = await callOllama(baseUrl, model, prompt);
+      return {
+        text,
+        usage: {
+          provider: "ollama", model,
+          inputTokens: usage?.prompt_tokens,
+          outputTokens: usage?.completion_tokens,
+          totalTokens: usage?.total_tokens,
+        },
+      };
+    } catch (ollamaErr) {
+      if (!(cfg.fallbackToGemini ?? true) || !cfg.geminiPool) throw ollamaErr;
+      logger.warn({ err: String(ollamaErr) }, "Ollama indisponível — caindo para fallback Gemini");
+      return cfg.geminiPool.call("gemini-2.5-flash", prompt);
+    }
+  }
+
+  if (cfg.provider === "openai") {
+    if (!cfg.openaiApiKey) throw new Error("API key da OpenAI não configurada");
+    const model = cfg.model || "gpt-4o-mini";
+    const { text, usage } = await callOpenAI(cfg.openaiApiKey, model, prompt);
+    return {
+      text,
+      usage: {
+        provider: "openai", model,
+        inputTokens: usage?.prompt_tokens,
+        outputTokens: usage?.completion_tokens,
+        totalTokens: usage?.total_tokens,
+      },
+    };
+  }
+
+  if (!cfg.geminiPool) throw new Error("geminiPool é obrigatório para provider \"gemini\"");
+  return cfg.geminiPool.call(cfg.model || "gemini-2.5-flash", prompt);
+}
+
+/** Extrai o campo `category` do JSON bruto da IA (tolerante a JSON malformado). */
+export function extractCategoryField(raw: string): string | undefined {
+  const stripped = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+  try {
+    const parsed = JSON.parse(stripped) as { category?: unknown };
+    if (typeof parsed.category === "string" && parsed.category.trim()) {
+      return parsed.category.trim().toLowerCase();
+    }
+  } catch { /* tenta regex abaixo */ }
+  const m = stripped.match(/"category"\s*:\s*"([^"]+)"/);
+  return m?.[1]?.trim().toLowerCase() || undefined;
+}
+
+export interface TranslateInput {
+  title: string;
+  subtitle?: string;
+  socialTitle?: string;
+  socialSummary?: string;
+  socialHashtags?: string;
+  contentHtml: string;
+  keywords?: string;
+  /** Idioma de destino ("en" | "pt-BR"). */
+  targetLanguage: string;
+  /** Taxonomia do blog — a MESMA chamada devolve `category`; vazia = sem classificação. */
+  categories?: Array<{ slug: string; hint?: string }>;
+  /** Template custom (settings do painel); default TRANSLATION_PROMPT_TEMPLATE. */
+  promptTemplate?: string;
+}
+
+export interface TranslateOutput extends RewriteResult {
+  usage?: TokenUsage;
+  /** Slug de categoria escolhido pela IA (já validado contra a lista) ou undefined. */
+  category?: string;
+}
+
+/**
+ * Traduz uma reescrita para o idioma do blog de destino. Monta o prompt
+ * SOZINHO (nunca via applyPromptTemplate, que trunca {{TEXTO}} em 7.000 chars
+ * e cortaria o artigo no meio) — o cap defensivo aqui é ~20k chars.
+ */
+export async function translateRewrite(
+  input: TranslateInput, cfg: RewriteEngineConfig,
+): Promise<TranslateOutput> {
+  const categories = input.categories ?? [];
+  const prompt = (input.promptTemplate?.trim() || TRANSLATION_PROMPT_TEMPLATE)
+    .replace(/\{\{IDIOMA_DESTINO\}\}/g, languageLabel(input.targetLanguage))
+    .replace(/\{\{TITULO\}\}/g, input.title)
+    .replace(/\{\{SUBTITULO\}\}/g, input.subtitle ?? "")
+    .replace(/\{\{SOCIAL_TITLE\}\}/g, input.socialTitle ?? "")
+    .replace(/\{\{SOCIAL_SUMMARY\}\}/g, input.socialSummary ?? "")
+    .replace(/\{\{SOCIAL_HASHTAGS\}\}/g, input.socialHashtags ?? "")
+    .replace(/\{\{KEYWORDS\}\}/g, input.keywords ?? "")
+    .replace(/\{\{CONTEUDO\}\}/g, input.contentHtml.slice(0, 20_000))
+    .replace(/\{\{CATEGORIAS\}\}/g, formatCategoriesForPrompt(categories));
+
+  const { text, usage } = await callTextModel(prompt, cfg);
+  const parsed = parseRewriteResult(text);
+  const rawCategory = extractCategoryField(text);
+  const valid = rawCategory && categories.some((c) => c.slug.toLowerCase() === rawCategory);
+  return { ...parsed, usage, category: valid ? rawCategory : undefined };
+}
+
+export interface ClassifyInput {
+  title: string;
+  summary?: string;
+  categories: Array<{ slug: string; hint?: string }>;
+  /** Template custom; default CLASSIFY_PROMPT_TEMPLATE. */
+  promptTemplate?: string;
+}
+
+export interface ClassifyOutput {
+  /** Slug validado contra a lista, ou null quando a IA não decidiu. */
+  category: string | null;
+  usage?: TokenUsage;
+}
+
+/**
+ * Classificação barata (só título + resumo, sem o corpo) para o caso
+ * classificação-sem-tradução (ex.: fonte EN → blog EN). NUNCA lança por
+ * resposta inválida — devolve null e o chamador aplica o fallback.
+ */
+export async function classifyArticle(
+  input: ClassifyInput, cfg: RewriteEngineConfig,
+): Promise<ClassifyOutput> {
+  if (input.categories.length === 0) return { category: null };
+  const prompt = (input.promptTemplate?.trim() || CLASSIFY_PROMPT_TEMPLATE)
+    .replace(/\{\{TITULO\}\}/g, input.title)
+    .replace(/\{\{RESUMO\}\}/g, (input.summary ?? "").slice(0, 1_000))
+    .replace(/\{\{CATEGORIAS\}\}/g, formatCategoriesForPrompt(input.categories));
+
+  const { text, usage } = await callTextModel(prompt, cfg);
+  // JSON {"category": "slug"} ou, em último caso, o slug cru na resposta.
+  const fromJson = extractCategoryField(text);
+  const raw = (fromJson ?? text.trim().toLowerCase().replace(/^["']|["']$/g, "")).trim();
+  const match = input.categories.find((c) => c.slug.toLowerCase() === raw);
+  return { category: match ? match.slug : null, usage };
 }

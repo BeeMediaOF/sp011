@@ -6,6 +6,7 @@ import { seedCentralAdmin } from "./lib/seed.js";
 import { startCollector } from "./services/collector.js";
 import { startRewriteWorker } from "./services/rewriter.js";
 import { startDistributor } from "./services/distributor.js";
+import { startLocalizer } from "./services/localizer.js";
 import { startDeliveryWorker } from "./services/deliveryWorker.js";
 
 process.once("SIGTERM", () => process.exit(0));
@@ -32,7 +33,8 @@ app.listen(port, async (err?: Error) => {
   startCollector();
   startRewriteWorker();
   startDistributor();
+  startLocalizer();
   startDeliveryWorker();
 
-  logger.info("Pipeline central ativo: collector + rewriter + distributor + delivery");
+  logger.info("Pipeline central ativo: collector + rewriter + distributor + localizer + delivery");
 });

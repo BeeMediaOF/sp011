@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { Router } from "express";
-import { db, blogsTable, type BlogRow } from "@workspace/central-db";
+import { db, blogsTable, type BlogRow, type BlogCategory } from "@workspace/central-db";
 import { encryptSecret } from "@workspace/news-engine";
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth.js";
@@ -18,6 +18,24 @@ function sanitize(blog: BlogRow) {
 
 function newSecret(): string {
   return randomBytes(32).toString("hex");
+}
+
+/** Normaliza a taxonomia vinda do painel: slugs kebab-case, sem vazios; null = sem classificação. */
+function normalizeCategories(input: unknown): BlogCategory[] | null {
+  if (!Array.isArray(input)) return null;
+  const out: BlogCategory[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") continue;
+    const slug = String((item as { slug?: unknown }).slug ?? "")
+      .trim().toLowerCase()
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "").slice(0, 60);
+    if (!slug || out.some((c) => c.slug === slug)) continue;
+    const hint = String((item as { hint?: unknown }).hint ?? "").trim().slice(0, 200);
+    out.push(hint ? { slug, hint } : { slug });
+  }
+  return out.length > 0 ? out : null;
 }
 
 router.get("/", async (_req, res) => {
@@ -51,6 +69,8 @@ router.post("/", async (req, res) => {
       deliveryMode: body.deliveryMode === "draft" ? "draft" : "publish",
       maxPostsPerDay: body.maxPostsPerDay ?? null,
       minMinutesBetweenPosts: body.minMinutesBetweenPosts ?? null,
+      language: body.language === "en" ? "en" : "pt-BR",
+      categories: normalizeCategories(body.categories),
       notes: body.notes ?? null,
     })
     .returning();
@@ -70,6 +90,8 @@ router.patch("/:id", async (req, res) => {
     return;
   }
   if (body.apiUrl) body.apiUrl = body.apiUrl.trim().replace(/\/+$/, "");
+  if (body.language !== undefined) body.language = body.language === "en" ? "en" : "pt-BR";
+  if (body.categories !== undefined) body.categories = normalizeCategories(body.categories);
 
   const [row] = await db
     .update(blogsTable)

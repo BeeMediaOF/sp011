@@ -29,6 +29,10 @@ interface MaskedSettings {
   maxPendingRewrites: number;
   rewriteEnabled: boolean;
   deliveryEnabled: boolean;
+  translationProvider?: string;
+  translationModel?: string;
+  translationPromptTemplate?: string;
+  translationMaxPerDay?: number;
 }
 
 interface Quota {
@@ -84,6 +88,10 @@ export default function Settings() {
           maxPendingRewrites: num(form.maxPendingRewrites) ?? 30,
           rewriteEnabled: form.rewriteEnabled,
           deliveryEnabled: form.deliveryEnabled,
+          translationProvider: form.translationProvider || undefined,
+          translationModel: form.translationModel || undefined,
+          translationPromptTemplate: form.translationPromptTemplate || undefined,
+          translationMaxPerDay: num(form.translationMaxPerDay),
         },
       });
       setMsg("✔ Configurações salvas");
@@ -282,6 +290,40 @@ export default function Settings() {
             <input type="number" value={form.maxPendingRewrites ?? 30} onChange={(e) => setForm({ ...form, maxPendingRewrites: Number(e.target.value) })} />
           </div>
         </div>
+      </div>
+
+      <div className="card">
+        <h3>Tradução &amp; Classificação</h3>
+        <p className="muted">
+          Entregas para blogs em idioma diferente da fonte são traduzidas antes de aprovar/enviar;
+          blogs com categorias definidas (aba Blogs) ganham a categoria decidida pela IA na mesma
+          etapa. Regra com categoria explícita sempre vence; indecisão cai em "others".
+        </p>
+        <div className="row">
+          <div>
+            <label>Provider da tradução</label>
+            <select value={form.translationProvider ?? "gemini"} onChange={(e) => setForm({ ...form, translationProvider: e.target.value })}>
+              <option value="gemini">Gemini (rodízio de chaves)</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (self-hosted)</option>
+            </select>
+          </div>
+          <div>
+            <label>Modelo (vazio = padrão do provider)</label>
+            <input value={form.translationModel ?? ""} onChange={(e) => setForm({ ...form, translationModel: e.target.value })} placeholder="gemini-2.5-flash" />
+          </div>
+          <div>
+            <label>Máx. traduções por dia (0 = ∞)</label>
+            <input type="number" min={0} value={form.translationMaxPerDay ?? 0} onChange={(e) => setForm({ ...form, translationMaxPerDay: Number(e.target.value) })} />
+          </div>
+        </div>
+        <label style={{ marginTop: 10 }}>Prompt de tradução customizado (vazio = padrão do sistema)</label>
+        <textarea
+          style={{ minHeight: 120 }}
+          value={form.translationPromptTemplate ?? ""}
+          onChange={(e) => setForm({ ...form, translationPromptTemplate: e.target.value })}
+          placeholder="Use {{IDIOMA_DESTINO}}, {{TITULO}}, {{SUBTITULO}}, {{CONTEUDO}}, {{CATEGORIAS}}…"
+        />
       </div>
 
       <div className="card">

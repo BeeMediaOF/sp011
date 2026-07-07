@@ -12,6 +12,8 @@ export const centralSourcesTable = pgTable("central_sources", {
   fetchLimit:    integer("fetch_limit"),
   giveCredit:    boolean("give_credit").notNull().default(false),
   customPrompt:  text("custom_prompt"),
+  /** Idioma do conteúdo da fonte ("pt-BR" | "en") — evita traduzir EN→EN. */
+  language:      text("language").notNull().default("pt-BR"),
   lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }),
   createdAt:     timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

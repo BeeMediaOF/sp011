@@ -12,10 +12,11 @@ interface Source {
   fetchLimit: number | null;
   giveCredit: boolean;
   customPrompt: string | null;
+  language: string;
   lastFetchedAt: string | null;
 }
 
-const EMPTY = { name: "", url: "", category: "geral", scheduleHours: "4", fetchLimit: "", giveCredit: false, active: true, customPrompt: "" };
+const EMPTY = { name: "", url: "", category: "geral", scheduleHours: "4", fetchLimit: "", giveCredit: false, active: true, customPrompt: "", language: "pt-BR" };
 
 export default function Sources() {
   const { data: sources, error, reload } = useLoad(() => api<Source[]>("/sources"));
@@ -30,6 +31,7 @@ export default function Sources() {
       name: s.name, url: s.url, category: s.category,
       scheduleHours: String(s.scheduleHours), fetchLimit: s.fetchLimit?.toString() ?? "",
       giveCredit: s.giveCredit, active: s.active, customPrompt: s.customPrompt ?? "",
+      language: s.language === "en" ? "en" : "pt-BR",
     });
     setEditing(s);
   };
@@ -43,6 +45,7 @@ export default function Sources() {
         fetchLimit: form.fetchLimit ? Number(form.fetchLimit) : null,
         giveCredit: form.giveCredit, active: form.active,
         customPrompt: form.customPrompt || null,
+        language: form.language,
       };
       if (editing?.id) await api(`/sources/${editing.id}`, { method: "PATCH", body });
       else await api("/sources", { method: "POST", body });
@@ -100,6 +103,7 @@ export default function Sources() {
               <tr key={s.id}>
                 <td>
                   <b>{s.name}</b>
+                  {s.language === "en" && <span className="badge" style={{ marginLeft: 6 }}>EN</span>}
                   {!s.active && <span className="badge err" style={{ marginLeft: 6 }}>inativa</span>}
                   {s.giveCredit && <span className="badge" style={{ marginLeft: 6 }}>com crédito</span>}
                   <div className="muted mono">{s.url}</div>
@@ -140,6 +144,13 @@ export default function Sources() {
               <div>
                 <label>Artigos por rodada (vazio = padrão)</label>
                 <input type="number" value={form.fetchLimit} onChange={(e) => setForm({ ...form, fetchLimit: e.target.value })} />
+              </div>
+              <div>
+                <label>Idioma do conteúdo</label>
+                <select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="en">Inglês</option>
+                </select>
               </div>
             </div>
             <div className="row" style={{ marginTop: 10 }}>

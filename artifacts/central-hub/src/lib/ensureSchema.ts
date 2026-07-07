@@ -214,6 +214,12 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
       updated_at timestamptz NOT NULL DEFAULT now()
     )`,
   },
+  // ── Localizer (tradução + classificação por entrega) — colunas aditivas ────
+  { name: "blogs_language", query: sql`ALTER TABLE blogs ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'pt-BR'` },
+  { name: "blogs_categories", query: sql`ALTER TABLE blogs ADD COLUMN IF NOT EXISTS categories jsonb` },
+  { name: "central_sources_language", query: sql`ALTER TABLE central_sources ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'pt-BR'` },
+  { name: "rewrites_language", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS language text` },
+  { name: "rewrites_variant_uniq", query: sql`CREATE UNIQUE INDEX IF NOT EXISTS rewrites_variant_uniq ON rewrites (news_item_id, blog_id) WHERE blog_id IS NOT NULL` },
 ];
 
 export async function ensureSchema(): Promise<void> {

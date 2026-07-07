@@ -103,6 +103,96 @@ export function buildPrompt(
   return applyPromptTemplate(DEFAULT_PROMPT_TEMPLATE, title, text, sourceName, giveCredit);
 }
 
+// ─── Localizer: tradução + classificação por entrega ─────────────────────────
+
+/** Nome legível do idioma de destino para os prompts. */
+export function languageLabel(lang: string): string {
+  return lang === "en" ? "inglês (English)" : "Português do Brasil";
+}
+
+/** Renderiza a lista `slug — hint` de categorias de um blog para os prompts. */
+export function formatCategoriesForPrompt(
+  categories: Array<{ slug: string; hint?: string }>,
+): string {
+  if (categories.length === 0) return "(nenhuma — deixe \"category\" vazio)";
+  return categories
+    .map((c) => `- ${c.slug}${c.hint ? ` — ${c.hint}` : ""}`)
+    .join("\n");
+}
+
+/**
+ * Tradução de uma reescrita para o idioma de um blog. Placeholders:
+ * {{IDIOMA_DESTINO}}, {{TITULO}}, {{SUBTITULO}}, {{SOCIAL_TITLE}},
+ * {{SOCIAL_SUMMARY}}, {{SOCIAL_HASHTAGS}}, {{KEYWORDS}}, {{CONTEUDO}},
+ * {{CATEGORIAS}}. A MESMA chamada devolve a categoria do blog (campo
+ * `category`), evitando uma segunda chamada de IA quando os dois se aplicam.
+ * NÃO use applyPromptTemplate aqui (trunca {{TEXTO}} em 7.000 chars e cortaria
+ * artigos no meio) — o translateRewrite monta o prompt sozinho.
+ */
+export const TRANSLATION_PROMPT_TEMPLATE = `Você é um tradutor editorial profissional de um portal de notícias.
+
+Traduza a matéria abaixo para {{IDIOMA_DESTINO}}, mantendo o tom jornalístico.
+
+## MATÉRIA ORIGINAL
+Título: {{TITULO}}
+Subtítulo: {{SUBTITULO}}
+Manchete social (social_title): {{SOCIAL_TITLE}}
+Resumo social (social_summary): {{SOCIAL_SUMMARY}}
+Hashtags sociais (social_hashtags): {{SOCIAL_HASHTAGS}}
+Palavras-chave (keywords): {{KEYWORDS}}
+
+Conteúdo HTML:
+{{CONTEUDO}}
+
+## CATEGORIA DO BLOG DE DESTINO
+Escolha UMA categoria para esta matéria entre as opções abaixo (use o slug exato):
+{{CATEGORIAS}}
+
+## REGRAS DA TRADUÇÃO
+- Traduza TODO o texto para {{IDIOMA_DESTINO}} com naturalidade de falante nativo; nada de tradução literal palavra a palavra.
+- PRESERVE exatamente a estrutura HTML do conteúdo: as mesmas tags (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), na mesma ordem e quantidade. Traduza apenas o texto dentro delas.
+- NÃO adicione, remova ou altere fatos, números, datas, valores, nomes próprios ou citações. Nomes de pessoas, clubes e organizações não se traduzem.
+- Títulos de seções fixas também se traduzem (ex.: "Perguntas Frequentes" vira "Frequently Asked Questions" em inglês).
+- social_title: manchete chamativa em {{IDIOMA_DESTINO}} entre 70 e 85 caracteres, voz ativa, tempo presente; envolva com asteriscos (*assim*) apenas o trecho de maior força. Nunca corte palavras nem use reticências.
+- social_summary: 1 a 2 frases (máximo ~250 caracteres) em {{IDIOMA_DESTINO}}, sem hashtags.
+- social_hashtags: 4 a 8 hashtags em {{IDIOMA_DESTINO}}, separadas por espaço, cada uma começando com # e sem acentos.
+- slug: gere um slug NOVO em {{IDIOMA_DESTINO}}, kebab-case sem acentos, com no máximo 5 palavras significativas e 55 caracteres.
+- keywords: adapte as palavras-chave para {{IDIOMA_DESTINO}} (8 termos separados por vírgula).
+
+## REGRAS ABSOLUTAS
+- Retorne EXCLUSIVAMENTE JSON válido, sem markdown, sem \`\`\`json, sem explicações antes ou depois.
+- "category" deve ser EXATAMENTE um dos slugs listados acima (ou "" quando a lista estiver vazia).
+
+## RESPOSTA (apenas JSON, direto, sem delimitadores de código):
+{
+  "title": "...",
+  "subtitle": "...",
+  "social_title": "HEADLINE OF 70 TO 85 CHARACTERS WITH *HIGHLIGHT* ON THE STRONGEST PART",
+  "social_summary": "...",
+  "social_hashtags": "#tag1 #tag2 #tag3 #tag4",
+  "content_html": "<h2>...</h2><p>...</p>",
+  "slug": "new-slug-in-target-language",
+  "keywords": "kw1, kw2, kw3, kw4, kw5, kw6, kw7, kw8",
+  "category": "slug-escolhido"
+}`;
+
+/**
+ * Classificação SEM tradução (ex.: fonte EN → blog EN): só título + resumo,
+ * chamada barata. Placeholders: {{TITULO}}, {{RESUMO}}, {{CATEGORIAS}}.
+ * Resposta em JSON para funcionar também no Ollama (response_format json).
+ */
+export const CLASSIFY_PROMPT_TEMPLATE = `Você é o classificador de notícias de um painel editorial.
+
+Escolha a categoria MAIS adequada para a notícia abaixo.
+
+Título: {{TITULO}}
+Resumo: {{RESUMO}}
+
+Categorias possíveis (slug — descrição):
+{{CATEGORIAS}}
+
+Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug"}, usando o slug EXATO de UMA categoria da lista. Sem markdown, sem explicações.`;
+
 /**
  * Resolve o melhor prompt para uma fonte seguindo a hierarquia:
  * source.customPrompt > prompt da categoria > prompt global > DEFAULT_PROMPT_TEMPLATE

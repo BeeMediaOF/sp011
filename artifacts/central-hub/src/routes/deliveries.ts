@@ -7,9 +7,10 @@ import {
   newsItemsTable,
   rewritesTable,
 } from "@workspace/central-db";
-import { and, asc, desc, eq, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth.js";
 import { logEvent } from "../lib/eventLog.js";
+import { needsTranslation } from "../lib/localization.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -133,21 +134,49 @@ router.post("/:id/retry", async (req, res) => {
     res.status(409).json({ error: `Entrega em status '${delivery.status}' não pode ser reenviada.` });
     return;
   }
+
+  // Blog em idioma diferente da reescrita apontada → volta para a fila de
+  // localização (reenviar direto como "pending" publicaria o texto no idioma
+  // errado — ex.: PT num blog EN quando a tradução era o que tinha falhado).
+  const [blog] = await db
+    .select({ language: blogsTable.language })
+    .from(blogsTable)
+    .where(eq(blogsTable.id, delivery.blogId))
+    .limit(1);
+  const [rewrite] = await db
+    .select({ language: rewritesTable.language })
+    .from(rewritesTable)
+    .where(eq(rewritesTable.id, delivery.rewriteId))
+    .limit(1);
+  const mustLocalize = !!blog && needsTranslation(blog.language, rewrite?.language);
+
   const [row] = await db
     .update(deliveriesTable)
-    .set({ status: "pending", nextRetryAt: null, scheduledAt: new Date(), lastError: null, updatedAt: new Date() })
+    .set({
+      status: mustLocalize ? "awaiting_localization" : "pending",
+      nextRetryAt: null,
+      scheduledAt: new Date(),
+      lastError: null,
+      updatedAt: new Date(),
+    })
     .where(eq(deliveriesTable.id, delivery.id))
     .returning();
-  logEvent({ module: "delivery", refType: "delivery", refId: delivery.id, message: "Reenvio manual solicitado" });
+  logEvent({
+    module: "delivery", refType: "delivery", refId: delivery.id,
+    message: mustLocalize ? "Reenvio manual: entrega voltou para tradução" : "Reenvio manual solicitado",
+  });
   res.json(row);
 });
 
-/** Cancela uma entrega pendente/agendada. */
+/** Cancela uma entrega pendente/agendada (inclui aguardando tradução). */
 router.post("/:id/cancel", async (req, res) => {
   const [row] = await db
     .update(deliveriesTable)
     .set({ status: "cancelled", updatedAt: new Date() })
-    .where(and(eq(deliveriesTable.id, req.params.id), eq(deliveriesTable.status, "pending")))
+    .where(and(
+      eq(deliveriesTable.id, req.params.id),
+      inArray(deliveriesTable.status, ["pending", "awaiting_localization"]),
+    ))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Entrega não encontrada ou não está pendente." });

@@ -5,7 +5,7 @@
 import { db, centralEventLogsTable } from "@workspace/central-db";
 import { logger } from "./logger.js";
 
-export type EventModule = "collector" | "rewriter" | "distributor" | "delivery" | "auth" | "api";
+export type EventModule = "collector" | "rewriter" | "distributor" | "localizer" | "delivery" | "auth" | "api";
 export type EventLevel = "info" | "warn" | "error";
 
 export function logEvent(entry: {

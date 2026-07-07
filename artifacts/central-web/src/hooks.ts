@@ -33,7 +33,8 @@ export function fmtDate(value: string | Date | null | undefined): string {
 const STATUS_CLASS: Record<string, string> = {
   delivered: "ok", duplicate: "ok", online: "ok", rewritten: "ok", distributed: "ok", ok: "ok",
   pending: "info", delivering: "info", queued: "info", rewriting: "info", collected: "info",
-  awaiting_approval: "warn", offline: "warn",
+  localizing: "info",
+  awaiting_approval: "warn", awaiting_localization: "warn", offline: "warn",
   failed: "err", dead: "err", error: "err", discarded: "err", cancelled: "err",
 };
 
@@ -44,6 +45,7 @@ export function statusClass(status: string): string {
 export const STATUS_LABEL: Record<string, string> = {
   collected: "coletada", queued: "na fila", rewriting: "reescrevendo",
   rewritten: "reescrita", distributed: "distribuída", failed: "falhou", discarded: "descartada",
+  awaiting_localization: "aguardando tradução/categoria", localizing: "traduzindo",
   awaiting_approval: "aguardando aprovação", pending: "pendente", delivering: "enviando",
   delivered: "entregue", duplicate: "duplicada no blog", dead: "esgotou tentativas", cancelled: "cancelada",
   online: "online", offline: "offline", error: "erro",

@@ -1,4 +1,11 @@
-import { pgTable, text, boolean, integer, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+
+/** Categoria da taxonomia de um blog (slug do menu + dica para a IA). */
+export interface BlogCategory {
+  slug: string;
+  /** Dica opcional para a classificação por IA (ex.: "american football"). */
+  hint?: string;
+}
 
 /**
  * Blogs conectados ao painel central (modelo: `social_connections` do blog).
@@ -22,6 +29,10 @@ export const blogsTable = pgTable("blogs", {
   deliveryMode:    text("delivery_mode").notNull().default("publish"), // 'publish' | 'draft'
   maxPostsPerDay:  integer("max_posts_per_day"),
   minMinutesBetweenPosts: integer("min_minutes_between_posts"),
+  /** Idioma do público do blog ("pt-BR" | "en"): difere do idioma da notícia → tradução. */
+  language:        text("language").notNull().default("pt-BR"),
+  /** Taxonomia do blog p/ classificação por IA (null = sem classificação). */
+  categories:      jsonb("categories").$type<BlogCategory[]>(),
   status:          text("status").notNull().default("offline"), // 'online' | 'offline' | 'error'
   lastSeenAt:      timestamp("last_seen_at", { withTimezone: true }),
   lastError:       text("last_error"),

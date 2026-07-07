@@ -69,6 +69,7 @@ export async function runDistributorCycle(): Promise<number> {
     .select({
       news: newsItemsTable,
       rewriteId: rewritesTable.id,
+      rewriteLanguage: rewritesTable.language,
     })
     .from(newsItemsTable)
     .innerJoin(
@@ -105,8 +106,9 @@ export async function runDistributorCycle(): Promise<number> {
 
   let created = 0;
 
-  for (const { news, rewriteId } of items) {
+  for (const { news, rewriteId, rewriteLanguage } of items) {
     const searchText = `${news.title} ${news.description ?? ""}`;
+    const sourceLang = rewriteLanguage ?? "pt-BR"; // null = legado pt-BR
 
     for (const blog of blogs) {
       const rules = rulesByBlog.get(blog.id) ?? [];
@@ -135,7 +137,17 @@ export async function runDistributorCycle(): Promise<number> {
         scheduledAt = brMidnightUtc(1); // dia seguinte
       }
 
-      const status = blog.requireApproval ? "awaiting_approval" : "pending";
+      // Localizer: idioma do blog difere da reescrita → traduzir; blog com
+      // taxonomia e regra SEM targetCategory explícito → classificar por IA.
+      // Nos dois casos a entrega nasce awaiting_localization (o rewriteId
+      // aponta a reescrita compartilhada até o localizer trocar) e a aprovação
+      // acontece DEPOIS — o revisor vê o conteúdo/categoria finais.
+      const needsTranslation = blog.language !== sourceLang;
+      const needsClassification =
+        (blog.categories?.length ?? 0) > 0 && !match.targetCategory;
+      const status = needsTranslation || needsClassification
+        ? "awaiting_localization"
+        : (blog.requireApproval ? "awaiting_approval" : "pending");
 
       try {
         const inserted = await db
@@ -160,9 +172,12 @@ export async function runDistributorCycle(): Promise<number> {
           created++;
           pace.lastScheduledAt = scheduledAt.getTime();
           pace.scheduledToday++;
+          const suffix = status === "awaiting_localization"
+            ? " (aguardando tradução/categoria)"
+            : status === "awaiting_approval" ? " (aguardando aprovação)" : "";
           logEvent({
             module: "distributor", refType: "delivery", refId: inserted[0]!.id,
-            message: `Entrega criada p/ ${blog.name}${status === "awaiting_approval" ? " (aguardando aprovação)" : ""}: ${news.title}`,
+            message: `Entrega criada p/ ${blog.name}${suffix}: ${news.title}`,
           });
         }
       } catch (err) {

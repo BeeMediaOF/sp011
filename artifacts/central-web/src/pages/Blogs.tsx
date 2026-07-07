@@ -2,6 +2,8 @@ import { useState } from "react";
 import { api } from "../api";
 import { fmtDate, statusClass, statusLabel, useLoad } from "../hooks";
 
+export interface BlogCategory { slug: string; hint?: string }
+
 export interface Blog {
   id: string;
   name: string;
@@ -13,6 +15,8 @@ export interface Blog {
   deliveryMode: string;
   maxPostsPerDay: number | null;
   minMinutesBetweenPosts: number | null;
+  language: string;
+  categories: BlogCategory[] | null;
   status: string;
   lastSeenAt: string | null;
   lastError: string | null;
@@ -23,7 +27,37 @@ const EMPTY = {
   name: "", domain: "", apiUrl: "", deliveryMode: "publish",
   requireApproval: false, isActive: true,
   maxPostsPerDay: "", minMinutesBetweenPosts: "", notes: "",
+  language: "pt-BR", categoriesText: "",
 };
+
+// Uma categoria por linha, "slug: dica p/ a IA" (dica opcional).
+function parseCategories(text: string): BlogCategory[] | null {
+  const out: BlogCategory[] = [];
+  for (const line of text.split("\n")) {
+    const [rawSlug, ...rest] = line.split(":");
+    const slug = (rawSlug ?? "").trim().toLowerCase();
+    if (!slug || out.some((c) => c.slug === slug)) continue;
+    const hint = rest.join(":").trim();
+    out.push(hint ? { slug, hint } : { slug });
+  }
+  return out.length > 0 ? out : null;
+}
+
+function categoriesToText(cats: BlogCategory[] | null): string {
+  return (cats ?? []).map((c) => (c.hint ? `${c.slug}: ${c.hint}` : c.slug)).join("\n");
+}
+
+// Pré-preenchimento com a taxonomia do KSports (menu decidido no starter).
+const KSPORTS_CATEGORIES_TEXT = [
+  "world-cup: FIFA World Cup",
+  "football: club & international soccer (futebol)",
+  "volleyball: volleyball (vôlei)",
+  "tennis: tennis",
+  "formula-1: Formula 1 / motorsport",
+  "nfl: NFL / american football",
+  "esports: e-sports & competitive gaming",
+  "others: anything that does not fit the categories above",
+].join("\n");
 
 export default function Blogs() {
   const { data: blogs, error, reload } = useLoad(() => api<Blog[]>("/blogs"));
@@ -41,6 +75,8 @@ export default function Blogs() {
       maxPostsPerDay: b.maxPostsPerDay?.toString() ?? "",
       minMinutesBetweenPosts: b.minMinutesBetweenPosts?.toString() ?? "",
       notes: b.notes ?? "",
+      language: b.language === "en" ? "en" : "pt-BR",
+      categoriesText: categoriesToText(b.categories),
     });
     setEditing(b);
     setMsg("");
@@ -55,6 +91,8 @@ export default function Blogs() {
         deliveryMode: form.deliveryMode, requireApproval: form.requireApproval, isActive: form.isActive,
         maxPostsPerDay: form.maxPostsPerDay ? Number(form.maxPostsPerDay) : null,
         minMinutesBetweenPosts: form.minMinutesBetweenPosts ? Number(form.minMinutesBetweenPosts) : null,
+        language: form.language,
+        categories: parseCategories(form.categoriesText),
         notes: form.notes || null,
       };
       if (editing?.id) {
@@ -131,8 +169,15 @@ export default function Blogs() {
               <tr key={b.id}>
                 <td>
                   <b>{b.name}</b>
+                  {b.language === "en" && <span className="badge" style={{ marginLeft: 6 }}>EN</span>}
                   {!b.isActive && <span className="badge err" style={{ marginLeft: 6 }}>inativo</span>}
                   <div className="muted">{b.domain}</div>
+                  {(b.categories?.length ?? 0) > 0 && (
+                    <div className="muted" title={(b.categories ?? []).map((c) => c.slug).join(", ")}>
+                      {(b.categories ?? []).length} categoria(s): {(b.categories ?? []).slice(0, 4).map((c) => c.slug).join(", ")}
+                      {(b.categories?.length ?? 0) > 4 ? "…" : ""}
+                    </div>
+                  )}
                 </td>
                 <td className="mono">{b.apiUrl}</td>
                 <td>
@@ -175,6 +220,13 @@ export default function Blogs() {
                 </select>
               </div>
               <div>
+                <label>Idioma do blog</label>
+                <select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="en">Inglês</option>
+                </select>
+              </div>
+              <div>
                 <label>Máx. posts/dia (vazio = sem limite)</label>
                 <input type="number" value={form.maxPostsPerDay} onChange={(e) => setForm({ ...form, maxPostsPerDay: e.target.value })} />
               </div>
@@ -193,6 +245,24 @@ export default function Blogs() {
                 Ativo
               </label>
             </div>
+            <label>
+              Categorias do blog (uma por linha, "slug: dica para a IA"; vazio = sem classificação)
+            </label>
+            <textarea
+              rows={6}
+              value={form.categoriesText}
+              onChange={(e) => setForm({ ...form, categoriesText: e.target.value })}
+              placeholder={"football: club & international soccer\nnfl: american football\nothers: tudo que não couber acima"}
+            />
+            <p className="muted" style={{ marginTop: 4 }}>
+              Com categorias definidas, a IA classifica cada entrega dentro DESTA lista (a home do
+              blog popula nas seções certas). Regra com categoria explícita sempre vence; indecisão
+              cai em "others" (ou no último slug).{" "}
+              <button type="button" className="secondary small"
+                onClick={() => setForm({ ...form, categoriesText: KSPORTS_CATEGORIES_TEXT })}>
+                Preencher com o menu do KSports
+              </button>
+            </p>
             <label>Notas</label>
             <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
             <div className="row" style={{ marginTop: 14 }}>
