@@ -64,6 +64,12 @@ export interface SiteSettings {
   headerBannerHtml?: string;
   /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */
   headerBannerLinkUrl?: string;
+  /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
+  articleSidebarBlocks?: import("../lib/homeBlocks").HomeBlock[];
+  /** Seções da página de notícia (ausente = exibidas). */
+  articleShowBreadcrumb?: boolean;
+  articleShowShare?: boolean;
+  articleShowRelated?: boolean;
   /** "bar" = menu vira faixa colorida full-width abaixo do logo. */
   menuBarStyle?: "attached" | "bar";
   menuBarBgColor?: string;

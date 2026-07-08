@@ -24,7 +24,14 @@ type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
-type Tab = "blocks" | "templates" | "header" | "footer" | "settings" | "styles";
+type Tab = "blocks" | "templates" | "header" | "footer" | "settings" | "styles" | "article";
+
+// ── Página de notícia: lateral padrão + classe de input do editor ────────────
+const DEFAULT_ARTICLE_SIDEBAR_BLOCKS: HomeBlock[] = [
+  { id: "mostread",           name: "Mais Lidas",        visible: true, order: 0, blockType: "mostread" },
+  { id: "advertising-artigo", name: "Propaganda (slot)", visible: true, order: 1, custom: true, blockType: "advertising", adSlot: "slot_07" },
+];
+const AINPUT = "w-full border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white";
 type FilterTab = "all" | "visible" | "hidden";
 type ResponsiveMode = "desktop" | "tablet" | "mobile";
 
@@ -1196,6 +1203,12 @@ export default function HomeBlocksManager() {
   const [topBarBgColor, setTopBarBgColor]         = useState("");
   const [headerBannerHtml, setHeaderBannerHtml]   = useState("");
   const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
+  // Página de notícia (aba Notícia): blocos da lateral + seções desligáveis.
+  const [articleBlocks, setArticleBlocks] = useState<HomeBlock[]>([]);
+  const [articleShowBreadcrumb, setArticleShowBreadcrumb] = useState(true);
+  const [articleShowShare, setArticleShowShare]           = useState(true);
+  const [articleShowRelated, setArticleShowRelated]       = useState(true);
+  const [articleSavedOk, setArticleSavedOk]               = useState(false);
   const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
   const [menuBarBgColor, setMenuBarBgColor]       = useState("");
   const [footerAccentColor, setFooterAccentColor] = useState("");
@@ -1302,6 +1315,12 @@ export default function HomeBlocksManager() {
         setTopBarBgColor(r.settings.topBarBgColor ?? "");
         setHeaderBannerHtml(r.settings.headerBannerHtml ?? "");
         setHeaderBannerLinkUrl(r.settings.headerBannerLinkUrl ?? "");
+        setArticleBlocks(r.settings.articleSidebarBlocks?.length
+          ? r.settings.articleSidebarBlocks.map((b) => ({ ...b }))
+          : DEFAULT_ARTICLE_SIDEBAR_BLOCKS.map((b) => ({ ...b })));
+        setArticleShowBreadcrumb(r.settings.articleShowBreadcrumb !== false);
+        setArticleShowShare(r.settings.articleShowShare !== false);
+        setArticleShowRelated(r.settings.articleShowRelated !== false);
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
         setFooterAccentColor(r.settings.footerAccentColor ?? "");
@@ -1565,6 +1584,45 @@ export default function HomeBlocksManager() {
       setPreviewBackup(null);
       setPreviewingPreset(null);
     } catch { } finally { setPreviewApplying(false); }
+  }
+
+  // ── Página de notícia: blocos da lateral ────────────────────────────────────
+  function patchArticleBlock(id: string, patch: Partial<HomeBlock>) {
+    setArticleBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  }
+
+  function moveArticleBlock(idx: number, dir: 1 | -1) {
+    setArticleBlocks((prev) => {
+      const to = idx + dir;
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[to]] = [next[to]!, next[idx]!];
+      return next;
+    });
+  }
+
+  function addArticleBlock(type: "html" | "image" | "advertising" | "mostread") {
+    const names: Record<string, string> = {
+      html: "Propaganda HTML", image: "Banner de imagem",
+      advertising: "Propaganda (slot)", mostread: "Mais Lidas",
+    };
+    setArticleBlocks((prev) => [...prev, {
+      id: type === "mostread" ? "mostread" : `${type}-artigo-${Date.now()}`,
+      name: names[type]!, visible: true, order: prev.length,
+      custom: type !== "mostread", blockType: type,
+      ...(type === "advertising" ? { adSlot: "slot_07" } : {}),
+      // Blocos de imagem/HTML da lateral nascem marcados como propaganda
+      // (aparecem na aba Propagandas; desmarque no card se não for anúncio).
+      ...(type === "html" || type === "image" ? { isAd: true } : {}),
+    }]);
+  }
+
+  async function saveArticleSidebar() {
+    const ordered = articleBlocks.map((b, i) => ({ ...b, order: i }));
+    setArticleBlocks(ordered);
+    await saveSettingsPatch({ articleSidebarBlocks: ordered });
+    setArticleSavedOk(true);
+    setTimeout(() => setArticleSavedOk(false), 2500);
   }
 
   // ── Templates: salvar/excluir snapshots da home ─────────────────────────────
@@ -1875,12 +1933,12 @@ export default function HomeBlocksManager() {
 
         {/* ══ Tabs ════════════════════════════════════════════════════════════ */}
         <div className="shrink-0 flex overflow-x-auto border-b border-[#E2E8F0] bg-white px-4 md:px-6">
-          {(["styles","templates","blocks","header","footer","settings"] as Tab[]).map((t) => (
+          {(["styles","templates","blocks","article","header","footer","settings"] as Tab[]).map((t) => (
             <button key={t} onClick={() => { setTab(t); setShowAdd(false); }}
               className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors -mb-px ${
                 tab === t ? "text-[#0B2A66] border-[#0B2A66]" : "text-[#64748B] border-transparent hover:text-[#0F172A]"
               }`}>
-              {t === "styles" ? "Estilos" : t === "templates" ? "Templates" : t === "blocks" ? "Blocos" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
+              {t === "styles" ? "Estilos" : t === "templates" ? "Templates" : t === "blocks" ? "Blocos" : t === "article" ? "Notícia" : t === "header" ? "Cabeçalho" : t === "footer" ? "Rodapé" : "Configurações"}
             </button>
           ))}
         </div>
@@ -2542,6 +2600,119 @@ export default function HomeBlocksManager() {
                 <div className="border-t border-[#E2E8F0] pt-4">
                   <FooterEditor saving={saving}
                     onSave={(patch) => { setFooterConfig(patch.footerConfig); return saveSettingsPatch(patch); }} />
+                </div>
+              </div>
+            )}
+
+            {/* ── ARTICLE tab (página de notícia) ── */}
+            {tab === "article" && (
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+                <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3 flex items-start gap-2.5">
+                  <Info size={14} className="text-[#2563EB] mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-[#1e40af] leading-relaxed">
+                    Controle da <b>página de notícia</b>: seções desligáveis e os blocos da
+                    coluna lateral (300px de largura). A prévia ao lado mostra a home —
+                    abra uma notícia do site para conferir o resultado.
+                  </p>
+                </div>
+
+                {/* Seções da página */}
+                <div className="space-y-2.5">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Seções da página</p>
+                  {([
+                    { label: "Caminho no topo (breadcrumb)", value: articleShowBreadcrumb, set: setArticleShowBreadcrumb, key: "articleShowBreadcrumb" as const },
+                    { label: "Botões de compartilhar", value: articleShowShare, set: setArticleShowShare, key: "articleShowShare" as const },
+                    { label: "Artigos relacionados", value: articleShowRelated, set: setArticleShowRelated, key: "articleShowRelated" as const },
+                  ]).map(({ label, value, set, key }) => (
+                    <div key={key} className="flex items-center justify-between">
+                      <span className="text-[12px] font-medium text-[#334155]">{label}</span>
+                      <Toggle checked={value} onChange={() => { const v = !value; set(v); void saveSettingsPatch({ [key]: v }); }} />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Blocos da coluna lateral */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-2">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Blocos da coluna lateral</p>
+                  {articleBlocks.map((b, idx) => {
+                    const btype = inferBlockType(b);
+                    return (
+                      <div key={b.id} className="border border-[#E2E8F0] rounded-xl p-2.5 space-y-2 bg-white">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col shrink-0">
+                            <button type="button" title="Mover para cima" onClick={() => moveArticleBlock(idx, -1)} disabled={idx === 0}
+                              className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronUp size={13} /></button>
+                            <button type="button" title="Mover para baixo" onClick={() => moveArticleBlock(idx, 1)} disabled={idx === articleBlocks.length - 1}
+                              className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronDown size={13} /></button>
+                          </div>
+                          <input value={b.name} onChange={(e) => patchArticleBlock(b.id, { name: e.target.value })}
+                            className={`${AINPUT} font-bold flex-1 min-w-0`} />
+                          <Toggle checked={b.visible !== false} onChange={() => patchArticleBlock(b.id, { visible: b.visible === false })} />
+                          <button type="button" title="Remover bloco"
+                            onClick={() => setArticleBlocks((prev) => prev.filter((x) => x.id !== b.id))}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors">
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+
+                        {btype === "mostread" && (
+                          <p className="text-[10px] text-[#94A3B8]">Lista automática dos mais lidos — o título público segue o idioma do site.</p>
+                        )}
+                        {btype === "advertising" && (
+                          <select value={b.adSlot ?? "slot_07"} onChange={(e) => patchArticleBlock(b.id, { adSlot: e.target.value })}
+                            className={`${AINPUT} appearance-none`}>
+                            {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                          </select>
+                        )}
+                        {btype === "html" && (
+                          <>
+                            <textarea value={b.html ?? ""} onChange={(e) => patchArticleBlock(b.id, { html: e.target.value })}
+                              rows={4} spellCheck={false} className={`${AINPUT} font-mono resize-y`} placeholder="<div>…HTML do banner…</div>" />
+                            <input value={b.linkUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { linkUrl: e.target.value })}
+                              className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
+                          </>
+                        )}
+                        {btype === "image" && (
+                          <>
+                            <input value={b.imageUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { imageUrl: e.target.value })}
+                              className={AINPUT} placeholder="URL da imagem (envie pela aba Propagandas ou cole aqui)" />
+                            <input value={b.linkUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { linkUrl: e.target.value })}
+                              className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
+                            <input value={b.caption ?? ""} onChange={(e) => patchArticleBlock(b.id, { caption: e.target.value })}
+                              className={AINPUT} placeholder="Legenda (opcional)" />
+                          </>
+                        )}
+                        {(btype === "html" || btype === "image") && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-[#64748B]">É uma propaganda (lista na aba Propagandas)</span>
+                            <Toggle checked={b.isAd === true} onChange={() => patchArticleBlock(b.id, { isAd: !b.isAd })} accent="#D97706" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {([
+                      ["html", "+ HTML"], ["image", "+ Imagem"], ["advertising", "+ Anúncio (slot)"], ["mostread", "+ Mais Lidas"],
+                    ] as const).map(([type, label]) => (
+                      <button key={type} type="button" onClick={() => addArticleBlock(type)}
+                        disabled={type === "mostread" && articleBlocks.some((b) => inferBlockType(b) === "mostread")}
+                        className="px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-dashed border-[#CBD5E1] rounded-xl hover:bg-[#F8FAFC] disabled:opacity-40 transition-colors">
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {articleSavedOk && (
+                    <p className="text-[12px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+                      Lateral da notícia salva — abra uma notícia para conferir.
+                    </p>
+                  )}
+                  <button type="button" onClick={() => void saveArticleSidebar()} disabled={saving}
+                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                    <Save size={13} /> Salvar lateral da notícia
+                  </button>
                 </div>
               </div>
             )}

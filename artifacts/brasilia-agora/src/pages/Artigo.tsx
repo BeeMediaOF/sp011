@@ -14,6 +14,9 @@ import { useT, formatDateTime } from "../lib/i18n";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
 import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
+import { HtmlBlock, ImageBlock } from "../components/blocks/HomeCustomBlocks";
+import { inferBlockType, type HomeBlock } from "../lib/homeBlocks";
+import type { AdSlotKey } from "../components/ads/useAds";
 
 const editoriaColor: Record<string, string> = {
   brasil: "#16a34a",
@@ -27,48 +30,71 @@ const editoriaColor: Record<string, string> = {
   df: "#0b3d91",
 };
 
+// Lateral padrão (mesma composição histórica) usada quando o painel ainda não
+// definiu blocos próprios em Blocos da Home → aba Notícia.
+const DEFAULT_ARTICLE_SIDEBAR: HomeBlock[] = [
+  { id: "mostread",           name: "Mais Lidas", visible: true, order: 0, blockType: "mostread" },
+  { id: "advertising-artigo", name: "Propaganda", visible: true, order: 1, custom: true, blockType: "advertising", adSlot: "slot_07" },
+];
+
 function ArticleSidebar() {
   const { t } = useT();
   const { articles } = useArticles();
+  const { settings } = useSite();
   const maisLidas = articles.slice(0, 8);
+
+  const blocks = (settings?.articleSidebarBlocks?.length ? settings.articleSidebarBlocks : DEFAULT_ARTICLE_SIDEBAR)
+    .filter((b) => b.visible !== false)
+    .slice()
+    .sort((a, b) => a.order - b.order);
+
+  const mostReadCard = maisLidas.length > 0 ? (
+    <div className="border border-gray-100 rounded-sm overflow-hidden">
+      <div className="flex items-center gap-2 bg-[#1a1a1a] px-4 py-3">
+        <div className="w-1 h-4 bg-[#c8102e]" />
+        <h3 className="text-white text-[13px] font-bold uppercase tracking-wider">
+          {t("article.mostRead")}
+        </h3>
+      </div>
+      <div className="divide-y divide-gray-100">
+        {maisLidas.map((item, idx) => (
+          <Link
+            key={item.id}
+            href={`/artigo/${item.slug || item.id}`}
+            className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group"
+          >
+            <span
+              className="text-[22px] font-black leading-none shrink-0 mt-0.5"
+              style={{ color: idx < 3 ? "#c8102e" : "#d1d5db" }}
+            >
+              {idx + 1}
+            </span>
+            <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
+              dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
+            />
+          </Link>
+        ))}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <aside className="w-full lg:w-[300px] shrink-0 space-y-6">
-      {/* Mais Lidas */}
-      {maisLidas.length > 0 && (
-        <div className="border border-gray-100 rounded-sm overflow-hidden">
-          <div className="flex items-center gap-2 bg-[#1a1a1a] px-4 py-3">
-            <div className="w-1 h-4 bg-[#c8102e]" />
-            <h3 className="text-white text-[13px] font-bold uppercase tracking-wider">
-              {t("article.mostRead")}
-            </h3>
+      {blocks.map((b, i) => {
+        const type = inferBlockType(b);
+        let content: React.ReactNode = null;
+        if (type === "mostread") content = mostReadCard;
+        else if (type === "advertising") content = <AdBanner slot={(b.adSlot ?? "slot_07") as AdSlotKey} />;
+        else if (type === "image") content = <ImageBlock block={b} contained={false} />;
+        else if (type === "html") content = <HtmlBlock block={b} contained={false} />;
+        if (!content) return null;
+        // Último bloco fica fixo ao rolar (comportamento clássico da propaganda).
+        return (
+          <div key={b.id} className={i === blocks.length - 1 ? "sticky top-24" : undefined}>
+            {content}
           </div>
-          <div className="divide-y divide-gray-100">
-            {maisLidas.map((item, idx) => (
-              <Link
-                key={item.id}
-                href={`/artigo/${item.slug || item.id}`}
-                className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors group"
-              >
-                <span
-                  className="text-[22px] font-black leading-none shrink-0 mt-0.5"
-                  style={{ color: idx < 3 ? "#c8102e" : "#d1d5db" }}
-                >
-                  {idx + 1}
-                </span>
-                <p className="text-[13px] text-[#1a1a1a] font-semibold leading-snug group-hover:text-[#c8102e] transition-colors line-clamp-3"
-                  dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
-                />
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Propaganda sidebar — gerenciada pelo painel */}
-      <div className="sticky top-24">
-        <AdBanner slot="slot_07" />
-      </div>
+        );
+      })}
     </aside>
   );
 }
@@ -539,21 +565,23 @@ export default function Artigo() {
                 </div>
               ) : (
                 <>
-                  {/* Breadcrumb */}
-                  <nav className="text-gray-400 text-xs mb-4 flex items-center gap-1.5 flex-wrap">
-                    <Link href="/" className="hover:text-[#1d4ed8]">{t("common.home")}</Link>
-                    <span>/</span>
-                    <Link
-                      href={categoryRoute(article.category)}
-                      className="hover:text-[#1d4ed8] capitalize"
-                    >
-                      {article.tag}
-                    </Link>
-                    <span>/</span>
-                    <span className="text-gray-300 truncate max-w-[240px]">
-                      {article.title.replace(/<[^>]*>/g, "")}
-                    </span>
-                  </nav>
+                  {/* Breadcrumb (desligável em Blocos da Home → Notícia) */}
+                  {settings?.articleShowBreadcrumb !== false && (
+                    <nav className="text-gray-400 text-xs mb-4 flex items-center gap-1.5 flex-wrap">
+                      <Link href="/" className="hover:text-[#1d4ed8]">{t("common.home")}</Link>
+                      <span>/</span>
+                      <Link
+                        href={categoryRoute(article.category)}
+                        className="hover:text-[#1d4ed8] capitalize"
+                      >
+                        {article.tag}
+                      </Link>
+                      <span>/</span>
+                      <span className="text-gray-300 truncate max-w-[240px]">
+                        {article.title.replace(/<[^>]*>/g, "")}
+                      </span>
+                    </nav>
+                  )}
 
                   {/* Chapéu */}
                   <span
@@ -594,6 +622,7 @@ export default function Artigo() {
                         </div>
                       </div>
                     </div>
+                    {settings?.articleShowShare !== false && (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
                         {t("article.share")}
@@ -644,6 +673,7 @@ export default function Artigo() {
                         <FaLink size={12} />
                       </button>
                     </div>
+                    )}
                   </div>
 
                   {/* Imagem principal — LCP candidate: eager + fetchpriority + srcset */}
@@ -686,7 +716,9 @@ export default function Artigo() {
                     </div>
                   )}
 
-                  <ArtigosRelacionados currentSlug={article.slug || article.id} />
+                  {settings?.articleShowRelated !== false && (
+                    <ArtigosRelacionados currentSlug={article.slug || article.id} />
+                  )}
 
                   {/* Tags + compartilhamento inferior */}
                   <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center gap-4 justify-between">

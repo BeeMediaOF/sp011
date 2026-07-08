@@ -554,10 +554,12 @@ export default function AdsManager() {
   // Guardamos a lista completa de blocos: salvar um bloco reenvia o array
   // inteiro em settings.homeBlocks (mesmo contrato do Blocos da Home).
   const [homeBlocks, setHomeBlocks] = useState<HomeBlock[]>([]);
+  const [articleBlocks, setArticleBlocks] = useState<HomeBlock[]>([]);
   const [headerBannerHtml, setHeaderBannerHtml] = useState("");
   const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
-  const [adEdit, setAdEdit] = useState<HomeBlock | "header" | null>(null);
+  const [adEdit, setAdEdit] = useState<{ scope: "home" | "article"; block: HomeBlock } | "header" | null>(null);
   const homeAdBlocks = homeBlocks.filter((b) => b.isAd === true);
+  const articleAdBlocks = articleBlocks.filter((b) => b.isAd === true);
   const hasHeaderBanner = !!headerBannerHtml.trim();
 
   const PAGE_SIZE = 8;
@@ -572,15 +574,23 @@ export default function AdsManager() {
     try {
       const { settings } = await adminApi.getSettings();
       setHomeBlocks(settings.homeBlocks ?? []);
+      setArticleBlocks(settings.articleSidebarBlocks ?? []);
       setHeaderBannerHtml(settings.headerBannerHtml ?? "");
       setHeaderBannerLinkUrl(settings.headerBannerLinkUrl ?? "");
     } catch { }
   };
 
   async function saveAdBlock(patched: HomeBlock) {
-    const next = homeBlocks.map((b) => (b.id === patched.id ? patched : b));
-    await adminApi.updateSettings({ homeBlocks: next });
-    setHomeBlocks(next);
+    const scope = adEdit !== null && adEdit !== "header" ? adEdit.scope : "home";
+    if (scope === "article") {
+      const next = articleBlocks.map((b) => (b.id === patched.id ? patched : b));
+      await adminApi.updateSettings({ articleSidebarBlocks: next });
+      setArticleBlocks(next);
+    } else {
+      const next = homeBlocks.map((b) => (b.id === patched.id ? patched : b));
+      await adminApi.updateSettings({ homeBlocks: next });
+      setHomeBlocks(next);
+    }
     invalidateSiteCache();
     setAdEdit(null);
   }
@@ -722,8 +732,8 @@ export default function AdsManager() {
 
       {adEdit !== null && (
         <HomeAdEditModal
-          key={adEdit === "header" ? "header" : adEdit.id}
-          block={adEdit === "header" ? null : adEdit}
+          key={adEdit === "header" ? "header" : adEdit.block.id}
+          block={adEdit === "header" ? null : adEdit.block}
           headerHtml={headerBannerHtml}
           headerLink={headerBannerLinkUrl}
           onClose={() => setAdEdit(null)}
@@ -789,16 +799,16 @@ export default function AdsManager() {
           </div>
         </div>
 
-        {/* ══ Blocos de propaganda da home ═════════════════════════════════════ */}
-        {(homeAdBlocks.length > 0 || hasHeaderBanner) && (
+        {/* ══ Blocos de propaganda da home e da notícia ════════════════════════ */}
+        {(homeAdBlocks.length > 0 || articleAdBlocks.length > 0 || hasHeaderBanner) && (
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-start justify-between gap-3 mb-3">
               <div>
                 <h2 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
-                  <LayoutGrid size={15} className="text-[#0B2A66]" /> Blocos de propaganda da home
+                  <LayoutGrid size={15} className="text-[#0B2A66]" /> Blocos de propaganda (home e notícia)
                 </h2>
                 <p className="text-xs text-gray-400 mt-0.5">
-                  Blocos de imagem/HTML marcados como propaganda em Blocos da Home (banners de parceiro, etc.).
+                  Blocos de imagem/HTML marcados como propaganda em Blocos da Home (abas Blocos e Notícia).
                 </p>
               </div>
               <a href="/admin/home-blocos"
@@ -825,11 +835,11 @@ export default function AdsManager() {
               )}
               {homeAdBlocks.map((b) => {
                 const type = inferBlockType(b);
-                const pos = b.area === "sidebar" ? "coluna lateral"
-                  : b.area === "main" ? "coluna principal"
-                  : b.width === "half" ? "meia largura"
-                  : b.width === "quarter" ? "1/4 de largura"
-                  : "largura total";
+                const pos = b.area === "sidebar" ? "home · coluna lateral"
+                  : b.area === "main" ? "home · coluna principal"
+                  : b.width === "half" ? "home · meia largura"
+                  : b.width === "quarter" ? "home · 1/4 de largura"
+                  : "home · largura total";
                 return (
                   <div key={b.id} className="flex items-center gap-3 py-2.5">
                     <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
@@ -842,7 +852,28 @@ export default function AdsManager() {
                       <p className="text-[11px] text-gray-400">{type === "image" ? "Imagem" : "HTML"} · {pos}</p>
                     </div>
                     <StatusBadge active={b.visible} />
-                    <button onClick={() => setAdEdit(b)} title="Editar propaganda"
+                    <button onClick={() => setAdEdit({ scope: "home", block: b })} title="Editar propaganda"
+                      className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+              {articleAdBlocks.map((b) => {
+                const type = inferBlockType(b);
+                return (
+                  <div key={`art-${b.id}`} className="flex items-center gap-3 py-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                      {type === "image"
+                        ? <ImageIcon size={14} className="text-amber-600" />
+                        : <Code size={14} className="text-amber-600" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#0F172A] truncate">{b.name}</p>
+                      <p className="text-[11px] text-gray-400">{type === "image" ? "Imagem" : "HTML"} · lateral da notícia</p>
+                    </div>
+                    <StatusBadge active={b.visible} />
+                    <button onClick={() => setAdEdit({ scope: "article", block: b })} title="Editar propaganda"
                       className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
                       <Pencil size={14} />
                     </button>

@@ -66,7 +66,11 @@ function SectionHeading({ title, color }: { title: string; color: string }) {
 }
 
 // ─── Imagem ──────────────────────────────────────────────────────────────────
-export function ImageBlock({ block, preview }: { block: HomeBlock; preview?: boolean }) {
+export function ImageBlock({ block, preview, contained = true }: {
+  block: HomeBlock; preview?: boolean;
+  /** false = sem o wrapper de página (uso na lateral da notícia/zonas). */
+  contained?: boolean;
+}) {
   const src = (block.imageUrl ?? "").trim();
   if (!src) {
     return <BlockPlaceholder preview={preview} label={`Bloco de imagem: ${block.name}`}
@@ -118,8 +122,8 @@ export function ImageBlock({ block, preview }: { block: HomeBlock; preview?: boo
     : body;
 
   return (
-    <section className={format === "full_width_image" ? "py-4" : "max-w-[1280px] mx-auto px-4 py-6"}>
-      {format === "full_width_image" ? inner : inner}
+    <section className={!contained ? "" : format === "full_width_image" ? "py-4" : "max-w-[1280px] mx-auto px-4 py-6"}>
+      {inner}
     </section>
   );
 }

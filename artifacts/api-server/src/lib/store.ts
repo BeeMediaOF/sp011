@@ -193,6 +193,12 @@ export interface SiteSettings {
   homeBlocks?: HomeBlock[]; adminLogoBase64?: string; loginLogoBase64?: string;
   /** Templates de home salvos no painel (aba Templates). */
   homeTemplates?: HomeTemplate[];
+  /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
+  articleSidebarBlocks?: HomeBlock[];
+  /** Seções da página de notícia (ausente = exibidas). */
+  articleShowBreadcrumb?: boolean;
+  articleShowShare?: boolean;
+  articleShowRelated?: boolean;
   adminSidebarColor?: string; adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai" | "ollama";
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;
