@@ -235,15 +235,17 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
 }
 
 // ─── Logo do cabeçalho (desktop + mobile) ─────────────────────────────────────
-// No mobile a altura ganha um teto e a largura nunca passa de ~60vw: logo larga
-// em altura grande passava da largura do celular, ficava "colada" nas bordas e
-// esticava a página para o lado. Se o painel definir um tamanho mobile próprio
-// (logoMobileSize), ele substitui o teto automático; se houver logo mobile
-// própria (versão vertical), ela substitui a principal só em telas pequenas.
-// O desktop segue exatamente o logoSize configurado.
-function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeight }: {
+// No mobile a altura ganha um teto automático (mobileCap) que o painel pode
+// substituir com um tamanho próprio (logoMobileSize). A largura é limitada pelo
+// PRÓPRIO espaço da linha do cabeçalho: o wrapper da logo (Link) recebe
+// `min-w-0 shrink` no mobile e o <img> usa max-w-full — a logo cresce até onde
+// há espaço real (sem o antigo teto fixo de 60vw, que travava logos largas) e
+// nunca estoura a tela para o lado. Se houver logo mobile própria (versão
+// vertical), ela substitui a principal só em telas pequenas. O desktop segue
+// exatamente o logoSize configurado.
+function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeight, centered }: {
   desktopSrc: string; mobileSrc: string; alt: string; height: number; mobileCap: number;
-  mobileHeight?: number;
+  mobileHeight?: number; centered?: boolean;
 }) {
   const mh = mobileHeight && mobileHeight > 0
     ? Math.min(mobileHeight, 120)
@@ -258,10 +260,13 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
       </>
     );
   }
+  // Quando a largura satura antes da altura (logo larga em tamanho grande), o
+  // object-contain "encaixota" a arte: alinhada à esquerda junto ao menu nos
+  // estilos standard/compact, centrada no estilo centered.
   return (
     <>
       <img src={mobileSrc} alt={alt} style={{ height: mh }}
-        className="lg:hidden w-auto max-w-[min(60vw,300px)] object-contain block" />
+        className={`lg:hidden w-auto max-w-full object-contain block ${centered ? "" : "object-left"}`} />
       <img src={desktopSrc} alt={alt} style={{ height }}
         className="hidden lg:block w-auto object-contain" />
     </>
@@ -412,7 +417,7 @@ export default function Header() {
               {menuOpen ? <X size={18} /> : <Menu size={18} />}
             </button>
 
-            <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
+            <Link href="/" className="min-w-0 shrink lg:shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
               <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
                 height={settings?.logoSize ? settings.logoSize * 0.65 : 30} mobileCap={34}
                 mobileHeight={settings?.logoMobileSize} />
@@ -496,10 +501,11 @@ export default function Header() {
               {menuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
 
-            <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
+            {/* max-w reserva os botões absolutos (menu à esquerda, busca à direita) */}
+            <Link href="/" className="flex items-center justify-center min-w-0 max-w-[calc(100%-104px)]" onClick={() => setMenu(false)}>
               <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
                 height={settings?.logoSize ?? 48} mobileCap={48}
-                mobileHeight={settings?.logoMobileSize} />
+                mobileHeight={settings?.logoMobileSize} centered />
             </Link>
 
             <button
@@ -582,7 +588,7 @@ export default function Header() {
             {menuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
+          <Link href="/" className="min-w-0 shrink lg:shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
             <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
               height={settings?.logoSize ?? 48} mobileCap={48}
               mobileHeight={settings?.logoMobileSize} />
