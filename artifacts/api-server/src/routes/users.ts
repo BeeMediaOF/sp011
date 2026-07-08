@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { authMiddleware, requireAdmin, hashPassword } from "../middlewares/auth.js";
 import { logAudit, getClientIp } from "../lib/audit.js";
@@ -14,6 +14,21 @@ function sanitize(u: typeof usersTable.$inferSelect): UserPublic {
   const { passwordHash: _ph, ...rest } = u;
   void _ph;
   return rest;
+}
+
+/** Existe algum OUTRO admin ativo além de `excludeId`? Protege contra travar a
+ *  instância rebaixando/desativando/excluindo o último administrador. */
+async function otherActiveAdminsExist(excludeId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: usersTable.id })
+    .from(usersTable)
+    .where(and(
+      eq(usersTable.role, "admin"),
+      eq(usersTable.status, "active"),
+      ne(usersTable.id, excludeId),
+    ))
+    .limit(1);
+  return rows.length > 0;
 }
 
 /** GET /api/admin/users */
@@ -97,6 +112,17 @@ router.put("/:id", async (req, res) => {
     const { name, email, role, status } = req.body as {
       name?: string; email?: string; role?: "admin" | "editor"; status?: "active" | "inactive" | "blocked";
     };
+    const [current] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (!current) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
+    // Guarda de lockout: não deixa rebaixar (admin→editor) nem desativar/bloquear
+    // o ÚLTIMO admin ativo.
+    const losesAdmin =
+      current.role === "admin" &&
+      ((role && role !== "admin") || (status && status !== "active"));
+    if (losesAdmin && !(await otherActiveAdminsExist(id))) {
+      res.status(400).json({ error: "Não é possível rebaixar ou desativar o último administrador ativo." });
+      return;
+    }
     const updates: Partial<typeof usersTable.$inferInsert> = { updatedAt: new Date() };
     if (name) updates.name = name;
     if (email) updates.email = email.toLowerCase();
@@ -157,6 +183,10 @@ router.delete("/:id", async (req, res) => {
     const id = parseInt(req.params.id ?? "0", 10);
     if (id === req.userId) {
       res.status(400).json({ error: "Você não pode excluir sua própria conta" }); return;
+    }
+    const [target] = await db.select().from(usersTable).where(eq(usersTable.id, id));
+    if (target?.role === "admin" && !(await otherActiveAdminsExist(id))) {
+      res.status(400).json({ error: "Não é possível excluir o último administrador ativo." }); return;
     }
     const [user] = await db.delete(usersTable).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }

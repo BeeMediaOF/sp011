@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useContext, useLayoutEffect, Suspense, createContext } from "react";
+import React, { useState, useEffect, useRef, useContext, useLayoutEffect, Suspense, createContext } from "react";
 import { BRAND } from "../../brand";
 import { Link, useLocation } from "wouter";
 import {
@@ -14,6 +14,7 @@ import { getStoredUser, setStoredUser, clearAuth, getStoredRole } from "../../pa
 import { adminApi } from "../../lib/adminApi";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { getAdminDarkMode, setAdminDarkMode } from "../../lib/adminDarkMode";
+import { useEditorPermissions, invalidatePermissionsCache } from "../../lib/permissionsCache";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 // permKey: null  → admin-only, never shown to editors
@@ -30,10 +31,8 @@ const NAV_MAIN = [
   { label: "Colunistas",    icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
   { label: "Fontes RSS",    icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
   { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
-  { label: "Redes Sociais", icon: Share2,           path: "/admin/social",       permKey: null },
+  { label: "Redes Sociais", icon: Share2,           path: "/admin/social",       permKey: "social.view" },
 ];
-
-const NAV_CONFIG_PERMS = ["security.view", "logs.view"];
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -44,7 +43,6 @@ interface AdminLayoutProps {
 
 const LS_SIDEBAR = "admin_sidebar_color";
 const LS_ACCENT  = "admin_accent_color";
-const LS_PERMS   = "editor_permissions_cache";
 
 let _cachedLogo: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
@@ -73,48 +71,6 @@ function usePanelTheme() {
   }, []);
 
   return { accent, logo };
-}
-
-// ─── Editor permission hook ───────────────────────────────────────────────────
-
-let _permPromise: Promise<void> | null = null;
-let _cachedPerms: Set<string> | null = null;
-
-function useEditorPermissions(role: string): { permSet: Set<string>; loaded: boolean } {
-  const [permSet, setPermSet] = useState<Set<string>>(() => {
-    if (role !== "editor") return new Set<string>();
-    try {
-      const raw = localStorage.getItem(LS_PERMS);
-      if (raw) return new Set<string>(JSON.parse(raw) as string[]);
-    } catch {}
-    return new Set<string>();
-  });
-  const [loaded, setLoaded] = useState(role !== "editor" || _cachedPerms !== null);
-
-  const fetchPerms = useCallback(() => {
-    if (role !== "editor") return;
-    if (_cachedPerms) { setPermSet(_cachedPerms); setLoaded(true); return; }
-    if (!_permPromise) {
-      _permPromise = adminApi.getMyPermissions()
-        .then(({ permissions }) => {
-          _cachedPerms = new Set(permissions);
-          try { localStorage.setItem(LS_PERMS, JSON.stringify(permissions)); } catch {}
-          setPermSet(_cachedPerms);
-          setLoaded(true);
-        })
-        .catch(() => { _permPromise = null; setLoaded(true); });
-    }
-  }, [role]);
-
-  useEffect(() => { fetchPerms(); }, [fetchPerms]);
-
-  return { permSet, loaded };
-}
-
-function invalidatePermissionsCache() {
-  _cachedPerms = null;
-  _permPromise = null;
-  try { localStorage.removeItem(LS_PERMS); } catch {}
 }
 
 function formatDate() {
@@ -443,7 +399,8 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
   }
 
   const visibleMain    = NAV_MAIN.filter((i) => canSee(i.permKey));
-  const canSeeConfig   = role === "admin" || NAV_CONFIG_PERMS.some((p) => permSet.has(p));
+  // Configurações aparece para admin ou para editor com a permissão de configurações.
+  const canSeeConfig   = role === "admin" || permSet.has("settings.view");
 
   function handleLogout() {
     clearAuth();

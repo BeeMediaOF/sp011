@@ -3,6 +3,7 @@ import { BRAND } from "../../brand";
 import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import DatabaseCard from "../../components/admin/DatabaseCard";
+import { getStoredRole } from "../Admin";
 import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission, type RetentionOptions } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
@@ -19,18 +20,22 @@ import {
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs" | "exclusao";
 
-const TABS: { id: SettingsTab; label: string }[] = [
+const TABS: { id: SettingsTab; label: string; adminOnly?: boolean }[] = [
   { id: "informacoes", label: "Informações do Site" },
   { id: "logo",        label: "Logo & Imagens" },
   { id: "aparencia",   label: "Aparência" },
   { id: "contato",     label: "Contato & Redes" },
   { id: "conexoes",    label: "Conexões" },
-  { id: "webhook",     label: "Webhook" },
-  { id: "seguranca",   label: "Segurança" },
-  { id: "permissoes",  label: "Permissões" },
-  { id: "logs",        label: "Logs" },
-  { id: "exclusao",    label: "Exclusão de artigos" },
+  // Abas sensíveis: só admin. Editor com settings.view gerencia o site,
+  // mas nunca webhook/segurança/permissões/logs/exclusão de artigos.
+  { id: "webhook",     label: "Webhook",              adminOnly: true },
+  { id: "seguranca",   label: "Segurança",            adminOnly: true },
+  { id: "permissoes",  label: "Permissões",           adminOnly: true },
+  { id: "logs",        label: "Logs",                 adminOnly: true },
+  { id: "exclusao",    label: "Exclusão de artigos",  adminOnly: true },
 ];
+
+const ADMIN_ONLY_TABS = new Set<SettingsTab>(TABS.filter((t) => t.adminOnly).map((t) => t.id));
 
 /* ── Logs helpers ─────────────────────────────────────────────────────── */
 const SEV_STYLE: Record<string, { bg: string; color: string; label: string }> = {
@@ -110,20 +115,25 @@ const CONTACT_GROUPS: {
   },
 ];
 
-function getTabFromUrl(): SettingsTab {
+function getTabFromUrl(isAdmin: boolean): SettingsTab {
   const p = new URLSearchParams(window.location.search).get("tab");
   const valid: SettingsTab[] = ["informacoes","logo","aparencia","contato","conexoes","webhook","seguranca","permissoes","logs","exclusao"];
-  return (valid.includes(p as SettingsTab) ? p : "informacoes") as SettingsTab;
+  let tab = (valid.includes(p as SettingsTab) ? p : "informacoes") as SettingsTab;
+  // Editor não abre aba restrita nem digitando ?tab= na URL — cai em Informações.
+  if (!isAdmin && ADMIN_ONLY_TABS.has(tab)) tab = "informacoes";
+  return tab;
 }
 
 export default function Settings() {
   const search = useSearch();
-  const [activeTab, setActiveTab] = useState<SettingsTab>(getTabFromUrl);
+  const isAdmin = getStoredRole() === "admin";
+  const visibleTabs = isAdmin ? TABS : TABS.filter((t) => !t.adminOnly);
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => getTabFromUrl(isAdmin));
   const { toast } = useToast();
 
   /* sync tab whenever the URL search string changes (sidebar links, popstate) */
   useEffect(() => {
-    setActiveTab(getTabFromUrl());
+    setActiveTab(getTabFromUrl(isAdmin));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
 
@@ -526,7 +536,7 @@ export default function Settings() {
 
         {/* Tab bar */}
         <div className="flex flex-wrap gap-1 p-1 bg-white rounded-2xl w-fit" style={CARD_SHADOW}>
-          {TABS.map(t => (
+          {visibleTabs.map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)}
               className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
                 activeTab === t.id
@@ -1184,7 +1194,7 @@ export default function Settings() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             {/* ── Coluna esquerda ── */}
             <div className="space-y-5">
-            <DatabaseCard/>
+            {isAdmin && <DatabaseCard/>}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<Link2 size={15}/>} label="Google Tag Manager"/>
               <p className="text-xs text-[#94A3B8]">
@@ -1256,7 +1266,8 @@ export default function Settings() {
 
             </div>
 
-            {/* ── Coluna direita — Código personalizado ── */}
+            {/* ── Coluna direita — Código personalizado (só admin: injeta script) ── */}
+            {isAdmin && (
             <div className="space-y-5">
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
               <SectionHeader icon={<Code size={15}/>} label="Código personalizado de rastreamento"/>
@@ -1303,6 +1314,7 @@ export default function Settings() {
               )}
             </div>
             </div>
+            )}
             </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings}/>

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, behaviorEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
+import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
 import { logger } from "../lib/logger.js";
@@ -362,7 +363,7 @@ router.get("/health", authMiddleware, (_req, res) => {
 });
 
 // ─── GET /api/analytics/stats ─────────────────────────────────────────────────
-router.get("/stats", authMiddleware, async (req, res) => {
+router.get("/stats", authMiddleware, requirePermission("analytics.view"), async (req, res) => {
   const now = Date.now();
   const win = resolvePeriod(req.query as { period?: unknown; from?: unknown; to?: unknown }, now);
   const winFrom  = new Date(win.fromMs);

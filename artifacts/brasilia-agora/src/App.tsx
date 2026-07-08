@@ -9,7 +9,7 @@ import { lazy, Suspense, useState, useEffect } from "react";
 
 /* ─── Eager — crítico para o carregamento inicial ─── */
 import Home from "@/pages/Home";
-import { RequireAuth, RequireAdmin } from "@/pages/Admin";
+import { RequireAdmin, RequirePermission } from "@/pages/Admin";
 
 /* ─── Lazy — páginas públicas (carregam só quando navegadas) ─── */
 const Artigo           = lazy(() => import("@/pages/Artigo"));
@@ -221,40 +221,40 @@ function Router() {
         <Route path="/admin/setup" component={Setup} />
 
         <Route path="/admin/artigos/novo">
-          <RequireAdmin><ArticleEdit /></RequireAdmin>
+          <RequirePermission perm="articles.view"><ArticleEdit /></RequirePermission>
         </Route>
         <Route path="/admin/artigos/:id">
-          <RequireAdmin><ArticleEdit /></RequireAdmin>
+          <RequirePermission perm="articles.view"><ArticleEdit /></RequirePermission>
         </Route>
         <Route path="/admin/artigos">
-          <RequireAdmin><Articles /></RequireAdmin>
+          <RequirePermission perm="articles.view"><Articles /></RequirePermission>
         </Route>
         <Route path="/admin/home-blocos">
-          <RequireAdmin><HomeBlocksManager /></RequireAdmin>
+          <RequirePermission perm="home_blocks.view"><HomeBlocksManager /></RequirePermission>
         </Route>
         <Route path="/admin/categorias">
-          <RequireAdmin><CategoriesManager /></RequireAdmin>
+          <RequirePermission perm="home_blocks.view"><CategoriesManager /></RequirePermission>
         </Route>
         <Route path="/admin/colunistas">
-          <RequireAdmin><ColumnistsManager /></RequireAdmin>
+          <RequirePermission perm="columnists.view"><ColumnistsManager /></RequirePermission>
         </Route>
         <Route path="/admin/rss">
-          <RequireAdmin><RSSManager /></RequireAdmin>
+          <RequirePermission perm="rss.view"><RSSManager /></RequirePermission>
         </Route>
         <Route path="/admin/webhook">
           <RequireAdmin><Webhook /></RequireAdmin>
         </Route>
         <Route path="/admin/configuracoes">
-          <RequireAdmin><Settings /></RequireAdmin>
+          <RequirePermission perm="settings.view"><Settings /></RequirePermission>
         </Route>
         <Route path="/admin/2fa-setup">
           <RequireAdmin><TwoFactorSetup /></RequireAdmin>
         </Route>
         <Route path="/admin/logo">
-          <RequireAdmin><Settings /></RequireAdmin>
+          <RequirePermission perm="settings.view"><Settings /></RequirePermission>
         </Route>
         <Route path="/admin/contato">
-          <RequireAdmin><Settings /></RequireAdmin>
+          <RequirePermission perm="settings.view"><Settings /></RequirePermission>
         </Route>
         <Route path="/admin/usuarios">
           <RequireAdmin><UsersManager /></RequireAdmin>
@@ -263,7 +263,7 @@ function Router() {
           <RequireAdmin><Settings /></RequireAdmin>
         </Route>
         <Route path="/admin/settings">
-          <RequireAdmin><Settings /></RequireAdmin>
+          <RequirePermission perm="settings.view"><Settings /></RequirePermission>
         </Route>
         <Route path="/admin/seguranca">
           <RequireAdmin><SecurityCheckup /></RequireAdmin>
@@ -272,19 +272,19 @@ function Router() {
           <RequireAdmin><EditorPermissions /></RequireAdmin>
         </Route>
         <Route path="/admin/social">
-          <RequireAdmin><SocialMedia /></RequireAdmin>
+          <RequirePermission perm="social.view"><SocialMedia /></RequirePermission>
         </Route>
         <Route path="/admin/menu">
-          <RequireAuth><MenuManager /></RequireAuth>
+          <RequirePermission perm="menu.view"><MenuManager /></RequirePermission>
         </Route>
         <Route path="/admin/propagandas">
-          <RequireAuth><AdsManager /></RequireAuth>
+          <RequirePermission perm="ads.view"><AdsManager /></RequirePermission>
         </Route>
         <Route path="/admin/analytics">
-          <RequireAuth><Analytics /></RequireAuth>
+          <RequirePermission perm="analytics.view"><Analytics /></RequirePermission>
         </Route>
         <Route path="/admin">
-          <RequireAuth><Dashboard /></RequireAuth>
+          <RequirePermission perm="dashboard.view"><Dashboard /></RequirePermission>
         </Route>
 
         {/* ── Public routes ── */}

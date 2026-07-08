@@ -833,7 +833,7 @@ router.post("/bulk-publish", requirePermission("articles.publish"), async (_req,
 // ─── Menu ────────────────────────────────────────────────────────────────────
 
 /** GET /api/admin/menu */
-router.get("/menu", (_req, res) => {
+router.get("/menu", requirePermission("menu.view"), (_req, res) => {
   res.json({ menuItems: store.getMenuItems() });
 });
 
@@ -900,16 +900,29 @@ router.get("/ai-quota", authMiddleware, (_req, res) => {
   res.json(getAIQuotaStatus());
 });
 
-/** PUT /api/admin/settings — admin only: inclui campos sensíveis (chaves de API,
- *  customHeadCode/customBodyCode injetados no site público). */
-router.put("/settings", requireAdmin, (req, res) => {
-  const updated = store.updateSettings(req.body as Parameters<typeof store.updateSettings>[0]);
+/** Campos de settings que injetam script no site público ou guardam segredo:
+ *  um Editor com `settings.view` gerencia o site, mas estes ficam só com o admin
+ *  (menor privilégio). São removidos do patch de um editor — o merge parcial do
+ *  store preserva o valor já gravado pelo admin. */
+const EDITOR_PROTECTED_SETTINGS = [
+  "customHeadCode", "customBodyCode",
+  "rssAiApiKey", "rssAiProvider", "rssAiModel", "rssAiBaseUrl",
+] as const;
+
+/** PUT /api/admin/settings — editor com settings.view salva o site; campos
+ *  sensíveis (injeção de script / chaves de API) só o admin altera. */
+router.put("/settings", requirePermission("settings.view"), (req, res) => {
+  const patch = { ...(req.body as Record<string, unknown>) };
+  if (req.userRole !== "admin") {
+    for (const k of EDITOR_PROTECTED_SETTINGS) delete patch[k];
+  }
+  const updated = store.updateSettings(patch as Parameters<typeof store.updateSettings>[0]);
   updateIndexHtml(updated);
   res.json({ settings: store.getPublicSettings() });
 });
 
 /** POST /api/admin/logo  — upload logo as base64 */
-router.post("/logo", requireAdmin, (req, res) => {
+router.post("/logo", requirePermission("settings.view"), (req, res) => {
   const { logoBase64 } = req.body as { logoBase64?: string };
   if (!logoBase64) { res.status(400).json({ error: "logoBase64 is required" }); return; }
   const settings = store.updateSettings({ logoBase64 });
@@ -1047,8 +1060,9 @@ router.get("/contact", (_req, res) => {
   res.json({ contactInfo: store.getContactInfo() });
 });
 
-// Admin only: privacyPolicy/termsOfUse são renderizados como HTML no site público.
-router.put("/contact", requireAdmin, (req, res) => {
+// Editor com settings.view edita contato/dados legais (inclui os textos legais
+// do blog — necessários p/ NDPA). privacyPolicy/termsOfUse vão como HTML ao site.
+router.put("/contact", requirePermission("settings.view"), (req, res) => {
   const info = store.updateContactInfo(req.body as Partial<ContactInfo>);
   res.json({ contactInfo: info });
 });

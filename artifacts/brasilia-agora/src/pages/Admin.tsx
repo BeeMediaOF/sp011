@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useEditorPermissions } from "../lib/permissionsCache";
 
 export function getStoredRole(): string {
   return localStorage.getItem("admin_role") ?? "";
@@ -35,17 +36,9 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-export function RequireAdmin({ children }: { children: React.ReactNode }) {
+function AccessDenied() {
   const [, navigate] = useLocation();
-  const token = localStorage.getItem("admin_token");
-  const role = getStoredRole();
-
-  useEffect(() => {
-    if (!token) { navigate("/admin/login"); return; }
-  }, [token, navigate]);
-
-  if (!token) return null;
-  if (role && role !== "admin") return (
+  return (
     <div className="h-full min-h-[50vh] flex items-center justify-center bg-[#F8FAFC]">
       <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -62,5 +55,41 @@ export function RequireAdmin({ children }: { children: React.ReactNode }) {
       </div>
     </div>
   );
+}
+
+export function RequireAdmin({ children }: { children: React.ReactNode }) {
+  const [, navigate] = useLocation();
+  const token = localStorage.getItem("admin_token");
+  const role = getStoredRole();
+
+  useEffect(() => {
+    if (!token) { navigate("/admin/login"); return; }
+  }, [token, navigate]);
+
+  if (!token) return null;
+  if (role && role !== "admin") return <AccessDenied />;
   return <>{children}</>;
+}
+
+/**
+ * Guarda de rota por permissão (perfil Editor). Admin passa sempre; editor só
+ * entra se a permissão estiver liberada no seu conjunto — bloqueando o acesso
+ * direto por URL mesmo com o item escondido do menu. É a 2ª das 3 camadas
+ * (menu → rota → API); o backend valida a mesma chave de novo.
+ */
+export function RequirePermission({ perm, children }: { perm: string; children: React.ReactNode }) {
+  const [, navigate] = useLocation();
+  const token = localStorage.getItem("admin_token");
+  const role = getStoredRole();
+  const { permSet, loaded } = useEditorPermissions(role);
+
+  useEffect(() => {
+    if (!token) navigate("/admin/login");
+  }, [token, navigate]);
+
+  if (!token) return null;
+  if (role === "admin") return <>{children}</>;
+  if (!loaded) return null; // aguardando o conjunto de permissões — evita flash de "Acesso Restrito"
+  if (permSet.has(perm)) return <>{children}</>;
+  return <AccessDenied />;
 }
