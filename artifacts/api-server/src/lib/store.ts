@@ -6,7 +6,7 @@
  * Call `initStore()` at server startup to hydrate the cache from DB.
  */
 
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { BRAND } from "./brand.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -737,6 +737,36 @@ export async function seedDefaultRssSources(): Promise<void> {
   logger.info({ count: rows.length }, "store: seeded default RSS sources");
 }
 
+// ─── Assets das settings servidos como URL ────────────────────────────────────
+// Campos de imagem em base64 (data URI) somavam MBs em TODA resposta pública de
+// /api/site (buscada em cada page load), inflando FCP/LCP. No payload público
+// cada um vira uma URL estável /api/site-asset/:key?v=<hash> (rota em site.ts)
+// — o binário fica cacheável como immutable no navegador.
+export const SITE_ASSET_FIELDS = {
+  "logo":        "logoBase64",
+  "logo-mobile": "logoMobileBase64",
+  "byline-logo": "bylineLogoBase64",
+  "favicon":     "faviconBase64",
+  "og-image":    "ogImageBase64",
+  "admin-logo":  "adminLogoBase64",
+  "login-logo":  "loginLogoBase64",
+} as const;
+
+export const SITE_ASSET_PREFIX = "/api/site-asset/";
+
+// Memo do hash por campo — o data URI só muda quando o admin troca a imagem.
+const _assetUrlMemo = new Map<string, { src: string; url: string }>();
+
+function assetUrl(key: string, value: string): string {
+  if (!value.startsWith("data:")) return value; // já é URL/caminho → mantém
+  const memo = _assetUrlMemo.get(key);
+  if (memo && memo.src === value) return memo.url;
+  const hash = createHash("sha1").update(value).digest("hex").slice(0, 10);
+  const url = `${SITE_ASSET_PREFIX}${key}?v=${hash}`;
+  _assetUrlMemo.set(key, { src: value, url });
+  return url;
+}
+
 // ─── Public store interface ───────────────────────────────────────────────────
 
 export const store = {
@@ -763,6 +793,11 @@ export const store = {
     delete out["youtubeApiKey"];
     delete out["webhookApiKey"];
     delete out["centralIngestSecret"];
+    // Imagens base64 → URLs cacheáveis (ver SITE_ASSET_FIELDS).
+    for (const [key, field] of Object.entries(SITE_ASSET_FIELDS)) {
+      const v = out[field];
+      if (typeof v === "string" && v.length > 0) out[field] = assetUrl(key, v);
+    }
     return out as Omit<SiteSettings, "rssAiApiKey"|"diffbotApiKey"|"geminiApiKey"|"geminiApiKeys"|"openaiApiKey"|"youtubeApiKey"|"webhookApiKey"|"centralIngestSecret"> & {
       hasRssAiKey: boolean; hasDiffbotKey: boolean; hasGeminiKey: boolean;
       hasOpenaiKey: boolean; hasYoutubeKey: boolean; hasCentralIngestSecret: boolean;
@@ -770,7 +805,15 @@ export const store = {
   },
 
   updateSettings: (data: Partial<SiteSettings>): SiteSettings => {
-    _cache.settings = { ..._cache.settings, ...data };
+    // O admin lê as settings públicas, onde os campos de imagem viram URLs
+    // derivadas (/api/site-asset/…). Se esse ponteiro voltar num PUT, ignorá-lo
+    // — gravar sobrescreveria o base64 real com a própria URL.
+    const patch: Record<string, unknown> = { ...data };
+    for (const field of Object.values(SITE_ASSET_FIELDS)) {
+      const v = patch[field];
+      if (typeof v === "string" && v.startsWith(SITE_ASSET_PREFIX)) delete patch[field];
+    }
+    _cache.settings = { ..._cache.settings, ...(patch as Partial<SiteSettings>) };
     persistSetting("site_settings", _cache.settings);
     return { ..._cache.settings };
   },

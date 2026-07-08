@@ -47,13 +47,29 @@ export function safeTitleHtml(input: string | null | undefined): string {
 }
 
 /**
+ * Sanitização leve SEM DOM, usada no SSR (DOMPurify exige DOM de navegador).
+ * Remove blocos executáveis, handlers inline e URLs javascript:. Precisa
+ * devolver o HTML renderizável: retornar "" no servidor fazia o banner do
+ * cabeçalho e os blocos HTML da home NÃO existirem no HTML do SSR mas
+ * aparecerem na hidratação → mismatch (#418) e o React descartava todo o
+ * SSR, arrasando o LCP.
+ */
+function stripDangerousHtml(html: string): string {
+  return html
+    .replace(/<(script|style|iframe|object|embed|form)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "")
+    .replace(/<\/?(script|style|iframe|object|embed|form|link|meta|base)\b[^>]*>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(href|src)\s*=\s*(["']?)\s*javascript:[^"'>\s]*\2/gi, "");
+}
+
+/**
  * Sanitiza HTML de corpo de artigo (parágrafos, títulos, listas, imagens,
  * links...) removendo scripts, event handlers e URLs javascript:.
- * DOMPurify precisa de DOM — no SSR retorna "" (a página de artigo não é
- * renderizada no servidor; apenas a home, que não usa corpo de artigo).
+ * No cliente usa DOMPurify; no SSR usa a variante leve acima (o conteúdo que
+ * chega ao SSR vem das settings do próprio painel — banner/blocos html).
  */
 export function sanitizeArticleHtml(html: string | null | undefined): string {
   if (!html) return "";
-  if (typeof window === "undefined") return "";
+  if (typeof window === "undefined") return stripDangerousHtml(html);
   return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
 }

@@ -1,7 +1,21 @@
 import { Router } from "express";
-import { store } from "../lib/store.js";
+import { SITE_ASSET_FIELDS, store } from "../lib/store.js";
 
 const router = Router();
+
+/** GET /api/site-asset/:key — imagens das settings (logo, favicon, og…) como
+ *  binário cacheável. O /api/site publica esses campos como URL com hash do
+ *  conteúdo (?v=) em vez do data URI, então o browser cacheia como immutable
+ *  e o JSON das settings fica pequeno. */
+router.get("/site-asset/:key", (req, res) => {
+  const field = SITE_ASSET_FIELDS[req.params.key as keyof typeof SITE_ASSET_FIELDS];
+  const value = field ? store.getSettings()[field] : undefined;
+  const m = typeof value === "string" ? /^data:([-\w.+/]+);base64,(.+)$/s.exec(value) : null;
+  if (!m) { res.status(404).json({ error: "Asset não configurado." }); return; }
+  res.setHeader("Content-Type", m[1]!);
+  res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  res.end(Buffer.from(m[2]!, "base64"));
+});
 
 /** GET /api/site — site settings + menu items (public, sensitive keys excluded) */
 router.get("/site", (_req, res) => {

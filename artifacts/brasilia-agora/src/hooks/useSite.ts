@@ -100,7 +100,10 @@ function saveToStorage(data: SiteSettings) {
 // Cache TTL: 60 seconds. After this, the next useSite() mount triggers a fresh fetch.
 const CACHE_TTL_MS = 60_000;
 
-let _cache: SiteSettings | null = null;
+// Seed síncrono do localStorage no boot (só cliente): o 1º paint já sai com a
+// identidade certa (logo/cores/menu) em visitas repetidas, sem flash da marca
+// padrão. _cacheAt fica 0 → o cache é tratado como velho e revalida no mount.
+let _cache: SiteSettings | null = typeof window === "undefined" ? null : loadFromStorage();
 let _cacheAt = 0;
 let _fetch: Promise<void> | null = null;
 const _subscribers = new Set<(s: SiteSettings) => void>();

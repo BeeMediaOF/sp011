@@ -136,9 +136,10 @@ function staticCachePlugin(): Plugin {
     if (/^\/assets\//.test(url) || /\.(woff2?|ttf)(\?.*)?$/.test(url)) {
       res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
     } else if (url === "/" || url.endsWith(".html")) {
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
+      // no-cache (e não no-store): o navegador sempre revalida antes de usar,
+      // mas o documento continua elegível ao bfcache — no-store bloqueava a
+      // restauração back/forward (diagnóstico do Lighthouse).
+      res.setHeader("Cache-Control", "no-cache, must-revalidate");
     }
     next();
   }
@@ -171,11 +172,11 @@ function staticCachePlugin(): Plugin {
         "/*.woff",
         "  Cache-Control: public, max-age=31536000, immutable",
         "",
-        "# HTML — nunca cachear; deve sempre buscar o mais recente",
+        "# HTML — sempre revalidar (no-cache, não no-store: preserva o bfcache)",
         "/*.html",
-        "  Cache-Control: no-store, no-cache, must-revalidate",
+        "  Cache-Control: no-cache, must-revalidate",
         "/",
-        "  Cache-Control: no-store, no-cache, must-revalidate",
+        "  Cache-Control: no-cache, must-revalidate",
         "",
         "# Manifesto e service worker",
         "/manifest.webmanifest",
@@ -343,19 +344,12 @@ function ssrHomePlugin(apiBase: string): Plugin {
         fetchJson(`${apiBase}/api/ads`),
       ])) as [{ articles?: unknown[] } | null, unknown, { ads?: unknown[] } | null];
 
-      /* CRÍTICO: o __SSR_DATA__ vai inline no HTML. Os campos base64 das settings
-         (logo/favicon/og em base64) podem somar centenas de KB que NÃO comprimem
-         com gzip → inchaço do documento e FCP/LCP altos. Removemos esses campos
-         (o cliente rebusca /api/site completo após hidratar — ver entry-client) e
-         o `keywords` dos artigos (não usado na home). O Header usa logo importado
-         estático, então o render do servidor não depende desses base64. */
-      const HEAVY_SITE = ["logoBase64", "faviconBase64", "ogImageBase64", "bylineLogoBase64", "adminLogoBase64"];
-      const rawSite = (s && typeof s === "object") ? (s as Record<string, unknown>) : null;
-      let site: Record<string, unknown> | null = rawSite;
-      if (rawSite) {
-        site = { ...rawSite };
-        for (const k of HEAVY_SITE) delete site[k];
-      }
+      /* O /api/site publica os campos de imagem como URLs pequenas
+         (/api/site-asset/…) em vez de data URI — o __SSR_DATA__ pode levar as
+         settings inteiras sem inchar o HTML, e o header/rodapé do SSR já saem
+         com a logo certa (sem flash da marca default na hidratação). */
+      const site: Record<string, unknown> | null =
+        (s && typeof s === "object") ? { ...(s as Record<string, unknown>) } : null;
       /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
          para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
          inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais

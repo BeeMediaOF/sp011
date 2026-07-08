@@ -7,7 +7,8 @@
  *
  * Segurança: links passam por safeLinkUrl (sem javascript:), iframes só com
  * https via safeEmbedUrl/parseVideoEmbedUrl, HTML livre sanitizado com
- * DOMPurify (sanitizeArticleHtml). No SSR o HTML livre rende vazio (fail-closed).
+ * DOMPurify (sanitizeArticleHtml; no SSR usa a variante leve sem DOM — render
+ * IGUAL nos dois lados, senão a hidratação descarta o SSR inteiro, #418).
  */
 import React, { useRef, useState } from "react";
 import { Link } from "wouter";

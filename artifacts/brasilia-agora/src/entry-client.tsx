@@ -21,8 +21,8 @@ if (data && rootEl.hasChildNodes()) {
   if (data.site) seedSite(data.site);
   if (Array.isArray(data.ads)) seedAds(data.ads);
   hydrateRoot(rootEl, <App />);
-  // O SSR semeou settings "magras" (sem base64 de logos/favicon/og). Após hidratar,
-  // busca a versão completa para restaurar logos do byline, favicon e analytics.
+  // Revalida as settings em background após hidratar (o seed do SSR pode ter
+  // até ~30s de idade por causa do cache de HTML da home).
   refreshSite();
 } else {
   createRoot(rootEl).render(<App />);

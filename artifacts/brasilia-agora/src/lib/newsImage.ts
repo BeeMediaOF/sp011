@@ -38,6 +38,23 @@ const PROXY_HOSTS = new Set([
   "upload.wikimedia.org",
 ]);
 
+/** Sufixos de CDNs das fontes internacionais (esportes/EN) — subdomínios variam
+ *  (a1.espncdn.com, e0.365dm.com…). Deve espelhar ALLOWED_HOST_SUFFIXES em
+ *  api-server/src/routes/image.ts. */
+const PROXY_HOST_SUFFIXES = [
+  ".espncdn.com", ".bbci.co.uk", ".365dm.com", ".skysports.com",
+  ".guim.co.uk", ".yimg.com", ".zenfs.com", ".reuters.com",
+  ".formula1.com", ".motorsport.com", ".autosport.com",
+  ".atptour.com", ".wtatennis.com", ".volleyballworld.com",
+  ".nfl.com", ".cbsistatic.com", ".brightspotcdn.com",
+  ".talksport.com", ".goal.com", ".dexerto.com", ".esports.gg",
+];
+
+function isProxyableHost(hostname: string): boolean {
+  return PROXY_HOSTS.has(hostname) ||
+    PROXY_HOST_SUFFIXES.some((s) => hostname.endsWith(s) || hostname === s.slice(1));
+}
+
 /**
  * Gera URL do proxy de imagens para uma largura específica.
  * Retorna a URL original se o domínio não estiver na allowlist.
@@ -61,7 +78,7 @@ export function proxyUrl(src: string, w: number, q = 82): string {
     return src;
   }
 
-  if (!PROXY_HOSTS.has(hostname)) return src;
+  if (!isProxyableHost(hostname)) return src;
 
   return `/api/image?url=${encodeURIComponent(src)}&w=${w}&q=${q}`;
 }
@@ -88,7 +105,7 @@ export function buildSrcSet(src: string, widths: number[], q = 82): string {
     return "";
   }
 
-  if (!PROXY_HOSTS.has(hostname)) return "";
+  if (!isProxyableHost(hostname)) return "";
 
   return widths.map((w) => `${proxyUrl(src, w, q)} ${w}w`).join(", ");
 }

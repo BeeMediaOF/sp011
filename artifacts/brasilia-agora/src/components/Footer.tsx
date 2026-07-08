@@ -118,8 +118,10 @@ export default function Footer() {
   const bgColor = settings?.footerBgColor;
   // Logo configurada no painel tem prioridade; as imagens do bundle (variante
   // negativa p/ fundo escuro, colorida p/ fundo claro) ficam só como fallback.
-  const logoSrc      = settings?.logoBase64 || logoImg;
-  const logoColorSrc = settings?.logoBase64 || logoColorImg;
+  // Enquanto as settings não chegam, src vazio → não mostra a marca default
+  // (evita o flash da logo do blog padrão nos blogs replicados).
+  const logoSrc      = settings ? (settings.logoBase64 || logoImg) : "";
+  const logoColorSrc = settings ? (settings.logoBase64 || logoColorImg) : "";
 
   // Conteúdo 100% editável no painel (aba Rodapé); defaults = contato + menu.
   const f = resolveFooterConfig({
@@ -161,7 +163,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              <img src={logoColorSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" />
+              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" /> : <span className="block h-10 mb-2" />}
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -225,7 +227,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            <img src={logoSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" />
+            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" /> : <span className="block h-10 mb-2" />}
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}

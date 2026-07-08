@@ -181,10 +181,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       setMeta("name", "twitter:title", settings.siteName);
     }
 
-    // OG image
+    // OG image — o /api/site publica o campo como URL relativa (/api/site-asset/…);
+    // crawlers exigem URL absoluta na tag og:image.
     if (settings.ogImageBase64) {
-      setMeta("property", "og:image", settings.ogImageBase64);
-      setMeta("name", "twitter:image", settings.ogImageBase64);
+      const og = settings.ogImageBase64.startsWith("/")
+        ? window.location.origin + settings.ogImageBase64
+        : settings.ogImageBase64;
+      setMeta("property", "og:image", og);
+      setMeta("name", "twitter:image", og);
     }
 
     // Favicon

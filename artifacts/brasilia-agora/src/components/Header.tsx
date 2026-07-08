@@ -178,7 +178,7 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
         className={`fixed top-0 left-0 z-50 h-full w-[84%] max-w-[330px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-2 px-4 h-14 border-b border-gray-200 shrink-0">
-          <img src={logoSrc} alt={siteName} className="h-7 w-auto object-contain" />
+          {logoSrc ? <img src={logoSrc} alt={siteName} className="h-7 w-auto object-contain" /> : <span className="h-7" />}
           <button onClick={onClose} aria-label={t("menu.close")} className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
             <X size={22} />
           </button>
@@ -243,6 +243,16 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
 function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap }: {
   desktopSrc: string; mobileSrc: string; alt: string; height: number; mobileCap: number;
 }) {
+  // Settings ainda carregando (src vazio): reserva o espaço sem mostrar a logo
+  // padrão embutida — num blog replicado ela é a marca errada (flash do sp011).
+  if (!desktopSrc) {
+    return (
+      <>
+        <span aria-hidden="true" className="lg:hidden block w-24" style={{ height: Math.min(height, mobileCap) }} />
+        <span aria-hidden="true" className="hidden lg:block w-24" style={{ height }} />
+      </>
+    );
+  }
   return (
     <>
       <img src={mobileSrc} alt={alt} style={{ height: Math.min(height, mobileCap) }}
@@ -259,9 +269,11 @@ export default function Header() {
   const { t, lang }             = useT();
   // Logo configurada no painel (Configurações → logo) tem prioridade; a imagem
   // empacotada no bundle é só fallback quando nenhuma logo foi enviada.
-  const logoSrc = settings?.logoBase64 || logoImg;
+  // Sem settings ainda (1º paint frio) o src fica vazio — o HeaderLogo reserva
+  // o espaço em vez de mostrar a logo embutida (que é a marca do blog default).
+  const logoSrc = settings ? (settings.logoBase64 || logoImg) : "";
   // Variante mobile opcional (Configurações → Logo & Imagens → Logo mobile).
-  const logoMobileSrc = settings?.logoMobileBase64 || logoSrc;
+  const logoMobileSrc = settings ? (settings.logoMobileBase64 || logoSrc) : "";
   const [location]              = useLocation();
   const [menuOpen, setMenu]       = useState(false);
   const [searchOpen, setSearch]   = useState(false);

@@ -67,6 +67,23 @@ const ALLOWED_HOSTS = new Set([
   "upload.wikimedia.org",
 ]);
 
+// CDNs de imagem das fontes internacionais (esportes/EN) — casados por SUFIXO
+// porque os subdomínios variam (a1.espncdn.com, e0.365dm.com,
+// cdn-3.motorsport.com…). Espelhar em brasilia-agora/src/lib/newsImage.ts.
+const ALLOWED_HOST_SUFFIXES = [
+  ".espncdn.com", ".bbci.co.uk", ".365dm.com", ".skysports.com",
+  ".guim.co.uk", ".yimg.com", ".zenfs.com", ".reuters.com",
+  ".formula1.com", ".motorsport.com", ".autosport.com",
+  ".atptour.com", ".wtatennis.com", ".volleyballworld.com",
+  ".nfl.com", ".cbsistatic.com", ".brightspotcdn.com",
+  ".talksport.com", ".goal.com", ".dexerto.com", ".esports.gg",
+];
+
+export function isAllowedImageHost(hostname: string): boolean {
+  return ALLOWED_HOSTS.has(hostname) ||
+    ALLOWED_HOST_SUFFIXES.some((s) => hostname.endsWith(s) || hostname === s.slice(1));
+}
+
 export { ALLOWED_HOSTS };
 
 // ── Domain-specific fetch headers ────────────────────────────────────────────
@@ -139,7 +156,7 @@ export async function warmImageCache(
 ): Promise<number> {
   const urls = imageUrls.filter((u) => {
     if (!u) return false;
-    try { return ALLOWED_HOSTS.has(new URL(u).hostname); } catch { return false; }
+    try { return isAllowedImageHost(new URL(u).hostname); } catch { return false; }
   });
 
   let warmed = 0;
@@ -192,7 +209,7 @@ router.get("/image", async (req, res) => {
     return;
   }
 
-  if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+  if (!isAllowedImageHost(parsed.hostname)) {
     res.status(403).json({ error: `Domínio não permitido: ${parsed.hostname}` });
     return;
   }
