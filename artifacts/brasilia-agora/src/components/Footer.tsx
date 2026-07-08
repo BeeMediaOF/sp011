@@ -123,6 +123,11 @@ export default function Footer() {
   // blog padrão nos blogs replicados).
   const logoSrc      = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoImg) : "";
   const logoColorSrc = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoColorImg) : "";
+  // Altura configurável no editor do rodapé (padrão 40px = o antigo h-10). A
+  // largura tem teto para uma logo larga em tamanho grande não estourar a
+  // coluna no celular (object-contain mantém a proporção dentro do teto).
+  const logoH = settings?.footerLogoSize && settings.footerLogoSize > 0
+    ? Math.min(settings.footerLogoSize, 160) : 40;
 
   // Conteúdo 100% editável no painel (aba Rodapé); defaults = contato + menu.
   const f = resolveFooterConfig({
@@ -164,7 +169,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" /> : <span className="block h-10 mb-2" />}
+              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || BRAND.name} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -228,7 +233,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || BRAND.name} className="h-10 w-auto object-contain mb-2" /> : <span className="block h-10 mb-2" />}
+            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || BRAND.name} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}

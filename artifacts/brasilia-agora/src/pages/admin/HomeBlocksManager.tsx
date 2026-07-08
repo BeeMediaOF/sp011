@@ -2489,7 +2489,7 @@ export default function HomeBlocksManager() {
                 {/* ── Conteúdo do rodapé (textos, links, redes, contato…) ── */}
                 <div className="border-t border-[#E2E8F0] pt-4">
                   <FooterEditor saving={saving}
-                    onSave={(cfg) => { setFooterConfig(cfg); return saveSettingsPatch({ footerConfig: cfg }); }} />
+                    onSave={(patch) => { setFooterConfig(patch.footerConfig); return saveSettingsPatch(patch); }} />
                 </div>
               </div>
             )}

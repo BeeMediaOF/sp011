@@ -27,6 +27,8 @@ export interface SiteSettings {
   logoMobileSize?: number;
   /** Logo própria do rodapé (ausente = usa a logo principal). */
   footerLogoBase64?: string;
+  /** Altura da logo no rodapé, em px (ausente/0 = 40, o padrão histórico). */
+  footerLogoSize?: number;
   /** Exibe "Fonte: Nome" discreto ao final das notícias importadas. */
   showSourceCredit?: boolean;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */

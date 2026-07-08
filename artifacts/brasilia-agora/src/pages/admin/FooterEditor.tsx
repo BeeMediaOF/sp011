@@ -5,15 +5,23 @@
  * do menu), permite editar textos, redes, colunas de links, contato,
  * newsletter, copyright e links legais — e salva tudo em settings.footerConfig.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { adminApi } from "../../lib/adminApi";
 import {
   resolveFooterConfig, type FooterConfig, type FooterColumn, type FooterLink,
   type FooterSocialKey,
 } from "../../lib/footerConfig";
 import {
-  ChevronDown, Plus, Trash2, Save, RefreshCw, GripVertical,
+  ChevronDown, Plus, Trash2, Save, RefreshCw, GripVertical, Upload,
 } from "lucide-react";
+
+/** Patch salvo pelo editor: o conteúdo (footerConfig) + a logo do rodapé, que
+ *  vive em settings (footerLogoBase64/footerLogoSize) mas é editada aqui. */
+export interface FooterEditorPatch {
+  footerConfig: FooterConfig;
+  footerLogoBase64?: string;
+  footerLogoSize?: number;
+}
 
 const INPUT = "w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors";
 const LABEL = "text-[11px] font-medium text-[#64748B] mb-1 block";
@@ -99,12 +107,20 @@ function LinkListEditor({ links, onChange }: {
 }
 
 export default function FooterEditor({ onSave, saving }: {
-  onSave: (cfg: FooterConfig) => Promise<void> | void;
+  onSave: (patch: FooterEditorPatch) => Promise<void> | void;
   saving: boolean;
 }) {
   const [cfg, setCfg] = useState<FooterConfig | null>(null);
   const [loadErr, setLoadErr] = useState(false);
   const [savedOk, setSavedOk] = useState(false);
+  // Logo do rodapé. Carregada como URL derivada (/api/site-asset/…): se voltar
+  // inalterada no PUT o backend a ignora e mantém o base64 salvo; "" remove;
+  // data URI (upload novo) substitui.
+  const [footerLogo, setFooterLogo] = useState("");
+  const [footerLogoSize, setFooterLogoSize] = useState(40);
+  // Logo principal do site — prévia do fallback quando não há logo própria.
+  const [mainLogo, setMainLogo] = useState("");
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     Promise.all([adminApi.getSettings(), adminApi.getContactInfo(), adminApi.getMenu()])
@@ -141,6 +157,9 @@ export default function FooterEditor({ onSave, saving }: {
           copyright: settings.footerConfig?.copyright ?? "© {year} {site}. Todos os direitos reservados.",
           legalLinks: resolved.legalLinks.map((l) => ({ ...l })),
         });
+        setFooterLogo(settings.footerLogoBase64 ?? "");
+        setFooterLogoSize(settings.footerLogoSize && settings.footerLogoSize > 0 ? settings.footerLogoSize : 40);
+        setMainLogo(settings.logoBase64 ?? "");
       })
       .catch(() => setLoadErr(true));
   }, []);
@@ -160,8 +179,14 @@ export default function FooterEditor({ onSave, saving }: {
     patch({ columns: (cfg!.columns ?? []).map((c) => c.id === id ? { ...c, ...p } : c) });
   }
 
+  function handleLogoFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = (e) => setFooterLogo((e.target?.result as string) ?? "");
+    reader.readAsDataURL(file);
+  }
+
   async function save() {
-    await onSave(cfg!);
+    await onSave({ footerConfig: cfg!, footerLogoBase64: footerLogo, footerLogoSize });
     setSavedOk(true);
     setTimeout(() => setSavedOk(false), 2500);
   }
@@ -171,6 +196,44 @@ export default function FooterEditor({ onSave, saving }: {
   return (
     <div className="space-y-2">
       <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider pt-1">Conteúdo do rodapé</p>
+
+      <Section title="Logo do rodapé">
+        <div className="flex items-start gap-3">
+          {/* Prévia sobre fundo escuro (o rodapé padrão é escuro) */}
+          <div className="rounded-xl bg-[#1e293b] px-3 py-2 flex items-center justify-center min-w-[110px] min-h-[56px] shrink-0">
+            {(footerLogo || mainLogo) ? (
+              <img src={footerLogo || mainLogo} alt="Prévia da logo do rodapé"
+                style={{ height: footerLogoSize, transition: "height 0.15s" }}
+                className="w-auto max-w-[170px] object-contain" />
+            ) : (
+              <span className="text-[10px] text-white/50">sem logo</span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 min-w-0">
+            <input ref={logoFileRef} type="file" accept="image/*" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); e.target.value = ""; }} />
+            <button type="button" onClick={() => logoFileRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-[#CBD5E1] rounded-xl hover:bg-[#F8FAFC] transition-colors w-fit">
+              <Upload size={11} /> Enviar logo do rodapé
+            </button>
+            {footerLogo && (
+              <button type="button" onClick={() => setFooterLogo("")}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#64748B] border border-[#E2E8F0] rounded-xl hover:bg-[#F8FAFC] transition-colors w-fit">
+                <Trash2 size={11} /> Remover (usar a logo principal)
+              </button>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className={`${LABEL} !mb-0`}>Tamanho da logo</label>
+            <span className="text-[11px] font-bold text-[#0B2A66]">{footerLogoSize}px</span>
+          </div>
+          <input type="range" min={24} max={120} step={4} value={footerLogoSize}
+            onChange={(e) => setFooterLogoSize(Number(e.target.value))} className="w-full accent-[#0B2A66]" />
+        </div>
+        <p className="text-[10px] text-[#94A3B8] leading-relaxed">Sem logo própria, o rodapé usa a logo principal do site. Padrão: 40px. As mudanças valem após "Salvar rodapé".</p>
+      </Section>
 
       <Section title="Descrição e copyright" defaultOpen>
         <div>
