@@ -288,3 +288,39 @@ label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 12px
 }
 html.dark .modal { background: var(--panel-2); }
 .modal h2 { margin: 0 0 12px; font-size: 16px; font-weight: 700; color: var(--text); }
+
+/* ── Fontes agrupadas por marca (mesmo visual do admin do blog) ─────────────── */
+
+.src-group {
+  border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden;
+  background: var(--panel); box-shadow: var(--shadow-card);
+}
+.src-group + .src-group { margin-top: 8px; }
+.src-group-head {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  font: inherit; color: inherit;
+}
+.src-group-head:hover { background: var(--panel-2); }
+.src-avatar {
+  width: 36px; height: 36px; border-radius: 12px; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.src-group-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.src-group-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.src-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.src-badge {
+  font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 500;
+  background: var(--ok-bg); color: var(--ok);
+}
+.src-badge.off { background: var(--panel-2); color: var(--faint); text-decoration: line-through; }
+.src-count { font-size: 11px; color: var(--faint); white-space: nowrap; flex-shrink: 0; }
+.src-chevron { color: var(--faint); font-size: 12px; transition: transform 0.15s; flex-shrink: 0; }
+.src-chevron.open { transform: rotate(180deg); }
+.src-rows { border-top: 1px solid var(--border-soft); }
+.src-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 16px; flex-wrap: wrap;
+}
+.src-row + .src-row { border-top: 1px solid var(--border-soft); }
+.src-row-main { flex: 1; min-width: 240px; }
+.src-row-actions { white-space: nowrap; flex-shrink: 0; }

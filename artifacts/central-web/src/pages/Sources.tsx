@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "../api";
 import { fmtDate, useLoad } from "../hooks";
 
@@ -18,12 +18,69 @@ interface Source {
 
 const EMPTY = { name: "", url: "", category: "geral", scheduleHours: "4", fetchLimit: "", giveCredit: false, active: true, customPrompt: "", language: "pt-BR" };
 
+// ─── Visual de marcas (mesmo padrão do admin do blog: RSSManager) ─────────────
+/** "Agência Brasil - Política" → "Agência Brasil" */
+function extractPublisher(name: string): string {
+  const idx = name.search(/\s[–\-]\s/);
+  return idx > 0 ? name.slice(0, idx).trim() : name;
+}
+
+function srcInitials(name: string): string {
+  const words = name.replace(/[^a-zA-ZÀ-ÿ0-9\s]/g, "").trim().split(/\s+/);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return (words[0] ?? "").slice(0, 2).toUpperCase();
+  return ((words[0]?.[0] ?? "") + (words[1]?.[0] ?? "")).toUpperCase();
+}
+
+const SRC_PALETTE = ["#E71D36", "#0B2A66", "#2563EB", "#16A34A", "#F97316", "#9333EA", "#0EA5E9", "#DC2626"];
+function srcColor(key: string): string {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = key.charCodeAt(i) + ((h << 5) - h);
+  return SRC_PALETTE[Math.abs(h) % SRC_PALETTE.length] ?? "#0B2A66";
+}
+
+function catLabel(c: string): string {
+  return (c || "geral").replace(/-/g, " ").toUpperCase();
+}
+
 export default function Sources() {
   const { data: sources, error, reload } = useLoad(() => api<Source[]>("/sources"));
   const [editing, setEditing] = useState<Partial<Source> | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+
+  const filtered = useMemo(() => {
+    const list = sources ?? [];
+    const q = search.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((s) =>
+      s.name.toLowerCase().includes(q) ||
+      s.url.toLowerCase().includes(q) ||
+      s.category.toLowerCase().includes(q));
+  }, [sources, search]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Source[]>();
+    for (const src of filtered) {
+      const pub = extractPublisher(src.name);
+      if (!map.has(pub)) map.set(pub, []);
+      map.get(pub)!.push(src);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b, "pt-BR"))
+      .map(([publisher, srcs]) => ({ publisher, srcs }));
+  }, [filtered]);
+
+  function toggleGroup(pub: string) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(pub)) next.delete(pub); else next.add(pub);
+      return next;
+    });
+  }
 
   const openNew = () => { setForm(EMPTY); setEditing({}); };
   const openEdit = (s: Source) => {
@@ -58,6 +115,15 @@ export default function Sources() {
     }
   };
 
+  const toggleActive = async (s: Source) => {
+    try {
+      await api(`/sources/${s.id}`, { method: "PATCH", body: { active: !s.active } });
+      reload();
+    } catch (err) {
+      setMsg(String((err as Error).message));
+    }
+  };
+
   const run = async (s: Source) => {
     setMsg(`Coletando ${s.name}…`);
     try {
@@ -85,6 +151,8 @@ export default function Sources() {
   return (
     <>
       <div className="toolbar">
+        <input value={search} onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar fonte, URL ou categoria…" style={{ maxWidth: 280 }} />
         <div className="grow" />
         <button className="secondary" onClick={runCycle}>Rodar ciclo agora</button>
         <button onClick={openNew}>+ Nova fonte</button>
@@ -93,35 +161,61 @@ export default function Sources() {
       {error && <div className="error-box">{error}</div>}
       {msg && <div className="card">{msg}</div>}
 
-      <div className="card">
-        <table>
-          <thead>
-            <tr><th>Nome</th><th>Categoria</th><th>Agenda</th><th>Limite</th><th>Última coleta</th><th></th></tr>
-          </thead>
-          <tbody>
-            {(sources ?? []).map((s) => (
-              <tr key={s.id}>
-                <td>
-                  <b>{s.name}</b>
-                  {s.language === "en" && <span className="badge" style={{ marginLeft: 6 }}>EN</span>}
-                  {!s.active && <span className="badge err" style={{ marginLeft: 6 }}>inativa</span>}
-                  {s.giveCredit && <span className="badge" style={{ marginLeft: 6 }}>com crédito</span>}
-                  <div className="muted mono">{s.url}</div>
-                </td>
-                <td>{s.category}</td>
-                <td>{s.scheduleHours > 0 ? `a cada ${s.scheduleHours}h` : "manual"}</td>
-                <td>{s.fetchLimit ?? "padrão"}</td>
-                <td>{fmtDate(s.lastFetchedAt)}</td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="secondary small" onClick={() => run(s)}>Coletar</button>{" "}
-                  <button className="secondary small" onClick={() => openEdit(s)}>Editar</button>{" "}
-                  <button className="danger small" onClick={() => remove(s)}>Remover</button>
-                </td>
-              </tr>
-            ))}
-            {sources?.length === 0 && <tr><td colSpan={6} className="muted">Nenhuma fonte ainda.</td></tr>}
-          </tbody>
-        </table>
+      <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
+        {grouped.length} marca{grouped.length !== 1 ? "s" : ""} · {filtered.length} fonte{filtered.length !== 1 ? "s" : ""}
+      </p>
+
+      {grouped.length === 0 && <div className="card muted">Nenhuma fonte ainda.</div>}
+
+      <div>
+        {grouped.map(({ publisher, srcs }) => {
+          const isOpen = openGroups.has(publisher);
+          const activeCount = srcs.filter((s) => s.active).length;
+          return (
+            <div key={publisher} className="src-group">
+              <button type="button" className="src-group-head" onClick={() => toggleGroup(publisher)}>
+                <span className="src-avatar" style={{ background: srcColor(publisher) }}>{srcInitials(publisher)}</span>
+                <span className="src-group-info">
+                  <span className="src-group-name">{publisher}</span>
+                  <span className="src-badges">
+                    {srcs.map((s) => (
+                      <span key={s.id} className={`src-badge${s.active ? "" : " off"}`}>{catLabel(s.category)}</span>
+                    ))}
+                  </span>
+                </span>
+                <span className="src-count">{activeCount}/{srcs.length} ativa{srcs.length !== 1 ? "s" : ""}</span>
+                <span className={`src-chevron${isOpen ? " open" : ""}`} aria-hidden>▾</span>
+              </button>
+
+              {isOpen && (
+                <div className="src-rows">
+                  {srcs.map((s) => (
+                    <div key={s.id} className="src-row">
+                      <div className="src-row-main">
+                        <div>
+                          <b>{s.name}</b>
+                          {s.language === "en" && <span className="badge" style={{ marginLeft: 6 }}>EN</span>}
+                          {!s.active && <span className="badge err" style={{ marginLeft: 6 }}>inativa</span>}
+                          {s.giveCredit && <span className="badge" style={{ marginLeft: 6 }}>com crédito</span>}
+                        </div>
+                        <div className="muted mono" style={{ fontSize: 11, wordBreak: "break-all" }}>{s.url}</div>
+                        <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                          {catLabel(s.category)} · {s.scheduleHours > 0 ? `a cada ${s.scheduleHours}h` : "manual"} · limite {s.fetchLimit ?? "padrão"} · última coleta {fmtDate(s.lastFetchedAt)}
+                        </div>
+                      </div>
+                      <div className="src-row-actions">
+                        <button className="secondary small" onClick={() => toggleActive(s)}>{s.active ? "Desligar" : "Ligar"}</button>{" "}
+                        <button className="secondary small" onClick={() => run(s)}>Coletar</button>{" "}
+                        <button className="secondary small" onClick={() => openEdit(s)}>Editar</button>{" "}
+                        <button className="danger small" onClick={() => remove(s)}>Remover</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {editing !== null && (
