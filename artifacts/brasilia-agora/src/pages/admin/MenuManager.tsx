@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { BRAND } from "../../brand";
+import { Link } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { adminApi, type MenuItem } from "../../lib/adminApi";
+import { adminApi, type MenuItem, type SiteSettings } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
+import { useCategories, categoryColor } from "../../hooks/useCategories";
 import {
   Plus, PlusCircle, Trash2, GripVertical, Save, Eye, EyeOff,
   Search, ChevronDown, ChevronRight, Pencil, Monitor, Tablet,
@@ -11,24 +12,20 @@ import {
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
-type Tab = "principal" | "superior" | "rodape";
 type DevicePreview = "desktop" | "tablet" | "mobile";
 type PagesTab = "paginas" | "categorias" | "links";
 
-const AVAILABLE_PAGES = [
-  "Página Inicial",
-  `Sobre o ${BRAND.name}`,
-  "Contato",
-  "Anuncie",
-  "Termos de Uso",
-  "Política de Privacidade",
-  "Trabalhe Conosco",
+/** Páginas institucionais reais do site (rotas fixas do App.tsx) — qualquer
+ * outra coisa cai na rota de categoria dinâmica. Categorias vêm do cadastro
+ * do blog (aba Categorias), nunca de lista fixa. */
+const AVAILABLE_PAGES: { label: string; path: string }[] = [
+  { label: "Página Inicial", path: "/" },
+  { label: "Arquivo de notícias", path: "/arquivo" },
+  { label: "Contato", path: "/contato" },
+  { label: "Termos de Uso", path: "/termos" },
+  { label: "Política de Privacidade", path: "/privacidade" },
 ];
-
-const CATEGORIES = [
-  "Cidades", "Política", "Economia", "Esportes",
-  "Cultura", "Tecnologia", "Saúde", "Educação",
-];
+const PAGE_PATHS = new Set(AVAILABLE_PAGES.map((p) => p.path));
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
@@ -57,7 +54,6 @@ export default function MenuManager() {
   const [applying, setApplying] = useState(false);
   const [applied, setApplied]   = useState(false);
 
-  const [tab, setTab]           = useState<Tab>("principal");
   const [device, setDevice]     = useState<DevicePreview>("desktop");
   const [pagesTab, setPagesTab] = useState<PagesTab>("paginas");
   const [pageSearch, setPageSearch] = useState("");
@@ -65,12 +61,14 @@ export default function MenuManager() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [selected, setSelected] = useState<string | null>(null);
 
+  // Identidade do blog (logo/nome na pré-visualização) e categorias cadastradas.
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const { categories } = useCategories();
+
   // Local edit state for selected item settings panel
   const [editLabel, setEditLabel]   = useState("");
   const [editPath, setEditPath]     = useState("/");
-  const [editNewTab, setEditNewTab] = useState(false);
   const [editVisible, setEditVisible] = useState(true);
-  const [editHighlight, setEditHighlight] = useState(false);
 
   useEffect(() => {
     adminApi.getMenu()
@@ -83,14 +81,13 @@ export default function MenuManager() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+    adminApi.getSettings().then((r) => setSettings(r.settings)).catch(() => {});
   }, []);
 
   function syncEdit(item: MenuItem) {
     setEditLabel(item.label);
     setEditPath(item.path);
-    setEditNewTab(false);
     setEditVisible(item.visible);
-    setEditHighlight(false);
   }
 
   function selectItem(item: MenuItem) {
@@ -120,8 +117,6 @@ export default function MenuManager() {
       label: editLabel.trim() || "Item sem nome",
       path: editPath.trim() || "/",
       visible: editVisible,
-      newTab: editNewTab,
-      highlight: editHighlight,
     };
     const nextItems = patchItemIn(items, selected, patch);
     setItems(nextItems);
@@ -231,34 +226,26 @@ export default function MenuManager() {
   })();
 
   const filteredPages = AVAILABLE_PAGES.filter((p) =>
-    !pageSearch || p.toLowerCase().includes(pageSearch.toLowerCase())
+    !pageSearch || p.label.toLowerCase().includes(pageSearch.toLowerCase())
+  );
+  const filteredCategories = categories.filter((c) =>
+    !pageSearch || c.label.toLowerCase().includes(pageSearch.toLowerCase())
   );
 
   return (
     <AdminLayout title="Menu">
       <div className="space-y-5">
 
-        {/* ── Page header — tabs + actions ─────────────────────── */}
+        {/* ── Page header — título + actions ───────────────────── */}
         <div className="flex flex-wrap items-center gap-4">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-200 flex-1 min-w-[300px]">
-            {([
-              { key: "principal", label: "Menu principal" },
-              { key: "superior",  label: "Menu superior"  },
-              { key: "rodape",    label: "Rodapé"          },
-            ] as { key: Tab; label: string }[]).map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setTab(key)}
-                className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                  tab === key
-                    ? "border-[#0B2A66] text-[#0B2A66]"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="flex-1 min-w-[300px]">
+            <h2 className="text-base font-bold text-[#0B2A66]">Menu principal</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Menu exibido no cabeçalho do site. A barra superior e o rodapé são editados em{" "}
+              <Link href="/admin/home-blocos" className="text-[#2563EB] font-medium hover:underline">
+                Blocos da Home
+              </Link>.
+            </p>
           </div>
 
           {/* Action buttons */}
@@ -312,9 +299,13 @@ export default function MenuManager() {
               </div>
             </div>
           </div>
-          {/* Simulated nav bar */}
+          {/* Simulated nav bar — identidade real do blog (logo/nome do painel) */}
           <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-1 flex-wrap overflow-x-auto">
-            <span className="font-black text-[#0B2A66] text-lg mr-3">SBC <span className="text-[#E71D36]">Agora</span></span>
+            {settings?.logoBase64 ? (
+              <img src={settings.logoBase64} alt={settings.siteName} className="h-7 w-auto max-w-[160px] object-contain mr-3 shrink-0" />
+            ) : (
+              <span className="font-black text-[#0B2A66] text-lg mr-3">{settings?.siteName ?? "…"}</span>
+            )}
             <div className="flex items-center gap-1 flex-wrap">
               <span className="flex items-center gap-1 text-xs font-semibold text-[#0B2A66] bg-[#EEF2FF] px-3 py-1.5 rounded-full cursor-pointer">
                 <Home size={11} /> Página inicial
@@ -390,39 +381,45 @@ export default function MenuManager() {
               {/* List */}
               <div className="space-y-1">
                 {pagesTab === "paginas" && filteredPages.map((page) => (
-                  <div key={page} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-slate-50 group cursor-pointer">
+                  <div key={page.path} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-slate-50 group cursor-pointer">
                     <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
                       <FileText size={12} className="text-slate-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-700 truncate">{page}</p>
-                      <p className="text-[10px] text-slate-400">Página</p>
+                      <p className="text-xs font-medium text-slate-700 truncate">{page.label}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{page.path}</p>
                     </div>
                     <button
-                      onClick={() => addItem(page, `/${page.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`)}
+                      onClick={() => addItem(page.label, page.path)}
                       className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                     >
                       <Plus size={11} />
                     </button>
                   </div>
                 ))}
-                {pagesTab === "categorias" && CATEGORIES.map((cat) => (
-                  <div key={cat} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-slate-50 group cursor-pointer">
-                    <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                      <LayoutGrid size={12} className="text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-700">{cat}</p>
-                      <p className="text-[10px] text-slate-400">Categoria</p>
-                    </div>
-                    <button
-                      onClick={() => addItem(cat, `/${cat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g,"-")}`)}
-                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                    >
-                      <Plus size={11} />
-                    </button>
-                  </div>
-                ))}
+                {pagesTab === "categorias" && (
+                  filteredCategories.length === 0 ? (
+                    <p className="text-xs text-slate-400 pt-1">Nenhuma categoria cadastrada ainda.</p>
+                  ) : (
+                    filteredCategories.map((cat) => (
+                      <div key={cat.value} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-slate-50 group cursor-pointer">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: categoryColor(cat.value) }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate">{cat.label}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">/{cat.value}</p>
+                        </div>
+                        <button
+                          onClick={() => addItem(cat.label, `/${cat.value}`)}
+                          className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                        >
+                          <Plus size={11} />
+                        </button>
+                      </div>
+                    ))
+                  )
+                )}
                 {pagesTab === "links" && (
                   <div className="pt-1">
                     <p className="text-xs text-slate-400 mb-3">Adicione um link externo ou personalizado.</p>
@@ -437,11 +434,13 @@ export default function MenuManager() {
               </div>
             </div>
 
-            <div className="border-t border-slate-100 px-4 py-3">
-              <button className="flex items-center gap-1 text-xs text-[#2563EB] hover:underline">
-                Ver todas as páginas <ChevronRight size={12} />
-              </button>
-            </div>
+            {pagesTab === "categorias" && (
+              <div className="border-t border-slate-100 px-4 py-3">
+                <Link href="/admin/categorias" className="flex items-center gap-1 text-xs text-[#2563EB] hover:underline">
+                  Gerenciar categorias <ChevronRight size={12} />
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* ── Column 2: Menu structure ── */}
@@ -513,11 +512,11 @@ export default function MenuManager() {
                           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                             item.path.startsWith("http")
                               ? "bg-purple-50 text-purple-600"
-                              : item.path.startsWith("/") && item.path.length > 1
-                              ? "bg-blue-50 text-blue-600"
-                              : "bg-slate-100 text-slate-500"
+                              : PAGE_PATHS.has(item.path)
+                              ? "bg-slate-100 text-slate-500"
+                              : "bg-blue-50 text-blue-600"
                           }`}>
-                            {item.path.startsWith("http") ? "Link" : "Categoria"}
+                            {item.path.startsWith("http") ? "Link" : PAGE_PATHS.has(item.path) ? "Página" : "Categoria"}
                           </span>
 
                           {/* Row actions */}
@@ -624,19 +623,6 @@ export default function MenuManager() {
                   />
                 </div>
 
-                {/* Tipo */}
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Tipo</label>
-                  <div className="relative">
-                    <select className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] appearance-none cursor-pointer text-slate-700">
-                      <option>Categoria</option>
-                      <option>Página</option>
-                      <option>Link personalizado</option>
-                    </select>
-                    <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  </div>
-                </div>
-
                 {/* Categoria / URL */}
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1.5">
@@ -654,15 +640,6 @@ export default function MenuManager() {
                 {/* Divider */}
                 <div className="border-t border-slate-100" />
 
-                {/* Toggle: Abrir em nova aba */}
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-700">Abrir em nova aba</p>
-                    <p className="text-[11px] text-slate-400">Abre o link em uma nova aba do navegador.</p>
-                  </div>
-                  <Toggle checked={editNewTab} onChange={setEditNewTab} />
-                </div>
-
                 {/* Toggle: Visível no menu */}
                 <div className="flex items-center justify-between py-1">
                   <div>
@@ -673,24 +650,6 @@ export default function MenuManager() {
                     checked={editVisible}
                     onChange={(v) => { setEditVisible(v); updateSelected({ visible: v }); }}
                   />
-                </div>
-
-                {/* Toggle: Destacar item */}
-                <div className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-700">Destacar item</p>
-                    <p className="text-[11px] text-slate-400">Aplica destaque visual no menu.</p>
-                  </div>
-                  <Toggle checked={editHighlight} onChange={setEditHighlight} />
-                </div>
-
-                {/* Ícone */}
-                <div className="border-t border-slate-100 pt-4">
-                  <label className="text-xs font-semibold text-slate-600 block mb-2">Ícone (opcional)</label>
-                  <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <span className="text-xs text-slate-400 flex-1">Selecione um ícone</span>
-                    <Search size={13} className="text-slate-400" />
-                  </div>
                 </div>
 
                 {/* Dica */}
