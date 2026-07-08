@@ -109,6 +109,8 @@ export interface HomeBlock {
   area?: "main" | "sidebar"; width?: "full" | "half";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona. */
   linkLabel?: string;
+  /** Fonte do texto do bloco (id do registro de fontes do frontend). */
+  fontFamily?: string;
 }
 
 /** Template de home salvo no painel (aba Templates de Blocos da Home):

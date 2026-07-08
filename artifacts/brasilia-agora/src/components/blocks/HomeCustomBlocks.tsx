@@ -10,7 +10,7 @@
  * DOMPurify (sanitizeArticleHtml; no SSR usa a variante leve sem DOM — render
  * IGUAL nos dois lados, senão a hidratação descarta o SSR inteiro, #418).
  */
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
@@ -25,6 +25,22 @@ import {
 } from "../../lib/homeBlocks";
 import type { AdSlotKey } from "../ads/useAds";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
+import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
+
+/**
+ * Aplica a fonte escolhida do bloco (HomeBlock.fontFamily) a todo o seu
+ * conteúdo. display:contents não gera caixa (layout/sticky intocados), mas as
+ * propriedades herdadas e as variáveis --app-font-* cascateiam normalmente —
+ * inclusive sobre os títulos com `font-serif`. Sem fonte definida, é um
+ * fragment puro (render byte-idêntico ao atual). Fontes do Google são
+ * carregadas sob demanda no cliente; no SSR sai só o style inline (hidrata igual).
+ */
+export function BlockFontScope({ fontId, children }: { fontId?: string; children: React.ReactNode }) {
+  useEffect(() => { ensureFontLoaded(fontId); }, [fontId]);
+  const style = blockFontStyle(fontId);
+  if (!style) return <>{children}</>;
+  return <div style={{ display: "contents", ...style }}>{children}</div>;
+}
 
 export interface BlockArticle {
   id: string;

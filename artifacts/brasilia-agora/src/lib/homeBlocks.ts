@@ -62,6 +62,8 @@ export interface HomeBlock {
   linkLabel?: string;
   /** Bloco de imagem/HTML marcado como propaganda — listado na aba Propagandas do admin. */
   isAd?: boolean;
+  /** Fonte do texto do bloco: id do registro em lib/fonts.ts. Ausente = padrão do site. */
+  fontFamily?: string;
 }
 
 /** Item de menu carregado por um template (mesmo shape do menu do site). */

@@ -3,6 +3,7 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, type TemplateMenuItem } from "../../lib/homeBlocks";
+import { FONT_OPTIONS, FONT_GROUP_LABELS, fontCss, ensureFontLoaded, type FontOption } from "../../lib/fonts";
 import type { FooterConfig } from "../../lib/footerConfig";
 import FooterEditor from "./FooterEditor";
 import {
@@ -605,6 +606,7 @@ interface BlockForm {
   width: "" | "full" | "half" | "quarter";
   linkLabel: string;
   isAd: boolean;
+  fontFamily: string;
 }
 
 const EMPTY_FORM: BlockForm = {
@@ -616,6 +618,7 @@ const EMPTY_FORM: BlockForm = {
   adSlot: "slot_05", adId: "",
   area: "", width: "", linkLabel: "",
   isAd: false,
+  fontFamily: "",
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
@@ -644,6 +647,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     width:         block.width ?? "",
     linkLabel:     block.linkLabel ?? "",
     isAd:          block.isAd ?? false,
+    fontFamily:    block.fontFamily ?? "",
   };
 }
 
@@ -676,7 +680,38 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     width:      f.width || undefined,
     linkLabel:  f.linkLabel.trim() || undefined,
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
+    fontFamily: f.fontFamily || undefined,
   };
+}
+
+// ─── Font picker (fonte do texto do bloco) ────────────────────────────────────
+const FONT_GROUPS: [string, FontOption[]][] = (["site", "system", "sans", "serif", "display"] as const)
+  .map((g) => [FONT_GROUP_LABELS[g], FONT_OPTIONS.filter((f) => f.group === g)]);
+
+function FontPicker({ value, onChange, inputClass }: {
+  value: string; onChange: (v: string) => void; inputClass: string;
+}) {
+  // Carrega a fonte escolhida no próprio painel para a amostra abaixo do select.
+  useEffect(() => { ensureFontLoaded(value); }, [value]);
+  const css = fontCss(value);
+  return (
+    <>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
+        <option value="">Padrão do site (Inter + Merriweather)</option>
+        {FONT_GROUPS.map(([label, opts]) => (
+          <optgroup key={label} label={label}>
+            {opts.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+          </optgroup>
+        ))}
+      </select>
+      {css && (
+        <div className="mt-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2" style={{ fontFamily: css }}>
+          <p className="text-[15px] font-black leading-snug text-slate-800">Título de exemplo da notícia</p>
+          <p className="text-[11px] text-slate-500 leading-snug">Linha de apoio com a fonte escolhida — AaBbCc 0123</p>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ─── Custom category input ────────────────────────────────────────────────────
@@ -1147,6 +1182,16 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         <PanelSection label="Texto do link da seção">
           <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
             className={INPUT} placeholder='Padrão: "Ver mais"' />
+        </PanelSection>
+      )}
+
+      {/* Fonte do texto do bloco (títulos e apoios trocam juntos) */}
+      {form.blockType !== "sep" && (
+        <PanelSection label="Fonte do texto" icon={Type}>
+          <FontPicker value={form.fontFamily} onChange={(v) => onChange("fontFamily", v)} inputClass={INPUT} />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            Vale para títulos e textos deste bloco. Fontes do Google são baixadas pelo site só quando algum bloco as usa.
+          </p>
         </PanelSection>
       )}
 
@@ -2752,6 +2797,10 @@ export default function HomeBlocksManager() {
                             <span className="text-[11px] font-medium text-[#64748B]">É uma propaganda (lista na aba Propagandas)</span>
                             <Toggle checked={b.isAd === true} onChange={() => patchArticleBlock(b.id, { isAd: !b.isAd })} accent="#D97706" />
                           </div>
+                        )}
+                        {btype !== "advertising" && (
+                          <FontPicker value={b.fontFamily ?? ""} inputClass={`${AINPUT} appearance-none`}
+                            onChange={(v) => patchArticleBlock(b.id, { fontFamily: v || undefined })} />
                         )}
                       </div>
                     );

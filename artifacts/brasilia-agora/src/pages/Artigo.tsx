@@ -14,7 +14,7 @@ import { useT, formatDateTime } from "../lib/i18n";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
 import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
-import { HtmlBlock, ImageBlock } from "../components/blocks/HomeCustomBlocks";
+import { HtmlBlock, ImageBlock, BlockFontScope } from "../components/blocks/HomeCustomBlocks";
 import { inferBlockType, type HomeBlock } from "../lib/homeBlocks";
 import type { AdSlotKey } from "../components/ads/useAds";
 
@@ -91,7 +91,7 @@ function ArticleSidebar() {
         // Último bloco fica fixo ao rolar (comportamento clássico da propaganda).
         return (
           <div key={b.id} className={i === blocks.length - 1 ? "sticky top-24" : undefined}>
-            {content}
+            <BlockFontScope fontId={b.fontFamily}>{content}</BlockFontScope>
           </div>
         );
       })}

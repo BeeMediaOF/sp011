@@ -22,7 +22,7 @@ import { inferBlockType, segmentBlocks, sampleForPreview, type SegmentEntry } fr
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
-  QuotesBlock, SeparatorBlock, AdSlotBlock,
+  QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope,
 } from "../components/blocks/HomeCustomBlocks";
 import { ZoneBlock } from "../components/blocks/PortalZoneBlocks";
 
@@ -720,10 +720,12 @@ export default function Home() {
         {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
         {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
         {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
-        {block.custom
-          ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-          : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-        }
+        <BlockFontScope fontId={block.fontFamily}>
+          {block.custom
+            ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
+            : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
+          }
+        </BlockFontScope>
       </>
     );
 
@@ -761,10 +763,12 @@ export default function Home() {
   function renderZoneItem(entry: SegmentEntry, zone: "main" | "sidebar" | "half"): React.ReactNode {
     const { block, idx } = entry;
     const inner = (
-      <ZoneBlock block={block} zone={zone} getArticles={getArticles} preview={isAdminPreview}
-        fallback={block.custom
-          ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
-          : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />} />
+      <BlockFontScope fontId={block.fontFamily}>
+        <ZoneBlock block={block} zone={zone} getArticles={getArticles} preview={isAdminPreview}
+          fallback={block.custom
+            ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
+            : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />} />
+      </BlockFontScope>
     );
     if (!isAdminPreview) return <React.Fragment key={block.id}>{inner}</React.Fragment>;
     return (
