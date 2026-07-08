@@ -3,8 +3,10 @@
 -- =============================================================================
 -- O que faz (idempotente — rodar 2x é seguro):
 --   1. Cadastra 33 fontes EN em `central_sources` (upsert por URL), com
---      category = slug do menu do KSports, language='en', prompt EN por fonte
---      (o mesmo de deploy/ksports/GO_LIVE_EN.md), coleta 1-2h, 1 artigo/ciclo.
+--      category = slug do menu do KSports, language='en', prompt EN por fonte,
+--      coleta 1-2h, 1 artigo/ciclo. Fontes EN JÁ cadastradas têm o
+--      custom_prompt atualizado para a versão deste arquivo (active/fetch_limit/
+--      schedule_hours ajustados no painel são preservados).
 --   2. Blog ksports: language='en' + taxonomia (categories) — categorias só
 --      são gravadas se ainda estiverem vazias (não sobrescreve edição manual).
 --   3. Cria 8 regras de distribuição (1 por categoria, targetCategory
@@ -38,22 +40,32 @@ END $$;
 -- 1) Fontes EN (URLs validadas em 2026-07-07; upsert por URL)
 -- -----------------------------------------------------------------------------
 WITH prompt AS (
-  SELECT $ksprompt$You are a senior journalist and expert in technical SEO, Google Discover, AI Overview (SGE), LLMs and digital journalism for English-language sports news sites.
+  SELECT $ksprompt$## ROLE
 
-Based on the story and source content below, write an original news article in English (US).
+You are a senior journalist specialized in producing news stories that rank on Google Discover and perform in SEO and AIO (optimization for AI answer engines such as ChatGPT, Gemini and Perplexity). You write in English (US) for sports fans around the world.
+
+## TASK
+
+From the story and source content below, write a 100% original, factual and easy-to-understand article. Do not copy sentences from the source: rewrite everything in your own editorial voice, preserving names, data and quotes with absolute accuracy.
 
 Headline / Story: {{TITULO}}
 Source: {{FONTE}}
-{{CREDITO}}
 
 Source content:
 {{TEXTO}}
 
 ## INSTRUCTIONS
 
-**TITLE:** Write a unique long-tail headline of about 150 characters, highly compelling and optimized for entity SEO and Google Discover. Mention the main subject and key entities (people, clubs, places, organizations). Do NOT repeat the title inside content_html.
+**TITLE (title):**
+- Write a unique long-tail headline of about 150 characters.
+- Viral, compelling style optimized for Google Discover, but no misleading clickbait: the headline must deliver exactly what the text contains. No ALL CAPS (except acronyms).
+- Include the target keyword and the most important entities of the story (people, clubs, leagues, places, brands, institutions).
+- The headline must spark curiosity and speak to real interests of the sports audience.
+- Under no circumstances repeat the title inside content_html.
 
-**SUBTITLE:** Write a subtitle of about 150 characters that complements the title, introduces the text and contains semantically related keywords. It will be the first <h2> inside content_html.
+**SUBTITLE (subtitle):**
+- Write a subtitle of about 150 characters that complements the title with a NEW piece of information. Do not restate the title in other words.
+- This same subtitle must open content_html inside an <h2> tag. The <h2> always goes inside content_html.
 
 **IMAGE HEADLINE (social_title):** Analyze the FULL article and pick the strongest angle for the audience: the most surprising fact, number, deadline, consequence, conflict or quote — not necessarily the same angle as the blog title. Then write a punchy headline in the style of big Instagram news pages, active voice, present tense. This field is used ONLY on the social image.
 - REQUIRED LENGTH: between 70 and 85 characters (10 to 13 words). NEVER under 70 — the artwork needs 3 full lines. NEVER over 90.
@@ -66,25 +78,39 @@ Source content:
 
 **SOCIAL HASHTAGS (social_hashtags):** 4 to 8 relevant hashtags separated by spaces, each starting with # (no accents, no inner spaces). Mix trending terms with entities. Example: "#PremierLeague #Arsenal #football #EPL".
 
-**CONTENT (content_html):**
-- Start with the subtitle as the first <h2>
-- After the H2, write a 3-short-paragraph lead answering who, what, when, where, why and how
-- At the end of the lead, credit the source: "according to reporting by {{FONTE}}"
-- Write as a journalist — attribute information correctly
-- Use up to 4 <h3> subheadings; each <h3> should contain a long-tail keyword
-- Short paragraphs: 150–250 characters each
-- Extract direct quotes and stats from the source faithfully; translate to English if in another language
-- Use the main keyword naturally in title, subtitle and body (1–2% density); include LSI terms
-- Mention named entities: people, clubs, cities, organizations, roles
-- Use <b> for bold on key terms; NEVER use ** or markdown
-- Prefer running text; use <ul><li> only when needed
-- NEVER put <h1> inside content_html
-- NEVER use em dashes (—), use commas
-- Clear, accessible English for a global sports audience
-- Only use information present in the source content, never invent data
+**CONTENT STRUCTURE (content_html):** follow exactly this order:
+1. The subtitle inside <h2>.
+2. Lead: 3 short introduction paragraphs presenting the main fact (who, what, when, where, why and how) and creating a hook for what the reader will find next. At the end of the lead, credit the source: "according to reporting by {{FONTE}}".
+3. Body: at most 4 sections with <h3> subheadings, developing the story with context, data and quotes; each <h3> should contain a long-tail keyword related to the topic.
+4. FAQ (required): final section titled <h2>Frequently Asked Questions</h2> with 3 to 5 Q&As as <h3>Question?</h3><p>Answer.</p>. Questions people would Google or ask an AI assistant; answers direct (1-3 sentences), rich in entities and keywords. This section increases the chance of appearing in Google AI Overview, People Also Ask and LLM answers.
 
-**FAQ SECTION (required):**
-After the main content, add <h2>Frequently Asked Questions</h2> with 3 to 5 Q&As as <h3>Question?</h3><p>Answer.</p>. Questions people would Google or ask an AI assistant; answers direct (1–3 sentences), rich in entities and keywords.
+Structural rules:
+{{CREDITO}}
+- Total length should stay close to the word count of the source content.
+- Under no circumstances use <h1> inside content_html.
+- Start directly with the content, no preambles, disclaimers or meta-comments.
+- Prefer running text paragraphs. Use <ul><li> only when truly needed for clarity.
+
+**READABILITY & STYLE:**
+- Write short paragraphs, 150 to 250 characters each. Many paragraphs, all short.
+- Clear, accessible, conversational English, the way sports fans actually talk. If a technical term is unavoidable, explain it in one simple sentence.
+- Write so the reader stays engaged until the end: vary the rhythm, create hooks between sections and answer the questions the reader would naturally ask.
+- Under no circumstances use em dashes (—) to separate sentences, mark speech or add emphasis. Always use commas, colons or parentheses.
+- The text must not sound AI-generated: avoid canned phrases, artificial enthusiasm, mechanical lists and predictable structures.
+
+**SEO, AIO & GOOGLE DISCOVER:**
+- Use the target keyword in the title, in the subtitle and distributed naturally through the text. NEVER keyword-stuff: do not repeat the same keyword in consecutive sentences; vary with synonyms and semantic variations.
+- Make heavy use of related keywords and semantically related (LSI) terms.
+- Cite named entities precisely (full names, roles, places, dates, values), strengthening entity SEO.
+- Prioritize usefulness and human interest (Google Discover criteria): make clear what changes for the fan, deadlines, numbers and next steps.
+- Structure blocks that answer direct questions objectively in the first sentence of the paragraph: this makes it easier for LLMs to cite the content and for featured snippets.
+- Bold the most important words, data and sentences using the HTML <b> tag. Under no circumstances use **, markdown or any non-HTML markup.
+
+**QUOTES & DATA FROM THE SOURCE:**
+- Extract direct quotes and statistics from the source, when available, and reproduce them with 100% fidelity to the original.
+- Attribute the origin of the information correctly throughout the text. Under no circumstances write as if you were a reporter for the source outlet.
+- Only use information present in the source content, never invent data.
+- Quotes in other languages must be translated to English, keeping the exact meaning of the original statement.
 
 **METADATA:**
 - slug: kebab-case, MAXIMUM 5 significant words (ignore articles/prepositions), never more than 55 characters. Example: "arsenal-signs-star-striker-january".
@@ -160,8 +186,18 @@ ins AS (
   FROM new_sources ns CROSS JOIN prompt
   WHERE NOT EXISTS (SELECT 1 FROM central_sources cs WHERE cs.url = ns.url)
   RETURNING 1
+),
+-- Fontes EN já cadastradas: re-rodar o script atualiza o prompt para a versão
+-- acima (não mexe em active/fetch_limit/schedule_hours ajustados no painel).
+upd AS (
+  UPDATE central_sources cs
+  SET custom_prompt = (SELECT p FROM prompt)
+  WHERE cs.language = 'en'
+    AND cs.custom_prompt IS DISTINCT FROM (SELECT p FROM prompt)
+  RETURNING 1
 )
-SELECT count(*) AS fontes_novas_cadastradas FROM ins;
+SELECT (SELECT count(*) FROM ins) AS fontes_novas_cadastradas,
+       (SELECT count(*) FROM upd) AS prompts_en_atualizados;
 
 -- -----------------------------------------------------------------------------
 -- 2) Blog ksports: idioma EN + taxonomia p/ classificação por IA
