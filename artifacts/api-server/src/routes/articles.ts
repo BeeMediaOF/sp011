@@ -4,9 +4,30 @@ import { store } from "../lib/store.js";
 
 const router = Router();
 
-/** GET /api/categories — distinct categories from all articles (public) */
+/** GET /api/categories — categorias do blog (public).
+ *  Com cadastro no painel (settings.categories), devolve SÓ as visíveis, na
+ *  ordem cadastrada, com contagem de publicados por slug. Sem cadastro,
+ *  mantém a derivação histórica a partir dos artigos existentes. */
 router.get("/categories", async (_req, res) => {
   const all = await articleService.getArticles();
+
+  const registered = (store.getSettings().categories ?? []).filter((c) => c.visible !== false);
+  if (registered.length > 0) {
+    const counts = new Map<string, number>();
+    for (const a of all) {
+      if (a.status !== "published") continue;
+      const key = (a.category ?? "geral").toLowerCase().trim();
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    res.json({
+      categories: registered.map((c) => ({
+        value: c.slug, label: c.name, tag: c.name.toUpperCase(),
+        count: counts.get(c.slug) ?? 0,
+      })),
+    });
+    return;
+  }
+
   const map = new Map<string, { label: string; tag: string; count: number }>();
 
   for (const a of all) {

@@ -323,6 +323,7 @@ export default function RSSManager() {
 
   // ── Dynamic categories from menu ──
   const [menuCategories, setMenuCategories] = useState<{ slug: string; label: string }[]>([]);
+  const [siteCategories, setSiteCategories] = useState<{ slug: string; label: string }[]>([]);
 
   // ── Stats ──
   const [rssStats, setRssStats] = useState({ total: 0, rewritten: 0, manual: 0 });
@@ -585,11 +586,26 @@ export default function RSSManager() {
     } catch { /* ignore */ }
   }, []);
 
+  // Categorias cadastradas no painel (→ /admin/categorias). Com lista salva,
+  // o seletor de categoria das fontes mostra SÓ elas (visíveis).
+  const loadSiteCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${BASE}api/admin/settings`, {
+        headers: { Authorization: `Bearer ${token()}` },
+      });
+      const d = await res.json() as { settings?: { categories?: { name: string; slug: string; visible?: boolean }[] } };
+      setSiteCategories((d.settings?.categories ?? [])
+        .filter((c) => c.visible !== false)
+        .map((c) => ({ slug: c.slug, label: c.name.toUpperCase() })));
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     void loadAiSettings();
     void loadAiQuota();
     void loadSources();
     void loadMenuCategories();
+    void loadSiteCategories();
     void loadRssStats();
     void loadPrompts();
     void loadLogs();
@@ -599,16 +615,18 @@ export default function RSSManager() {
     const quotaInterval = setInterval(() => void loadAiQuota(), 15_000);
     const queueInterval = setInterval(() => void loadQueueStats(), 10_000);
     return () => { clearInterval(quotaInterval); clearInterval(queueInterval); };
-  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats, loadCollectionSettings, loadFallbackSettings]);
+  }, [loadAiSettings, loadAiQuota, loadSources, loadMenuCategories, loadSiteCategories, loadRssStats, loadPrompts, loadLogs, loadQueueStats, loadCollectionSettings, loadFallbackSettings]);
 
   const allCategories = useMemo(() => {
+    // Cadastro do painel manda; fallback = lista padrão + categorias do menu.
+    if (siteCategories.length > 0) return siteCategories;
     const baseSet = new Set(BASE_CATEGORIES);
     const extra = menuCategories.filter((m) => !baseSet.has(m.slug));
     return [
       ...BASE_CATEGORIES.map((s) => ({ slug: s, label: TAG_MAP[s] ?? s.toUpperCase() })),
       ...extra,
     ];
-  }, [menuCategories]);
+  }, [siteCategories, menuCategories]);
 
   // ── Filtered / grouped sources ───────────────────────────────────────────────
   const filteredSources = useMemo(() => {

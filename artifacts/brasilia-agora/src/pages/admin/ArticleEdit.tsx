@@ -1211,6 +1211,10 @@ export default function ArticleEdit() {
                   {categories.map((c) => (
                     <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
+                  {/* Categoria do artigo que saiu do cadastro: mantém selecionável */}
+                  {form.category && !categories.some((c) => c.value === form.category) && (
+                    <option value={form.category}>{form.category}</option>
+                  )}
                 </select>
                 <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
