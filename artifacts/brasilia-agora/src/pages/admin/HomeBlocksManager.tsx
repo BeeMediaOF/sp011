@@ -426,9 +426,11 @@ const KSPORTS_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-si
 const KSPORTS_AD_BG = `border:1px solid #232145;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(255,43,116,.42), transparent 42%), radial-gradient(circle at 10% 60%, rgba(102,0,184,.55), transparent 46%), linear-gradient(135deg, ${KSPORTS_DARK}, ${KSPORTS_BLUE2} 60%, ${KSPORTS_DARK});`;
 
 // Banner de bônus (largura total, entre o ticker e o Recent News).
-const KSPORTS_AD_BONUS = `<div style="display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 26px;${KSPORTS_AD_BG}">
+// flex-wrap + justify center: no celular as três peças empilham em vez de
+// espremer o texto central (que estouraria a largura da tela).
+const KSPORTS_AD_BONUS = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;${KSPORTS_AD_BG}">
   ${KSPORTS_AD_BRAND}
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">EXCLUSIVE <span style="color:${KSPORTS_PINK};">BONUSES</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">FOR THE KSPORTS COMMUNITY</span></span>
+  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">EXCLUSIVE <span style="color:${KSPORTS_PINK};">BONUSES</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">FOR THE KSPORTS COMMUNITY</span></span>
   <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">GET STARTED</span>
 </div>`;
 

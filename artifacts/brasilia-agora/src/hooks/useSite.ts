@@ -21,6 +21,8 @@ export interface SiteSettings {
   tagline: string;
   logoBase64?: string;
   logoSize?: number;
+  /** Logo alternativa exibida só no mobile (ex.: versão vertical/compacta). */
+  logoMobileBase64?: string;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
@@ -88,8 +90,8 @@ function saveToStorage(data: SiteSettings) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     try {
-      const { logoBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64, ...slim } = data;
-      void [logoBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64];
+      const { logoBase64, logoMobileBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64, ...slim } = data;
+      void [logoBase64, logoMobileBase64, bylineLogoBase64, ogImageBase64, faviconBase64, adminLogoBase64];
       localStorage.setItem(STORAGE_KEY, JSON.stringify(slim));
     } catch {}
   }

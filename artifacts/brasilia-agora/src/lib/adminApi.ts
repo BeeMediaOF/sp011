@@ -281,6 +281,8 @@ export interface SiteSettings {
   tagline: string;
   logoBase64?: string;
   logoSize?: number;
+  /** Logo alternativa exibida só no mobile (ex.: versão vertical/compacta). */
+  logoMobileBase64?: string;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */

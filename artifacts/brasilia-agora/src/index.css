@@ -223,6 +223,13 @@
     @apply border-border;
   }
 
+  /* overflow-x no html E no body: iOS Safari não propaga o clip do body para
+     o viewport de forma confiável — sem o clip no html a página ainda "anda"
+     de lado quando algum bloco estoura a largura da tela. */
+  html {
+    overflow-x: clip;
+  }
+
   body {
     @apply font-sans antialiased bg-background text-foreground;
     overflow-x: clip;
@@ -249,6 +256,28 @@
 /* ── Article HTML body (AI rewrite output with WordPress HTML) ─────────────── */
 .article-body {
   --chapeu: #c8102e;
+  /* HTML vindo da IA/WordPress: URLs e palavras compridas precisam quebrar,
+     senão estouram a coluna no celular. */
+  overflow-wrap: break-word;
+}
+
+/* Mídia e embeds do corpo nunca passam da largura da coluna. */
+.article-body img,
+.article-body video,
+.article-body iframe {
+  max-width: 100%;
+}
+
+/* Tabelas e blocos pré-formatados rolam dentro da própria caixa no mobile. */
+.article-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.article-body pre {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 .article-body h2 {

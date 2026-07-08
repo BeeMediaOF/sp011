@@ -187,6 +187,7 @@ export default function Settings() {
 
   /* ── logo state ── */
   const logoInputRef   = useRef<HTMLInputElement>(null);
+  const logoMobileRef  = useRef<HTMLInputElement>(null);
   const ogRef          = useRef<HTMLInputElement>(null);
   const faviconRef     = useRef<HTMLInputElement>(null);
   const adminLogoRef   = useRef<HTMLInputElement>(null);
@@ -468,7 +469,9 @@ export default function Settings() {
         setField("logoBase64", logoPreview);
         setLogoPreview(null);
       }
-      await adminApi.updateSettings({ logoSize });
+      // logoMobileBase64 junto: o botão "Salvar Logo" persiste também a variante
+      // mobile ("" = removida; undefined sai do JSON e mantém a atual).
+      await adminApi.updateSettings({ logoSize, logoMobileBase64: settings.logoMobileBase64 });
       invalidateSiteCache();
       setLogoStatus("success");
       toast({ title: "Logo salvo!", duration: 2000 });
@@ -499,7 +502,7 @@ export default function Settings() {
     reader.readAsDataURL(file);
   }
 
-  function handleImageFile(key: "ogImageBase64" | "faviconBase64", file: File) {
+  function handleImageFile(key: "ogImageBase64" | "faviconBase64" | "logoMobileBase64", file: File) {
     const reader = new FileReader();
     reader.onload = e => setField(key, e.target?.result as string);
     reader.readAsDataURL(file);
@@ -854,6 +857,31 @@ export default function Settings() {
                     <img src={displayLogo} alt="size preview" style={{ height: logoSize, transition: "height 0.15s" }} className="w-auto object-contain"/>
                   </div>
                 )}
+              </div>
+
+              {/* Logo mobile (opcional) */}
+              <div className="pt-4 border-t border-[#F1F5F9]">
+                <p className="text-xs font-medium text-[#64748B] mb-1">Logo mobile (opcional)</p>
+                <p className="text-xs text-[#94A3B8] mb-3">
+                  Versão vertical ou compacta exibida só em telas pequenas — o celular trava a
+                  altura da logo em ~48px, então logos muito largas ficam melhores com uma
+                  variante própria. Sem envio, o site usa a logo principal reduzida.
+                </p>
+                <input ref={logoMobileRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("logoMobileBase64", f); }}/>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => logoMobileRef.current?.click()}
+                    className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
+                    Selecionar imagem
+                  </button>
+                  {settings.logoMobileBase64 && (
+                    <div className="relative">
+                      <img src={settings.logoMobileBase64} alt="Logo mobile" className="h-12 max-w-[120px] object-contain rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2"/>
+                      <button onClick={() => setField("logoMobileBase64", "")}
+                        className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">&times;</button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {logoStatus === "success" && (

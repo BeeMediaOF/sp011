@@ -502,7 +502,10 @@ export default function Artigo() {
     : null;
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col">
+    // overflow-x-clip: nenhum bloco interno pode esticar o canvas no mobile
+    // (clip, não hidden — hidden viraria scroll container e mataria o sticky
+    // da sidebar).
+    <div className="min-h-screen w-full bg-white flex flex-col overflow-x-clip">
       {newsArticleSchema && (
         <script
           type="application/ld+json"
@@ -522,7 +525,9 @@ export default function Artigo() {
           <div className="flex flex-col lg:flex-row gap-8">
 
             {/* ── CONTEÚDO PRINCIPAL ─────────────────────────────────── */}
-            <article className="w-full lg:flex-1 min-w-0 pl-[0px] pr-[0px] pt-[0px] pb-[0px] ml-[0px] mb-[0px] mr-[106px]">
+            {/* mr só em lg+: no mobile o artigo tem w-full — margem à direita
+                empurraria o canvas 106px além da tela (página "andando" de lado). */}
+            <article className="w-full lg:flex-1 min-w-0 lg:mr-[106px]">
               {showSkeleton ? (
                 <ArticleSkeleton />
               ) : !article ? (

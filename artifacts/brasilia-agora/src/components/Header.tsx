@@ -234,6 +234,25 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
   );
 }
 
+// ─── Logo do cabeçalho (desktop + mobile) ─────────────────────────────────────
+// No mobile a altura ganha um teto e a largura nunca passa de ~60vw: logo larga
+// em altura grande passava da largura do celular, ficava "colada" nas bordas e
+// esticava a página para o lado. Se o painel tiver uma logo mobile própria
+// (ex.: versão vertical), ela substitui a principal só em telas pequenas; o
+// desktop segue exatamente o logoSize configurado.
+function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap }: {
+  desktopSrc: string; mobileSrc: string; alt: string; height: number; mobileCap: number;
+}) {
+  return (
+    <>
+      <img src={mobileSrc} alt={alt} style={{ height: Math.min(height, mobileCap) }}
+        className="lg:hidden w-auto max-w-[min(60vw,300px)] object-contain block" />
+      <img src={desktopSrc} alt={alt} style={{ height }}
+        className="hidden lg:block w-auto object-contain" />
+    </>
+  );
+}
+
 // ─── Header principal ─────────────────────────────────────────────────────────
 export default function Header() {
   const { settings }            = useSite();
@@ -241,6 +260,8 @@ export default function Header() {
   // Logo configurada no painel (Configurações → logo) tem prioridade; a imagem
   // empacotada no bundle é só fallback quando nenhuma logo foi enviada.
   const logoSrc = settings?.logoBase64 || logoImg;
+  // Variante mobile opcional (Configurações → Logo & Imagens → Logo mobile).
+  const logoMobileSrc = settings?.logoMobileBase64 || logoSrc;
   const [location]              = useLocation();
   const [menuOpen, setMenu]       = useState(false);
   const [searchOpen, setSearch]   = useState(false);
@@ -375,12 +396,8 @@ export default function Header() {
             </button>
 
             <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
-              <img
-                src={logoSrc}
-                alt={settings?.siteName ?? BRAND.name}
-                style={{ height: settings?.logoSize ? settings.logoSize * 0.65 : 30 }}
-                className="w-auto object-contain block"
-              />
+              <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
+                height={settings?.logoSize ? settings.logoSize * 0.65 : 30} mobileCap={34} />
             </Link>
 
             {menuBarStyle === "attached" && (
@@ -442,7 +459,7 @@ export default function Header() {
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
         <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
-          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoSrc} siteName={siteName} />
+          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoMobileSrc} siteName={siteName} />
       </div>
     );
   }
@@ -462,12 +479,8 @@ export default function Header() {
             </button>
 
             <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
-              <img
-                src={logoSrc}
-                alt={settings?.siteName ?? BRAND.name}
-                style={{ height: settings?.logoSize ?? 48 }}
-                className="w-auto object-contain block"
-              />
+              <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
+                height={settings?.logoSize ?? 48} mobileCap={48} />
             </Link>
 
             <button
@@ -531,7 +544,7 @@ export default function Header() {
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
         <MobileNav open={menuOpen} onClose={() => setMenu(false)} navItems={navItems}
-          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoSrc} siteName={siteName} />
+          isActive={isActive} activeColor={menuActiveColor} logoSrc={logoMobileSrc} siteName={siteName} />
       </div>
     );
   }
@@ -551,12 +564,8 @@ export default function Header() {
           </button>
 
           <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
-            <img
-              src={logoSrc}
-              alt={settings?.siteName ?? BRAND.name}
-              style={{ height: settings?.logoSize ?? 48 }}
-              className="w-auto object-contain block"
-            />
+            <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
+              height={settings?.logoSize ?? 48} mobileCap={48} />
           </Link>
 
           {menuBarStyle === "attached" && (
