@@ -1,11 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import { useLocation } from "wouter";
 import { getConsent } from "../components/LGPDConsent";
+import { parseUtm, refHostOf, contentScrollPct, newMilestones, type UtmSignals } from "../lib/analyticsClient";
 
 const SESSION_KEY = "bee_session_id";
+const VISITOR_KEY = "bee_visitor_id";
 const REF_KEY     = "bee_ref_done";
+const UTM_KEY     = "bee_utm";
 /** Teto de duração de leitura — aba esquecida aberta não vira "leitura" de horas. */
 const MAX_READ_SECONDS = 1800;
+/** Heartbeat de leitura: envia a duração ACUMULADA (idempotente no servidor, que
+ *  guarda o MAX por sessão+página) — fechar a aba sem pagehide perde no máximo 30s. */
+const READ_HEARTBEAT_MS = 30_000;
 /** Painel admin não é audiência do site. */
 const ADMIN_RE   = /^\/admin(\/|$)/;
 /** Páginas de artigo: o pageview sai de trackArticle (com id/categoria/título) —
@@ -25,21 +31,71 @@ function getSessionId(): string {
   }
 }
 
-function classifyReferrer(ref: string): string {
-  if (!ref) return "direto";
-  if (/google\.|bing\.|yahoo\.|duckduckgo\.|baidu\./i.test(ref)) return "busca";
-  if (/facebook|instagram|twitter|x\.com|whatsapp|t\.me|telegram|linkedin|tiktok|youtube/i.test(ref)) return "social";
-  return "outro";
+/** Visitante anônimo persistente: UUID aleatório em localStorage, criado SÓ após
+ *  o aceite LGPD (sem fingerprinting; rejeitou = nunca existe). */
+function getVisitorId(): string | undefined {
+  if (getConsent() !== "accepted") return undefined;
+  try {
+    let id = localStorage.getItem(VISITOR_KEY);
+    if (!id) {
+      id = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+      localStorage.setItem(VISITOR_KEY, id);
+    }
+    return id;
+  } catch {
+    return undefined;
+  }
 }
 
-/** Origem é atribuída por SESSÃO: só o primeiro pageview enviado carrega referrer.
- *  document.referrer não muda em navegação SPA — reenviar a cada página
- *  multiplicaria a origem pelo nº de páginas vistas na sessão. */
-function takeReferrer(): string | null {
+/** Tráfego interno: sessão com admin logado neste navegador, ou ambiente dev.
+ *  O servidor grava o evento marcado (auditável) e o exclui das métricas. */
+function isInternalClient(): boolean {
+  if (import.meta.env.DEV) return true;
+  try {
+    return Boolean(localStorage.getItem("admin_token"));
+  } catch {
+    return false;
+  }
+}
+
+/** Captura UTM/gclid da URL DE ENTRADA uma única vez por sessão (navegação SPA
+ *  perde a query string). Nada sai do dispositivo antes do consentimento — isto
+ *  só guarda em sessionStorage. */
+function captureUtmOnce(): void {
+  try {
+    if (sessionStorage.getItem(UTM_KEY) !== null) return;
+    sessionStorage.setItem(UTM_KEY, JSON.stringify(parseUtm(window.location.search)));
+  } catch { /* ignore */ }
+}
+
+/**
+ * Origem é atribuída por SESSÃO: só o primeiro pageview enviado carrega os
+ * sinais crus (hostname do referrer + UTM). document.referrer não muda em
+ * navegação SPA — reenviar a cada página multiplicaria a origem pelo nº de
+ * páginas vistas. `firstTouch: true` marca inclusive a entrada direta sem
+ * nenhum sinal (o servidor classifica como "direto").
+ */
+function takeFirstTouch(): Record<string, unknown> | null {
   try {
     if (sessionStorage.getItem(REF_KEY)) return null;
   } catch { /* ignore */ }
-  return classifyReferrer(document.referrer);
+  const out: Record<string, unknown> = { firstTouch: true };
+  const host = refHostOf(document.referrer);
+  const ownHost = window.location.hostname.toLowerCase().replace(/^www\./, "");
+  if (host && host !== ownHost) out["refHost"] = host; // auto-referência não é origem externa
+  try {
+    const raw = sessionStorage.getItem(UTM_KEY);
+    if (raw) {
+      const u = JSON.parse(raw) as UtmSignals;
+      if (u.utmSource)   out["utmSource"]   = u.utmSource;
+      if (u.utmMedium)   out["utmMedium"]   = u.utmMedium;
+      if (u.utmCampaign) out["utmCampaign"] = u.utmCampaign;
+      if (u.paidClick)   out["paidClick"]   = true;
+    }
+  } catch { /* ignore */ }
+  return out;
 }
 
 function markReferrerDone(): void {
@@ -49,7 +105,10 @@ function markReferrerDone(): void {
 /** Retorna true se o evento foi de fato despachado (consentimento aceito). */
 function send(payload: Record<string, unknown>): boolean {
   if (getConsent() !== "accepted") return false;
-  const data = { ...payload, sessionId: getSessionId() };
+  const data: Record<string, unknown> = { ...payload, sessionId: getSessionId() };
+  const visitorId = getVisitorId();
+  if (visitorId) data["visitorId"] = visitorId;
+  if (isInternalClient()) data["internal"] = true;
   if (navigator.sendBeacon) {
     navigator.sendBeacon(
       "/api/analytics/event",
@@ -66,19 +125,25 @@ function send(payload: Record<string, unknown>): boolean {
   return true;
 }
 
-/** Pageview com referrer de sessão: marca como consumido só se o envio passou
+/** Pageview com first-touch de sessão: marca como consumido só se o envio passou
  *  pelo gate de consentimento (senão a origem se perderia para sempre). */
 function sendPageview(extra: Record<string, unknown>): void {
-  const ref = takeReferrer();
-  const ok = send({ type: "pageview", ...(ref ? { referrer: ref } : {}), ...extra });
-  if (ok && ref) markReferrerDone();
+  const firstTouch = takeFirstTouch();
+  const ok = send({ type: "pageview", ...(firstTouch ?? {}), ...extra });
+  if (ok && firstTouch) markReferrerDone();
 }
 
 export function useAnalytics() {
   const [location] = useLocation();
-  const enterRef    = useRef<number>(Date.now());
-  const prevPathRef = useRef<string>("");
+  const prevPathRef  = useRef<string>("");
   const articleIdRef = useRef<string | undefined>(undefined);
+  // Tempo ATIVO VISÍVEL: acumulado (ms) + início do trecho visível corrente.
+  // Aba em segundo plano não conta como leitura.
+  const activeMsRef     = useRef(0);
+  const visibleSinceRef = useRef<number | null>(null);
+
+  // Captura UTM da URL de entrada antes de qualquer envio (efeitos rodam na ordem).
+  useEffect(() => { captureUtmOnce(); }, []);
 
   // Consentimento aceito no meio da navegação: registra a página atual.
   useEffect(() => {
@@ -91,38 +156,76 @@ export function useAnalytics() {
   }, [location]);
 
   useEffect(() => {
-    const prev    = prevPathRef.current;
-    const elapsed = Math.round((Date.now() - enterRef.current) / 1000);
-    if (prev && !ADMIN_RE.test(prev) && elapsed > 2) {
-      send({ type: "read", path: prev, duration: Math.min(elapsed, MAX_READ_SECONDS),
+    const activeSecs = (): number => {
+      let ms = activeMsRef.current;
+      if (visibleSinceRef.current !== null) ms += Date.now() - visibleSinceRef.current;
+      return Math.round(ms / 1000);
+    };
+
+    // Leitura da página ANTERIOR (navegação SPA) — só o tempo em que esteve visível.
+    const prev = prevPathRef.current;
+    const prevSecs = activeSecs();
+    if (prev && !ADMIN_RE.test(prev) && prevSecs > 2) {
+      send({ type: "read", path: prev, duration: Math.min(prevSecs, MAX_READ_SECONDS),
              articleId: articleIdRef.current });
     }
 
-    articleIdRef.current = undefined;
-    prevPathRef.current  = location;
-    enterRef.current     = Date.now();
+    articleIdRef.current  = undefined;
+    prevPathRef.current   = location;
+    activeMsRef.current   = 0;
+    visibleSinceRef.current = document.hidden ? null : Date.now();
+
+    // Envia a duração CUMULATIVA da página atual (heartbeat/troca de aba/saída).
+    const sendReadIfWorth = () => {
+      if (ADMIN_RE.test(location)) return;
+      const secs = activeSecs();
+      if (secs > 2) {
+        send({ type: "read", path: location, duration: Math.min(secs, MAX_READ_SECONDS),
+               articleId: articleIdRef.current });
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.hidden) {
+        if (visibleSinceRef.current !== null) {
+          activeMsRef.current += Date.now() - visibleSinceRef.current;
+          visibleSinceRef.current = null;
+        }
+        // Aba escondida pode nunca voltar: garante o parcial já acumulado.
+        sendReadIfWorth();
+      } else {
+        visibleSinceRef.current = Date.now();
+      }
+    };
+
+    const onPageHide = () => { sendReadIfWorth(); };
+
+    // Volta do bfcache: zera o relógio — o read até o pagehide já foi enviado;
+    // sem isso o tempo fora da página contaria de novo na próxima navegação.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        activeMsRef.current = 0;
+        visibleSinceRef.current = document.hidden ? null : Date.now();
+      }
+    };
+
+    // Heartbeat: fechamento abrupto (sem pagehide) perde no máximo 30s de leitura.
+    const heartbeat = window.setInterval(() => {
+      if (!document.hidden) sendReadIfWorth();
+    }, READ_HEARTBEAT_MS);
+
     if (!ADMIN_RE.test(location) && !ARTICLE_RE.test(location)) {
       sendPageview({ path: location, title: document.title });
     }
 
-    const onUnload = () => {
-      if (ADMIN_RE.test(location)) return;
-      const dur = Math.round((Date.now() - enterRef.current) / 1000);
-      if (dur > 2) {
-        send({ type: "read", path: location, duration: Math.min(dur, MAX_READ_SECONDS),
-               articleId: articleIdRef.current });
-      }
-    };
-    // Volta do bfcache: zera o relógio — o read até o pagehide já foi enviado;
-    // sem isso o tempo fora da página contaria de novo na próxima navegação.
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) enterRef.current = Date.now();
-    };
-    window.addEventListener("pagehide", onUnload);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
     return () => {
-      window.removeEventListener("pagehide", onUnload);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
+      window.clearInterval(heartbeat);
     };
   }, [location]);
 
@@ -145,7 +248,8 @@ export function useAnalytics() {
 
 function sendBehavior(payload: Record<string, unknown>) {
   if (getConsent() !== "accepted") return;
-  const data = { ...payload, sessionId: getSessionId() };
+  const data: Record<string, unknown> = { ...payload, sessionId: getSessionId() };
+  if (isInternalClient()) data["internal"] = true;
   fetch("/api/analytics/behavior", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -163,35 +267,65 @@ export function trackLinkClick(url: string, articleId?: string) {
   sendBehavior({ eventType: "link_click", value: url.slice(0, 500), articleId });
 }
 
-/** Track scroll depth milestones (25/50/75/100%) on article pages. */
-export function useScrollDepth(articleId: string | undefined) {
+/**
+ * Scroll depth (25/50/75/100%) relativo ao BLOCO DE CONTEÚDO quando `contentRef`
+ * é passado (cabeçalho/lateral/rodapé não contam); cai para a página inteira sem
+ * ref. Dedup por sessão+artigo em sessionStorage — remount/re-navegação no mesmo
+ * artigo NÃO dispara de novo.
+ */
+export function useScrollDepth(
+  articleId: string | undefined,
+  contentRef?: RefObject<HTMLElement | null>,
+) {
   const [location] = useLocation();
-  const milestones  = useRef(new Set<number>());
 
   useEffect(() => {
-    milestones.current.clear();
+    const storeKey = articleId ? `bee_scroll_${articleId}` : `bee_scroll_p:${location}`;
+    const fired = new Set<number>();
+    try {
+      const raw = sessionStorage.getItem(storeKey);
+      if (raw) {
+        for (const n of JSON.parse(raw) as number[]) {
+          if (n === 25 || n === 50 || n === 75 || n === 100) fired.add(n);
+        }
+      }
+    } catch { /* storage indisponível → dedup só por mount (fallback) */ }
+
     const fire = (m: number) => {
-      milestones.current.add(m);
+      fired.add(m);
+      try { sessionStorage.setItem(storeKey, JSON.stringify([...fired])); } catch { /* ignore */ }
       send({ type: "scroll", path: location, scrollDepth: m, articleId });
     };
-    const onScroll = () => {
-      const el = document.documentElement;
-      const total = el.scrollHeight - el.clientHeight;
-      if (total <= 0) return;
-      const pct = Math.floor((el.scrollTop / total) * 100);
-      for (const m of [25, 50, 75, 100]) {
-        if (pct >= m && !milestones.current.has(m)) fire(m);
+
+    const measurePct = (): number | null => {
+      const el = contentRef?.current;
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const contentTop = rect.top + window.scrollY;
+        return contentScrollPct(window.scrollY + window.innerHeight, contentTop, rect.height);
       }
+      const doc = document.documentElement;
+      const total = doc.scrollHeight - doc.clientHeight;
+      if (total <= 0) return null;
+      return Math.floor((doc.scrollTop / total) * 100);
     };
-    // Artigo mais curto que a viewport nunca dispara scroll: se depois do
-    // conteúdo renderizar não há o que rolar, o leitor já viu 100%.
+
+    const onScroll = () => {
+      const pct = measurePct();
+      if (pct === null) return;
+      for (const m of newMilestones(pct, fired)) fire(m);
+    };
+
+    // Artigo mais curto que a viewport nunca dispara scroll: mede uma vez após o
+    // conteúdo assentar — com contentRef o próprio measurePct devolve 100.
     let shortTimer: number | undefined;
     if (articleId) {
       shortTimer = window.setTimeout(() => {
-        const el = document.documentElement;
-        if (el.scrollHeight - el.clientHeight <= 0) {
-          for (const m of [25, 50, 75, 100]) {
-            if (!milestones.current.has(m)) fire(m);
+        onScroll();
+        if (!contentRef?.current) {
+          const doc = document.documentElement;
+          if (doc.scrollHeight - doc.clientHeight <= 0) {
+            for (const m of newMilestones(100, fired)) fire(m);
           }
         }
       }, 3000);
@@ -201,5 +335,5 @@ export function useScrollDepth(articleId: string | undefined) {
       window.removeEventListener("scroll", onScroll);
       if (shortTimer !== undefined) window.clearTimeout(shortTimer);
     };
-  }, [location, articleId]);
+  }, [location, articleId, contentRef]);
 }

@@ -1,7 +1,19 @@
 # Auditoria do Sistema de Analytics — 03/07/2026
 
+> **STATUS (08/07/2026): RODADA 2 APLICADA** — ver a documentação viva em
+> **`docs/ANALYTICS.md`** (dicionário de métricas, regras de exclusão, limitações)
+> e o roteiro de validação em **`docs/ANALYTICS-VALIDACAO.md`**. A rodada 2
+> (auditoria-completa-analytics.md) adicionou: visitante único persistente,
+> UTM/8 canais de origem classificados no servidor, tráfego interno marcado
+> (admin/dev/IPs configuráveis), dedup de F5, tempo de leitura ativo-visível com
+> heartbeat cumulativo, scroll relativo ao corpo do artigo com dedup por sessão,
+> impressão de anúncio com dwell de 1s + 1×/sessão, seletor de período no painel,
+> geo por janela com "Não identificado", navegador/SO, endpoint de saúde da
+> coleta e testes automatizados (node --test no api-server).
+>
 > **STATUS (03/07/2026): TODOS os itens abaixo foram corrigidos no código** (críticos C1-C5,
-> altos A1-A6 e médios M1-M7 — exceto a troca do provedor de geolocalização, ver nota em A2).
+> altos A1-A6 e médios M1-M7 — exceto a troca do provedor de geolocalização, ver nota em A2;
+> decisão de 08/07: manter ip-api por ora, documentado como limitação).
 > A limpeza do histórico foi executada no banco: **918 eventos do painel admin** (metade do
 > total!), **54 pageviews duplicados** de artigo e a tabela `geo_stats` (74 "views" sem
 > significado) foram removidos — de 1.846 eventos restaram 874 legítimos.

@@ -22,6 +22,8 @@ router.get("/site", (_req, res) => {
   const settings = { ...store.getPublicSettings() };
   // Templates de home são material do painel (aba Templates) — fora do payload público.
   delete settings.homeTemplates;
+  // IPs internos da redação são configuração de Analytics — vazariam ao público.
+  delete settings.internalIps;
   const menuItems = store.getMenuItems()
     .filter((m) => m.visible)
     .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));

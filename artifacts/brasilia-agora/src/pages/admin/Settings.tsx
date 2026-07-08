@@ -588,6 +588,16 @@ export default function Settings() {
                         className={INPUT} placeholder="Continente/Cidade"/>
                     </Field>
                   )}
+                  <Field label="IPs internos (Analytics)"
+                    hint="separados por vírgula ou espaço">
+                    <textarea value={settings.internalIps ?? ""} onChange={e => setField("internalIps", e.target.value)}
+                      rows={2} className={INPUT + " resize-none"}
+                      placeholder="Ex.: 200.100.50.25, 200.100.50.26"/>
+                    <p className="text-[11px] text-[#94A3B8] mt-1.5">
+                      Acessos destes IPs (redação/escritório) são marcados como tráfego interno
+                      e ficam fora das métricas públicas do Analytics.
+                    </p>
+                  </Field>
                 </div>
 
                 {/* SEO */}

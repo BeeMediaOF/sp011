@@ -22,14 +22,30 @@ export function isBotRequest(req: Request): boolean {
 interface HitWindow { count: number; resetAt: number }
 
 const _hits = new Map<string, HitWindow>();
+const _lastSeen = new Map<string, number>();
 
 const _sweeper = setInterval(() => {
   const now = Date.now();
   for (const [key, w] of _hits) {
     if (w.resetAt < now) _hits.delete(key);
   }
+  for (const [key, ts] of _lastSeen) {
+    if (now - ts > 60_000) _lastSeen.delete(key);
+  }
 }, 5 * 60_000);
 if (typeof _sweeper.unref === "function") _sweeper.unref();
+
+/**
+ * Dedup de repetição imediata (ex.: F5 em sequência): true quando a MESMA chave
+ * (ex.: `"pv:<sessão>|<path>"`) foi vista há menos de `windowMs`. Janela
+ * deslizante: refresh contínuo permanece dedupado até parar por `windowMs`.
+ */
+export function isRecentDuplicate(key: string, windowMs: number): boolean {
+  const now = Date.now();
+  const prev = _lastSeen.get(key);
+  _lastSeen.set(key, now);
+  return prev !== undefined && now - prev < windowMs;
+}
 
 /** True quando a chave (ex.: `"ev:1.2.3.4"`) excedeu `maxPerMinute` na janela atual. */
 export function overRateLimit(key: string, maxPerMinute: number): boolean {

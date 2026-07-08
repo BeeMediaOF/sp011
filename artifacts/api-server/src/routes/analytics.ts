@@ -1,11 +1,20 @@
 import { Router } from "express";
-import { gte, eq, count, sql, desc } from "drizzle-orm";
+import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
 import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, behaviorEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
 import { logger } from "../lib/logger.js";
-import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
+import { isBotRequest, overRateLimit, isRecentDuplicate } from "../lib/trafficGuard.js";
+import {
+  DAY, brtDayKey, brtDayStartMs,
+  VALID_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
+  cleanStr, normalizeIp, isPrivateIp, parseInternalIps,
+  detectDevice, parseUa, classifyChannel,
+  resolvePeriod, buildWindowAggregates, pctChange,
+  ANALYTICS_V2_SINCE, type EventLike,
+} from "../lib/analyticsShared.js";
+import { bumpHealth, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
 
 const router = Router();
 
@@ -25,29 +34,17 @@ export interface AnalyticsEvent {
   platform?: string;
   city?: string;
   region?: string;
-}
-
-// ─── Fuso de exibição ─────────────────────────────────────────────────────────
-// America/Sao_Paulo é UTC-3 fixo (o horário de verão foi abolido em 2019).
-// Todo o bucketing por dia/hora usa o relógio de Brasília, não o do container.
-const BRT_OFFSET_MS = 3 * 3_600_000;
-const DAY = 86_400_000;
-const brtDayKey = (tsMs: number): string => new Date(tsMs - BRT_OFFSET_MS).toISOString().slice(0, 10);
-const brtHour   = (tsMs: number): number => new Date(tsMs - BRT_OFFSET_MS).getUTCHours();
-const brtDow    = (tsMs: number): number => new Date(tsMs - BRT_OFFSET_MS).getUTCDay();
-
-// ─── Validação de entrada ─────────────────────────────────────────────────────
-// O endpoint é público: tudo que chega é hostil até prova em contrário. Um único
-// valor fora do enum do Postgres faria o INSERT em lote falhar e travaria o
-// buffer inteiro — por isso whitelist + clamps aqui, antes de enfileirar.
-const VALID_TYPES: ReadonlySet<string>     = new Set(["pageview", "read", "category", "scroll", "share"]);
-const VALID_REFERRERS: ReadonlySet<string> = new Set(["direto", "busca", "social", "outro"]);
-const SCROLL_MILESTONES: ReadonlySet<number> = new Set([25, 50, 75, 100]);
-/** Teto de duração de leitura — aba esquecida aberta não pode distorcer a média. */
-const MAX_READ_SECONDS = 1800;
-
-function cleanStr(v: unknown, max: number): string | undefined {
-  return typeof v === "string" && v.length > 0 ? v.slice(0, max) : undefined;
+  visitorId?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  refHost?: string;
+  isInternal?: boolean;
+  browser?: string;
+  os?: string;
+  /** IP normalizado, transiente (nunca vai para o banco) — permite retro-preencher
+   *  a geo de eventos ainda no buffer quando o lookup assíncrono resolve. */
+  _ip?: string;
 }
 
 // ─── In-memory buffer ─────────────────────────────────────────────────────────
@@ -72,6 +69,14 @@ function toRow(ev: AnalyticsEvent) {
     platform:    ev.platform ?? null,
     city:        ev.city ?? null,
     region:      ev.region ?? null,
+    visitorId:   ev.visitorId ?? null,
+    utmSource:   ev.utmSource ?? null,
+    utmMedium:   ev.utmMedium ?? null,
+    utmCampaign: ev.utmCampaign ?? null,
+    refHost:     ev.refHost ?? null,
+    isInternal:  ev.isInternal ?? false,
+    browser:     ev.browser ?? null,
+    os:          ev.os ?? null,
   };
 }
 
@@ -81,6 +86,7 @@ async function flushBuffer(): Promise<void> {
   const batch = _buffer.splice(0, _buffer.length);
   try {
     await db.insert(analyticsEventsTable).values(batch.map(toRow));
+    noteFlush(true, batch.length);
   } catch {
     // Lote falhou. Tenta um a um: um evento inválido é descartado sozinho em vez
     // de envenenar o buffer para sempre; se NENHUM entrar (banco fora do ar),
@@ -98,9 +104,11 @@ async function flushBuffer(): Promise<void> {
         failed.push(ev);
       }
     }
+    if (ok > 0) noteFlush(true, ok);
     if (ok === 0 && failed.length > 0) {
       _buffer.unshift(...failed.slice(0, Math.max(0, BUFFER_MAX - _buffer.length)));
     } else if (failed.length > 0) {
+      noteFlush(false, failed.length);
       logger.warn({ dropped: failed.length }, "analytics: eventos inválidos descartados no flush");
     }
   } finally {
@@ -125,36 +133,30 @@ export function getPendingAnalyticsEvents(): AnalyticsEvent[] {
   return [..._buffer];
 }
 
-// ─── Device detection ─────────────────────────────────────────────────────────
-function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
-  if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
-  if (/mobile|android|iphone|ipod|blackberry|opera mini|windows phone/i.test(ua)) return "mobile";
-  return "desktop";
+// ─── Tráfego interno ──────────────────────────────────────────────────────────
+// IPs configurados no painel (Configurações) — memoizado; o sync periódico de
+// settings atualiza a string e o Set é reconstruído sem restart.
+let _internalIpsRaw: string | undefined;
+let _internalIpSet = new Set<string>();
+function internalIpSet(): Set<string> {
+  const raw = store.getSettings().internalIps;
+  if (raw !== _internalIpsRaw) {
+    _internalIpsRaw = raw;
+    _internalIpSet = new Set(parseInternalIps(raw));
+  }
+  return _internalIpSet;
 }
 
 // ─── IP Geolocation via ip-api.com (async, cached, non-blocking) ──────────────
+// LIMITAÇÃO CONHECIDA (decisão registrada): plano grátis do ip-api é HTTP-only e
+// veta uso comercial. A agregação já é agnóstica de provedor (lê city/region das
+// linhas de evento) — trocar de provedor = trocar só esta função.
 interface GeoResult { city: string; region: string; country: string }
 const _geoCache = new Map<string, GeoResult | null>();
 const _geoPending = new Set<string>();
 
-function normalizeIp(raw: string): string {
-  return raw.replace(/^::ffff:/i, "");
-}
-
-function isPrivateIp(raw: string): boolean {
-  const ip = normalizeIp(raw);
-  return (
-    ip === "" ||
-    ip === "127.0.0.1" ||
-    ip === "::1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
-  );
-}
-
-/** Soma 1 view da cidade em geo_stats — chamado a cada pageview com geo conhecida,
- *  então `views` ≈ pageviews por cidade (não "IPs novos", como era antes). */
+/** Soma 1 view da cidade em geo_stats — contador all-time legado (o /stats agrega
+ *  cidade/estado por evento na janela; esta tabela fica só como histórico bruto). */
 function bumpGeoViews(geo: GeoResult): void {
   const id = `${geo.city}::${geo.region}`;
   void db
@@ -189,6 +191,11 @@ function lookupGeoAsync(ip: string): void {
       };
       _geoCache.set(ip, geo);
       bumpGeoViews(geo); // conta o pageview que originou o lookup
+      // Retro-preenche eventos deste IP ainda no buffer (o 1º pageview de um IP
+      // chegava sem cidade porque o lookup é assíncrono).
+      for (const ev of _buffer) {
+        if (ev._ip === ip && !ev.city) { ev.city = geo.city; ev.region = geo.region; }
+      }
     })
     .catch(() => { _geoCache.set(ip, null); })
     .finally(() => { _geoPending.delete(ip); });
@@ -197,11 +204,11 @@ function lookupGeoAsync(ip: string): void {
 // ─── POST /api/analytics/event ────────────────────────────────────────────────
 router.post("/event", (req, res) => {
   // Bots e flood: descarte silencioso — nunca falha para o cliente.
-  if (isBotRequest(req)) { res.json({ ok: true }); return; }
+  if (isBotRequest(req)) { bumpHealth("droppedBot"); res.json({ ok: true }); return; }
   // trust proxy (app.ts) já resolve o X-Forwarded-For adicionado pelo Caddy;
   // ler o header na mão pegaria o primeiro valor, que o cliente pode forjar.
-  const ip = req.ip ?? "";
-  if (overRateLimit(`ev:${ip}`, 120)) { res.json({ ok: true }); return; }
+  const ip = normalizeIp(req.ip ?? "");
+  if (overRateLimit(`ev:${ip}`, 120)) { bumpHealth("droppedRate"); res.json({ ok: true }); return; }
 
   const b = (req.body ?? {}) as Record<string, unknown>;
 
@@ -210,17 +217,51 @@ router.post("/event", (req, res) => {
     : null;
   const path      = cleanStr(b["path"], 500);
   const sessionId = cleanStr(b["sessionId"], 100);
-  if (!type || !path || !sessionId) { res.status(400).json({ ok: false }); return; }
+  if (!type || !path || !sessionId) {
+    bumpHealth("droppedInvalid");
+    logger.debug({ reason: "payload" }, "analytics: evento descartado");
+    res.status(400).json({ ok: false });
+    return;
+  }
   // Navegação no painel não é audiência do site (o cliente já filtra; defesa extra).
-  if (path.startsWith("/admin")) { res.json({ ok: true }); return; }
+  if (path.startsWith("/admin")) { bumpHealth("droppedInvalid"); res.json({ ok: true }); return; }
+
+  // F5 em sequência não é audiência nova: mesma sessão+página em <15s é descartada.
+  if (type === "pageview" && isRecentDuplicate(`pv:${sessionId}|${path}`, 15_000)) {
+    bumpHealth("droppedDuplicate");
+    logger.debug({ reason: "duplicate", path }, "analytics: evento descartado");
+    res.json({ ok: true });
+    return;
+  }
+
+  // Tráfego interno: marcado e gravado (auditável), mas fora das métricas públicas.
+  const isInternal =
+    b["internal"] === true ||       // cliente detectou admin logado ou ambiente dev
+    internalIpSet().has(ip) ||      // IP cadastrado em Configurações
+    isPrivateIp(ip);                // localhost/rede privada (dev, health checks)
+  if (isInternal) bumpHealth("flaggedInternal");
 
   const title     = cleanStr(b["title"], 300);
   const category  = cleanStr(b["category"], 100);
   const articleId = cleanStr(b["articleId"], 100);
   const platform  = cleanStr(b["platform"], 50);
+  const visitorId = cleanStr(b["visitorId"], 64);
 
-  let referrer = cleanStr(b["referrer"], 20);
-  if (referrer && !VALID_REFERRERS.has(referrer)) referrer = "outro";
+  // Sinais crus de origem — quem classifica o canal é o servidor.
+  const utmSource   = cleanStr(b["utmSource"], 120);
+  const utmMedium   = cleanStr(b["utmMedium"], 120);
+  const utmCampaign = cleanStr(b["utmCampaign"], 120);
+  const refHost     = cleanStr(b["refHost"], 253)?.toLowerCase().replace(/^www\./, "");
+  const paidClick   = b["paidClick"] === true;
+  const legacyChannel = cleanStr(b["referrer"], 20); // bundle antigo: direto|busca|social|outro
+
+  // Canal só no pageview de entrada da sessão (first-touch); navegações internas
+  // não reenviam origem. `firstTouch` marca inclusive a entrada direta sem sinais.
+  const firstTouch = b["firstTouch"] === true ||
+    Boolean(refHost || utmSource || utmMedium || paidClick || legacyChannel);
+  const referrer = firstTouch
+    ? (isInternal ? "interno" : classifyChannel({ utmSource, utmMedium, paidClick, refHost, legacyChannel }))
+    : undefined;
 
   const durationRaw = Number(b["duration"]);
   const duration = Number.isFinite(durationRaw) && durationRaw > 0
@@ -231,13 +272,16 @@ router.post("/event", (req, res) => {
   const scrollDepth = SCROLL_MILESTONES.has(scrollRaw) ? scrollRaw : undefined;
 
   const ua = String(req.headers["user-agent"] ?? "");
+  const { browser, os } = parseUa(ua);
 
   const cachedGeo = _geoCache.get(ip);
-  if (type === "pageview") {
+  if (type === "pageview" && !isInternal) {
     if (cachedGeo) bumpGeoViews(cachedGeo);
     else lookupGeoAsync(ip);
   }
 
+  bumpHealth("received");
+  noteEvent();
   pushEvent({
     type, path, title, category, articleId, sessionId, duration,
     device: detectDevice(ua),
@@ -248,10 +292,19 @@ router.post("/event", (req, res) => {
     platform,
     city:   cachedGeo?.city,
     region: cachedGeo?.region,
+    visitorId,
+    utmSource, utmMedium, utmCampaign, refHost,
+    isInternal,
+    browser, os,
+    _ip: isPrivateIp(ip) ? undefined : ip,
   });
 
-  if (type === "category" && category) store.trackCategoryView(category);
-  if (type === "pageview" && articleId && title) store.trackArticleView(articleId, title);
+  // Contadores all-time (fallback de título / monitor) também não devem inflar
+  // com navegação interna.
+  if (!isInternal) {
+    if (type === "category" && category) store.trackCategoryView(category);
+    if (type === "pageview" && articleId && title) store.trackArticleView(articleId, title);
+  }
 
   res.json({ ok: true });
 });
@@ -260,7 +313,7 @@ router.post("/event", (req, res) => {
 router.post("/behavior", async (req, res) => {
   try {
     if (isBotRequest(req)) { res.json({ ok: true }); return; }
-    const ip = req.ip ?? "";
+    const ip = normalizeIp(req.ip ?? "");
     if (overRateLimit(`bh:${ip}`, 30)) { res.json({ ok: true }); return; }
 
     const b = (req.body ?? {}) as Record<string, unknown>;
@@ -270,6 +323,10 @@ router.post("/behavior", async (req, res) => {
 
     const ALLOWED = new Set(["search", "link_click", "newsletter", "video_play", "download"]);
     if (!ALLOWED.has(eventType)) { res.status(400).json({ ok: false }); return; }
+
+    // behavior_events não tem coluna de tráfego interno (limitação documentada):
+    // eventos internos são simplesmente não gravados para não sujar os oficiais.
+    if (b["internal"] === true || internalIpSet().has(ip)) { res.json({ ok: true }); return; }
 
     const value     = cleanStr(b["value"], 500);
     const articleId = cleanStr(b["articleId"], 100);
@@ -289,18 +346,49 @@ router.post("/behavior", async (req, res) => {
   }
 });
 
-// ─── GET /api/analytics/stats ─────────────────────────────────────────────────
-router.get("/stats", authMiddleware, async (_req, res) => {
-  const now = Date.now();
-  const thirtyDaysAgo = new Date(now - 30 * DAY);
-  const sixtyDaysAgo  = new Date(now - 60 * DAY);
-  const thirtyDaysAgoStr = brtDayKey(now - 30 * DAY);
+// ─── GET /api/analytics/health — saúde da coleta (admin) ─────────────────────
+router.get("/health", authMiddleware, (_req, res) => {
+  res.json({
+    ...healthSnapshot({ buffered: _buffer.length }),
+    reliableSince: ANALYTICS_V2_SINCE,
+    filters: [
+      "user-agent de bot/CLI",
+      "rate limit 120 eventos/min por IP",
+      "pageview duplicado (mesma sessão+página em <15s)",
+      "caminhos /admin",
+      "tráfego interno marcado (admin logado, dev, IPs configurados, rede privada)",
+    ],
+  });
+});
 
-  const [dbRows, allTimeResult, geoRows, allAds, adDailyRows, behaviorRows, prevAggRes, prevBounceRes] = await Promise.all([
-    // Projeção: só as colunas usadas na agregação (ua/path/city ficam de fora —
-    // ua sozinho costuma ser o campo mais pesado da tabela).
+// ─── GET /api/analytics/stats ─────────────────────────────────────────────────
+router.get("/stats", authMiddleware, async (req, res) => {
+  const now = Date.now();
+  const win = resolvePeriod(req.query as { period?: unknown; from?: unknown; to?: unknown }, now);
+  const winFrom  = new Date(win.fromMs);
+  const winTo    = new Date(win.toMs);
+  const prevFrom = new Date(win.prevFromMs);
+  const prevTo   = new Date(win.prevToMs);
+
+  // Janelas fixas dos totais (contrato do Dashboard: sempre relativas ao agora,
+  // independentes do período selecionado no painel de Analytics).
+  const todayStart     = new Date(brtDayStartMs(brtDayKey(now)));
+  const yesterdayStart = new Date(todayStart.getTime() - DAY);
+  const d7  = new Date(now - 7 * DAY);
+  const d14 = new Date(now - 14 * DAY);
+  const d30 = new Date(now - 30 * DAY);
+  const d60 = new Date(now - 60 * DAY);
+
+  const [
+    dbRows, totalsRes, prevAggRes, prevReadRes, prevBounceRes,
+    geoAggRes, browserOsRes, visitorsRes,
+    allAds, adDailyRows, adHasAnyRes, behaviorRows,
+  ] = await Promise.all([
+    // Projeção: só as colunas usadas no reducer (ua/city/region ficam de fora —
+    // geo, navegador e SO vêm de queries agregadas próprias, mais baratas).
     db.select({
       type:        analyticsEventsTable.type,
+      path:        analyticsEventsTable.path,
       title:       analyticsEventsTable.title,
       category:    analyticsEventsTable.category,
       articleId:   analyticsEventsTable.articleId,
@@ -311,170 +399,174 @@ router.get("/stats", authMiddleware, async (_req, res) => {
       referrer:    analyticsEventsTable.referrer,
       scrollDepth: analyticsEventsTable.scrollDepth,
       platform:    analyticsEventsTable.platform,
-    }).from(analyticsEventsTable).where(gte(analyticsEventsTable.ts, thirtyDaysAgo)),
-    db.select({ count: count() }).from(analyticsEventsTable).where(eq(analyticsEventsTable.type, "pageview")),
-    db.select().from(geoStatsTable),
-    db.select({
-      id: adsTable.id, name: adsTable.name, position: adsTable.position,
-      impressions: adsTable.impressions, clicks: adsTable.clicks,
-      active: adsTable.active, createdAt: adsTable.createdAt,
-    }).from(adsTable).orderBy(desc(adsTable.impressions)),
-    db.select().from(adDailyStatsTable)
-      .where(gte(adDailyStatsTable.date, thirtyDaysAgoStr)),
-    db.select().from(behaviorEventsTable)
-      .where(gte(behaviorEventsTable.ts, thirtyDaysAgo)),
-    // Janela anterior (30-60 dias atrás) — base das tendências reais dos KPIs.
+      refHost:     analyticsEventsTable.refHost,
+      utmCampaign: analyticsEventsTable.utmCampaign,
+    }).from(analyticsEventsTable).where(and(
+      gte(analyticsEventsTable.ts, winFrom),
+      lt(analyticsEventsTable.ts, winTo),
+      eq(analyticsEventsTable.isInternal, false),
+    )),
+    db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE ts >= ${todayStart})::int                          AS today,
+        count(*) FILTER (WHERE ts >= ${yesterdayStart} AND ts < ${todayStart})::int AS yesterday,
+        count(*) FILTER (WHERE ts >= ${d7})::int                                  AS week,
+        count(*) FILTER (WHERE ts >= ${d14} AND ts < ${d7})::int                  AS prev_week,
+        count(*) FILTER (WHERE ts >= ${d30})::int                                 AS month,
+        count(*) FILTER (WHERE ts >= ${d60} AND ts < ${d30})::int                 AS prev_month,
+        count(*)::int                                                             AS all_time
+      FROM analytics_events
+      WHERE type = 'pageview' AND is_internal = false
+    `),
+    // Janela imediatamente anterior, de mesmo tamanho — base das tendências.
     db.execute(sql`
       SELECT
         count(*) FILTER (WHERE type = 'pageview')::int                   AS pv,
         count(DISTINCT session_id) FILTER (WHERE type = 'pageview')::int AS sessions,
-        COALESCE(avg(LEAST(duration, ${MAX_READ_SECONDS})) FILTER (WHERE type = 'read' AND duration > 0), 0)::float AS avg_read
+        count(DISTINCT visitor_id) FILTER (WHERE type = 'pageview' AND visitor_id IS NOT NULL)::int AS visitors
       FROM analytics_events
-      WHERE ts >= ${sixtyDaysAgo} AND ts < ${thirtyDaysAgo}
+      WHERE ts >= ${prevFrom} AND ts < ${prevTo} AND is_internal = false
+    `),
+    // Tempo médio anterior com a MESMA regra da janela atual: MAX cumulativo por
+    // sessão+página (heartbeats são idempotentes), depois média.
+    db.execute(sql`
+      SELECT COALESCE(avg(md), 0)::float AS avg_read
+      FROM (
+        SELECT max(LEAST(duration, ${MAX_READ_SECONDS})) AS md
+        FROM analytics_events
+        WHERE type = 'read' AND duration > 0 AND is_internal = false
+          AND ts >= ${prevFrom} AND ts < ${prevTo}
+        GROUP BY session_id, path
+      ) t
     `),
     db.execute(sql`
       SELECT count(*)::int AS total, count(*) FILTER (WHERE c = 1)::int AS bounced
       FROM (
         SELECT session_id, count(*) AS c
         FROM analytics_events
-        WHERE type = 'pageview' AND ts >= ${sixtyDaysAgo} AND ts < ${thirtyDaysAgo}
+        WHERE type = 'pageview' AND is_internal = false
+          AND ts >= ${prevFrom} AND ts < ${prevTo}
         GROUP BY session_id
       ) s
     `),
+    // Geo por evento DA JANELA (não mais o contador all-time de geo_stats);
+    // cidade vazia vira "Não identificado" no fold — nunca inventamos local.
+    db.execute(sql`
+      SELECT COALESCE(city, '') AS city, COALESCE(region, '') AS region, count(*)::int AS views
+      FROM analytics_events
+      WHERE type = 'pageview' AND is_internal = false
+        AND ts >= ${winFrom} AND ts < ${winTo}
+      GROUP BY 1, 2
+    `),
+    db.execute(sql`
+      SELECT COALESCE(browser, 'desconhecido') AS browser, COALESCE(os, 'desconhecido') AS os, count(*)::int AS views
+      FROM analytics_events
+      WHERE type = 'pageview' AND is_internal = false
+        AND ts >= ${winFrom} AND ts < ${winTo}
+      GROUP BY 1, 2
+    `),
+    // Visitantes únicos + recorrentes (recorrente = tem evento ANTES da janela).
+    db.execute(sql`
+      WITH win_visitors AS (
+        SELECT DISTINCT visitor_id AS vid
+        FROM analytics_events
+        WHERE type = 'pageview' AND is_internal = false AND visitor_id IS NOT NULL
+          AND ts >= ${winFrom} AND ts < ${winTo}
+      )
+      SELECT
+        (SELECT count(*) FROM win_visitors)::int AS uniq,
+        (SELECT count(*) FROM win_visitors w WHERE EXISTS (
+          SELECT 1 FROM analytics_events e WHERE e.visitor_id = w.vid AND e.ts < ${winFrom}
+        ))::int AS returning
+    `),
+    db.select({
+      id: adsTable.id, name: adsTable.name, position: adsTable.position,
+      active: adsTable.active, createdAt: adsTable.createdAt,
+    }).from(adsTable),
+    db.select().from(adDailyStatsTable).where(and(
+      gte(adDailyStatsTable.date, win.fromDay),
+      lte(adDailyStatsTable.date, win.toDay),
+    )),
+    db.execute(sql`SELECT EXISTS (SELECT 1 FROM ad_daily_stats) AS has`),
+    db.select().from(behaviorEventsTable).where(and(
+      gte(behaviorEventsTable.ts, winFrom),
+      lt(behaviorEventsTable.ts, winTo),
+    )),
   ]);
 
-  type EventLike = {
-    type: string; title?: string | null; category?: string | null;
-    articleId?: string | null; sessionId: string; duration?: number | null;
-    device: string; ts: Date | number; referrer?: string | null;
-    scrollDepth?: number | null; platform?: string | null;
-  };
+  // Linhas do banco + buffer ainda não persistido (só não-internos).
   const rows: EventLike[] = [
-    ...dbRows,
-    ..._buffer.map((ev) => ({ ...ev, ts: new Date(ev.ts) })),
+    ...dbRows.map((r) => ({ ...r, ts: r.ts.getTime() })),
+    ..._buffer.filter((ev) => !ev.isInternal),
   ];
+  const agg = buildWindowAggregates(rows, win);
 
-  const byDay: Record<string, number> = {};
-  for (let i = 29; i >= 0; i--) {
-    byDay[brtDayKey(now - i * DAY)] = 0;
-  }
-  const todayKey     = brtDayKey(now);
-  const yesterdayKey = brtDayKey(now - DAY);
+  // ── Derivados de engajamento ──────────────────────────────────────────────
+  const uniqueSessions = Object.keys(agg.sessionPageviews).length;
+  const readVals = [...agg.readMax.values()];
+  const avgReadTime = readVals.length > 0
+    ? Math.round(readVals.reduce((a, b) => a + b, 0) / readVals.length)
+    : 0;
+  const bounceSessions = Object.values(agg.sessionPageviews).filter((v) => v === 1).length;
+  const bounceRate = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
+  const readCompletions = agg.scrollSessions[100]?.size ?? 0;
 
-  const byHour: number[]       = Array(24).fill(0);
-  const byDayOfWeek: number[]  = Array(7).fill(0);
-  const articleMap: Record<string, { title: string; views: number; totalReadTime: number; readSessions: number }> = {};
-  const catViewMap:  Record<string, number> = {};
-  const catClickMap: Record<string, number> = {};
-  const deviceMap:   Record<string, number> = { mobile: 0, desktop: 0, tablet: 0 };
-  const referrerMap: Record<string, number> = { direto: 0, busca: 0, social: 0, outro: 0 };
-  const scrollMap:   Record<number, number> = { 25: 0, 50: 0, 75: 0, 100: 0 };
-  const shareMap:    Record<string, number> = {};
-  const sessionPageviews: Record<string, number> = {};
+  // ── Totais fixos (SQL) + buffer não persistido ────────────────────────────
+  const t = (totalsRes.rows?.[0] ?? {}) as {
+    today?: number; yesterday?: number; week?: number; prev_week?: number;
+    month?: number; prev_month?: number; all_time?: number;
+  };
+  const bufPv = _buffer.filter((e) => e.type === "pageview" && !e.isInternal);
+  const bufSince = (fromMs: number): number => bufPv.filter((e) => e.ts >= fromMs).length;
+  const today   = (t.today ?? 0) + bufSince(todayStart.getTime());
+  const week    = (t.week ?? 0) + bufSince(now - 7 * DAY);
+  const month   = (t.month ?? 0) + bufSince(now - 30 * DAY);
+  const allTime = (t.all_time ?? 0) + bufPv.length;
+  const yesterday = t.yesterday ?? 0;
 
-  let week = 0, prevWeek = 0, month = 0;
-  let totalReadTime = 0, readCount = 0;
-
-  for (const ev of rows) {
-    const evTs  = ev.ts instanceof Date ? ev.ts.getTime() : ev.ts;
-    const age   = now - evTs;
-    const evType = ev.type;
-
-    if (evType === "pageview") {
-      const dayKey = brtDayKey(evTs);
-
-      if (age <= 30 * DAY) {
-        if (byDay[dayKey] !== undefined) byDay[dayKey]++;
-        month++;
-      }
-      if (age <= 7 * DAY) week++;
-      else if (age <= 14 * DAY) prevWeek++;
-
-      byHour[brtHour(evTs)]++;
-      byDayOfWeek[brtDow(evTs)]++;
-      deviceMap[ev.device] = (deviceMap[ev.device] ?? 0) + 1;
-
-      // Origem é atribuída por sessão: só o pageview de entrada carrega referrer
-      // (o cliente não reenvia nas navegações internas).
-      if (ev.referrer) referrerMap[ev.referrer] = (referrerMap[ev.referrer] ?? 0) + 1;
-      sessionPageviews[ev.sessionId] = (sessionPageviews[ev.sessionId] ?? 0) + 1;
-
-      if (ev.articleId) {
-        if (!articleMap[ev.articleId]) {
-          articleMap[ev.articleId] = { title: ev.title ?? ev.articleId, views: 0, totalReadTime: 0, readSessions: 0 };
-        }
-        articleMap[ev.articleId]!.views++;
-      }
-      if (ev.category) catViewMap[ev.category] = (catViewMap[ev.category] ?? 0) + 1;
-    }
-
-    if (evType === "category" && ev.category) {
-      catClickMap[ev.category] = (catClickMap[ev.category] ?? 0) + 1;
-    }
-
-    if (evType === "read" && ev.duration) {
-      const dur = Math.min(ev.duration, MAX_READ_SECONDS);
-      totalReadTime += dur;
-      readCount++;
-      if (ev.articleId && articleMap[ev.articleId]) {
-        articleMap[ev.articleId]!.totalReadTime += dur;
-        articleMap[ev.articleId]!.readSessions++;
-      }
-    }
-
-    if (evType === "scroll" && ev.scrollDepth) {
-      scrollMap[ev.scrollDepth] = (scrollMap[ev.scrollDepth] ?? 0) + 1;
-    }
-
-    if (evType === "share" && ev.platform) {
-      shareMap[ev.platform] = (shareMap[ev.platform] ?? 0) + 1;
-    }
-  }
-
-  const today     = byDay[todayKey] ?? 0;
-  const yesterday = byDay[yesterdayKey] ?? 0;
-
-  const uniqueSessions = Object.keys(sessionPageviews).length;
-  const avgReadTime    = readCount > 0 ? Math.round(totalReadTime / readCount) : 0;
-  const bounceSessions = Object.values(sessionPageviews).filter((v) => v === 1).length;
-  const bounceRate     = uniqueSessions > 0 ? Math.round((bounceSessions / uniqueSessions) * 100) : 0;
-  const readCompletions = scrollMap[100] ?? 0;
-  const allTime = (allTimeResult[0]?.count ?? 0) + _buffer.filter((e) => e.type === "pageview").length;
-
-  // ── Tendências reais (janela atual vs janela anterior de mesmo tamanho) ──
-  const prevAgg = (prevAggRes.rows?.[0] ?? {}) as { pv?: number; sessions?: number; avg_read?: number };
+  // ── Tendências reais (null = sem base de comparação = sem badge) ──────────
+  const prevAgg = (prevAggRes.rows?.[0] ?? {}) as { pv?: number; sessions?: number; visitors?: number };
+  const prevAvgRead = Math.round(((prevReadRes.rows?.[0] ?? {}) as { avg_read?: number }).avg_read ?? 0);
   const prevBounceRow = (prevBounceRes.rows?.[0] ?? {}) as { total?: number; bounced?: number };
-  const prevPv        = prevAgg.pv ?? 0;
-  const prevSessions  = prevAgg.sessions ?? 0;
-  const prevAvgRead   = Math.round(prevAgg.avg_read ?? 0);
   const prevBounceTotal = prevBounceRow.total ?? 0;
-  const prevBounceRate  = prevBounceTotal > 0
+  const prevBounceRate = prevBounceTotal > 0
     ? Math.round(((prevBounceRow.bounced ?? 0) / prevBounceTotal) * 100)
     : null;
-
-  const pctChange = (cur: number, prev: number): number | null =>
-    prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
+  const visitorsRow = (visitorsRes.rows?.[0] ?? {}) as { uniq?: number; returning?: number };
+  const visitorsUnique = visitorsRow.uniq ?? 0;
+  const visitorsReturning = visitorsRow.returning ?? 0;
 
   const trends = {
     today:          pctChange(today, yesterday),
-    week:           pctChange(week, prevWeek),
-    month:          pctChange(month, prevPv),
-    uniqueSessions: pctChange(uniqueSessions, prevSessions),
+    week:           pctChange(week, t.prev_week ?? 0),
+    month:          pctChange(month, t.prev_month ?? 0),
+    window:         pctChange(agg.windowPv, prevAgg.pv ?? 0),
+    uniqueSessions: pctChange(uniqueSessions, prevAgg.sessions ?? 0),
+    visitors:       pctChange(visitorsUnique, prevAgg.visitors ?? 0),
     avgReadTime:    pctChange(avgReadTime, prevAvgRead),
     // Rejeição: diferença em pontos percentuais (variação % de uma taxa confunde).
     bounceRate:     prevBounceRate !== null ? Math.round((bounceRate - prevBounceRate) * 10) / 10 : null,
   };
 
-  // ── Rankings: SEMPRE janela de 30 dias (o contador all-time persistido serve
-  //    só de fallback de título — antes ele vazava contagens históricas aqui). ──
+  // ── Rankings da janela ────────────────────────────────────────────────────
+  const articleReadAgg: Record<string, { total: number; n: number }> = {};
+  for (const [key, dur] of agg.articleReadMax) {
+    const aid = key.slice(0, key.indexOf("|"));
+    const cur = articleReadAgg[aid] ?? (articleReadAgg[aid] = { total: 0, n: 0 });
+    cur.total += dur;
+    cur.n++;
+  }
   const persistedTitles = store.getArticleViews();
-  const topArticles = Object.entries(articleMap)
-    .map(([id, a]) => ({
-      id,
-      title:   a.title || persistedTitles[id]?.title || id,
-      views:   a.views,
-      avgTime: a.readSessions > 0 ? Math.round(a.totalReadTime / a.readSessions) : undefined,
-    }))
+  const topArticles = Object.entries(agg.articleMap)
+    .map(([id, a]) => {
+      const read = articleReadAgg[id];
+      return {
+        id,
+        title:   a.title || persistedTitles[id]?.title || id,
+        views:   a.views,
+        avgTime: read && read.n > 0 ? Math.round(read.total / read.n) : undefined,
+      };
+    })
     .sort((a, b) => b.views - a.views)
     .slice(0, 10);
 
@@ -484,42 +576,68 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     if (a.category) articleCountByCategory[a.category] = (articleCountByCategory[a.category] ?? 0) + 1;
   }
   const allCatNames = new Set([
-    ...Object.keys(catViewMap),
-    ...Object.keys(catClickMap),
+    ...Object.keys(agg.catViewMap),
+    ...Object.keys(agg.catClickMap),
     ...Object.keys(articleCountByCategory),
   ]);
   const topCategories = Array.from(allCatNames).map((name) => ({
     name,
-    views:    catViewMap[name]  ?? 0,
-    clicks:   catClickMap[name] ?? 0,
+    views:    agg.catViewMap[name]  ?? 0,
+    clicks:   agg.catClickMap[name] ?? 0,
     articles: articleCountByCategory[name] ?? 0,
   })).sort((a, b) => (b.clicks + b.views || b.articles) - (a.clicks + a.views || a.articles)).slice(0, 10);
 
   const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+  // ── Localização (eventos da janela; vazio = "Não identificado") ───────────
   const cityTotals:   Record<string, number> = {};
   const regionTotals: Record<string, number> = {};
-  for (const row of geoRows) {
-    if (row.city)   cityTotals[row.city]     = (cityTotals[row.city]     ?? 0) + row.views;
-    if (row.region) regionTotals[row.region] = (regionTotals[row.region] ?? 0) + row.views;
+  for (const row of (geoAggRes.rows ?? []) as { city?: string; region?: string; views?: number }[]) {
+    const views = row.views ?? 0;
+    const city   = row.city   && row.city.length   > 0 ? row.city   : "Não identificado";
+    const region = row.region && row.region.length > 0 ? row.region : "Não identificado";
+    cityTotals[city]     = (cityTotals[city]     ?? 0) + views;
+    regionTotals[region] = (regionTotals[region] ?? 0) + views;
   }
 
-  // ── Ad stats ──────────────────────────────────────────────────────────────
-  const adStats = allAds.map((ad) => ({
-    id:          ad.id,
-    name:        ad.name,
-    position:    ad.position,
-    active:      ad.active,
-    impressions: ad.impressions,
-    clicks:      ad.clicks,
-    ctr:         ad.impressions > 0 ? Number(((ad.clicks / ad.impressions) * 100).toFixed(2)) : 0,
-  }));
+  // ── Navegador / SO ────────────────────────────────────────────────────────
+  const browserTotals: Record<string, number> = {};
+  const osTotals:      Record<string, number> = {};
+  for (const row of (browserOsRes.rows ?? []) as { browser?: string; os?: string; views?: number }[]) {
+    const views = row.views ?? 0;
+    browserTotals[row.browser ?? "desconhecido"] = (browserTotals[row.browser ?? "desconhecido"] ?? 0) + views;
+    osTotals[row.os ?? "desconhecido"]           = (osTotals[row.os ?? "desconhecido"] ?? 0) + views;
+  }
+  const toTopList = (m: Record<string, number>, n: number) =>
+    Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, n).map(([name, views]) => ({ name, views }));
 
-  // Build 30-day daily chart for top 3 ads by impressions
+  // ── Ads: números DA JANELA (ad_daily_stats); all-time fica no AdsManager ──
+  const adWindowTotals: Record<string, { impressions: number; clicks: number }> = {};
+  for (const row of adDailyRows) {
+    const cur = adWindowTotals[row.adId] ?? (adWindowTotals[row.adId] = { impressions: 0, clicks: 0 });
+    cur.impressions += row.impressions;
+    cur.clicks      += row.clicks;
+  }
+  const adStats = allAds.map((ad) => {
+    const wTot = adWindowTotals[ad.id];
+    const impressions = wTot?.impressions ?? 0;
+    const clicks      = wTot?.clicks ?? 0;
+    return {
+      id:          ad.id,
+      name:        ad.name,
+      position:    ad.position,
+      active:      ad.active,
+      impressions,
+      clicks,
+      ctr:         impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0,
+      hasData:     wTot !== undefined, // distingue "sem dados no período" de zero real
+    };
+  }).sort((a, b) => b.impressions - a.impressions);
+
   const top3AdIds = adStats.slice(0, 3).map((a) => a.id);
   const adDailyByDate: Record<string, Record<string, { impressions: number; clicks: number }>> = {};
-  for (let i = 29; i >= 0; i--) {
-    const d = brtDayKey(now - i * DAY);
+  for (let ms = win.fromMs; ms < win.toMs; ms += DAY) {
+    const d = brtDayKey(ms);
     adDailyByDate[d] = {};
     for (const adId of top3AdIds) adDailyByDate[d]![adId] = { impressions: 0, clicks: 0 };
   }
@@ -537,17 +655,18 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     return entry;
   });
 
-  // Total ad KPIs
   const totalAdImpressions = adStats.reduce((s, a) => s + a.impressions, 0);
-  const totalAdClicks       = adStats.reduce((s, a) => s + a.clicks, 0);
-  const avgCtr              = totalAdImpressions > 0
+  const totalAdClicks      = adStats.reduce((s, a) => s + a.clicks, 0);
+  const avgCtr             = totalAdImpressions > 0
     ? Number(((totalAdClicks / totalAdImpressions) * 100).toFixed(2))
     : 0;
-  const bestAd = adStats.length > 0
-    ? adStats.reduce((best, a) => (a.ctr > best.ctr ? a : best), adStats[0]!)
+  const adsWithData = adStats.filter((a) => a.impressions > 0);
+  const bestAd = adsWithData.length > 0
+    ? adsWithData.reduce((best, a) => (a.ctr > best.ctr ? a : best), adsWithData[0]!)
     : null;
+  const adHasAnyData = Boolean(((adHasAnyRes.rows?.[0] ?? {}) as { has?: boolean }).has);
 
-  // ── Behavior stats ────────────────────────────────────────────────────────
+  // ── Behavior stats (janela) ───────────────────────────────────────────────
   const searchTerms: Record<string, number> = {};
   const linkDomains: Record<string, number> = {};
   let newsletterSignups = 0;
@@ -576,32 +695,42 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     .slice(0, 10)
     .map(([domain, count]) => ({ domain, count }));
 
-  const totalBehaviorEvents = behaviorRows.length;
-
-  const maxHourViews = Math.max(...byHour);
-  const maxDowViews  = Math.max(...byDayOfWeek);
+  const maxHourViews = Math.max(...agg.byHour);
+  const maxDowViews  = Math.max(...agg.byDow);
 
   res.json({
-    totals: { today, week, month, allTime },
+    period: { key: win.key, from: win.fromDay, to: win.toDay, label: win.label, days: win.days },
+    totals: { today, week, month, allTime, window: agg.windowPv },
     engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
+    visitors: {
+      unique:    visitorsUnique,
+      new:       Math.max(0, visitorsUnique - visitorsReturning),
+      returning: visitorsReturning,
+      since:     ANALYTICS_V2_SINCE, // antes desta data não havia visitor_id
+    },
     trends,
-    dailyChart:      Object.entries(byDay).map(([date, views]) => ({ date, views })),
-    hourlyChart:     byHour.map((views, hour) => ({ hour, views })),
-    peakHour:        maxHourViews > 0 ? byHour.indexOf(maxHourViews) : null,
-    dayOfWeekChart:  byDayOfWeek.map((views, day) => ({ day: DAY_NAMES[day]!, views })),
-    peakDay:         maxDowViews > 0 ? DAY_NAMES[byDayOfWeek.indexOf(maxDowViews)]! : null,
+    dailyChart:      Object.entries(agg.byDay).map(([date, views]) => ({ date, views })),
+    hourlyChart:     agg.byHour.map((views, hour) => ({ hour, views })),
+    peakHour:        maxHourViews > 0 ? agg.byHour.indexOf(maxHourViews) : null,
+    dayOfWeekChart:  agg.byDow.map((views, day) => ({ day: DAY_NAMES[day]!, views })),
+    peakDay:         maxDowViews > 0 ? DAY_NAMES[agg.byDow.indexOf(maxDowViews)]! : null,
     topArticles,
     topCategories,
-    topCities:  Object.entries(cityTotals).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
-    topRegions: Object.entries(regionTotals).sort((a,b) => b[1]-a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
-    devices:         deviceMap,
-    scrollDepthChart: [25,50,75,100].map((depth) => ({ depth, count: scrollMap[depth] ?? 0 })),
-    referrerChart:   Object.entries(referrerMap).map(([name,value])=>({name,value})).sort((a,b)=>b.value-a.value),
-    shareChart:      Object.entries(shareMap).map(([platform,count])=>({platform,count})).sort((a,b)=>b.count-a.count),
-    // Ad analytics
+    topCities:  Object.entries(cityTotals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
+    topRegions: Object.entries(regionTotals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),
+    devices:         agg.deviceMap,
+    browsers:        toTopList(browserTotals, 8),
+    osList:          toTopList(osTotals, 8),
+    scrollDepthChart: [25, 50, 75, 100].map((depth) => ({ depth, count: agg.scrollSessions[depth]?.size ?? 0 })),
+    referrerChart:   Object.entries(agg.channelMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value),
+    topRefHosts:     toTopList(agg.refHostMap, 10),
+    topCampaigns:    toTopList(agg.campaignMap, 10),
+    shareChart:      Object.entries(agg.shareMap).map(([platform, count]) => ({ platform, count })).sort((a, b) => b.count - a.count),
+    // Ad analytics (janela selecionada)
     adStats,
     adDailyChart,
     adTopNames: top3AdIds.map((id) => adStats.find((a) => a.id === id)?.name ?? id),
+    adHasAnyData,
     adKpis: {
       totalImpressions: totalAdImpressions,
       totalClicks:      totalAdClicks,
@@ -611,7 +740,7 @@ router.get("/stats", authMiddleware, async (_req, res) => {
     },
     // Behavior analytics
     behaviorStats: {
-      totalEvents:     totalBehaviorEvents,
+      totalEvents:     behaviorRows.length,
       newsletterSignups,
       topSearchTerms,
       topLinkDomains,

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { BRAND } from "../brand";
 import { buildSrcSet, HERO_WIDTHS } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
@@ -125,7 +125,10 @@ export default function Artigo() {
   const { trackArticle, trackShare } = useAnalytics();
   // article.id (não o slug): pageview/read usam o id — com o slug seria
   // impossível cruzar profundidade de leitura com as views do artigo.
-  useScrollDepth(article?.id);
+  // contentRef: profundidade medida sobre o CORPO do artigo (cabeçalho,
+  // lateral e rodapé não contam como leitura).
+  const contentRef = useRef<HTMLDivElement>(null);
+  useScrollDepth(article?.id, contentRef);
 
   // Compartilhamento configurável (Blocos da Home → Notícia): rótulo e redes.
   // Ausente = todas as redes com o rótulo do idioma do site.
@@ -274,7 +277,12 @@ export default function Artigo() {
         return <em key={i}>{part.slice(1, -1)}</em>;
       const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (link)
-        return <a key={i} href={link[2]} target="_blank" rel="noreferrer" className="text-[#0b3d91] underline hover:text-[#c8102e] transition-colors" onClick={() => trackLinkClick(link[2], article?.id)}>{link[1]}</a>;
+        // Só link EXTERNO conta como clique de saída (mesma regra do corpo HTML).
+        return <a key={i} href={link[2]} target="_blank" rel="noreferrer" className="text-[#0b3d91] underline hover:text-[#c8102e] transition-colors" onClick={() => {
+          if (/^https?:\/\//i.test(link[2]) && !link[2].startsWith(window.location.origin)) {
+            trackLinkClick(link[2], article?.id);
+          }
+        }}>{link[1]}</a>;
       return part;
     });
   }
@@ -709,8 +717,8 @@ export default function Artigo() {
                     <AdBanner slot="slot_10" />
                   </div>
 
-                  {/* Corpo */}
-                  <div className="max-w-none">
+                  {/* Corpo — contentRef ancora a profundidade de leitura real */}
+                  <div className="max-w-none" ref={contentRef}>
                     {renderContent(article.content)}
                   </div>
 

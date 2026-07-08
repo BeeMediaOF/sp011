@@ -170,6 +170,10 @@ export interface SiteSettings {
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
   siteTimezone?: string;
+  /** IPs de tráfego interno (redação/escritório), separados por vírgula/espaço:
+   *  eventos desses IPs são marcados internos e excluídos do Analytics público.
+   *  NUNCA vai no payload público de /api/site (redigido em routes/site.ts). */
+  internalIps?: string;
   mobileEnabled: boolean; desktopEnabled: boolean;
   showTickerBar?: boolean; showHeroStrip?: boolean;
   headerStyle?: "standard" | "compact" | "centered";

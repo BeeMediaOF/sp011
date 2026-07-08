@@ -108,10 +108,15 @@ export const adminApi = {
   updateContactInfo: (info: Partial<ContactInfo>) => req<{ contactInfo: ContactInfo }>("PUT", "/contact", info),
 
   // Analytics
-  getAnalyticsStats: (): Promise<AnalyticsStats> => {
+  getAnalyticsStats: (params?: { period?: string; from?: string; to?: string }): Promise<AnalyticsStats> => {
     const token = localStorage.getItem("admin_token");
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-    return fetch("/api/analytics/stats", { headers }).then((r) => r.json()) as Promise<AnalyticsStats>;
+    const qs = new URLSearchParams();
+    if (params?.period) qs.set("period", params.period);
+    if (params?.from)   qs.set("from", params.from);
+    if (params?.to)     qs.set("to", params.to);
+    const url = qs.size > 0 ? `/api/analytics/stats?${qs.toString()}` : "/api/analytics/stats";
+    return fetch(url, { headers }).then((r) => r.json()) as Promise<AnalyticsStats>;
   },
 
   // Users (admin only)
@@ -306,6 +311,9 @@ export interface SiteSettings {
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
   siteTimezone?: string;
+  /** IPs de tráfego interno (analytics), separados por vírgula/espaço — eventos
+   *  desses IPs são marcados internos e ficam fora das métricas públicas. */
+  internalIps?: string;
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   showTickerBar?: boolean;
@@ -398,10 +406,17 @@ export interface RetentionOptions {
 }
 
 export interface AnalyticsStats {
-  totals: { today: number; week: number; month: number; allTime: number };
+  /** Janela aplicada pelo servidor (?period=…); sem params = últimos 30 dias.
+   *  totals.today/week/month/allTime são SEMPRE relativos ao agora (contrato do
+   *  Dashboard), independentes do período; `window` é o total da janela. */
+  period?: { key: string; from: string; to: string; label: string; days: number };
+  totals: { today: number; week: number; month: number; allTime: number; window?: number };
+  /** Visitantes anônimos persistentes (coletados a partir de `since`). */
+  visitors?: { unique: number; new: number; returning: number; since: string };
   /** Variação real vs a janela anterior de mesmo tamanho (null = sem base). */
   trends?: {
     today: number | null; week: number | null; month: number | null;
+    window?: number | null; visitors?: number | null;
     uniqueSessions: number | null; avgReadTime: number | null; bounceRate: number | null;
   };
   dailyChart: { date: string; views: number }[];
@@ -409,6 +424,8 @@ export interface AnalyticsStats {
   topArticles: { id: string; title: string; views: number }[];
   topCategories: { name: string; views: number; clicks: number; articles: number }[];
   devices: { mobile: number; desktop: number; tablet: number };
+  browsers?: { name: string; views: number }[];
+  osList?: { name: string; views: number }[];
 }
 
 export interface Ad {

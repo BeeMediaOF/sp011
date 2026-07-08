@@ -17,14 +17,22 @@ import { Link } from "wouter";
 interface AdStat {
   id: string; name: string; position: string; active: boolean;
   impressions: number; clicks: number; ctr: number;
+  /** false = nenhum registro diário no período (≠ zero real). */
+  hasData?: boolean;
 }
+type PeriodKey = "today" | "yesterday" | "7d" | "30d" | "custom";
 interface Stats {
-  totals: { today: number; week: number; month: number; allTime: number };
+  /** Janela efetivamente aplicada pelo servidor (ecoada — a UI nunca mente). */
+  period?: { key: PeriodKey; from: string; to: string; label: string; days: number };
+  totals: { today: number; week: number; month: number; allTime: number; window?: number };
   engagement?: { uniqueSessions: number; avgReadTime: number; bounceRate: number; readCompletions: number };
+  /** Visitantes anônimos persistentes — coletados a partir de `since`. */
+  visitors?: { unique: number; new: number; returning: number; since: string };
   /** Variação real vs a janela anterior de mesmo tamanho (null = sem base de comparação).
    *  bounceRate vem em pontos percentuais; os demais em %. */
   trends?: {
     today: number | null; week: number | null; month: number | null;
+    window?: number | null; visitors?: number | null;
     uniqueSessions: number | null; avgReadTime: number | null; bounceRate: number | null;
   };
   dailyChart: { date: string; views: number }[];
@@ -37,13 +45,19 @@ interface Stats {
   topCities?: { name: string; views: number }[];
   topRegions?: { name: string; views: number }[];
   devices: { mobile: number; desktop: number; tablet: number };
+  browsers?: { name: string; views: number }[];
+  osList?: { name: string; views: number }[];
   scrollDepthChart?: { depth: number; count: number }[];
   referrerChart?: { name: string; value: number }[];
+  topRefHosts?: { name: string; views: number }[];
+  topCampaigns?: { name: string; views: number }[];
   shareChart?: { platform: string; count: number }[];
   // Ad analytics
   adStats?: AdStat[];
   adDailyChart?: Record<string, unknown>[];
   adTopNames?: string[];
+  /** false = nunca houve registro diário de anúncio (coleta não iniciada). */
+  adHasAnyData?: boolean;
   adKpis?: {
     totalImpressions: number; totalClicks: number;
     avgCtr: number; bestAdName: string | null; bestAdCtr: number;
@@ -54,6 +68,14 @@ interface Stats {
     topSearchTerms: { term: string; count: number }[];
     topLinkDomains: { domain: string; count: number }[];
   };
+}
+
+/** GET /api/analytics/health — contadores de coleta desde o boot do servidor. */
+interface Health {
+  received: number; droppedBot: number; droppedRate: number; droppedInvalid: number;
+  droppedDuplicate: number; flaggedInternal: number; flushedOk: number; flushFailed: number;
+  buffered: number; lastEventAt: string | null; lastFlushAt: string | null;
+  reliableSince: string; filters: string[];
 }
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -71,17 +93,38 @@ const CAT_COLORS: Record<string, string> = {
 const CAT_COLORS_ARR = ["#2563EB","#E71D36","#F97316","#16A34A","#7C3AED","#64748B"];
 
 const REFERRER_LABELS: Record<string, string> = {
-  direto: "Direto",
-  busca:  "Busca (Google, Bing…)",
-  social: "Redes Sociais",
-  outro:  "Referência",
+  direto:       "Direto",
+  busca:        "Busca (Google, Bing…)",
+  social:       "Redes Sociais",
+  referencia:   "Referência (outros sites)",
+  email:        "E-mail / Newsletter",
+  pago:         "Tráfego pago",
+  desconhecido: "Desconhecido",
+  outro:        "Referência", // legado (linhas antigas; o servidor já remapeia)
 };
 const REFERRER_COLORS: Record<string, string> = {
-  direto: "#2563EB",
-  busca:  "#F97316",
-  social: "#7C3AED",
-  outro:  "#16A34A",
+  direto:       "#2563EB",
+  busca:        "#F97316",
+  social:       "#7C3AED",
+  referencia:   "#16A34A",
+  email:        "#0891b2",
+  pago:         "#E71D36",
+  desconhecido: "#94A3B8",
+  outro:        "#16A34A",
 };
+
+const PERIOD_PRESETS: { key: PeriodKey; label: string }[] = [
+  { key: "today",     label: "Hoje" },
+  { key: "yesterday", label: "Ontem" },
+  { key: "7d",        label: "7 dias" },
+  { key: "30d",       label: "30 dias" },
+  { key: "custom",    label: "Personalizado" },
+];
+
+/** dd/mm/aaaa a partir de YYYY-MM-DD. */
+function fmtDayBr(d: string): string {
+  return `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+}
 
 const DEVICE_COLORS = ["#2563EB", "#22C55E", "#F97316"];
 
@@ -122,19 +165,36 @@ function EmptyState({ label }: { label: string }) {
 
 export default function Analytics() {
   const [stats,      setStats]      = useState<Stats | null>(null);
+  const [health,     setHealth]     = useState<Health | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated,setLastUpdated]= useState<Date | null>(null);
   const [geoTab,     setGeoTab]     = useState<"cidades" | "estados">("cidades");
+  // Período do relatório (o servidor ecoa a janela aplicada em stats.period).
+  const [periodKey,  setPeriodKey]  = useState<PeriodKey>("30d");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo,   setCustomTo]   = useState("");
 
   const fetchStats = React.useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
     const token = localStorage.getItem("admin_token");
+    const headers = { Authorization: `Bearer ${token}` };
+    const qs = new URLSearchParams({ period: periodKey });
+    if (periodKey === "custom") {
+      // Sem as duas datas o servidor cai no padrão de 30 dias — não envia pela metade.
+      if (!customFrom || !customTo) { if (silent) setRefreshing(false); return; }
+      qs.set("from", customFrom);
+      qs.set("to", customTo);
+    }
     try {
-      const r    = await fetch("/api/analytics/stats", { headers: { Authorization: `Bearer ${token}` } });
+      const [r, rh] = await Promise.all([
+        fetch(`/api/analytics/stats?${qs.toString()}`, { headers }),
+        fetch("/api/analytics/health", { headers }),
+      ]);
       const data = await r.json() as Stats;
       setStats(data);
+      if (rh.ok) setHealth(await rh.json() as Health);
       setLastUpdated(new Date());
       if (!silent) setLoading(false);
     } catch {
@@ -142,7 +202,7 @@ export default function Analytics() {
     } finally {
       if (silent) setRefreshing(false);
     }
-  }, []);
+  }, [periodKey, customFrom, customTo]);
 
   useEffect(() => {
     void fetchStats(false);
@@ -181,7 +241,7 @@ export default function Analytics() {
 </head>
 <body>
   <h1>Relatório de Analytics</h1>
-  <p class="sub">Gerado em ${now}</p>
+  <p class="sub">Gerado em ${now} · Período: ${stats.period?.label ?? "Últimos 30 dias"} · Bots, tráfego interno e duplicados filtrados</p>
 
   <h2>Resumo de Tráfego</h2>
   <div class="kpis">
@@ -265,24 +325,43 @@ export default function Analytics() {
 
   const topArts = stats.topArticles ?? [];
 
-  // Tendências REAIS calculadas pelo servidor (janela atual vs 30 dias
-  // anteriores). null = sem base de comparação → badge não aparece.
+  // Tendências REAIS calculadas pelo servidor (janela selecionada vs janela
+  // anterior de mesmo tamanho). null = sem base de comparação → badge não aparece.
   const tr = stats.trends ?? {
     today: null, week: null, month: null,
     uniqueSessions: null, avgReadTime: null, bounceRate: null,
   };
 
+  // Janela aplicada pelo servidor (ecoada) — todos os cards usam este rótulo.
+  const windowLabel = stats.period?.label ?? "Últimos 30 dias";
+  const visitorsRollout = stats.visitors && stats.period && stats.period.from < stats.visitors.since;
+
   const kpis = [
     {
       label:   "Visualizações de página",
-      value:   (stats.totals?.month ?? 0).toLocaleString("pt-BR"),
-      delta:   tr.month,
-      deltaTxt: fmtDelta(tr.month, "%"),
+      value:   (stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString("pt-BR"),
+      delta:   tr.window ?? tr.month,
+      deltaTxt: fmtDelta(tr.window ?? tr.month, "%"),
       goodWhenUp: true,
-      sub:     "vs 30 dias anteriores",
+      sub:     "vs período anterior",
+      tip:     `Pageviews de ${windowLabel.toLowerCase()}. Bots, tráfego interno, caminhos /admin e refresh repetido (<15s) não contam.`,
       icon:    Eye,
       iconBg:  "#EEF4FF",
       iconClr: "#2563EB",
+    },
+    {
+      label:   "Visitantes únicos",
+      value:   (stats.visitors?.unique ?? 0).toLocaleString("pt-BR"),
+      delta:   tr.visitors ?? null,
+      deltaTxt: fmtDelta(tr.visitors ?? null, "%"),
+      goodWhenUp: true,
+      sub:     stats.visitors
+        ? `${stats.visitors.new.toLocaleString("pt-BR")} novos · ${stats.visitors.returning.toLocaleString("pt-BR")} recorrentes${visitorsRollout ? ` · desde ${fmtDayBr(stats.visitors.since)}` : ""}`
+        : "vs período anterior",
+      tip:     `Visitantes anônimos persistentes (ID aleatório pós-consentimento). Coletado a partir de ${fmtDayBr(stats.visitors?.since ?? "2026-07-08")} — períodos anteriores não têm esse dado.`,
+      icon:    Users,
+      iconBg:  "#F5F3FF",
+      iconClr: "#7C3AED",
     },
     {
       label:   "Sessões únicas",
@@ -290,7 +369,8 @@ export default function Analytics() {
       delta:   tr.uniqueSessions,
       deltaTxt: fmtDelta(tr.uniqueSessions, "%"),
       goodWhenUp: true,
-      sub:     "vs 30 dias anteriores",
+      sub:     "vs período anterior",
+      tip:     "Sessões de navegação distintas (uma por aba/visita) com ao menos 1 pageview no período.",
       icon:    Users,
       iconBg:  "#ECFDF5",
       iconClr: "#16A34A",
@@ -301,7 +381,8 @@ export default function Analytics() {
       delta:   tr.avgReadTime,
       deltaTxt: fmtDelta(tr.avgReadTime, "%"),
       goodWhenUp: true,
-      sub:     "vs 30 dias anteriores",
+      sub:     "vs período anterior",
+      tip:     "Tempo ATIVO com a aba visível, por página e sessão (teto de 30min). Aba em segundo plano não conta.",
       icon:    Clock,
       iconBg:  "#FFF7ED",
       iconClr: "#F97316",
@@ -312,7 +393,8 @@ export default function Analytics() {
       delta:   tr.bounceRate,
       deltaTxt: fmtDelta(tr.bounceRate, " pp"),
       goodWhenUp: false,
-      sub:     "vs 30 dias anteriores",
+      sub:     "vs período anterior",
+      tip:     "Sessões que viram só 1 página ÷ total de sessões do período (variação em pontos percentuais).",
       icon:    TrendingDown,
       iconBg:  "#FEF2F2",
       iconClr: "#EF4444",
@@ -336,7 +418,30 @@ export default function Analytics() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Seletor de período — a janela aplicada é a que o servidor ecoa */}
+            <div className="flex border border-slate-200 rounded-xl overflow-hidden text-xs bg-white">
+              {PERIOD_PRESETS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPeriodKey(key)}
+                  className={`px-3 py-1.5 font-medium transition-colors ${
+                    periodKey === key ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {periodKey === "custom" && (
+              <div className="flex items-center gap-1.5 text-xs">
+                <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
+                  className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-600 bg-white"/>
+                <span className="text-slate-400">a</span>
+                <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
+                  className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-600 bg-white"/>
+              </div>
+            )}
             <button
               onClick={() => { void fetchStats(true); }}
               disabled={refreshing}
@@ -356,9 +461,9 @@ export default function Analytics() {
         </div>
 
         {/* ── KPI cards ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {kpis.map(({ label, value, delta, deltaTxt, goodWhenUp, sub, icon: Icon, iconBg, iconClr }) => (
-            <div key={label} className="bg-white rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: CARD_SHADOW }}>
+        <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
+          {kpis.map(({ label, value, delta, deltaTxt, goodWhenUp, sub, tip, icon: Icon, iconBg, iconClr }) => (
+            <div key={label} className="bg-white rounded-2xl p-5 flex flex-col gap-3" style={{ boxShadow: CARD_SHADOW }} title={tip}>
               <div className="flex items-center justify-between">
                 <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: iconBg }}>
                   <Icon size={18} style={{ color: iconClr }} />
@@ -395,12 +500,12 @@ export default function Analytics() {
           {/* Line chart — Tráfego (5/10) */}
           <div className="xl:col-span-5 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title="Pageviews por dia (fuso de Brasília). Bots, tráfego interno e duplicados não contam.">
                 <h2 className="text-sm font-semibold text-[#0B2A66]">Tráfego ao longo do tempo</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                Últimos 30 dias
+                {windowLabel}
               </span>
             </div>
             {!hasChart ? (
@@ -450,12 +555,12 @@ export default function Analytics() {
           {/* Traffic sources (3/10) */}
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title="Canal de entrada de cada sessão (1× por sessão, classificado no servidor por referrer + UTM). Sessões antigas sem sinal aparecem como Direto.">
                 <h2 className="text-sm font-semibold text-[#0B2A66]">Fontes de tráfego</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                Últimos 30 dias
+                {windowLabel}
               </span>
             </div>
             {referrers.length === 0 ? (
@@ -485,13 +590,40 @@ export default function Analytics() {
                     </div>
                   );
                 })}
+                {/* Domínios de origem e campanhas UTM (quando existem) */}
+                {(stats.topRefHosts ?? []).length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Principais domínios de origem</p>
+                    <div className="space-y-1.5">
+                      {(stats.topRefHosts ?? []).slice(0, 5).map(({ name, views }) => (
+                        <div key={name} className="flex items-center justify-between">
+                          <span className="text-xs text-slate-600 truncate max-w-[170px]">{name}</span>
+                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {(stats.topCampaigns ?? []).length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Campanhas (utm_campaign)</p>
+                    <div className="space-y-1.5">
+                      {(stats.topCampaigns ?? []).slice(0, 5).map(({ name, views }) => (
+                        <div key={name} className="flex items-center justify-between">
+                          <span className="text-xs text-slate-600 truncate max-w-[170px]">{name}</span>
+                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Devices donut (2/10) */}
           <div className="xl:col-span-2 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-            <div className="flex items-center gap-2 mb-5">
+            <div className="flex items-center gap-2 mb-5" title="Derivado do user-agent no servidor (mobile/desktop/tablet + família de navegador e SO). Fora do catálogo = 'outro'; nunca inventamos valor.">
               <h2 className="text-sm font-semibold text-[#0B2A66]">Dispositivos</h2>
               <Info size={13} className="text-slate-400" />
             </div>
@@ -515,7 +647,7 @@ export default function Analytics() {
                 </PieChart>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-sm font-bold text-[#0F172A] leading-none">
-                    {(stats.totals?.month ?? 0).toLocaleString("pt-BR")}
+                    {(stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString("pt-BR")}
                   </p>
                   <p className="text-[9px] text-slate-400 mt-0.5">views</p>
                 </div>
@@ -529,6 +661,33 @@ export default function Analytics() {
                   </div>
                 ))}
               </div>
+              {/* Navegador / SO (parse do user-agent no servidor) */}
+              {(stats.browsers ?? []).length > 0 && (
+                <div className="mt-4 pt-3 border-t border-slate-100 w-full">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Navegadores</p>
+                  <div className="space-y-1">
+                    {(stats.browsers ?? []).slice(0, 4).map(({ name, views }) => (
+                      <div key={name} className="flex items-center justify-between">
+                        <span className="text-xs text-slate-600 capitalize">{name}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(stats.osList ?? []).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-slate-100 w-full">
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Sistemas</p>
+                  <div className="space-y-1">
+                    {(stats.osList ?? []).slice(0, 4).map(({ name, views }) => (
+                      <div key={name} className="flex items-center justify-between">
+                        <span className="text-xs text-slate-600 capitalize">{name}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -633,7 +792,7 @@ export default function Analytics() {
           {/* Localização: Cidades / Estados (3/10) */}
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" title={`Cidade/estado por evento do período (geolocalização por IP). "Não identificado" = IP sem localização resolvida — nunca inventamos local.`}>
                 <h2 className="text-sm font-semibold text-[#0B2A66]">Localização</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
@@ -794,10 +953,11 @@ export default function Analytics() {
           </div>
 
           {/* Profundidade de leitura */}
-          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
+          <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}
+            title="Sessões únicas que atingiram cada marco do CORPO do artigo (cabeçalho/rodapé não contam). Cada marco vale 1× por sessão e artigo.">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-[#0B2A66]">Profundidade de leitura</h2>
-              <span className="text-xs text-slate-400">% que chegou até</span>
+              <span className="text-xs text-slate-400">sessões que chegaram até</span>
             </div>
             {(stats.scrollDepthChart ?? []).every(d => d.count === 0) ? (
               <EmptyState label="Sem dados de scroll ainda" />
@@ -811,7 +971,7 @@ export default function Analytics() {
                     <div key={depth}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-medium text-slate-600">{labels[depth]}</span>
-                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString("pt-BR")} leitores</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString("pt-BR")} sessões</span>
                       </div>
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
@@ -832,6 +992,10 @@ export default function Analytics() {
           <div className="flex items-center gap-2 mb-4">
             <Megaphone size={16} className="text-[#E71D36]" />
             <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">Propagandas</h2>
+            <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100"
+              title="Números do período selecionado (histórico diário). Totais acumulados desde o início ficam em Propagandas → Gerenciar. Impressão = anúncio ≥50% visível por 1s contínuo, 1× por sessão.">
+              {windowLabel}
+            </span>
           </div>
 
           {/* KPIs de anúncios */}
@@ -879,7 +1043,7 @@ export default function Analytics() {
           <div className="grid grid-cols-1 xl:grid-cols-10 gap-4">
             {/* Tabela de anúncios */}
             <div className="xl:col-span-6 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-              <h3 className="text-sm font-semibold text-[#0B2A66] mb-4">Desempenho por anúncio</h3>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-4">Desempenho por anúncio <span className="font-normal text-slate-400">(no período)</span></h3>
               {!stats.adStats || stats.adStats.length === 0 ? (
                 <EmptyState label="Nenhum anúncio cadastrado ainda" />
               ) : (
@@ -910,15 +1074,24 @@ export default function Analytics() {
                                 />
                               </div>
                             </td>
-                            <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                              {ad.impressions.toLocaleString("pt-BR")}
-                            </td>
-                            <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                              {ad.clicks.toLocaleString("pt-BR")}
-                            </td>
-                            <td className="py-3 px-3 text-right">
-                              <span className="font-bold text-sm" style={{ color: ctrColor }}>{ad.ctr.toFixed(2)}%</span>
-                            </td>
+                            {ad.hasData === false ? (
+                              /* Sem registro diário no período ≠ zero real */
+                              <td colSpan={3} className="py-3 px-3 text-right text-[11px] text-slate-400 italic">
+                                sem dados no período
+                              </td>
+                            ) : (
+                              <>
+                                <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                                  {ad.impressions.toLocaleString("pt-BR")}
+                                </td>
+                                <td className="py-3 px-3 text-right font-semibold text-slate-700">
+                                  {ad.clicks.toLocaleString("pt-BR")}
+                                </td>
+                                <td className="py-3 px-3 text-right">
+                                  <span className="font-bold text-sm" style={{ color: ctrColor }}>{ad.ctr.toFixed(2)}%</span>
+                                </td>
+                              </>
+                            )}
                             <td className="py-3 px-3 text-right">
                               <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                                 ad.active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"
@@ -938,10 +1111,13 @@ export default function Analytics() {
 
             {/* Gráfico de impressões dos top 3 anúncios */}
             <div className="xl:col-span-4 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-              <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Impressões — top 3 (30 dias)</h3>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Impressões — top 3 ({windowLabel.toLowerCase()})</h3>
               <p className="text-xs text-slate-400 mb-4">Histórico diário dos anúncios com mais visualizações</p>
-              {!stats.adDailyChart || stats.adDailyChart.every(d => (stats.adTopNames ?? []).every(n => (d[n] as number) === 0)) ? (
+              {/* 3 estados distintos: coleta nunca começou / começou mas nada NESTE período / dados */}
+              {stats.adHasAnyData === false ? (
                 <EmptyState label="Acumulando dados diários…" />
+              ) : !stats.adDailyChart || stats.adDailyChart.every(d => (stats.adTopNames ?? []).every(n => (d[n] as number) === 0)) ? (
+                <EmptyState label="Sem dados no período selecionado" />
               ) : (
                 <ResponsiveContainer width="100%" height={210}>
                   <LineChart data={stats.adDailyChart as { date: string; [key: string]: unknown }[]} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
@@ -1003,7 +1179,7 @@ export default function Analytics() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-700">Termos mais buscados</h3>
-                  <p className="text-[10px] text-slate-400">Últimos 30 dias</p>
+                  <p className="text-[10px] text-slate-400">{windowLabel}</p>
                 </div>
               </div>
               {!stats.behaviorStats?.topSearchTerms.length ? (
@@ -1075,7 +1251,7 @@ export default function Analytics() {
                 </div>
                 <div>
                   <h3 className="text-xs font-semibold text-slate-700">Resumo de interações</h3>
-                  <p className="text-[10px] text-slate-400">30 dias</p>
+                  <p className="text-[10px] text-slate-400">{windowLabel}</p>
                 </div>
               </div>
               <div className="space-y-4">
@@ -1126,8 +1302,45 @@ export default function Analytics() {
           </div>
         </div>
 
+        {/* ══ SAÚDE DA COLETA ═══════════════════════════════════ */}
+        {health && (
+          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
+            <div className="flex items-center gap-2 mb-3">
+              <Info size={14} className="text-slate-400" />
+              <h2 className="text-xs font-bold text-[#0B2A66] uppercase tracking-wide">Saúde da coleta</h2>
+              <span className="text-[10px] text-slate-400">(contadores desde o último reinício do servidor)</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 text-center">
+              {[
+                { label: "Aceitos", value: health.received, tip: "Eventos válidos enfileirados para gravação" },
+                { label: "Gravados", value: health.flushedOk, tip: "Linhas efetivamente persistidas no banco" },
+                { label: "Bots filtrados", value: health.droppedBot, tip: "User-agent de robô/CLI ou vazio" },
+                { label: "Duplicados", value: health.droppedDuplicate, tip: "Refresh da mesma página em menos de 15s" },
+                { label: "Rate limit", value: health.droppedRate, tip: "Acima de 120 eventos/min por IP" },
+                { label: "Internos marcados", value: health.flaggedInternal, tip: "Admin logado, ambiente dev ou IP configurado — gravados, mas fora das métricas" },
+              ].map(({ label, value, tip }) => (
+                <div key={label} className="bg-slate-50 rounded-xl px-2 py-2.5" title={tip}>
+                  <p className="text-sm font-bold text-[#0F172A]">{value.toLocaleString("pt-BR")}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{label}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11px] text-slate-400">
+              <span>Último evento: {health.lastEventAt ? new Date(health.lastEventAt).toLocaleTimeString("pt-BR") : "—"}</span>
+              <span>Última gravação: {health.lastFlushAt ? new Date(health.lastFlushAt).toLocaleTimeString("pt-BR") : "—"}</span>
+              <span>No buffer: {health.buffered}</span>
+              {health.flushFailed > 0 && (
+                <span className="text-red-500 font-semibold">Falhas de gravação: {health.flushFailed}</span>
+              )}
+              <span className="font-medium text-slate-500">Dados confiáveis desde {fmtDayBr(health.reliableSince)}</span>
+            </div>
+          </div>
+        )}
+
         <p className="text-xs text-slate-400 text-center pb-2">
-          Dados coletados de visitantes · Views por artigo e por categoria persistidos em disco · Atualização automática a cada 30s
+          Bots, tráfego interno, caminho /admin e refresh repetido são filtrados ·
+          Dados confiáveis desde {fmtDayBr(health?.reliableSince ?? "2026-07-08")} ·
+          Fuso de Brasília · Atualização automática a cada 30s
         </p>
       </div>
     </AdminLayout>

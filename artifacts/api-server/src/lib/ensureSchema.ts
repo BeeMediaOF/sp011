@@ -34,6 +34,17 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`CREATE UNIQUE INDEX IF NOT EXISTS articles_central_id_uniq ON articles (central_id) WHERE central_id IS NOT NULL`,
     // Variante Story (1080×1920) do template: { backgroundColor, elements }.
     sql`ALTER TABLE social_templates ADD COLUMN IF NOT EXISTS story jsonb`,
+    // Analytics rodada 2: visitante anônimo, sinais de origem (UTM/host do
+    // referrer), flag de tráfego interno e navegador/SO parseados no ingest.
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS visitor_id text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS utm_source text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS utm_medium text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS utm_campaign text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ref_host text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS is_internal boolean NOT NULL DEFAULT false`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS browser text`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS os text`,
+    sql`CREATE INDEX IF NOT EXISTS analytics_visitor_ts_idx ON analytics_events (visitor_id, ts)`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,

@@ -103,18 +103,42 @@ export function useAds() {
   return { ads, getSlot, getSlotAll, banners, sidebars, centrals, loading };
 }
 
+/** Publicidade de admin logado (ou ambiente dev) não entra nos números oficiais. */
+function isInternalTraffic(): boolean {
+  if (import.meta.env.DEV) return true;
+  try {
+    return Boolean(localStorage.getItem("admin_token"));
+  } catch {
+    return false;
+  }
+}
+
 export function trackClick(adId: string) {
+  if (isInternalTraffic()) return Promise.resolve();
   return fetch(`/api/ads/${adId}/click`, { method: "POST" }).catch(() => {});
 }
 
 export function trackImpression(adId: string) {
+  if (isInternalTraffic()) return Promise.resolve();
   return fetch(`/api/ads/${adId}/impression`, { method: "POST" }).catch(() => {});
 }
 
+/** Tempo mínimo de visibilidade CONTÍNUA (≥50% na tela) para valer impressão —
+ *  passar rolando por cima do banner não conta (padrão de viewability IAB). */
+const IMPRESSION_DWELL_MS = 1000;
+
+function impressionAlreadyCounted(adId: string): boolean {
+  try { return sessionStorage.getItem(`bee_adimp_${adId}`) === "1"; } catch { return false; }
+}
+function markImpressionCounted(adId: string): void {
+  try { sessionStorage.setItem(`bee_adimp_${adId}`, "1"); } catch { /* ignore */ }
+}
+
 /**
- * Impressão "viewável": conta quando ≥50% do anúncio entra na viewport
- * (IntersectionObserver), uma vez por anúncio por montagem — nunca no render,
- * senão banner abaixo da dobra que ninguém viu contaria impressão.
+ * Impressão "viewável": conta quando ≥50% do anúncio fica visível por 1s
+ * contínuo (IntersectionObserver + dwell), UMA vez por anúncio por SESSÃO
+ * (sessionStorage; o Set por montagem é só fallback se o storage falhar).
+ * Nunca no render — banner abaixo da dobra que ninguém viu não conta.
  * Uso: `const adRef = useAdImpression(ad?.id)` e `ref={adRef}` no contêiner.
  */
 export function useAdImpression(adId: string | null | undefined): (el: HTMLElement | null) => void {
@@ -134,10 +158,17 @@ export function useAdImpression(adId: string | null | undefined): (el: HTMLEleme
   }, [el]);
 
   useEffect(() => {
-    if (visible && adId && !seen.current.has(adId)) {
+    if (!visible || !adId) return;
+    if (seen.current.has(adId) || impressionAlreadyCounted(adId)) return;
+    // Timer de dwell: sair da tela (ou trocar o anúncio do carrossel) antes de
+    // 1s cancela pelo cleanup — visibilidade precisa ser contínua.
+    const timer = window.setTimeout(() => {
+      if (seen.current.has(adId) || impressionAlreadyCounted(adId)) return;
       seen.current.add(adId);
+      markImpressionCounted(adId);
       void trackImpression(adId);
-    }
+    }, IMPRESSION_DWELL_MS);
+    return () => window.clearTimeout(timer);
   }, [visible, adId]);
 
   return setEl;
