@@ -13,10 +13,10 @@
 -- O prompt EN canônico vive em deploy/ksports/sources_en.sql — se ele mudar,
 -- atualize também este arquivo.
 --
--- Uso (na VPS, em /opt/sp011 — note que o DBURL é o do BLOG, não o central;
--- nos blogs replicados a variável chama SUPABASE_DATABASE_URL):
---   BLOGDB=$(grep -m1 '^SUPABASE_DATABASE_URL=' /opt/blogs/ksports/.env | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
---   docker compose exec -T pg-blogs psql "$BLOGDB" -v ON_ERROR_STOP=1 < deploy/ksports/sources_blog_backup.sql
+-- Uso (na VPS, em /opt/sp011). A conexão do blog NÃO fica no .env (é o wizard
+-- que a guarda, criptografada em db-config.enc) — conecte como superusuário
+-- local do pg-blogs direto no banco do blog (nome = BLOG_ID, ver runbook):
+--   docker compose exec -T pg-blogs psql -U postgres -d ksports -v ON_ERROR_STOP=1 < deploy/ksports/sources_blog_backup.sql
 --   cd /opt/blogs/ksports && docker compose restart api   # o admin lê as fontes no boot
 -- =============================================================================
 
