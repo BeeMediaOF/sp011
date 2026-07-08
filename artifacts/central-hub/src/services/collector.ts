@@ -20,6 +20,7 @@ import { getSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
 import { isDuplicateNews } from "../lib/newsDedup.js";
+import { dailyQuotaFilledReason } from "../lib/dailyQuota.js";
 
 const TICK_MS = 60_000;
 
@@ -197,6 +198,13 @@ export async function runCollectorCycle(force = false): Promise<{ collected: num
   const pending = await countPendingRewrites();
   if (pending >= s.maxPendingRewrites) {
     return { collected: 0, skipped: `backpressure: ${pending} reescritas pendentes` };
+  }
+
+  // Fila do dia cheia em todos os blogs → coletar agora só geraria entrega
+  // para amanhã (gasto de scraping/IA à toa). Coleta manual (force) ignora.
+  if (!force) {
+    const quotaReason = await dailyQuotaFilledReason();
+    if (quotaReason) return { collected: 0, skipped: quotaReason };
   }
 
   let budget = s.collectionMaxPerCycle ?? Number.POSITIVE_INFINITY;

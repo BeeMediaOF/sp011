@@ -33,6 +33,7 @@ import {
 import { and, asc, count, eq, notInArray } from "drizzle-orm";
 import { getPrompts, getSettings, type HubSettings } from "../lib/store.js";
 import { getGeminiPool } from "../lib/aiPool.js";
+import { dailyQuotaFilledReason } from "../lib/dailyQuota.js";
 import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
 
@@ -473,6 +474,12 @@ async function tick(): Promise<void> {
   try {
     const s = getSettings();
     if (!s.rewriteEnabled) return;
+
+    // Fila do dia cheia em todos os blogs → reescrever agora só gastaria
+    // tokens com material que não pode ser entregue hoje (os itens ficam em
+    // `queued` e são processados quando abrir vaga / virar o dia). A pausa
+    // vale também para a lane de reforço (dispatchBoost roda dentro do tick).
+    if (await dailyQuotaFilledReason()) return;
 
     const slots = s.aiProvider === "gemini"
       ? Math.min(getGeminiPool().availableKeyCount(), MAX_CONCURRENCY)
