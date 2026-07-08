@@ -80,7 +80,7 @@ function ArticleSidebar() {
 
   return (
     <aside className="w-full lg:w-[300px] shrink-0 space-y-6">
-      {blocks.map((b, i) => {
+      {blocks.map((b) => {
         const type = inferBlockType(b);
         let content: React.ReactNode = null;
         if (type === "mostread") content = mostReadCard;
@@ -88,9 +88,8 @@ function ArticleSidebar() {
         else if (type === "image") content = <ImageBlock block={b} contained={false} />;
         else if (type === "html") content = <HtmlBlock block={b} contained={false} />;
         if (!content) return null;
-        // Último bloco fica fixo ao rolar (comportamento clássico da propaganda).
         return (
-          <div key={b.id} className={i === blocks.length - 1 ? "sticky top-24" : undefined}>
+          <div key={b.id}>
             <BlockFontScope fontId={b.fontFamily}>{content}</BlockFontScope>
           </div>
         );
@@ -529,8 +528,7 @@ export default function Artigo() {
 
   return (
     // overflow-x-clip: nenhum bloco interno pode esticar o canvas no mobile
-    // (clip, não hidden — hidden viraria scroll container e mataria o sticky
-    // da sidebar).
+    // (clip, não hidden — hidden viraria um scroll container desnecessário).
     <div className="min-h-screen w-full bg-white flex flex-col overflow-x-clip">
       {newsArticleSchema && (
         <script
