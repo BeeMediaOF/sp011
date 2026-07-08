@@ -36,6 +36,8 @@ const PROXY_HOSTS = new Set([
   "imagem.band.uol.com.br",
   // Wikimedia
   "upload.wikimedia.org",
+  // CDN (CloudFront) de fonte EN do ksports — host exato, distribuição fixa
+  "d2me2qg8dfiw8u.cloudfront.net",
 ]);
 
 /** Sufixos de CDNs das fontes internacionais (esportes/EN) — subdomínios variam
@@ -48,6 +50,10 @@ const PROXY_HOST_SUFFIXES = [
   ".atptour.com", ".wtatennis.com", ".volleyballworld.com",
   ".nfl.com", ".cbsistatic.com", ".brightspotcdn.com",
   ".talksport.com", ".goal.com", ".dexerto.com", ".esports.gg",
+  // Hosts reais vistos nos artigos do ksports (levantamento no banco, 2026-07-08)
+  ".dailymail.com", ".dailymail.co.uk", ".independent.co.uk",
+  ".mirror.co.uk", ".foxsports.com", ".minutemediacdn.com",
+  ".offtheblockblog.com", ".esportsinsider.com",
 ];
 
 function isProxyableHost(hostname: string): boolean {
