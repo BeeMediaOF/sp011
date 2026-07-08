@@ -2,6 +2,8 @@ import React, { useEffect, useState, useRef, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import { inferBlockType, type HomeBlock } from "../../lib/homeBlocks";
+import { sanitizeArticleHtml } from "../../lib/sanitize";
+import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   Plus, Trash2, Pencil, Search, Megaphone,
   MousePointer, Sparkles, ImageIcon, X, Upload,
@@ -350,6 +352,177 @@ function AdFormModal({
   );
 }
 
+// ─── Edição dos blocos de propaganda da home ──────────────────────────────────
+/** HTML pronto para banner de imagem (o link fica para o usuário preencher). */
+function bannerImgHtml(url: string, maxWidth?: number): string {
+  const mw = maxWidth ? `max-width:${maxWidth}px;` : "";
+  return `<a href="https://" target="_blank" rel="noopener sponsored"><img src="${url}" alt="banner" style="width:100%;${mw}height:auto;border-radius:8px;display:block;"></a>`;
+}
+
+/** Modal de edição de um bloco de propaganda (imagem/HTML) ou do banner do
+ *  cabeçalho, direto na aba Propagandas — com mini-prévia do HTML renderizado. */
+function HomeAdEditModal({ block, headerHtml, onClose, onSaveBlock, onSaveHeader }: {
+  /** null = banner do cabeçalho (settings.headerBannerHtml). */
+  block: HomeBlock | null;
+  headerHtml: string;
+  onClose: () => void;
+  onSaveBlock: (b: HomeBlock) => Promise<void>;
+  onSaveHeader: (html: string) => Promise<void>;
+}) {
+  const isHeader = !block;
+  const type = block ? inferBlockType(block) : "html";
+  const [name, setName]         = useState(block?.name ?? "");
+  const [html, setHtml]         = useState(isHeader ? headerHtml : (block?.html ?? ""));
+  const [imageUrl, setImageUrl] = useState(block?.imageUrl ?? "");
+  const [linkUrl, setLinkUrl]   = useState(block?.linkUrl ?? "");
+  const [caption, setCaption]   = useState(block?.caption ?? "");
+  const [visible, setVisible]   = useState(block?.visible ?? true);
+  const [saving, setSaving]     = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const INPUT_CLS = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]";
+
+  async function handleUpload(file: File) {
+    setUploading(true);
+    try {
+      const r = await adminApi.uploadImage(file, name || "banner");
+      if (!isHeader && type === "image") setImageUrl(r.url);
+      else setHtml(bannerImgHtml(r.url, isHeader ? 720 : undefined));
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    try {
+      if (isHeader) {
+        await onSaveHeader(html.trim());
+      } else if (type === "image") {
+        await onSaveBlock({
+          ...block!, name: name.trim() || block!.name, visible,
+          imageUrl: imageUrl.trim() || undefined, linkUrl: linkUrl.trim() || undefined,
+          caption: caption.trim() || undefined,
+        });
+      } else {
+        await onSaveBlock({ ...block!, name: name.trim() || block!.name, visible, html: html.trim() || undefined });
+      }
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const cleanPreview = sanitizeArticleHtml(html);
+  const uploadBtn = (label: string) => (
+    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors disabled:opacity-50">
+      <Upload size={11} /> {uploading ? "Enviando…" : label}
+    </button>
+  );
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(15,23,42,0.5)" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        style={{ boxShadow: "0 24px 64px rgba(15,23,42,0.2)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 pt-5 pb-3">
+          <h2 className="text-base font-bold text-[#0F172A]">{isHeader ? "Banner do cabeçalho" : `Editar: ${block!.name}`}</h2>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-700 rounded-lg" aria-label="Fechar">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="px-6 pb-6 space-y-4">
+          {isHeader && (
+            <p className="text-xs text-gray-500 -mt-1">Exibido ao lado da logo, só no desktop. Deixe o código vazio e salve para remover o banner.</p>
+          )}
+
+          {!isHeader && (
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[#0F172A]">Nome do bloco</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className={INPUT_CLS} />
+            </div>
+          )}
+
+          {(isHeader || type === "html") ? (
+            <>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-[#0F172A]">Código HTML</label>
+                  {uploadBtn("Usar uma imagem (upload)")}
+                </div>
+                <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={7} spellCheck={false}
+                  className={`${INPUT_CLS} !text-xs font-mono resize-y`} placeholder="<div>…</div>" />
+                <p className="text-[10px] text-gray-400 leading-relaxed">
+                  O upload troca o código por uma tag de imagem pronta — depois substitua o <span className="font-mono">https://</span> do link pelo destino do banner. Scripts são removidos ao exibir.
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-[#0F172A] mb-1.5">Prévia</p>
+                <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 overflow-auto max-h-72">
+                  {cleanPreview ? (
+                    <div className="pointer-events-none select-none origin-top-left"
+                      style={{ transform: "scale(0.8)", width: "125%" }}
+                      dangerouslySetInnerHTML={{ __html: cleanPreview }} />
+                  ) : (
+                    <p className="text-xs text-gray-400 text-center py-5">Nada para mostrar ainda.</p>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">Renderização aproximada (80% do tamanho) — o fundo e a largura reais do site podem variar.</p>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-[#0F172A]">Imagem</label>
+                {uploadBtn("Enviar imagem")}
+              </div>
+              {imageUrl ? (
+                <img src={imageUrl} alt="Prévia do banner"
+                  className="w-full max-h-48 object-contain rounded-xl border border-gray-200 bg-gray-50" />
+              ) : (
+                <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl py-6 text-center">Sem imagem — envie uma ou cole a URL abaixo.</p>
+              )}
+              <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} className={INPUT_CLS} placeholder="URL da imagem" />
+              <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className={INPUT_CLS} placeholder="Link ao clicar (opcional)" />
+              <input value={caption} onChange={(e) => setCaption(e.target.value)} className={INPUT_CLS} placeholder="Legenda (opcional)" />
+            </div>
+          )}
+
+          {!isHeader && (
+            <div className="flex items-center justify-between py-3 border-t border-gray-100">
+              <div>
+                <span className="text-sm font-medium text-[#0F172A]">Exibição</span>
+                <p className="text-xs text-gray-500 mt-0.5">{visible ? "Visível na home" : "Oculto na home"}</p>
+              </div>
+              <ToggleSwitch checked={visible} onChange={() => setVisible((v) => !v)} />
+            </div>
+          )}
+
+          <input ref={fileRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); e.target.value = ""; }} />
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void save()} disabled={saving}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50"
+              style={{ backgroundColor: "#0B2A66" }}>
+              {saving ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function AdsManager() {
   const [ads, setAds]           = useState<Ad[]>([]);
@@ -366,10 +539,14 @@ export default function AdsManager() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Blocos da home marcados como propaganda (toggle "É uma propaganda" nos
-  // blocos de imagem/HTML) + banner do cabeçalho — listados aqui para o time
-  // de anúncios enxergar tudo num lugar só. A edição continua em Blocos da Home.
-  const [homeAdBlocks, setHomeAdBlocks] = useState<HomeBlock[]>([]);
-  const [hasHeaderBanner, setHasHeaderBanner] = useState(false);
+  // blocos de imagem/HTML) + banner do cabeçalho — listados e EDITÁVEIS aqui.
+  // Guardamos a lista completa de blocos: salvar um bloco reenvia o array
+  // inteiro em settings.homeBlocks (mesmo contrato do Blocos da Home).
+  const [homeBlocks, setHomeBlocks] = useState<HomeBlock[]>([]);
+  const [headerBannerHtml, setHeaderBannerHtml] = useState("");
+  const [adEdit, setAdEdit] = useState<HomeBlock | "header" | null>(null);
+  const homeAdBlocks = homeBlocks.filter((b) => b.isAd === true);
+  const hasHeaderBanner = !!headerBannerHtml.trim();
 
   const PAGE_SIZE = 8;
 
@@ -382,10 +559,25 @@ export default function AdsManager() {
     finally { setLoading(false); }
     try {
       const { settings } = await adminApi.getSettings();
-      setHomeAdBlocks((settings.homeBlocks ?? []).filter((b) => b.isAd === true));
-      setHasHeaderBanner(!!(settings.headerBannerHtml ?? "").trim());
+      setHomeBlocks(settings.homeBlocks ?? []);
+      setHeaderBannerHtml(settings.headerBannerHtml ?? "");
     } catch { }
   };
+
+  async function saveAdBlock(patched: HomeBlock) {
+    const next = homeBlocks.map((b) => (b.id === patched.id ? patched : b));
+    await adminApi.updateSettings({ homeBlocks: next });
+    setHomeBlocks(next);
+    invalidateSiteCache();
+    setAdEdit(null);
+  }
+
+  async function saveHeaderBanner(html: string) {
+    await adminApi.updateSettings({ headerBannerHtml: html });
+    setHeaderBannerHtml(html);
+    invalidateSiteCache();
+    setAdEdit(null);
+  }
 
   useEffect(() => { void load(); }, []);
 
@@ -514,6 +706,17 @@ export default function AdsManager() {
         />
       )}
 
+      {adEdit !== null && (
+        <HomeAdEditModal
+          key={adEdit === "header" ? "header" : adEdit.id}
+          block={adEdit === "header" ? null : adEdit}
+          headerHtml={headerBannerHtml}
+          onClose={() => setAdEdit(null)}
+          onSaveBlock={saveAdBlock}
+          onSaveHeader={saveHeaderBanner}
+        />
+      )}
+
       <div className="space-y-6">
 
         {/* ══ Stat cards ══════════════════════════════════════════════════════ */}
@@ -596,9 +799,13 @@ export default function AdsManager() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#0F172A] truncate">Banner do cabeçalho</p>
-                    <p className="text-[11px] text-gray-400">HTML · ao lado da logo (só desktop) · editar na aba Cabeçalho</p>
+                    <p className="text-[11px] text-gray-400">HTML · ao lado da logo (só desktop)</p>
                   </div>
                   <StatusBadge active />
+                  <button onClick={() => setAdEdit("header")} title="Editar banner"
+                    className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
+                    <Pencil size={14} />
+                  </button>
                 </div>
               )}
               {homeAdBlocks.map((b) => {
@@ -620,6 +827,10 @@ export default function AdsManager() {
                       <p className="text-[11px] text-gray-400">{type === "image" ? "Imagem" : "HTML"} · {pos}</p>
                     </div>
                     <StatusBadge active={b.visible} />
+                    <button onClick={() => setAdEdit(b)} title="Editar propaganda"
+                      className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
+                      <Pencil size={14} />
+                    </button>
                   </div>
                 );
               })}

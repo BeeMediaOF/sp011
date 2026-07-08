@@ -1246,6 +1246,22 @@ export default function HomeBlocksManager() {
   const logoInputRef  = useRef<HTMLInputElement>(null);
   const saveTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debounceRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Upload de imagem para o banner ao lado da logo: gera a tag <a><img>
+  // pronta no campo HTML (o usuário só troca o link de destino).
+  const bannerImgInputRef = useRef<HTMLInputElement>(null);
+  const [bannerUploading, setBannerUploading] = useState(false);
+
+  async function uploadHeaderBannerImage(file: File) {
+    setBannerUploading(true);
+    try {
+      const r = await adminApi.uploadImage(file, "banner-cabecalho");
+      setHeaderBannerHtml(`<a href="https://" target="_blank" rel="noopener sponsored"><img src="${r.url}" alt="banner" style="width:100%;max-width:720px;height:auto;border-radius:8px;display:block;"></a>`);
+    } catch {
+      alert("Falha no upload da imagem — tente novamente.");
+    } finally {
+      setBannerUploading(false);
+    }
+  }
   const blockRefs     = useRef<Record<string, HTMLDivElement | null>>({});
   const iframeRef     = useRef<HTMLIFrameElement>(null);
   const blocksRef     = useRef<HomeBlock[]>([]);
@@ -2433,11 +2449,19 @@ export default function HomeBlocksManager() {
                     </div>
                   )}
                   <div>
-                    <p className="text-[11px] font-medium text-[#64748B] mb-1.5">Banner ao lado do logo (HTML)</p>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-[11px] font-medium text-[#64748B]">Banner ao lado do logo (HTML ou imagem)</p>
+                      <button type="button" onClick={() => bannerImgInputRef.current?.click()} disabled={bannerUploading}
+                        className="flex items-center gap-1 text-[10px] font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-lg px-2 py-1 hover:bg-blue-50 transition-colors disabled:opacity-50">
+                        <Upload size={10} /> {bannerUploading ? "Enviando…" : "Upload de imagem"}
+                      </button>
+                    </div>
+                    <input ref={bannerImgInputRef} type="file" accept="image/*" className="hidden"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadHeaderBannerImage(f); e.target.value = ""; }} />
                     <textarea value={headerBannerHtml} onChange={(e) => setHeaderBannerHtml(e.target.value)} rows={4}
                       placeholder="<div>…HTML do banner…</div> (vazio = sem banner)"
                       className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
-                    <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo.</p>
+                    <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo. O upload gera a tag da imagem pronta — troque o https:// pelo link de destino do banner.</p>
                     <button onClick={() => saveSettingsPatch({ headerBannerHtml })} disabled={saving}
                       className="w-full mt-1.5 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
                       <Save size={13} /> Salvar banner
