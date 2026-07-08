@@ -58,6 +58,8 @@ export interface HomeBlock {
   width?: "full" | "half" | "quarter";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona (padrão "Ver mais"). */
   linkLabel?: string;
+  /** Bloco de imagem/HTML marcado como propaganda — listado na aba Propagandas do admin. */
+  isAd?: boolean;
 }
 
 /** Item de menu carregado por um template (mesmo shape do menu do site). */

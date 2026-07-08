@@ -529,12 +529,12 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
       { id: "mais-lidas",              name: "Most Read",                 visible: true, order: 1, color: KSPORTS_PINK, area: "sidebar" },
       // ── Faixa TRENDING NOW + banner de bônus ──
       { id: "ticker-ksports",          name: "Trending Now",              visible: true, order: 2, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK },
-      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 3, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE },
+      { id: "html-ksports-ad-bonus",   name: "KBET — Exclusive Bonuses",  visible: true, order: 3, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BONUS, color: KSPORTS_PURPLE, isAd: true },
       // ── Zona 2 colunas: Recent News em grade + lateral Latest/box do parceiro
       //    (a grade de 8 é mais alta que os dois juntos — sem buraco no main) ──
       { id: "content-ksports-recent",  name: "Recent News",               visible: true, order: 4, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: KSPORTS_PINK, area: "main" },
       { id: "list-ksports-latest",     name: "Latest News",               visible: true, order: 5, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: KSPORTS_PINK, area: "sidebar" },
-      { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar" },
+      { id: "html-ksports-ad-box",     name: "KBET — Official Partner",   visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: KSPORTS_AD_BOX, color: KSPORTS_PINK, area: "sidebar", isAd: true },
       // ── Seções por modalidade em fileira de 4 (imagem + lista, como no mockup) ──
       { id: "content-ksports-football", name: "Football",  visible: true, order: 7,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "football",  color: KSPORTS_PINK, width: "quarter", linkLabel: "VIEW ALL →" },
       { id: "content-ksports-nfl",      name: "NFL",       visible: true, order: 8,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "nfl",       color: KSPORTS_PURPLE, width: "quarter", linkLabel: "VIEW ALL →" },
@@ -579,6 +579,7 @@ interface BlockForm {
   area: "" | "main" | "sidebar";
   width: "" | "full" | "half" | "quarter";
   linkLabel: string;
+  isAd: boolean;
 }
 
 const EMPTY_FORM: BlockForm = {
@@ -589,6 +590,7 @@ const EMPTY_FORM: BlockForm = {
   imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
   adSlot: "slot_05",
   area: "", width: "", linkLabel: "",
+  isAd: false,
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
@@ -615,6 +617,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     area:          block.area ?? "",
     width:         block.width ?? "",
     linkLabel:     block.linkLabel ?? "",
+    isAd:          block.isAd ?? false,
   };
 }
 
@@ -645,6 +648,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     area:       f.area || undefined,
     width:      f.width || undefined,
     linkLabel:  f.linkLabel.trim() || undefined,
+    isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
   };
 }
 
@@ -942,6 +946,19 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
             className={`${INPUT} font-mono text-xs resize-y`} placeholder="<div>…</div>" />
           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Scripts e eventos inline são removidos por segurança ao exibir.</p>
         </PanelSection>
+      )}
+
+      {/* ── Marcar como propaganda (imagem/HTML) ── */}
+      {!isSpecial && (form.blockType === "image" || form.blockType === "html") && (
+        <div className="rounded-xl border border-slate-200 px-3 py-2.5 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold text-slate-700 flex items-center gap-1.5">
+              <Megaphone size={12} className="text-[#D97706] shrink-0" /> É uma propaganda
+            </p>
+            <p className="text-[10px] text-slate-400 leading-relaxed">Blocos marcados aparecem listados na aba Propagandas do admin.</p>
+          </div>
+          <Toggle checked={form.isAd} onChange={() => onChange("isAd", !form.isAd)} accent="#D97706" />
+        </div>
       )}
 
       {/* ── Embed / Mapa ── */}
