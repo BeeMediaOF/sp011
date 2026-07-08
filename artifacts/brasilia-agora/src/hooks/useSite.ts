@@ -64,6 +64,8 @@ export interface SiteSettings {
   headerBannerHtml?: string;
   /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */
   headerBannerLinkUrl?: string;
+  /** Categorias do blog (painel → Categorias). Ausente = lista padrão + menu. */
+  categories?: { id: string; name: string; slug: string; color?: string; visible?: boolean }[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: import("../lib/homeBlocks").HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */

@@ -193,6 +193,8 @@ export interface SiteSettings {
   homeBlocks?: HomeBlock[]; adminLogoBase64?: string; loginLogoBase64?: string;
   /** Templates de home salvos no painel (aba Templates). */
   homeTemplates?: HomeTemplate[];
+  /** Categorias do blog (painel → Categorias). Ausente = lista padrão + menu. */
+  categories?: { id: string; name: string; slug: string; color?: string; visible?: boolean }[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */

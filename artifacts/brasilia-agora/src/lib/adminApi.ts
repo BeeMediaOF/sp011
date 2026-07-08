@@ -276,6 +276,15 @@ export interface MenuItem {
 
 export type { HomeBlock, HomeTemplate } from "./homeBlocks";
 import type { HomeBlock, HomeTemplate } from "./homeBlocks";
+
+/** Categoria do blog (painel → Categorias). */
+export interface SiteCategory {
+  id: string;
+  name: string;
+  slug: string;
+  color?: string;
+  visible?: boolean;
+}
 import type { FooterConfig } from "./footerConfig";
 
 export interface SiteSettings {
@@ -340,6 +349,8 @@ export interface SiteSettings {
   headerBannerHtml?: string;
   /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */
   headerBannerLinkUrl?: string;
+  /** Categorias do blog (painel → Categorias). Ausente = lista padrão + menu. */
+  categories?: SiteCategory[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */

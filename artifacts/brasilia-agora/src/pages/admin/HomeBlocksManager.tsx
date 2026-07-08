@@ -814,8 +814,10 @@ function TemplateCard({ tpl, isPreviewing, busy, onPreview, onConfirm, onCancel,
 }
 
 // ─── Settings panel ───────────────────────────────────────────────────────────
-function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, onDelete, onCancel }: {
+function SettingsPanel({ block, form, saving, categories, onChange, onApply, onDuplicate, onDelete, onCancel }: {
   block: HomeBlock; form: BlockForm; saving: boolean;
+  /** Categorias do seletor (cadastradas no painel ou fallback padrão). */
+  categories: { value: string; label: string; color: string }[];
   onChange: <K extends keyof BlockForm>(key: K, val: BlockForm[K]) => void;
   onApply: () => void; onDuplicate: () => void; onDelete: () => void; onCancel: () => void;
 }) {
@@ -1054,7 +1056,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
       {!isSpecial && isArticleType && form.source === "automatic_by_category" && (
         <PanelSection label="Categoria" icon={FolderOpen}>
           <div className="flex flex-wrap gap-1">
-            {CATEGORIES.map((c) => {
+            {categories.map((c) => {
               const active = form.categories.includes(c.value);
               return (
                 <button key={c.value} type="button" onClick={() => toggleCategory(c.value)}
@@ -1068,7 +1070,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
               );
             })}
             {/* Chips for custom categories not in the list */}
-            {form.categories.filter(v => !CATEGORIES.find(c => c.value === v)).map((v) => (
+            {form.categories.filter(v => !categories.find(c => c.value === v)).map((v) => (
               <button key={v} type="button" onClick={() => toggleCategory(v)}
                 className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold border transition-all"
                 style={{ borderColor: "#0369a1", backgroundColor: "#0369a120", color: "#0369a1" }}>
@@ -1083,6 +1085,10 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
               if (!form.categories.includes(val)) toggleCategory(val);
             }}
           />
+          <a href="/admin/categorias" target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#0B2A66] hover:underline mt-1.5">
+            <FolderOpen size={10} /> Gerenciar categorias
+          </a>
         </PanelSection>
       )}
 
@@ -1238,6 +1244,13 @@ export default function HomeBlocksManager() {
   const [articleSavedOk, setArticleSavedOk]               = useState(false);
   // Propagandas cadastradas p/ o seletor dos blocos de anúncio da lateral.
   const articleAdsList = useAdsList(tab === "article");
+  // Categorias cadastradas no painel (→ /admin/categorias). Com lista salva,
+  // o seletor de categoria dos blocos mostra SÓ elas; sem lista, o fallback
+  // é a lista padrão histórica (CATEGORIES).
+  const [siteCategories, setSiteCategories] = useState<{ id: string; name: string; slug: string; color?: string; visible?: boolean }[]>([]);
+  const blockCategories = siteCategories.length > 0
+    ? siteCategories.filter((c) => c.visible !== false).map((c) => ({ value: c.slug, label: c.name, color: c.color || "#0369a1" }))
+    : CATEGORIES;
   // Slug da notícia mais recente — a prévia da aba Notícia abre essa página.
   const [previewArticleSlug, setPreviewArticleSlug] = useState<string | null>(null);
   useEffect(() => {
@@ -1364,6 +1377,7 @@ export default function HomeBlocksManager() {
         setArticleShowBreadcrumb(r.settings.articleShowBreadcrumb !== false);
         setArticleShowShare(r.settings.articleShowShare !== false);
         setArticleShowRelated(r.settings.articleShowRelated !== false);
+        setSiteCategories(r.settings.categories ?? []);
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
         setFooterAccentColor(r.settings.footerAccentColor ?? "");
@@ -2299,6 +2313,7 @@ export default function HomeBlocksManager() {
                           {isEditing && (
                             <SettingsPanel
                               block={block} form={editForm} saving={saving}
+                              categories={blockCategories}
                               onChange={handleFormChange}
                               onApply={() => applyAndSave(block.id)}
                               onDuplicate={() => duplicateBlock(block.id)}

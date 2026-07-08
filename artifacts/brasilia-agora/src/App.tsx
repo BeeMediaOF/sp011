@@ -68,6 +68,7 @@ const AdsManager       = lazyWithPreload(() => import("@/pages/admin/AdsManager"
 const ColumnistsManager = lazyWithPreload(() => import("@/pages/admin/ColumnistsManager"));
 const Analytics        = lazyWithPreload(() => import("@/pages/admin/Analytics"));
 const HomeBlocksManager = lazyWithPreload(() => import("@/pages/admin/HomeBlocksManager"));
+const CategoriesManager = lazyWithPreload(() => import("@/pages/admin/CategoriesManager"));
 const RSSManager       = lazyWithPreload(() => import("@/pages/admin/RSSManager"));
 const UsersManager     = lazyWithPreload(() => import("@/pages/admin/UsersManager"));
 const SecurityCheckup  = lazyWithPreload(() => import("@/pages/admin/SecurityCheckup"));
@@ -85,7 +86,7 @@ function preloadAdminPages() {
     for (const c of [
       Dashboard, Articles, ArticleEdit, MenuManager, Settings, TwoFactorSetup,
       Webhook, AdsManager, ColumnistsManager, Analytics, HomeBlocksManager,
-      RSSManager, UsersManager, SecurityCheckup, EditorPermissions, SocialMedia,
+      CategoriesManager, RSSManager, UsersManager, SecurityCheckup, EditorPermissions, SocialMedia,
     ]) {
       c.preload().catch(() => {});
     }
@@ -230,6 +231,9 @@ function Router() {
         </Route>
         <Route path="/admin/home-blocos">
           <RequireAdmin><HomeBlocksManager /></RequireAdmin>
+        </Route>
+        <Route path="/admin/categorias">
+          <RequireAdmin><CategoriesManager /></RequireAdmin>
         </Route>
         <Route path="/admin/colunistas">
           <RequireAdmin><ColumnistsManager /></RequireAdmin>
