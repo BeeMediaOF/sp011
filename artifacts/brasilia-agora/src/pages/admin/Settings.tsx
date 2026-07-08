@@ -14,7 +14,7 @@ import {
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
   Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
-  Share2, Code, Trash2, CalendarClock,
+  Share2, Code, Trash2, CalendarClock, Rss,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs" | "exclusao";
@@ -188,12 +188,15 @@ export default function Settings() {
   /* ── logo state ── */
   const logoInputRef   = useRef<HTMLInputElement>(null);
   const logoMobileRef  = useRef<HTMLInputElement>(null);
+  const footerLogoRef  = useRef<HTMLInputElement>(null);
   const ogRef          = useRef<HTMLInputElement>(null);
   const faviconRef     = useRef<HTMLInputElement>(null);
   const adminLogoRef   = useRef<HTMLInputElement>(null);
   const bylineLogoRef  = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview]     = useState<string | null>(null);
   const [logoSize, setLogoSize]           = useState(101);
+  // 0 = automático (teto de 48px no celular); >0 = altura mobile explícita.
+  const [logoMobileSize, setLogoMobileSize] = useState(0);
   const [logoStatus, setLogoStatus]       = useState<"idle" | "success" | "error">("idle");
   const [savingLogo, setSavingLogo]       = useState(false);
 
@@ -415,6 +418,7 @@ export default function Settings() {
       .then(r => {
         setSettings(r.settings);
         if (r.settings.logoSize) setLogoSize(r.settings.logoSize);
+        if (r.settings.logoMobileSize) setLogoMobileSize(r.settings.logoMobileSize);
         saveAdminThemeToStorage(
           r.settings.adminSidebarColor ?? "#0B2A66",
           r.settings.adminAccentColor  ?? "#E71D36",
@@ -469,9 +473,14 @@ export default function Settings() {
         setField("logoBase64", logoPreview);
         setLogoPreview(null);
       }
-      // logoMobileBase64 junto: o botão "Salvar Logo" persiste também a variante
-      // mobile ("" = removida; undefined sai do JSON e mantém a atual).
-      await adminApi.updateSettings({ logoSize, logoMobileBase64: settings.logoMobileBase64 });
+      // logoMobileBase64/footerLogoBase64 juntos: o botão "Salvar Logo" persiste
+      // também as variantes ("" = removida; undefined sai do JSON e mantém a atual).
+      await adminApi.updateSettings({
+        logoSize,
+        logoMobileSize,
+        logoMobileBase64: settings.logoMobileBase64,
+        footerLogoBase64: settings.footerLogoBase64,
+      });
       invalidateSiteCache();
       setLogoStatus("success");
       toast({ title: "Logo salvo!", duration: 2000 });
@@ -502,7 +511,7 @@ export default function Settings() {
     reader.readAsDataURL(file);
   }
 
-  function handleImageFile(key: "ogImageBase64" | "faviconBase64" | "logoMobileBase64", file: File) {
+  function handleImageFile(key: "ogImageBase64" | "faviconBase64" | "logoMobileBase64" | "footerLogoBase64", file: File) {
     const reader = new FileReader();
     reader.onload = e => setField(key, e.target?.result as string);
     reader.readAsDataURL(file);
@@ -733,6 +742,32 @@ export default function Settings() {
                   </div>
                 </div>
 
+                {/* Créditos da fonte */}
+                <div className={`${CARD} p-6`} style={CARD_SHADOW}>
+                  <SectionHeader icon={<Rss size={15}/>} label="Créditos da Fonte"/>
+                  <p className="text-xs text-[#64748B] mb-4 mt-1">
+                    Exibe "Fonte: Nome" de forma discreta ao final das notícias importadas
+                    (apenas o nome, sem link). Também dá para forçar exibir/ocultar por
+                    notícia, na edição do artigo.
+                  </p>
+                  <button
+                    onClick={() => setField("showSourceCredit", !(settings.showSourceCredit ?? false))}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                      (settings.showSourceCredit ?? false)
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                        : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    }`}>
+                    <Rss size={18}/>
+                    <div className="flex-1 text-left">
+                      <p className="text-[13px] font-semibold">Créditos da fonte nas notícias</p>
+                      <p className="text-[11px] opacity-70">"Fonte: Agência X" ao final do artigo</p>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showSourceCredit ?? false) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showSourceCredit ?? false) ? "Ativado" : "Desativado"}
+                    </span>
+                  </button>
+                </div>
+
                 {/* Ticker bar */}
                 <div className={`${CARD} p-6`} style={CARD_SHADOW}>
                   <SectionHeader icon={<TrendingUp size={15}/>} label="Barra de Cotações"/>
@@ -836,7 +871,7 @@ export default function Settings() {
               {/* Size control */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-medium text-[#64748B]">Tamanho da logo</p>
+                  <p className="text-xs font-medium text-[#64748B]">Tamanho da logo (desktop)</p>
                   <span className="text-sm font-bold text-[#0B2A66]">{logoSize}px</span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -855,6 +890,34 @@ export default function Settings() {
                 {displayLogo && (
                   <div className="mt-3 border border-[#F1F5F9] rounded-2xl p-4 flex items-center justify-center bg-[#F8FAFC]">
                     <img src={displayLogo} alt="size preview" style={{ height: logoSize, transition: "height 0.15s" }} className="w-auto object-contain"/>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile size control */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs font-medium text-[#64748B]">Tamanho da logo no celular</p>
+                  <span className="text-sm font-bold text-[#0B2A66]">{logoMobileSize > 0 ? `${logoMobileSize}px` : "Automático"}</span>
+                </div>
+                <p className="text-xs text-[#94A3B8] mb-3">
+                  "Automático" limita a altura a ~48px para a logo não estourar a tela.
+                  Arraste para definir uma altura fixa no mobile (a largura é limitada a 60% da tela).
+                </p>
+                <div className="flex items-center gap-3">
+                  <input type="range" min={0} max={96} step={4} value={logoMobileSize}
+                    onChange={e => setLogoMobileSize(Number(e.target.value))}
+                    className="flex-1 accent-[#0B2A66]"/>
+                  {logoMobileSize > 0 && (
+                    <button onClick={() => setLogoMobileSize(0)}
+                      className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
+                      Automático
+                    </button>
+                  )}
+                </div>
+                {displayLogo && logoMobileSize > 0 && (
+                  <div className="mt-3 border border-[#F1F5F9] rounded-2xl p-4 flex items-center justify-center bg-[#F8FAFC]">
+                    <img src={settings.logoMobileBase64 || displayLogo} alt="mobile size preview" style={{ height: logoMobileSize, transition: "height 0.15s" }} className="w-auto object-contain"/>
                   </div>
                 )}
               </div>
@@ -878,6 +941,31 @@ export default function Settings() {
                     <div className="relative">
                       <img src={settings.logoMobileBase64} alt="Logo mobile" className="h-12 max-w-[120px] object-contain rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-2"/>
                       <button onClick={() => setField("logoMobileBase64", "")}
+                        className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">&times;</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Logo do rodapé (opcional) */}
+              <div className="pt-4 border-t border-[#F1F5F9]">
+                <p className="text-xs font-medium text-[#64748B] mb-1">Logo do rodapé (opcional)</p>
+                <p className="text-xs text-[#94A3B8] mb-3">
+                  Exibida na parte de cima do rodapé no lugar da logo principal — útil quando o
+                  rodapé tem fundo escuro e a logo principal não contrasta. Sem envio, o rodapé
+                  usa a logo principal.
+                </p>
+                <input ref={footerLogoRef} type="file" accept="image/*" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("footerLogoBase64", f); }}/>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => footerLogoRef.current?.click()}
+                    className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
+                    Selecionar imagem
+                  </button>
+                  {settings.footerLogoBase64 && (
+                    <div className="relative">
+                      <img src={settings.footerLogoBase64} alt="Logo do rodapé" className="h-12 max-w-[120px] object-contain rounded-xl border border-[#E2E8F0] bg-[#1e293b] px-2"/>
+                      <button onClick={() => setField("footerLogoBase64", "")}
                         className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">&times;</button>
                     </div>
                   )}

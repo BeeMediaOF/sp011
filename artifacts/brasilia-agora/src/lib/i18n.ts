@@ -60,8 +60,7 @@ const PT = {
   "article.copyLink": "Copiar link",
   "article.notFound": "Artigo não encontrado",
   "article.backHome": "Voltar à página inicial",
-  "article.sourcePrefix": "Conteúdo originalmente publicado por",
-  "article.sourceSuffix": ". Reproduzido com fins informativos.",
+  "article.sourceLabel": "Fonte:",
   "article.related": "Relacionadas",
   "article.mostRead": "Mais Lidas",
 
@@ -150,8 +149,7 @@ const EN: Record<TKey, string> = {
   "article.copyLink": "Copy link",
   "article.notFound": "Article not found",
   "article.backHome": "Back to home page",
-  "article.sourcePrefix": "Content originally published by",
-  "article.sourceSuffix": ". Reproduced for informational purposes.",
+  "article.sourceLabel": "Source:",
   "article.related": "Related",
   "article.mostRead": "Most Read",
 

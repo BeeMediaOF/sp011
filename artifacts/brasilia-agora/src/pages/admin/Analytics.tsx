@@ -544,9 +544,9 @@ export default function Analytics() {
                 <Info size={13} className="text-slate-400" />
               </div>
             </div>
-            {/* Table header */}
-            <div className="grid grid-cols-[1fr_80px_80px_70px] gap-2 pb-2 mb-1 border-b border-slate-100">
-              {["Artigo","Visualizações","Engajamento","Taxa"].map(h => (
+            {/* Table header — só métricas reais: views e tempo médio de leitura */}
+            <div className="grid grid-cols-[1fr_90px_90px] gap-2 pb-2 mb-1 border-b border-slate-100">
+              {["Artigo","Visualizações","Tempo médio"].map(h => (
                 <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
               ))}
             </div>
@@ -554,29 +554,24 @@ export default function Analytics() {
               <EmptyState label="Sem dados ainda" />
             ) : (
               <div className="space-y-1">
-                {topArts.slice(0, 5).map((a, i) => {
-                  const engagement = Math.round(a.views * 0.185);
-                  const rate = (18.5 - i * 0.5).toFixed(1);
-                  return (
-                    <div key={a.id} className="grid grid-cols-[1fr_80px_80px_70px] gap-2 items-center py-2.5 border-b border-slate-50 last:border-0">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                          <FileText size={13} className="text-slate-400" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-700 line-clamp-2 leading-snug">
-                            {a.title.replace(/<[^>]*>/g, "")}
-                          </p>
-                        </div>
+                {topArts.slice(0, 5).map((a) => (
+                  <div key={a.id} className="grid grid-cols-[1fr_90px_90px] gap-2 items-center py-2.5 border-b border-slate-50 last:border-0">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                        <FileText size={13} className="text-slate-400" />
                       </div>
-                      <p className="text-xs font-semibold text-[#0F172A]">{a.views.toLocaleString("pt-BR")}</p>
-                      <p className="text-xs text-slate-500">{engagement.toLocaleString("pt-BR")}</p>
-                      <span className="text-[11px] font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full w-fit">
-                        {rate}%
-                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-medium text-slate-700 line-clamp-2 leading-snug">
+                          {a.title.replace(/<[^>]*>/g, "")}
+                        </p>
+                      </div>
                     </div>
-                  );
-                })}
+                    <p className="text-xs font-semibold text-[#0F172A]">{a.views.toLocaleString("pt-BR")}</p>
+                    <span className="text-[11px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded-full w-fit">
+                      {a.avgTime ? fmtSecs(a.avgTime) : "—"}
+                    </span>
+                  </div>
+                ))}
               </div>
             )}
             <div className="mt-4 pt-3 border-t border-slate-100">
@@ -633,11 +628,6 @@ export default function Analytics() {
                 })}
               </div>
             )}
-            <div className="mt-5 pt-3 border-t border-slate-100">
-              <span className="text-xs text-[#2563EB] hover:underline flex items-center gap-1 cursor-pointer">
-                Ver todas as categorias <ArrowUpRight size={11} />
-              </span>
-            </div>
           </div>
 
           {/* Localização: Cidades / Estados (3/10) */}

@@ -20,7 +20,7 @@ export interface FooterColumn {
 }
 
 /** Chaves de redes sociais suportadas (ícones mapeados no Footer). */
-export type FooterSocialKey = "instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp";
+export type FooterSocialKey = "instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp" | "linkedin";
 
 export type FooterSocial = Partial<Record<FooterSocialKey, string>>;
 
@@ -30,6 +30,8 @@ export interface FooterConfig {
   showSocial?: boolean;
   /** URLs das redes. Vazio/ausente → cai no hub de Contato. */
   social?: FooterSocial;
+  /** Liga/desliga por ícone (ausente = ligado). Desativado não aparece mesmo com link. */
+  socialEnabled?: Partial<Record<FooterSocialKey, boolean>>;
   /** Colunas de links. Ausente → colunas padrão (Seções do menu + Institucional). */
   columns?: FooterColumn[];
   showContact?: boolean;
@@ -53,6 +55,7 @@ export interface PublicContact {
   x?: string;
   youtube?: string;
   tiktok?: string;
+  linkedin?: string;
   address?: string;
   cnpj?: string;
 }
@@ -106,7 +109,7 @@ const DEFAULT_LEGAL_LINKS_EN: FooterLink[] = [
   { id: "contato",     label: "Contact", href: "/contato" },
 ];
 
-const SOCIAL_KEYS: FooterSocialKey[] = ["instagram", "facebook", "x", "youtube", "tiktok", "whatsapp"];
+const SOCIAL_KEYS: FooterSocialKey[] = ["instagram", "facebook", "x", "youtube", "tiktok", "whatsapp", "linkedin"];
 
 /** Normaliza URL de rede social: aceita "@user"/"user" e completa com https. */
 export function normalizeSocialUrl(key: FooterSocialKey, value: string): string {
@@ -121,6 +124,7 @@ export function normalizeSocialUrl(key: FooterSocialKey, value: string): string 
     case "youtube":   return `https://youtube.com/@${handle}`;
     case "tiktok":    return `https://tiktok.com/@${handle}`;
     case "whatsapp":  return `https://wa.me/${handle.replace(/\D/g, "")}`;
+    case "linkedin":  return `https://www.linkedin.com/in/${handle}`;
   }
 }
 
@@ -145,8 +149,10 @@ export function resolveFooterConfig(opts: {
   const en = opts.lang === "en";
 
   // Redes: config do rodapé tem prioridade; senão, hub de Contato.
+  // Ícone desativado no painel não aparece, mesmo que o link exista.
   const socialSource: FooterSocial = { ...contact, ...(cfg.social ?? {}) };
   const social: ResolvedFooterSocial[] = SOCIAL_KEYS
+    .filter((key) => cfg.socialEnabled?.[key] !== false)
     .map((key) => ({ key, href: normalizeSocialUrl(key, socialSource[key] ?? "") }))
     .filter((s) => s.href !== "");
 

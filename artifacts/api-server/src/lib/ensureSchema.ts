@@ -29,6 +29,8 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS social_hashtags text`,
     // id da notícia no painel central (ingest) — idempotência de reenvio.
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS central_id text`,
+    // Crédito da fonte por notícia (NULL = segue settings.showSourceCredit).
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS show_source_credit boolean`,
     sql`CREATE UNIQUE INDEX IF NOT EXISTS articles_central_id_uniq ON articles (central_id) WHERE central_id IS NOT NULL`,
     // Variante Story (1080×1920) do template: { backgroundColor, elements }.
     sql`ALTER TABLE social_templates ADD COLUMN IF NOT EXISTS story jsonb`,

@@ -1285,6 +1285,29 @@ export default function ArticleEdit() {
                 )}
               </div>
             )}
+
+            {/* Crédito da fonte — só para notícias importadas (têm rssSourceName) */}
+            {form.rssSourceName && (
+              <div className="pt-1">
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">Crédito da fonte</label>
+                <div className="relative">
+                  <select
+                    value={form.showSourceCredit == null ? "default" : form.showSourceCredit ? "show" : "hide"}
+                    onChange={(e) => setField("showSourceCredit",
+                      e.target.value === "default" ? null : e.target.value === "show")}
+                    className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700"
+                  >
+                    <option value="default">Padrão do site</option>
+                    <option value="show">Exibir nesta notícia</option>
+                    <option value="hide">Ocultar nesta notícia</option>
+                  </select>
+                  <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  "Fonte: {form.rssSourceName}" discreto ao final da notícia. O padrão do site fica em Configurações → Informações.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ── SEO card ──────────────────────────────────────────── */}

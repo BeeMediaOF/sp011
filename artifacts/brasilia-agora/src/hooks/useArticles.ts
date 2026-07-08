@@ -18,6 +18,8 @@ export interface Article {
   rssSourceUrl?: string;
   aiRewritten?: boolean;
   canonicalUrl?: string;
+  /** Crédito da fonte: true/false força; null/ausente segue settings.showSourceCredit. */
+  showSourceCredit?: boolean | null;
   /** Leituras registradas pelo analytics — ordena os blocos "Mais lidas". */
   views?: number;
 }

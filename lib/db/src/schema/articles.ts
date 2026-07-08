@@ -34,6 +34,12 @@ export const articlesTable = pgTable("articles", {
   draftReason:   text("draft_reason"),
   canonicalUrl:  text("canonical_url"),
   /**
+   * Crédito da fonte no rodapé da notícia: true/false força exibir/ocultar
+   * nesta notícia; NULL segue o padrão do site (settings.showSourceCredit).
+   * Coluna criada por ensureSchema (ADD COLUMN IF NOT EXISTS).
+   */
+  showSourceCredit: boolean("show_source_credit"),
+  /**
    * id da notícia no painel central quando o artigo chegou via /api/ingest.
    * Âncora de idempotência (reenvio do central → replay, nunca duplica).
    * Nulo para artigos locais (manuais, RSS local, Perplexity).

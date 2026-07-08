@@ -19,12 +19,13 @@ const INPUT = "w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-sm bg-wh
 const LABEL = "text-[11px] font-medium text-[#64748B] mb-1 block";
 
 const SOCIAL_FIELDS: { key: FooterSocialKey; label: string; placeholder: string }[] = [
-  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
-  { key: "facebook",  label: "Facebook",  placeholder: "https://facebook.com/…" },
-  { key: "x",         label: "X (Twitter)", placeholder: "https://x.com/…" },
-  { key: "youtube",   label: "YouTube",   placeholder: "https://youtube.com/@…" },
-  { key: "tiktok",    label: "TikTok",    placeholder: "https://tiktok.com/@…" },
   { key: "whatsapp",  label: "WhatsApp",  placeholder: "(61) 99999-9999 ou link wa.me" },
+  { key: "instagram", label: "Instagram", placeholder: "https://instagram.com/…" },
+  { key: "x",         label: "X (Twitter)", placeholder: "https://x.com/…" },
+  { key: "tiktok",    label: "TikTok",    placeholder: "https://tiktok.com/@…" },
+  { key: "facebook",  label: "Facebook",  placeholder: "https://facebook.com/…" },
+  { key: "youtube",   label: "YouTube",   placeholder: "https://youtube.com/@…" },
+  { key: "linkedin",  label: "LinkedIn",  placeholder: "https://linkedin.com/company/…" },
 ];
 
 function uid(): string {
@@ -121,7 +122,13 @@ export default function FooterEditor({ onSave, saving }: {
         setCfg({
           description: resolved.description,
           showSocial: resolved.showSocial,
-          social: Object.fromEntries(resolved.social.map((s2) => [s2.key, s2.href])),
+          // resolved.social omite ícones desativados — mescla com a config salva
+          // para não perder o link de um ícone que está apenas desligado.
+          social: {
+            ...Object.fromEntries(resolved.social.map((s2) => [s2.key, s2.href])),
+            ...(settings.footerConfig?.social ?? {}),
+          },
+          socialEnabled: settings.footerConfig?.socialEnabled ?? {},
           columns: resolved.columns.map((col) => ({
             ...col,
             links: col.links.map((l) => ({ ...l })),
@@ -182,15 +189,22 @@ export default function FooterEditor({ onSave, saving }: {
           <span className="text-[12px] font-medium text-[#334155]">Exibir ícones de redes</span>
           <Toggle checked={cfg.showSocial ?? true} onChange={() => patch({ showSocial: !(cfg.showSocial ?? true) })} />
         </div>
-        {(cfg.showSocial ?? true) && SOCIAL_FIELDS.map(({ key, label, placeholder }) => (
-          <div key={key}>
-            <label className={LABEL}>{label}</label>
-            <input value={cfg.social?.[key] ?? ""} placeholder={placeholder}
-              onChange={(e) => patch({ social: { ...(cfg.social ?? {}), [key]: e.target.value } })}
-              className={INPUT} />
-          </div>
-        ))}
-        <p className="text-[10px] text-[#94A3B8] leading-relaxed">Deixe vazio para ocultar a rede. Valores iniciais vêm do hub de Contato.</p>
+        {(cfg.showSocial ?? true) && SOCIAL_FIELDS.map(({ key, label, placeholder }) => {
+          const enabled = cfg.socialEnabled?.[key] !== false;
+          return (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <label className={`${LABEL} !mb-0`}>{label}</label>
+                <Toggle checked={enabled}
+                  onChange={() => patch({ socialEnabled: { ...(cfg.socialEnabled ?? {}), [key]: !enabled } })} />
+              </div>
+              <input value={cfg.social?.[key] ?? ""} placeholder={placeholder} disabled={!enabled}
+                onChange={(e) => patch({ social: { ...(cfg.social ?? {}), [key]: e.target.value } })}
+                className={`${INPUT} ${enabled ? "" : "opacity-50"}`} />
+            </div>
+          );
+        })}
+        <p className="text-[10px] text-[#94A3B8] leading-relaxed">Basta informar o link (ou @usuário) de cada rede. Ícone desligado ou com link vazio não aparece no site. Valores iniciais vêm do hub de Contato.</p>
       </Section>
 
       <Section title={`Colunas de links (${columns.length})`}>

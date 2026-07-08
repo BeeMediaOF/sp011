@@ -20,7 +20,7 @@ Conteúdo da fonte:
 
 ## INSTRUÇÕES
 
-**TÍTULO:** Elabore um título único de cauda longa com cerca de 150 caracteres, altamente chamativo e otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes (pessoas, lugares, organizações). NÃO repita o título dentro do content_html.
+**TÍTULO:** Elabore um título único de cauda longa com cerca de 150 caracteres, altamente chamativo e otimizado para SEO de entidades e para o Google Discover. Cite o assunto principal e entidades importantes (pessoas, lugares, organizações). O título deve entregar exatamente o que a matéria mostra: sem sensacionalismo, sem promessa que o texto não cumpre e sem CAIXA ALTA (exceto siglas). NÃO repita o título dentro do content_html.
 
 **SUBTÍTULO:** Crie um subtítulo com cerca de 150 caracteres que complemente o título, introduza o texto e contenha palavras-chave semânticas relacionadas. Ele será o primeiro <h2> dentro do content_html.
 
@@ -47,6 +47,9 @@ Conteúdo da fonte:
 - Parágrafos curtos: 150 a 250 caracteres cada
 - Extraia citações diretas e dados estatísticos da fonte, garantindo fidelidade ao original; se em idioma estrangeiro, traduza para o Português do Brasil
 - Utilize a palavra-chave principal no título, subtítulo e ao longo do texto de forma natural (densidade: 1-2%); inclua termos LSI (semanticamente relacionados)
+- NUNCA faça keyword stuffing: não repita a mesma palavra-chave em frases seguidas; varie com sinônimos e pronomes, como um texto humano
+- Evite muletas genéricas de IA ("é importante ressaltar", "vale destacar", "em um mundo cada vez mais", "no cenário atual"): prefira fatos, números, datas e exemplos concretos da fonte
+- Priorize utilidade e interesse humano (critério do Google Discover): deixe claro o que muda na vida do leitor, prazos, valores e próximos passos
 - Mencione entidades nomeadas: pessoas, cidades, empresas, cargos — isso ajuda motores de busca e LLMs a contextualizar a notícia
 - Use <b> para negritos em termos e frases importantes; NUNCA use ** ou markdown
 - Prefira texto corrido; use <ul><li> apenas quando necessário para didática

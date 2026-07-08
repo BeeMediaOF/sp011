@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { BRAND } from "../brand";
 import { Link } from "wouter";
-import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import logoImg from "../assets/images/logo_sbc_negativo.png";
 import logoColorImg from "../assets/images/logo_sbc_agora.png";
@@ -13,7 +13,7 @@ import {
 
 const SOCIAL_ICONS: Record<FooterSocialKey, React.ElementType> = {
   instagram: FaInstagram, facebook: FaFacebook, x: FaXTwitter,
-  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp,
+  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp, linkedin: FaLinkedin,
 };
 
 // Link interno via wouter (SPA); externo abre em nova aba.
@@ -116,12 +116,13 @@ export default function Footer() {
   const { t, lang } = useT();
   const style = settings?.footerStyle ?? "dark";
   const bgColor = settings?.footerBgColor;
-  // Logo configurada no painel tem prioridade; as imagens do bundle (variante
-  // negativa p/ fundo escuro, colorida p/ fundo claro) ficam só como fallback.
-  // Enquanto as settings não chegam, src vazio → não mostra a marca default
-  // (evita o flash da logo do blog padrão nos blogs replicados).
-  const logoSrc      = settings ? (settings.logoBase64 || logoImg) : "";
-  const logoColorSrc = settings ? (settings.logoBase64 || logoColorImg) : "";
+  // Logo própria do rodapé (painel → Logo & Imagens) tem prioridade; depois a
+  // logo principal; as imagens do bundle (variante negativa p/ fundo escuro,
+  // colorida p/ fundo claro) ficam só como fallback. Enquanto as settings não
+  // chegam, src vazio → não mostra a marca default (evita o flash da logo do
+  // blog padrão nos blogs replicados).
+  const logoSrc      = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoImg) : "";
+  const logoColorSrc = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoColorImg) : "";
 
   // Conteúdo 100% editável no painel (aba Rodapé); defaults = contato + menu.
   const f = resolveFooterConfig({

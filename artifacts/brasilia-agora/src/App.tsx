@@ -166,6 +166,29 @@ function AnalyticsProvider() {
   return null;
 }
 
+/**
+ * Navegação SPA não mexe no scroll: quem abria uma notícia com a home rolada
+ * "caía no meio" do artigo (pior no celular). Toda troca de rota via link volta
+ * ao topo; voltar/avançar do navegador (popstate) preserva a posição que o
+ * próprio browser restaura (history.scrollRestoration = "auto").
+ */
+let _isPopNavigation = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => { _isPopNavigation = true; });
+}
+
+function ScrollToTop() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (_isPopNavigation) {
+      _isPopNavigation = false;
+      return;
+    }
+    window.scrollTo(0, 0);
+  }, [location]);
+  return null;
+}
+
 /** Mantém <html lang> sincronizado com settings.siteLanguage nas rotas SPA
     (o HTML SSR da home já sai com o lang certo via ssrHomePlugin). */
 function LangSync() {
@@ -298,6 +321,7 @@ function App({ ssrPath }: { ssrPath?: string } = {}) {
       <TooltipProvider>
         <WouterRouter ssrPath={ssrPath} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <AnalyticsProvider />
+          <ScrollToTop />
           <LangSync />
           <SEOHead />
           <Router />

@@ -12,7 +12,7 @@
  */
 import React, { useRef, useState } from "react";
 import { Link } from "wouter";
-import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import AdBanner from "../ads/AdBanner";
@@ -378,7 +378,7 @@ export function CategoriesBlock({ block }: { block: HomeBlock }) {
 // ─── Redes sociais ───────────────────────────────────────────────────────────
 const SOCIAL_ICONS: Record<FooterSocialKey, React.ElementType> = {
   instagram: FaInstagram, facebook: FaFacebook, x: FaXTwitter,
-  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp,
+  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp, linkedin: FaLinkedin,
 };
 
 export function SocialLinksBlock({ block, preview }: { block: HomeBlock; preview?: boolean }) {

@@ -674,25 +674,14 @@ export default function Artigo() {
                     {renderContent(article.content)}
                   </div>
 
-                  {/* Crédito de fonte — só para artigos RSS não reescritos */}
-                  {article.origin === "rss" && !article.aiRewritten && article.rssSourceName && (
+                  {/* Crédito de fonte — controlado pelo painel (global) com override
+                      por notícia; discreto, só o nome, sem link. */}
+                  {(article.showSourceCredit ?? settings?.showSourceCredit) === true
+                    && article.rssSourceName && (
                     <div className="mt-6 pt-4 border-t border-gray-100">
                       <p className="text-[12px] text-gray-400 italic">
-                        {t("article.sourcePrefix")}{" "}
-                        {article.rssSourceUrl ? (
-                          <a
-                            href={article.rssSourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[#0b3d91] hover:underline font-medium"
-                            onClick={() => trackLinkClick(article.rssSourceUrl!, article.id)}
-                          >
-                            {article.rssSourceName}
-                          </a>
-                        ) : (
-                          <span className="font-medium text-gray-500">{article.rssSourceName}</span>
-                        )}
-                        {t("article.sourceSuffix")}
+                        {t("article.sourceLabel")}{" "}
+                        <span className="font-medium text-gray-500 not-italic">{article.rssSourceName}</span>
                       </p>
                     </div>
                   )}

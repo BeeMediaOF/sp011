@@ -237,25 +237,30 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
 // ─── Logo do cabeçalho (desktop + mobile) ─────────────────────────────────────
 // No mobile a altura ganha um teto e a largura nunca passa de ~60vw: logo larga
 // em altura grande passava da largura do celular, ficava "colada" nas bordas e
-// esticava a página para o lado. Se o painel tiver uma logo mobile própria
-// (ex.: versão vertical), ela substitui a principal só em telas pequenas; o
-// desktop segue exatamente o logoSize configurado.
-function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap }: {
+// esticava a página para o lado. Se o painel definir um tamanho mobile próprio
+// (logoMobileSize), ele substitui o teto automático; se houver logo mobile
+// própria (versão vertical), ela substitui a principal só em telas pequenas.
+// O desktop segue exatamente o logoSize configurado.
+function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeight }: {
   desktopSrc: string; mobileSrc: string; alt: string; height: number; mobileCap: number;
+  mobileHeight?: number;
 }) {
+  const mh = mobileHeight && mobileHeight > 0
+    ? Math.min(mobileHeight, 120)
+    : Math.min(height, mobileCap);
   // Settings ainda carregando (src vazio): reserva o espaço sem mostrar a logo
   // padrão embutida — num blog replicado ela é a marca errada (flash do sp011).
   if (!desktopSrc) {
     return (
       <>
-        <span aria-hidden="true" className="lg:hidden block w-24" style={{ height: Math.min(height, mobileCap) }} />
+        <span aria-hidden="true" className="lg:hidden block w-24" style={{ height: mh }} />
         <span aria-hidden="true" className="hidden lg:block w-24" style={{ height }} />
       </>
     );
   }
   return (
     <>
-      <img src={mobileSrc} alt={alt} style={{ height: Math.min(height, mobileCap) }}
+      <img src={mobileSrc} alt={alt} style={{ height: mh }}
         className="lg:hidden w-auto max-w-[min(60vw,300px)] object-contain block" />
       <img src={desktopSrc} alt={alt} style={{ height }}
         className="hidden lg:block w-auto object-contain" />
@@ -409,7 +414,8 @@ export default function Header() {
 
             <Link href="/" className="shrink-0 mr-2 flex items-center self-center" onClick={() => setMenu(false)}>
               <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
-                height={settings?.logoSize ? settings.logoSize * 0.65 : 30} mobileCap={34} />
+                height={settings?.logoSize ? settings.logoSize * 0.65 : 30} mobileCap={34}
+                mobileHeight={settings?.logoMobileSize} />
             </Link>
 
             {menuBarStyle === "attached" && (
@@ -492,7 +498,8 @@ export default function Header() {
 
             <Link href="/" className="flex items-center" onClick={() => setMenu(false)}>
               <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
-                height={settings?.logoSize ?? 48} mobileCap={48} />
+                height={settings?.logoSize ?? 48} mobileCap={48}
+                mobileHeight={settings?.logoMobileSize} />
             </Link>
 
             <button
@@ -577,7 +584,8 @@ export default function Header() {
 
           <Link href="/" className="shrink-0 mr-3 flex items-center self-center" onClick={() => setMenu(false)}>
             <HeaderLogo desktopSrc={logoSrc} mobileSrc={logoMobileSrc} alt={siteName}
-              height={settings?.logoSize ?? 48} mobileCap={48} />
+              height={settings?.logoSize ?? 48} mobileCap={48}
+              mobileHeight={settings?.logoMobileSize} />
           </Link>
 
           {menuBarStyle === "attached" && (

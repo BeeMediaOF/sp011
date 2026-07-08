@@ -29,9 +29,14 @@ test("safeTitleHtml: entradas vazias", () => {
   assert.equal(safeTitleHtml(undefined), "");
 });
 
-test("sanitizeArticleHtml: retorna vazio fora do browser (SSR nunca renderiza corpo de artigo)", () => {
-  // Em Node não há window/DOM — a função deve falhar fechada (string vazia),
-  // nunca devolver o HTML cru.
-  assert.equal(sanitizeArticleHtml("<p>ok</p><script>alert(1)</script>"), "");
+test("sanitizeArticleHtml: no SSR sanitiza sem DOM e preserva o HTML seguro", () => {
+  // Em Node não há window/DOM — entra o sanitizador isomórfico (stripDangerousHtml).
+  // Ele precisa devolver HTML equivalente ao do cliente (SSR ≠ cliente causa
+  // hydration mismatch → React #418 descarta o SSR), removendo o que é perigoso.
+  assert.equal(sanitizeArticleHtml("<p>ok</p><script>alert(1)</script>"), "<p>ok</p>");
   assert.equal(sanitizeArticleHtml(""), "");
+  // Handlers inline e javascript: nunca sobrevivem
+  const out = sanitizeArticleHtml('<p onclick="alert(1)">x</p><a href="javascript:alert(1)">y</a>');
+  assert.ok(!/onclick|javascript:/i.test(out));
+  assert.ok(out.includes("x") && out.includes("y"));
 });

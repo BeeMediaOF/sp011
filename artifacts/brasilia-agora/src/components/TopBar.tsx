@@ -8,7 +8,7 @@
  */
 import React from "react";
 import { Link } from "wouter";
-import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp } from "react-icons/fa";
+import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { useSite } from "../hooks/useSite";
 import { useT, formatLongDate } from "../lib/i18n";
@@ -18,7 +18,7 @@ import { resolveFooterConfig, type FooterSocialKey } from "../lib/footerConfig";
 
 const SOCIAL_ICONS: Record<FooterSocialKey, React.ElementType> = {
   instagram: FaInstagram, facebook: FaFacebook, x: FaXTwitter,
-  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp,
+  youtube: FaYoutube, tiktok: FaTiktok, whatsapp: FaWhatsapp, linkedin: FaLinkedin,
 };
 
 export default function TopBar() {

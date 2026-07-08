@@ -141,7 +141,9 @@ export interface HomeTemplate {
 export interface FooterConfig {
   description?: string;
   showSocial?: boolean;
-  social?: Partial<Record<"instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp", string>>;
+  social?: Partial<Record<"instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp" | "linkedin", string>>;
+  /** Liga/desliga por ícone (ausente = ligado). */
+  socialEnabled?: Partial<Record<"instagram" | "facebook" | "x" | "youtube" | "tiktok" | "whatsapp" | "linkedin", boolean>>;
   columns?: { id: string; title: string; links: { id: string; label: string; href: string }[] }[];
   showContact?: boolean; phone?: string; email?: string;
   showNewsletter?: boolean; newsletterTitle?: string;
@@ -153,6 +155,12 @@ export interface SiteSettings {
   siteName: string; tagline: string; logoBase64?: string; logoSize?: number;
   /** Logo alternativa exibida só no mobile (ex.: versão vertical/compacta). */
   logoMobileBase64?: string;
+  /** Altura da logo do cabeçalho no mobile, em px (ausente = teto automático de 48). */
+  logoMobileSize?: number;
+  /** Logo própria do rodapé (ausente = usa a logo principal). */
+  footerLogoBase64?: string;
+  /** Exibe "Fonte: Nome" discreto ao final das notícias importadas (padrão: oculto). */
+  showSourceCredit?: boolean;
   /** Idioma do SITE PÚBLICO (chrome/datas/SEO). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
@@ -745,6 +753,7 @@ export async function seedDefaultRssSources(): Promise<void> {
 export const SITE_ASSET_FIELDS = {
   "logo":        "logoBase64",
   "logo-mobile": "logoMobileBase64",
+  "footer-logo": "footerLogoBase64",
   "byline-logo": "bylineLogoBase64",
   "favicon":     "faviconBase64",
   "og-image":    "ogImageBase64",

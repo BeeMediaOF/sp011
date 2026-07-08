@@ -23,6 +23,12 @@ export interface SiteSettings {
   logoSize?: number;
   /** Logo alternativa exibida só no mobile (ex.: versão vertical/compacta). */
   logoMobileBase64?: string;
+  /** Altura da logo do cabeçalho no mobile, em px (ausente = teto automático de 48). */
+  logoMobileSize?: number;
+  /** Logo própria do rodapé (ausente = usa a logo principal). */
+  footerLogoBase64?: string;
+  /** Exibe "Fonte: Nome" discreto ao final das notícias importadas. */
+  showSourceCredit?: boolean;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */

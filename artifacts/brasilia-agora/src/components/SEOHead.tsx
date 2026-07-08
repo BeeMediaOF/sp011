@@ -1,5 +1,17 @@
 import { useEffect } from "react";
+import { useLocation } from "wouter";
 import { useSite } from "../hooks/useSite";
+
+/**
+ * IDs de rastreamento (GTM-XXXX, G-XXXX, pixel numérico) vão interpolados em
+ * <script> inline: valores fora do formato esperado (espaços, aspas, HTML)
+ * quebrariam o script ou abririam injeção. Fora do padrão → não injeta.
+ */
+const TRACKING_ID_RE = /^[A-Za-z0-9_-]{4,40}$/;
+function cleanTrackingId(v: string | undefined): string {
+  const t = (v ?? "").trim();
+  return TRACKING_ID_RE.test(t) ? t : "";
+}
 
 // Properly executes HTML snippets that contain <script> tags.
 // createContextualFragment parses but does NOT run scripts — this does.
@@ -83,17 +95,24 @@ function onIdle(cb: () => void): () => void {
 
 export default function SEOHead() {
   const { settings } = useSite();
+  const [location] = useLocation();
+  // Painel não é audiência: GTM/GA4/Pixel no /admin inflariam as métricas
+  // externas com navegação interna da redação (o analytics próprio já filtra).
+  const isAdmin = /^\/admin(\/|$)/.test(location);
 
   // ── Scripts de terceiros (pesados) → adiados para o idle, fora do TBT ────────
   useEffect(() => {
-    if (!settings) return;
-    if (!settings.gtmId && !settings.ga4MeasurementId && !settings.facebookPixelId
+    if (!settings || isAdmin) return;
+    const gtmId   = cleanTrackingId(settings.gtmId);
+    const ga4Id   = cleanTrackingId(settings.ga4MeasurementId);
+    const pixelId = cleanTrackingId(settings.facebookPixelId);
+    if (!gtmId && !ga4Id && !pixelId
         && !settings.customHeadCode && !settings.customBodyCode) return;
 
     const cancel = onIdle(() => {
     // ── Google Tag Manager ────────────────────────────────────────────────────
-    if (settings.gtmId) {
-      const gid = settings.gtmId.trim();
+    if (gtmId) {
+      const gid = gtmId;
       if (!document.getElementById("gtm-init")) {
         injectScript("gtm-init", `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
 new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -111,8 +130,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     // ── Google Analytics 4 ────────────────────────────────────────────────────
-    if (settings.ga4MeasurementId) {
-      const gid = settings.ga4MeasurementId.trim();
+    if (ga4Id) {
+      const gid = ga4Id;
       injectExternalScript("ga4-gtag", `https://www.googletagmanager.com/gtag/js?id=${gid}`);
       injectScript("ga4-init", `
         window.dataLayer = window.dataLayer || [];
@@ -123,8 +142,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     // ── Facebook Pixel ────────────────────────────────────────────────────────
-    if (settings.facebookPixelId) {
-      const pid = settings.facebookPixelId.trim();
+    if (pixelId) {
+      const pid = pixelId;
       injectScript("fb-pixel-init", `
         !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
@@ -151,7 +170,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     });
 
     return cancel;
-  }, [settings]);
+  }, [settings, isAdmin]);
 
   // ── Title / meta / favicon → síncrono (barato e relevante para SEO/SPA) ──────
   useEffect(() => {

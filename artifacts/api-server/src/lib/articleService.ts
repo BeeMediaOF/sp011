@@ -133,6 +133,8 @@ export interface Article {
   keywords?: string;
   draftReason?: string;
   canonicalUrl?: string;
+  /** Crédito da fonte no rodapé: true/false força; null/ausente segue o padrão do site. */
+  showSourceCredit?: boolean | null;
 }
 
 function rowToArticle(row: ArticleRow): Article {
@@ -161,6 +163,7 @@ function rowToArticle(row: ArticleRow): Article {
     keywords:      row.keywords ?? undefined,
     draftReason:   row.draftReason ?? undefined,
     canonicalUrl:  row.canonicalUrl ?? undefined,
+    showSourceCredit: row.showSourceCredit,
   };
 }
 
@@ -340,6 +343,7 @@ export const articleService = {
         keywords:      data.keywords,
         draftReason:   data.draftReason ?? null,
         canonicalUrl:  data.canonicalUrl ?? null,
+        showSourceCredit: data.showSourceCredit ?? null,
         createdAt:     now,
         updatedAt:     now,
       })
@@ -377,6 +381,7 @@ export const articleService = {
         ...(data.keywords      !== undefined && { keywords:      data.keywords }),
         ...(data.draftReason   !== undefined && { draftReason:   data.draftReason }),
         ...(data.canonicalUrl  !== undefined && { canonicalUrl:  data.canonicalUrl }),
+        ...(data.showSourceCredit !== undefined && { showSourceCredit: data.showSourceCredit }),
         updatedAt: new Date(),
       })
       .where(eq(articlesTable.id, id))
