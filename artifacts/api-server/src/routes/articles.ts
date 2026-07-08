@@ -88,9 +88,10 @@ router.get("/:id", async (req, res) => {
   res.json({ article });
 });
 
-/** GET /api/articles/:id/relacionados — 4 related published articles */
+/** GET /api/articles/:id/relacionados — related published articles (?limit=, padrão 4) */
 router.get("/:id/relacionados", async (req, res) => {
   const slug = req.params.id ?? "";
+  const limit = Math.min(Math.max(Number(req.query.limit) || 4, 1), 12);
   const current = await articleService.getArticle(slug);
   if (!current || current.status !== "published") {
     res.json({ articles: [] }); return;
@@ -119,7 +120,7 @@ router.get("/:id/relacionados", async (req, res) => {
       y.score - x.score ||
       new Date(y.a.publishedAt).getTime() - new Date(x.a.publishedAt).getTime()
     )
-    .slice(0, 4)
+    .slice(0, limit)
     .map(({ a }) => ({
       id: a.id,
       slug: a.slug || a.id,

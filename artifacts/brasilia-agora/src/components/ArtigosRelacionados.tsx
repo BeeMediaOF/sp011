@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { safeTitleHtml } from "@/lib/sanitize";
 import { useT, formatDayMonth } from "../lib/i18n";
+import { useSite } from "../hooks/useSite";
 
 interface RelatedArticle {
   id: string;
@@ -41,18 +42,24 @@ function Skeleton() {
 
 export default function ArtigosRelacionados({ currentSlug }: Props) {
   const { t, lang, tz } = useT();
+  const { settings } = useSite();
   const [articles, setArticles] = useState<RelatedArticle[]>([]);
   const [loading, setLoading]   = useState(true);
+
+  // Título e quantidade configuráveis (Blocos da Home → Notícia); ausentes =
+  // padrão do idioma do site e 4 artigos (comportamento histórico).
+  const title = settings?.articleRelatedTitle?.trim() || t("article.related");
+  const count = Math.min(Math.max(settings?.articleRelatedCount || 4, 1), 12);
 
   useEffect(() => {
     if (!currentSlug) return;
     setLoading(true);
-    fetch(`/api/articles/${encodeURIComponent(currentSlug)}/relacionados`)
+    fetch(`/api/articles/${encodeURIComponent(currentSlug)}/relacionados?limit=${count}`)
       .then((r) => r.ok ? r.json() : { articles: [] })
       .then((data) => setArticles(data.articles ?? []))
       .catch(() => setArticles([]))
       .finally(() => setLoading(false));
-  }, [currentSlug]);
+  }, [currentSlug, count]);
 
   if (loading) return <Skeleton />;
   if (!articles.length) return null;
@@ -62,7 +69,7 @@ export default function ArtigosRelacionados({ currentSlug }: Props) {
       <div className="flex items-center gap-2 mb-5">
         <div className="w-1 h-5 bg-[#c8102e]" />
         <h2 className="text-[15px] font-black text-[#1a2448] uppercase tracking-wider">
-          {t("article.related")}
+          {title}
         </h2>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

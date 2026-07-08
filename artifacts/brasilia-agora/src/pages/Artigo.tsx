@@ -127,6 +127,27 @@ export default function Artigo() {
   // impossível cruzar profundidade de leitura com as views do artigo.
   useScrollDepth(article?.id);
 
+  // Compartilhamento configurável (Blocos da Home → Notícia): rótulo e redes.
+  // Ausente = todas as redes com o rótulo do idioma do site.
+  const shareLabel = settings?.articleShareLabel?.trim() || t("article.share");
+  const shareNetworks = Array.isArray(settings?.articleShareNetworks)
+    ? ["facebook", "twitter", "whatsapp", "copy"].filter((n) => settings!.articleShareNetworks!.includes(n))
+    : ["facebook", "twitter", "whatsapp", "copy"];
+  const shareOn = (network: string) => {
+    const url = encodeURIComponent(window.location.href);
+    const text = encodeURIComponent(article?.title ?? "");
+    if (network === "facebook") {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank", "noopener");
+    } else if (network === "twitter") {
+      window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, "_blank", "noopener");
+    } else if (network === "whatsapp") {
+      window.open(`https://api.whatsapp.com/send?text=${text}%20${url}`, "_blank", "noopener");
+    } else {
+      navigator.clipboard.writeText(window.location.href).catch(() => {});
+    }
+    trackShare(network);
+  };
+
   /* Track article once resolved */
   useEffect(() => {
     if (article) {
@@ -620,56 +641,47 @@ export default function Artigo() {
                         </div>
                       </div>
                     </div>
-                    {settings?.articleShowShare !== false && (
+                    {settings?.articleShowShare !== false && shareNetworks.length > 0 && (
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
-                        {t("article.share")}
+                        {shareLabel}
                       </span>
-                      <button
-                        onClick={() => {
-                          const url = encodeURIComponent(window.location.href);
-                          window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, "_blank", "noopener");
-                          trackShare("facebook");
-                        }}
-                        className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title={t("article.shareFacebook")}
-                      >
-                        <FaFacebook size={13} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const url = encodeURIComponent(window.location.href);
-                          const text = encodeURIComponent(article?.title ?? "");
-                          window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, "_blank", "noopener");
-                          trackShare("twitter");
-                        }}
-                        className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title={t("article.shareTwitter")}
-                      >
-                        <FaTwitter size={13} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const url = encodeURIComponent(window.location.href);
-                          const text = encodeURIComponent((article?.title ?? "") + " ");
-                          window.open(`https://api.whatsapp.com/send?text=${text}${url}`, "_blank", "noopener");
-                          trackShare("whatsapp");
-                        }}
-                        className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
-                        title={t("article.shareWhatsApp")}
-                      >
-                        <FaWhatsapp size={13} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(window.location.href).catch(() => {});
-                          trackShare("copy");
-                        }}
-                        className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
-                        title={t("article.copyLink")}
-                      >
-                        <FaLink size={12} />
-                      </button>
+                      {shareNetworks.includes("facebook") && (
+                        <button
+                          onClick={() => shareOn("facebook")}
+                          className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                          title={t("article.shareFacebook")}
+                        >
+                          <FaFacebook size={13} />
+                        </button>
+                      )}
+                      {shareNetworks.includes("twitter") && (
+                        <button
+                          onClick={() => shareOn("twitter")}
+                          className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                          title={t("article.shareTwitter")}
+                        >
+                          <FaTwitter size={13} />
+                        </button>
+                      )}
+                      {shareNetworks.includes("whatsapp") && (
+                        <button
+                          onClick={() => shareOn("whatsapp")}
+                          className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity"
+                          title={t("article.shareWhatsApp")}
+                        >
+                          <FaWhatsapp size={13} />
+                        </button>
+                      )}
+                      {shareNetworks.includes("copy") && (
+                        <button
+                          onClick={() => shareOn("copy")}
+                          className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-300 transition-colors"
+                          title={t("article.copyLink")}
+                        >
+                          <FaLink size={12} />
+                        </button>
+                      )}
                     </div>
                     )}
                   </div>
@@ -730,20 +742,32 @@ export default function Artigo() {
                         </span>
                       ))}
                     </div>
+                    {settings?.articleShowShare !== false
+                      && shareNetworks.some((n) => n !== "copy") && (
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mr-1">
-                        {t("article.share")}
+                        {shareLabel}
                       </span>
-                      <button className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
-                        <FaFacebook size={13} />
-                      </button>
-                      <button className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
-                        <FaTwitter size={13} />
-                      </button>
-                      <button className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
-                        <FaWhatsapp size={13} />
-                      </button>
+                      {shareNetworks.includes("facebook") && (
+                        <button onClick={() => shareOn("facebook")} title={t("article.shareFacebook")}
+                          className="w-8 h-8 rounded-full bg-[#1877f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                          <FaFacebook size={13} />
+                        </button>
+                      )}
+                      {shareNetworks.includes("twitter") && (
+                        <button onClick={() => shareOn("twitter")} title={t("article.shareTwitter")}
+                          className="w-8 h-8 rounded-full bg-[#1da1f2] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                          <FaTwitter size={13} />
+                        </button>
+                      )}
+                      {shareNetworks.includes("whatsapp") && (
+                        <button onClick={() => shareOn("whatsapp")} title={t("article.shareWhatsApp")}
+                          className="w-8 h-8 rounded-full bg-[#25d366] text-white flex items-center justify-center hover:opacity-80 transition-opacity">
+                          <FaWhatsapp size={13} />
+                        </button>
+                      )}
                     </div>
+                    )}
                   </div>
 
                   {/* Banner horizontal — gerenciado pelo painel */}

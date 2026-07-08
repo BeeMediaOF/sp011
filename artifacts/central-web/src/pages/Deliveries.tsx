@@ -44,6 +44,7 @@ export default function Deliveries() {
 
   const retry = async (d: Delivery) => { await api(`/deliveries/${d.id}/retry`, { method: "POST" }); reload(); };
   const cancel = async (d: Delivery) => { await api(`/deliveries/${d.id}/cancel`, { method: "POST" }); reload(); };
+  const publishNow = async (d: Delivery) => { await api(`/deliveries/${d.id}/publish-now`, { method: "POST" }); reload(); };
   const showAttempts = async (d: Delivery) =>
     setAttempts({ delivery: d, list: await api<Attempt[]>(`/deliveries/${d.id}/attempts`) });
 
@@ -94,6 +95,9 @@ export default function Deliveries() {
                 <td style={{ whiteSpace: "nowrap" }}>
                   {["dead", "failed", "cancelled"].includes(d.status) && (
                     <button className="secondary small" onClick={() => retry(d)}>Reenviar</button>
+                  )}{" "}
+                  {["pending", "awaiting_approval"].includes(d.status) && (
+                    <button className="small" onClick={() => publishNow(d)}>Publicar agora</button>
                   )}{" "}
                   {["pending", "awaiting_localization"].includes(d.status) && (
                     <button className="danger small" onClick={() => cancel(d)}>Cancelar</button>

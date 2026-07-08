@@ -203,6 +203,14 @@ export interface SiteSettings {
   articleShowBreadcrumb?: boolean;
   articleShowShare?: boolean;
   articleShowRelated?: boolean;
+  /** Rótulo dos botões de compartilhar (vazio = padrão do idioma do site). */
+  articleShareLabel?: string;
+  /** Redes exibidas: facebook | twitter | whatsapp | copy (ausente = todas). */
+  articleShareNetworks?: string[];
+  /** Título da seção de relacionados (vazio = padrão do idioma do site). */
+  articleRelatedTitle?: string;
+  /** Quantidade de artigos relacionados (0/ausente = 4). */
+  articleRelatedCount?: number;
   adminSidebarColor?: string; adminAccentColor?: string;
   rssAiProvider?: "gemini_free" | "gemini_paid" | "gemini_direct" | "openai" | "ollama";
   rssAiApiKey?: string; rssAiModel?: string; rssAiOutputPrompt?: string;

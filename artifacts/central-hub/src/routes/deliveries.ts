@@ -168,6 +168,46 @@ router.post("/:id/retry", async (req, res) => {
   res.json(row);
 });
 
+/** Publica agora: fura o agendamento de uma entrega pendente e, se estava
+ *  aguardando aprovação, aprova no mesmo ato. O worker envia no próximo tick. */
+router.post("/:id/publish-now", async (req, res) => {
+  const rows = await db.select().from(deliveriesTable).where(eq(deliveriesTable.id, req.params.id)).limit(1);
+  const delivery = rows[0];
+  if (!delivery) {
+    res.status(404).json({ error: "Entrega não encontrada." });
+    return;
+  }
+  if (!["pending", "awaiting_approval"].includes(delivery.status)) {
+    res.status(409).json({ error: `Entrega em status '${delivery.status}' não pode ser publicada agora.` });
+    return;
+  }
+
+  const [row] = await db
+    .update(deliveriesTable)
+    .set({
+      status: "pending",
+      scheduledAt: new Date(),
+      nextRetryAt: null,
+      ...(delivery.status === "awaiting_approval"
+        ? { approvedBy: req.centralUserId ?? null, approvedAt: new Date() }
+        : {}),
+      updatedAt: new Date(),
+    })
+    // Condição no status original: se o worker/revisor mudou o estado no meio
+    // tempo, não sobrescreve (evita "aprovar" uma entrega já cancelada).
+    .where(and(eq(deliveriesTable.id, delivery.id), eq(deliveriesTable.status, delivery.status)))
+    .returning();
+  if (!row) {
+    res.status(409).json({ error: "Entrega mudou de status — recarregue a lista." });
+    return;
+  }
+  logEvent({
+    module: "delivery", refType: "delivery", refId: row.id,
+    message: delivery.status === "awaiting_approval" ? "Publicação imediata (aprovada no ato)" : "Publicação imediata solicitada",
+  });
+  res.json(row);
+});
+
 /** Cancela uma entrega pendente/agendada (inclui aguardando tradução). */
 router.post("/:id/cancel", async (req, res) => {
   const [row] = await db

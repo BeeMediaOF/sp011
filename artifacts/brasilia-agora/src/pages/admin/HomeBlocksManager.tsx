@@ -127,6 +127,14 @@ const AD_SLOT_OPTIONS = Array.from({ length: 11 }, (_, i) => {
   return { value: `slot_${n}`, label: `Slot ${n}` };
 });
 
+// ─── Redes dos botões de compartilhar da página de notícia ────────────────────
+const SHARE_NETWORK_OPTIONS: { value: string; label: string }[] = [
+  { value: "facebook", label: "Facebook" },
+  { value: "twitter",  label: "X (Twitter)" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "copy",     label: "Copiar link" },
+];
+
 // ─── Tipos de bloco com artigos (mostram fonte/categoria/quantidade) ─────────
 const ARTICLE_TYPES = new Set<BlockType>(["content", "carousel", "list", "ticker"]);
 
@@ -1286,6 +1294,12 @@ export default function HomeBlocksManager() {
   const [articleShowBreadcrumb, setArticleShowBreadcrumb] = useState(true);
   const [articleShowShare, setArticleShowShare]           = useState(true);
   const [articleShowRelated, setArticleShowRelated]       = useState(true);
+  // Conteúdo editável das seções: rótulo/redes do compartilhar e título/quantidade
+  // dos relacionados (vazio/4 = padrão do idioma do site).
+  const [articleShareLabel, setArticleShareLabel]         = useState("");
+  const [articleShareNetworks, setArticleShareNetworks]   = useState<string[]>(SHARE_NETWORK_OPTIONS.map((n) => n.value));
+  const [articleRelatedTitle, setArticleRelatedTitle]     = useState("");
+  const [articleRelatedCount, setArticleRelatedCount]     = useState(4);
   const [articleSavedOk, setArticleSavedOk]               = useState(false);
   // Propagandas cadastradas p/ o seletor dos blocos de anúncio da lateral.
   const articleAdsList = useAdsList(tab === "article");
@@ -1422,6 +1436,12 @@ export default function HomeBlocksManager() {
         setArticleShowBreadcrumb(r.settings.articleShowBreadcrumb !== false);
         setArticleShowShare(r.settings.articleShowShare !== false);
         setArticleShowRelated(r.settings.articleShowRelated !== false);
+        setArticleShareLabel(r.settings.articleShareLabel ?? "");
+        setArticleShareNetworks(Array.isArray(r.settings.articleShareNetworks)
+          ? r.settings.articleShareNetworks
+          : SHARE_NETWORK_OPTIONS.map((n) => n.value));
+        setArticleRelatedTitle(r.settings.articleRelatedTitle ?? "");
+        setArticleRelatedCount(r.settings.articleRelatedCount || 4);
         setSiteCategories(r.settings.categories ?? []);
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
@@ -2719,19 +2739,71 @@ export default function HomeBlocksManager() {
                   </p>
                 </div>
 
-                {/* Seções da página */}
+                {/* Seções da página — toggle liga/desliga; ligada, mostra os campos editáveis */}
                 <div className="space-y-2.5">
                   <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Seções da página</p>
-                  {([
-                    { label: "Caminho no topo (breadcrumb)", value: articleShowBreadcrumb, set: setArticleShowBreadcrumb, key: "articleShowBreadcrumb" as const },
-                    { label: "Botões de compartilhar", value: articleShowShare, set: setArticleShowShare, key: "articleShowShare" as const },
-                    { label: "Artigos relacionados", value: articleShowRelated, set: setArticleShowRelated, key: "articleShowRelated" as const },
-                  ]).map(({ label, value, set, key }) => (
-                    <div key={key} className="flex items-center justify-between">
-                      <span className="text-[12px] font-medium text-[#334155]">{label}</span>
-                      <Toggle checked={value} onChange={() => { const v = !value; set(v); void saveSettingsPatch({ [key]: v }); }} />
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-[#334155]">Caminho no topo (breadcrumb)</span>
+                    <Toggle checked={articleShowBreadcrumb}
+                      onChange={() => { const v = !articleShowBreadcrumb; setArticleShowBreadcrumb(v); void saveSettingsPatch({ articleShowBreadcrumb: v }); }} />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-[#334155]">Botões de compartilhar</span>
+                    <Toggle checked={articleShowShare}
+                      onChange={() => { const v = !articleShowShare; setArticleShowShare(v); void saveSettingsPatch({ articleShowShare: v }); }} />
+                  </div>
+                  {articleShowShare && (
+                    <div className="ml-3 pl-3 border-l-2 border-[#E2E8F0] space-y-2">
+                      <input value={articleShareLabel}
+                        onChange={(e) => setArticleShareLabel(e.target.value)}
+                        onBlur={() => void saveSettingsPatch({ articleShareLabel: articleShareLabel.trim() })}
+                        placeholder="Rótulo — vazio = padrão do idioma do site"
+                        className={AINPUT} />
+                      <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+                        {SHARE_NETWORK_OPTIONS.map((n) => (
+                          <label key={n.value} className="flex items-center gap-1.5 text-[11px] text-[#334155] cursor-pointer">
+                            <input type="checkbox" checked={articleShareNetworks.includes(n.value)}
+                              onChange={() => {
+                                const next = articleShareNetworks.includes(n.value)
+                                  ? articleShareNetworks.filter((x) => x !== n.value)
+                                  : SHARE_NETWORK_OPTIONS.map((o) => o.value).filter((v) => v === n.value || articleShareNetworks.includes(v));
+                                setArticleShareNetworks(next);
+                                void saveSettingsPatch({ articleShareNetworks: next });
+                              }} />
+                            {n.label}
+                          </label>
+                        ))}
+                      </div>
+                      {articleShareNetworks.length === 0 && (
+                        <p className="text-[10px] text-amber-600">Nenhuma rede marcada — os botões somem do site (igual a desligar a seção).</p>
+                      )}
                     </div>
-                  ))}
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-[#334155]">Artigos relacionados</span>
+                    <Toggle checked={articleShowRelated}
+                      onChange={() => { const v = !articleShowRelated; setArticleShowRelated(v); void saveSettingsPatch({ articleShowRelated: v }); }} />
+                  </div>
+                  {articleShowRelated && (
+                    <div className="ml-3 pl-3 border-l-2 border-[#E2E8F0] space-y-2">
+                      <input value={articleRelatedTitle}
+                        onChange={(e) => setArticleRelatedTitle(e.target.value)}
+                        onBlur={() => void saveSettingsPatch({ articleRelatedTitle: articleRelatedTitle.trim() })}
+                        placeholder="Título da seção — vazio = padrão do idioma do site"
+                        className={AINPUT} />
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#64748B]">Quantidade de artigos</span>
+                        <select value={articleRelatedCount}
+                          onChange={(e) => { const v = Number(e.target.value); setArticleRelatedCount(v); void saveSettingsPatch({ articleRelatedCount: v }); }}
+                          className="border border-[#E2E8F0] rounded-xl px-2 py-1 text-xs bg-white appearance-none">
+                          {[2, 3, 4, 6, 8, 12].map((n) => <option key={n} value={n}>{n}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Blocos da coluna lateral */}
