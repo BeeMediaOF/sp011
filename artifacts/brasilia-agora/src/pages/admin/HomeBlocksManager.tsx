@@ -32,6 +32,23 @@ const DEFAULT_ARTICLE_SIDEBAR_BLOCKS: HomeBlock[] = [
   { id: "advertising-artigo", name: "Propaganda (slot)", visible: true, order: 1, custom: true, blockType: "advertising", adSlot: "slot_07" },
 ];
 const AINPUT = "w-full border border-[#E2E8F0] rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 bg-white";
+
+// Propagandas cadastradas (aba Propagandas) para seleção direta nos blocos de
+// anúncio — cache de módulo: 1 fetch por sessão do painel.
+let _adsListCache: { id: string; name: string }[] | null = null;
+function useAdsList(enabled: boolean): { id: string; name: string }[] {
+  const [list, setList] = useState<{ id: string; name: string }[]>(_adsListCache ?? []);
+  useEffect(() => {
+    if (!enabled || _adsListCache) return;
+    adminApi.getAds()
+      .then((r) => {
+        _adsListCache = r.ads.map((a) => ({ id: a.id, name: a.name }));
+        setList(_adsListCache);
+      })
+      .catch(() => {});
+  }, [enabled]);
+  return list;
+}
 type FilterTab = "all" | "visible" | "hidden";
 type ResponsiveMode = "desktop" | "tablet" | "mobile";
 
@@ -583,6 +600,7 @@ interface BlockForm {
   html: string;
   embedUrl: string;
   adSlot: string;
+  adId: string;
   area: "" | "main" | "sidebar";
   width: "" | "full" | "half" | "quarter";
   linkLabel: string;
@@ -595,7 +613,7 @@ const EMPTY_FORM: BlockForm = {
   source: "automatic_by_category", itemsLimit: 4,
   color: "#1d4ed8", reverse: false,
   imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
-  adSlot: "slot_05",
+  adSlot: "slot_05", adId: "",
   area: "", width: "", linkLabel: "",
   isAd: false,
 };
@@ -621,6 +639,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     html:          block.html ?? "",
     embedUrl:      block.embedUrl ?? "",
     adSlot:        block.adSlot ?? "slot_05",
+    adId:          block.adId ?? "",
     area:          block.area ?? "",
     width:         block.width ?? "",
     linkLabel:     block.linkLabel ?? "",
@@ -652,6 +671,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     html:       f.html.trim() || undefined,
     embedUrl:   f.embedUrl.trim() || undefined,
     adSlot:     f.blockType === "advertising" ? f.adSlot : undefined,
+    adId:       f.blockType === "advertising" ? (f.adId || undefined) : undefined,
     area:       f.area || undefined,
     width:      f.width || undefined,
     linkLabel:  f.linkLabel.trim() || undefined,
@@ -807,6 +827,7 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
   const [uploading, setUploading] = useState(false);
   const [uploadErr, setUploadErr]  = useState(false);
   const imgInputRef = useRef<HTMLInputElement>(null);
+  const adsList = useAdsList(form.blockType === "advertising");
 
   async function uploadBlockImage(file: File) {
     setUploading(true); setUploadErr(false);
@@ -929,6 +950,12 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
             <select value={form.adSlot} onChange={(e) => onChange("adSlot", e.target.value)} className={INPUT}>
               {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase mt-2 mb-1">Qual propaganda exibir</label>
+            <select value={form.adId} onChange={(e) => onChange("adId", e.target.value)} className={INPUT}>
+              <option value="">Automática — anúncios ativos do slot acima</option>
+              {adsList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Escolha uma propaganda cadastrada para fixá-la neste bloco (na proporção natural da arte), ou deixe em Automática.</p>
           </PanelSection>
           <div className="rounded-xl border border-[#FDE68A] bg-[#FFFBEB] p-3 flex items-start gap-2.5">
             <Megaphone size={14} className="text-[#D97706] mt-0.5 shrink-0" />
@@ -1209,6 +1236,22 @@ export default function HomeBlocksManager() {
   const [articleShowShare, setArticleShowShare]           = useState(true);
   const [articleShowRelated, setArticleShowRelated]       = useState(true);
   const [articleSavedOk, setArticleSavedOk]               = useState(false);
+  // Propagandas cadastradas p/ o seletor dos blocos de anúncio da lateral.
+  const articleAdsList = useAdsList(tab === "article");
+  // Slug da notícia mais recente — a prévia da aba Notícia abre essa página.
+  const [previewArticleSlug, setPreviewArticleSlug] = useState<string | null>(null);
+  useEffect(() => {
+    if (tab !== "article" || previewArticleSlug !== null) return;
+    fetch("/api/articles")
+      .then((r) => r.json())
+      .then((d: { articles?: { slug?: string; id: string }[] }) => {
+        const a = d.articles?.[0];
+        if (a) setPreviewArticleSlug(a.slug || a.id);
+      })
+      .catch(() => {});
+  }, [tab, previewArticleSlug]);
+  // Prévia: home nas demais abas; a notícia mais recente na aba Notícia.
+  const previewPath = tab === "article" && previewArticleSlug ? `/artigo/${previewArticleSlug}` : "/";
   const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
   const [menuBarBgColor, setMenuBarBgColor]       = useState("");
   const [footerAccentColor, setFooterAccentColor] = useState("");
@@ -2659,10 +2702,17 @@ export default function HomeBlocksManager() {
                           <p className="text-[10px] text-[#94A3B8]">Lista automática dos mais lidos — o título público segue o idioma do site.</p>
                         )}
                         {btype === "advertising" && (
-                          <select value={b.adSlot ?? "slot_07"} onChange={(e) => patchArticleBlock(b.id, { adSlot: e.target.value })}
-                            className={`${AINPUT} appearance-none`}>
-                            {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                          </select>
+                          <>
+                            <select value={b.adSlot ?? "slot_07"} onChange={(e) => patchArticleBlock(b.id, { adSlot: e.target.value })}
+                              className={`${AINPUT} appearance-none`}>
+                              {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+                            </select>
+                            <select value={b.adId ?? ""} onChange={(e) => patchArticleBlock(b.id, { adId: e.target.value || undefined })}
+                              className={`${AINPUT} appearance-none`}>
+                              <option value="">Automática — anúncios ativos do espaço acima</option>
+                              {articleAdsList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                          </>
                         )}
                         {btype === "html" && (
                           <>
@@ -2848,7 +2898,7 @@ export default function HomeBlocksManager() {
                       className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[#64748B] border border-[#E2E8F0] rounded-xl hover:bg-[#F8FAFC] transition-colors">
                       <RefreshCw size={12} /> Atualizar
                     </button>
-                    <a href="/" target="_blank" rel="noopener noreferrer"
+                    <a href={previewPath} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium text-[#64748B] border border-[#E2E8F0] rounded-xl hover:bg-[#F8FAFC] transition-colors">
                       <ExternalLink size={12} /> Abrir site
                     </a>
@@ -2857,7 +2907,9 @@ export default function HomeBlocksManager() {
                 <div className="flex-1 overflow-auto bg-[#F1F5F9] p-4">
                   <div className="mx-auto transition-all duration-300 h-full" style={{ maxWidth: previewWidth, minHeight: "100%" }}>
                     <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-white" style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.08)" }}>
-                      <iframe key={previewKey} ref={iframeRef} src="/?adminPreview=1" title="Prévia da Home"
+                      <iframe key={`${previewKey}-${previewPath}`} ref={iframeRef}
+                        src={`${previewPath}?adminPreview=1`}
+                        title={tab === "article" ? "Prévia da notícia" : "Prévia da Home"}
                         className="w-full h-full border-0" style={{ minHeight: "600px" }} />
                     </div>
                   </div>

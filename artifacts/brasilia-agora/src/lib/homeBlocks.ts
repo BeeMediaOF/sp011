@@ -50,6 +50,8 @@ export interface HomeBlock {
   embedUrl?: string;
   /** Bloco de propaganda: slot do AdBanner. */
   adSlot?: string;
+  /** Bloco de propaganda: exibir UMA propaganda específica do cadastro (por id). */
+  adId?: string;
   /** Zona da home: blocos consecutivos com area formam a zona de 2 colunas
    *  (coluna principal + lateral de 320px). Ausente = fluxo clássico. */
   area?: "main" | "sidebar";

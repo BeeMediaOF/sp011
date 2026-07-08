@@ -4,6 +4,9 @@ import { useAds, trackClick, useAdImpression, type AdSlotKey, SLOT_CONFIG } from
 
 interface Props {
   slot: AdSlotKey;
+  /** Propaganda específica do cadastro (por id) — ignora a seleção por slot e
+   *  exibe a imagem na proporção natural dela. Mantém impressões/cliques. */
+  adId?: string;
   interval?: number;
   /** Override do aspectRatio do SLOT_CONFIG — usar apenas em casos especiais */
   aspectRatio?: string;
@@ -17,12 +20,13 @@ interface Props {
 
 export default function AdBanner({
   slot,
+  adId,
   interval = 5000,
   aspectRatio: aspectRatioProp,
   priority = false,
   showLabel = true,
 }: Props) {
-  const { getSlotAll, loading } = useAds();
+  const { ads, getSlotAll, loading } = useAds();
   const [index, setIndex] = useState(0);
   const [fading, setFading] = useState(false);
 
@@ -30,7 +34,7 @@ export default function AdBanner({
   const aspectRatio = aspectRatioProp ?? cfg?.aspectRatio ?? "970/90";
   const { imgWidth, imgHeight } = cfg ?? { imgWidth: 970, imgHeight: 90 };
 
-  const items = getSlotAll(slot);
+  const items = adId ? ads.filter((a) => a.id === adId) : getSlotAll(slot);
 
   const goTo = useCallback((next: number) => {
     setFading(true);
@@ -101,7 +105,7 @@ export default function AdBanner({
         <div
           ref={impressionRef}
           className="relative w-full group"
-          style={{ aspectRatio }}
+          style={adId ? undefined : { aspectRatio }}
         >
           <a
             href={ad.link}
@@ -114,9 +118,9 @@ export default function AdBanner({
             <img
               src={ad.imageUrl}
               alt="Publicidade"
-              className="block w-full h-full object-cover"
-              width={imgWidth}
-              height={imgHeight}
+              className={adId ? "block w-full h-auto" : "block w-full h-full object-cover"}
+              width={adId ? undefined : imgWidth}
+              height={adId ? undefined : imgHeight}
               loading={priority ? "eager" : "lazy"}
               fetchPriority={priority ? "high" : "auto"}
               decoding={priority ? "sync" : "async"}

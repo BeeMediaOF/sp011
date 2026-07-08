@@ -84,7 +84,7 @@ function ArticleSidebar() {
         const type = inferBlockType(b);
         let content: React.ReactNode = null;
         if (type === "mostread") content = mostReadCard;
-        else if (type === "advertising") content = <AdBanner slot={(b.adSlot ?? "slot_07") as AdSlotKey} />;
+        else if (type === "advertising") content = <AdBanner slot={(b.adSlot ?? "slot_07") as AdSlotKey} adId={b.adId} />;
         else if (type === "image") content = <ImageBlock block={b} contained={false} />;
         else if (type === "html") content = <HtmlBlock block={b} contained={false} />;
         if (!content) return null;

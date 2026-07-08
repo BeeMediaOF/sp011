@@ -451,7 +451,7 @@ export function AdSlotBlock({ block, preview }: { block: HomeBlock; preview?: bo
   const slot = AD_SLOTS.includes(block.adSlot ?? "") ? (block.adSlot as AdSlotKey) : "slot_05";
   return (
     <div className="max-w-[1280px] mx-auto px-4 py-4">
-      <AdBanner slot={slot} />
+      <AdBanner slot={slot} adId={block.adId} />
       {preview && !block.adSlot && (
         <p className="text-center text-[11px] text-slate-400 mt-1">
           Espaço de anúncio ({slot}) — escolha o slot e cadastre a arte em Propagandas.
