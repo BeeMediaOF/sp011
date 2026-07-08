@@ -107,6 +107,7 @@ export interface HomeTemplate {
   showTopBar?: boolean;
   topBarBgColor?: string;
   headerBannerHtml?: string;
+  headerBannerLinkUrl?: string;
   menuBarStyle?: "attached" | "bar";
   menuBarBgColor?: string;
   footerAccentColor?: string;

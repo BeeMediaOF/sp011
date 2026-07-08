@@ -944,7 +944,9 @@ function SettingsPanel({ block, form, saving, onChange, onApply, onDuplicate, on
           <textarea value={form.html} onChange={(e) => onChange("html", e.target.value)}
             rows={6} spellCheck={false}
             className={`${INPUT} font-mono text-xs resize-y`} placeholder="<div>…</div>" />
-          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Scripts e eventos inline são removidos por segurança ao exibir.</p>
+          <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+            className={`${INPUT} mt-1.5`} placeholder="Link de redirecionamento ao clicar (opcional)" />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Scripts e eventos inline são removidos por segurança ao exibir. Com o link preenchido, o bloco inteiro vira clicável (abre em nova aba).</p>
         </PanelSection>
       )}
 
@@ -1193,6 +1195,7 @@ export default function HomeBlocksManager() {
   const [showTopBar, setShowTopBar]               = useState(false);
   const [topBarBgColor, setTopBarBgColor]         = useState("");
   const [headerBannerHtml, setHeaderBannerHtml]   = useState("");
+  const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
   const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
   const [menuBarBgColor, setMenuBarBgColor]       = useState("");
   const [footerAccentColor, setFooterAccentColor] = useState("");
@@ -1232,6 +1235,7 @@ export default function HomeBlocksManager() {
     /** Campos "portal" — strings vazias = não configurado (site usa defaults). */
     showTopBar?: boolean; topBarBgColor?: string;
     headerBannerHtml?: string;
+    headerBannerLinkUrl?: string;
     menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
     footerAccentColor?: string;
     /** Idioma/fuso do site público (aplicados/restaurados só quando definidos). */
@@ -1255,7 +1259,7 @@ export default function HomeBlocksManager() {
     setBannerUploading(true);
     try {
       const r = await adminApi.uploadImage(file, "banner-cabecalho");
-      setHeaderBannerHtml(`<a href="https://" target="_blank" rel="noopener sponsored"><img src="${r.url}" alt="banner" style="width:100%;max-width:720px;height:auto;border-radius:8px;display:block;"></a>`);
+      setHeaderBannerHtml(`<img src="${r.url}" alt="banner" style="width:100%;max-width:720px;height:auto;border-radius:8px;display:block;">`);
     } catch {
       alert("Falha no upload da imagem — tente novamente.");
     } finally {
@@ -1297,6 +1301,7 @@ export default function HomeBlocksManager() {
         setShowTopBar(r.settings.showTopBar ?? false);
         setTopBarBgColor(r.settings.topBarBgColor ?? "");
         setHeaderBannerHtml(r.settings.headerBannerHtml ?? "");
+        setHeaderBannerLinkUrl(r.settings.headerBannerLinkUrl ?? "");
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
         setFooterAccentColor(r.settings.footerAccentColor ?? "");
@@ -1411,7 +1416,7 @@ export default function HomeBlocksManager() {
       headerStyle, footerStyle, headerBgColor, footerBgColor,
       menuTextColor, menuActiveColor, menuFontSize, menuFontWeight,
       headerPaddingX, headerMarginTop, showTickerBar, showHeroStrip,
-      showTopBar, topBarBgColor, headerBannerHtml, menuBarStyle, menuBarBgColor,
+      showTopBar, topBarBgColor, headerBannerHtml, headerBannerLinkUrl, menuBarStyle, menuBarBgColor,
       footerAccentColor,
       siteLanguage, siteTimezone,
       ...(menuItems ? { menuItems: menuItems.map((m) => ({ ...m, children: m.children?.map((c) => ({ ...c })) })) } : {}),
@@ -1439,6 +1444,7 @@ export default function HomeBlocksManager() {
       ...(snap.showTopBar        !== undefined ? { showTopBar:        snap.showTopBar }        : {}),
       ...(snap.topBarBgColor     !== undefined ? { topBarBgColor:     snap.topBarBgColor }     : {}),
       ...(snap.headerBannerHtml  !== undefined ? { headerBannerHtml:  snap.headerBannerHtml }  : {}),
+      ...(snap.headerBannerLinkUrl !== undefined ? { headerBannerLinkUrl: snap.headerBannerLinkUrl } : {}),
       ...(snap.menuBarStyle      !== undefined ? { menuBarStyle:      snap.menuBarStyle }      : {}),
       ...(snap.menuBarBgColor    !== undefined ? { menuBarBgColor:    snap.menuBarBgColor }    : {}),
       ...(snap.footerAccentColor !== undefined ? { footerAccentColor: snap.footerAccentColor } : {}),
@@ -1464,6 +1470,7 @@ export default function HomeBlocksManager() {
     if (snap.showTopBar        !== undefined) setShowTopBar(snap.showTopBar);
     if (snap.topBarBgColor     !== undefined) setTopBarBgColor(snap.topBarBgColor);
     if (snap.headerBannerHtml  !== undefined) setHeaderBannerHtml(snap.headerBannerHtml);
+    if (snap.headerBannerLinkUrl !== undefined) setHeaderBannerLinkUrl(snap.headerBannerLinkUrl);
     if (snap.menuBarStyle      !== undefined) setMenuBarStyle(snap.menuBarStyle);
     if (snap.menuBarBgColor    !== undefined) setMenuBarBgColor(snap.menuBarBgColor);
     if (snap.footerAccentColor !== undefined) setFooterAccentColor(snap.footerAccentColor);
@@ -1493,11 +1500,12 @@ export default function HomeBlocksManager() {
   // define — um look antigo restaura o visual clássico em vez de herdar sobras
   // do KSports. ("" = não configurado; o site trata vazio como default.)
   function portalFieldsOf(src: Partial<HomeSnapshot>): Pick<HomeSnapshot,
-    "showTopBar" | "topBarBgColor" | "headerBannerHtml" | "menuBarStyle" | "menuBarBgColor" | "footerAccentColor"> {
+    "showTopBar" | "topBarBgColor" | "headerBannerHtml" | "headerBannerLinkUrl" | "menuBarStyle" | "menuBarBgColor" | "footerAccentColor"> {
     return {
       showTopBar:        src.showTopBar        ?? false,
       topBarBgColor:     src.topBarBgColor     ?? "",
       headerBannerHtml:  src.headerBannerHtml  ?? "",
+      headerBannerLinkUrl: src.headerBannerLinkUrl ?? "",
       menuBarStyle:      src.menuBarStyle      ?? "attached",
       menuBarBgColor:    src.menuBarBgColor    ?? "",
       footerAccentColor: src.footerAccentColor ?? "",
@@ -2461,8 +2469,11 @@ export default function HomeBlocksManager() {
                     <textarea value={headerBannerHtml} onChange={(e) => setHeaderBannerHtml(e.target.value)} rows={4}
                       placeholder="<div>…HTML do banner…</div> (vazio = sem banner)"
                       className="w-full border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
-                    <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo. O upload gera a tag da imagem pronta — troque o https:// pelo link de destino do banner.</p>
-                    <button onClick={() => saveSettingsPatch({ headerBannerHtml })} disabled={saving}
+                    <input value={headerBannerLinkUrl} onChange={(e) => setHeaderBannerLinkUrl(e.target.value)}
+                      placeholder="Link de redirecionamento ao clicar (opcional)"
+                      className="w-full mt-1.5 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
+                    <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo. O upload gera a tag da imagem pronta; com o link preenchido, o banner inteiro vira clicável (abre em nova aba).</p>
+                    <button onClick={() => saveSettingsPatch({ headerBannerHtml, headerBannerLinkUrl })} disabled={saving}
                       className="w-full mt-1.5 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
                       <Save size={13} /> Salvar banner
                     </button>

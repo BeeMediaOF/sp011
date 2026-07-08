@@ -62,6 +62,8 @@ export interface SiteSettings {
   topBarBgColor?: string;
   /** Banner HTML (sanitizado) exibido ao lado do logo no desktop. */
   headerBannerHtml?: string;
+  /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */
+  headerBannerLinkUrl?: string;
   /** "bar" = menu vira faixa colorida full-width abaixo do logo. */
   menuBarStyle?: "attached" | "bar";
   menuBarBgColor?: string;

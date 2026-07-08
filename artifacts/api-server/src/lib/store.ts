@@ -133,6 +133,7 @@ export interface HomeTemplate {
   /** Campos "portal" (barra do topo, banner do logo, menu em faixa, acento). */
   showTopBar?: boolean; topBarBgColor?: string;
   headerBannerHtml?: string;
+  headerBannerLinkUrl?: string;
   menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
   footerAccentColor?: string;
 }
@@ -179,6 +180,8 @@ export interface SiteSettings {
   showTopBar?: boolean; topBarBgColor?: string;
   /** Banner HTML (sanitizado no front) exibido ao lado do logo no desktop. */
   headerBannerHtml?: string;
+  /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */
+  headerBannerLinkUrl?: string;
   /** "bar" = menu vira faixa colorida full-width abaixo do logo. */
   menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
   /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */

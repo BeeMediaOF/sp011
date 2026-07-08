@@ -6,6 +6,7 @@ import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
+import { safeLinkUrl } from "../lib/homeBlocks";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_sbc_agora.png";
 
@@ -348,10 +349,18 @@ export default function Header() {
   const hasDropdowns = navItems.some((it) => visibleChildren(it).length > 0);
   const navOverflow = hasDropdowns ? "overflow-visible" : "overflow-x-auto no-scrollbar";
   const headerBannerClean = sanitizeArticleHtml(settings?.headerBannerHtml);
+  // Link de redirecionamento do banner (painel → Cabeçalho ou aba Propagandas):
+  // overlay que cobre o banner inteiro, sem aninhar <a> no HTML do usuário.
+  const headerBannerLink = safeLinkUrl(settings?.headerBannerLinkUrl);
   const headerBanner = headerBannerClean ? (
-    <div className="hidden lg:flex flex-1 min-w-0 items-center justify-end"
-      style={{ minHeight: 48 }}
-      dangerouslySetInnerHTML={{ __html: headerBannerClean }} />
+    <div className="hidden lg:flex flex-1 min-w-0 items-center justify-end relative" style={{ minHeight: 48 }}>
+      <div className="w-full min-w-0 flex items-center justify-end"
+        dangerouslySetInnerHTML={{ __html: headerBannerClean }} />
+      {headerBannerLink && (
+        <a href={headerBannerLink} target="_blank" rel="noopener noreferrer sponsored"
+          className="absolute inset-0 z-10" aria-label={settings?.siteName ? `Banner — ${settings.siteName}` : "Banner"} />
+      )}
+    </div>
   ) : null;
 
   const menuBar = menuBarStyle === "bar" ? (

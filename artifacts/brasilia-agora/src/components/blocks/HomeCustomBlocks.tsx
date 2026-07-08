@@ -212,13 +212,23 @@ export function HtmlBlock({ block, preview, contained = true }: {
   contained?: boolean;
 }) {
   const clean = sanitizeArticleHtml(block.html);
+  const link = safeLinkUrl(block.linkUrl);
   if (!clean) {
     return <BlockPlaceholder preview={preview} label={`Bloco HTML: ${block.name}`}
       hint="Adicione o código HTML no painel (scripts são removidos por segurança)." />;
   }
+  const body = <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />;
   return (
     <section className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}>
-      <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />
+      {link ? (
+        // Link por overlay: o banner inteiro fica clicável sem aninhar <a>
+        // dentro de possíveis <a> do próprio HTML (aninhado é HTML inválido).
+        <div className="relative">
+          {body}
+          <a href={link} target="_blank" rel="noopener noreferrer sponsored"
+            className="absolute inset-0 z-10" aria-label={block.name} />
+        </div>
+      ) : body}
     </section>
   );
 }

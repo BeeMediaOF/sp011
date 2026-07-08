@@ -353,28 +353,30 @@ function AdFormModal({
 }
 
 // ─── Edição dos blocos de propaganda da home ──────────────────────────────────
-/** HTML pronto para banner de imagem (o link fica para o usuário preencher). */
+/** Tag de imagem pronta para banner (o clique fica no campo de link, que vira
+ *  um overlay cobrindo o banner inteiro no site). */
 function bannerImgHtml(url: string, maxWidth?: number): string {
   const mw = maxWidth ? `max-width:${maxWidth}px;` : "";
-  return `<a href="https://" target="_blank" rel="noopener sponsored"><img src="${url}" alt="banner" style="width:100%;${mw}height:auto;border-radius:8px;display:block;"></a>`;
+  return `<img src="${url}" alt="banner" style="width:100%;${mw}height:auto;border-radius:8px;display:block;">`;
 }
 
 /** Modal de edição de um bloco de propaganda (imagem/HTML) ou do banner do
  *  cabeçalho, direto na aba Propagandas — com mini-prévia do HTML renderizado. */
-function HomeAdEditModal({ block, headerHtml, onClose, onSaveBlock, onSaveHeader }: {
+function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, onSaveHeader }: {
   /** null = banner do cabeçalho (settings.headerBannerHtml). */
   block: HomeBlock | null;
   headerHtml: string;
+  headerLink: string;
   onClose: () => void;
   onSaveBlock: (b: HomeBlock) => Promise<void>;
-  onSaveHeader: (html: string) => Promise<void>;
+  onSaveHeader: (html: string, linkUrl: string) => Promise<void>;
 }) {
   const isHeader = !block;
   const type = block ? inferBlockType(block) : "html";
   const [name, setName]         = useState(block?.name ?? "");
   const [html, setHtml]         = useState(isHeader ? headerHtml : (block?.html ?? ""));
   const [imageUrl, setImageUrl] = useState(block?.imageUrl ?? "");
-  const [linkUrl, setLinkUrl]   = useState(block?.linkUrl ?? "");
+  const [linkUrl, setLinkUrl]   = useState(isHeader ? headerLink : (block?.linkUrl ?? ""));
   const [caption, setCaption]   = useState(block?.caption ?? "");
   const [visible, setVisible]   = useState(block?.visible ?? true);
   const [saving, setSaving]     = useState(false);
@@ -400,7 +402,7 @@ function HomeAdEditModal({ block, headerHtml, onClose, onSaveBlock, onSaveHeader
     setSaving(true);
     try {
       if (isHeader) {
-        await onSaveHeader(html.trim());
+        await onSaveHeader(html.trim(), linkUrl.trim());
       } else if (type === "image") {
         await onSaveBlock({
           ...block!, name: name.trim() || block!.name, visible,
@@ -408,7 +410,10 @@ function HomeAdEditModal({ block, headerHtml, onClose, onSaveBlock, onSaveHeader
           caption: caption.trim() || undefined,
         });
       } else {
-        await onSaveBlock({ ...block!, name: name.trim() || block!.name, visible, html: html.trim() || undefined });
+        await onSaveBlock({
+          ...block!, name: name.trim() || block!.name, visible,
+          html: html.trim() || undefined, linkUrl: linkUrl.trim() || undefined,
+        });
       }
     } catch (err) {
       alert((err as Error).message);
@@ -458,8 +463,14 @@ function HomeAdEditModal({ block, headerHtml, onClose, onSaveBlock, onSaveHeader
                 <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={7} spellCheck={false}
                   className={`${INPUT_CLS} !text-xs font-mono resize-y`} placeholder="<div>…</div>" />
                 <p className="text-[10px] text-gray-400 leading-relaxed">
-                  O upload troca o código por uma tag de imagem pronta — depois substitua o <span className="font-mono">https://</span> do link pelo destino do banner. Scripts são removidos ao exibir.
+                  O upload troca o código pela tag da imagem pronta. Scripts são removidos ao exibir.
                 </p>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-[#0F172A]">Link de redirecionamento (opcional)</label>
+                <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} className={INPUT_CLS}
+                  placeholder="https://parceiro.com/promo" />
+                <p className="text-[10px] text-gray-400">Ao clicar em qualquer parte da propaganda, o leitor é levado a este endereço (abre em nova aba).</p>
               </div>
               <div>
                 <p className="text-xs font-semibold text-[#0F172A] mb-1.5">Prévia</p>
@@ -544,6 +555,7 @@ export default function AdsManager() {
   // inteiro em settings.homeBlocks (mesmo contrato do Blocos da Home).
   const [homeBlocks, setHomeBlocks] = useState<HomeBlock[]>([]);
   const [headerBannerHtml, setHeaderBannerHtml] = useState("");
+  const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
   const [adEdit, setAdEdit] = useState<HomeBlock | "header" | null>(null);
   const homeAdBlocks = homeBlocks.filter((b) => b.isAd === true);
   const hasHeaderBanner = !!headerBannerHtml.trim();
@@ -561,6 +573,7 @@ export default function AdsManager() {
       const { settings } = await adminApi.getSettings();
       setHomeBlocks(settings.homeBlocks ?? []);
       setHeaderBannerHtml(settings.headerBannerHtml ?? "");
+      setHeaderBannerLinkUrl(settings.headerBannerLinkUrl ?? "");
     } catch { }
   };
 
@@ -572,9 +585,10 @@ export default function AdsManager() {
     setAdEdit(null);
   }
 
-  async function saveHeaderBanner(html: string) {
-    await adminApi.updateSettings({ headerBannerHtml: html });
+  async function saveHeaderBanner(html: string, linkUrl: string) {
+    await adminApi.updateSettings({ headerBannerHtml: html, headerBannerLinkUrl: linkUrl });
     setHeaderBannerHtml(html);
+    setHeaderBannerLinkUrl(linkUrl);
     invalidateSiteCache();
     setAdEdit(null);
   }
@@ -711,6 +725,7 @@ export default function AdsManager() {
           key={adEdit === "header" ? "header" : adEdit.id}
           block={adEdit === "header" ? null : adEdit}
           headerHtml={headerBannerHtml}
+          headerLink={headerBannerLinkUrl}
           onClose={() => setAdEdit(null)}
           onSaveBlock={saveAdBlock}
           onSaveHeader={saveHeaderBanner}
