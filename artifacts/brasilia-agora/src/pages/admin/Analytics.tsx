@@ -13,6 +13,7 @@ import {
   ExternalLink, BarChart2, Mail,
 } from "lucide-react";
 import { Link } from "wouter";
+import { useAdminT, type AdminLang, type AdminTKey } from "../../lib/adminI18n";
 
 interface AdStat {
   id: string; name: string; position: string; active: boolean;
@@ -92,15 +93,29 @@ const CAT_COLORS: Record<string, string> = {
 };
 const CAT_COLORS_ARR = ["#2563EB","#E71D36","#F97316","#16A34A","#7C3AED","#64748B"];
 
-const REFERRER_LABELS: Record<string, string> = {
-  direto:       "Direto",
-  busca:        "Busca (Google, Bing…)",
-  social:       "Redes Sociais",
-  referencia:   "Referência (outros sites)",
-  email:        "E-mail / Newsletter",
-  pago:         "Tráfego pago",
-  desconhecido: "Desconhecido",
-  outro:        "Referência", // legado (linhas antigas; o servidor já remapeia)
+/** referrer key → chave de tradução (o rótulo é traduzido no render). */
+const REFERRER_TKEYS: Record<string, AdminTKey> = {
+  direto:       "an.refDireto",
+  busca:        "an.refBusca",
+  social:       "an.refSocial",
+  referencia:   "an.refReferencia",
+  email:        "an.refEmail",
+  pago:         "an.refPago",
+  desconhecido: "an.refDesconhecido",
+  outro:        "an.refReferenciaShort", // legado (linhas antigas; o servidor já remapeia)
+};
+
+/** period key → chave do rótulo longo da janela (usado nos badges e no PDF). */
+const WIN_TKEYS: Record<Exclude<PeriodKey, "custom">, AdminTKey> = {
+  today:     "an.winToday",
+  yesterday: "an.winYesterday",
+  "7d":      "an.win7d",
+  "30d":     "an.win30d",
+};
+
+/** Dias da semana do servidor (pt) → en. */
+const DOW_EN: Record<string, string> = {
+  Dom: "Sun", Seg: "Mon", Ter: "Tue", Qua: "Wed", Qui: "Thu", Sex: "Fri", "Sáb": "Sat",
 };
 const REFERRER_COLORS: Record<string, string> = {
   direto:       "#2563EB",
@@ -113,12 +128,12 @@ const REFERRER_COLORS: Record<string, string> = {
   outro:        "#16A34A",
 };
 
-const PERIOD_PRESETS: { key: PeriodKey; label: string }[] = [
-  { key: "today",     label: "Hoje" },
-  { key: "yesterday", label: "Ontem" },
-  { key: "7d",        label: "7 dias" },
-  { key: "30d",       label: "30 dias" },
-  { key: "custom",    label: "Personalizado" },
+const PERIOD_PRESETS: { key: PeriodKey; tk: AdminTKey }[] = [
+  { key: "today",     tk: "an.periodToday" },
+  { key: "yesterday", tk: "an.periodYesterday" },
+  { key: "7d",        tk: "an.period7d" },
+  { key: "30d",       tk: "an.period30d" },
+  { key: "custom",    tk: "an.periodCustom" },
 ];
 
 /** dd/mm/aaaa a partir de YYYY-MM-DD. */
@@ -136,16 +151,18 @@ function fmtSecs(s: number): string {
 }
 
 /** Formata a variação calculada pelo servidor; null = sem base de comparação. */
-function fmtDelta(v: number | null | undefined, suffix: string): string | null {
+function fmtDelta(v: number | null | undefined, suffix: string, loc = "pt-BR"): string | null {
   if (v === null || v === undefined) return null;
-  const s = v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  const s = v.toLocaleString(loc, { maximumFractionDigits: 1 });
   return `${v > 0 ? "+" : ""}${s}${suffix}`;
 }
 
-function fmtDate(d: string) {
+function fmtDate(d: string, lang: AdminLang = "pt-BR") {
   const [, m, day] = d.split("-");
-  const monthNames = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-  return `${parseInt(day)} ${monthNames[parseInt(m) - 1]}`;
+  const monthsPt = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  const monthsEn = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mo = (lang === "en" ? monthsEn : monthsPt)[parseInt(m) - 1];
+  return lang === "en" ? `${mo} ${parseInt(day)}` : `${parseInt(day)} ${mo}`;
 }
 
 function catColor(name?: string, idx = 0) {
@@ -175,6 +192,10 @@ export default function Analytics() {
   const [periodKey,  setPeriodKey]  = useState<PeriodKey>("30d");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo,   setCustomTo]   = useState("");
+
+  const { t, lang } = useAdminT();
+  const nloc = lang === "en" ? "en-US" : "pt-BR";
+  const dow = (d: string) => (lang === "en" ? DOW_EN[d] ?? d : d);
 
   const fetchStats = React.useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -212,14 +233,19 @@ export default function Analytics() {
 
   function exportPDF() {
     if (!stats) return;
-    const now = new Date().toLocaleString("pt-BR");
+    const now = new Date().toLocaleString(nloc);
+    const periodLbl = stats.period
+      ? (stats.period.key === "custom"
+          ? stats.period.label
+          : t(WIN_TKEYS[stats.period.key as Exclude<PeriodKey, "custom">]))
+      : t("an.win30d");
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`<!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="${lang === "en" ? "en" : "pt-BR"}">
 <head>
   <meta charset="UTF-8"/>
-  <title>Relatório Analytics — ${now}</title>
+  <title>${t("an.pdfReportTitle")} — ${now}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; color: #0f172a; padding: 32px; background: #fff; }
@@ -240,38 +266,38 @@ export default function Analytics() {
   </style>
 </head>
 <body>
-  <h1>Relatório de Analytics</h1>
-  <p class="sub">Gerado em ${now} · Período: ${stats.period?.label ?? "Últimos 30 dias"} · Bots, tráfego interno e duplicados filtrados</p>
+  <h1>${t("an.pdfH1")}</h1>
+  <p class="sub">${t("an.pdfGeneratedAt")} ${now} · ${t("an.pdfPeriod")} ${periodLbl} · ${t("an.pdfFiltered")}</p>
 
-  <h2>Resumo de Tráfego</h2>
+  <h2>${t("an.pdfTrafficSummary")}</h2>
   <div class="kpis">
-    <div class="kpi"><div class="kpi-val">${stats.totals.today.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Hoje</div></div>
-    <div class="kpi"><div class="kpi-val">${stats.totals.week.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 7 dias</div></div>
-    <div class="kpi"><div class="kpi-val">${stats.totals.month.toLocaleString("pt-BR")}</div><div class="kpi-lbl">Últimos 30 dias</div></div>
-    <div class="kpi"><div class="kpi-val">${(stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR")}</div><div class="kpi-lbl">Sessões únicas</div></div>
-    <div class="kpi"><div class="kpi-val">${stats.engagement?.bounceRate ?? 0}%</div><div class="kpi-lbl">Taxa de rejeição</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.totals.today.toLocaleString(nloc)}</div><div class="kpi-lbl">${t("an.winToday")}</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.totals.week.toLocaleString(nloc)}</div><div class="kpi-lbl">${t("an.win7d")}</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.totals.month.toLocaleString(nloc)}</div><div class="kpi-lbl">${t("an.win30d")}</div></div>
+    <div class="kpi"><div class="kpi-val">${(stats.engagement?.uniqueSessions ?? 0).toLocaleString(nloc)}</div><div class="kpi-lbl">${t("an.kpiUniqueSessions")}</div></div>
+    <div class="kpi"><div class="kpi-val">${stats.engagement?.bounceRate ?? 0}%</div><div class="kpi-lbl">${t("an.kpiBounce")}</div></div>
   </div>
 
-  <h2>Artigos com mais visualizações</h2>
+  <h2>${t("an.pdfTopArticles")}</h2>
   <table>
-    <tr><th>#</th><th>Artigo</th><th>Visualizações</th><th>Tempo médio</th></tr>
-    ${stats.topArticles.map((a, i) => `<tr><td>${i + 1}</td><td>${a.title.replace(/<[^>]*>/g, "")}</td><td>${a.views.toLocaleString("pt-BR")}</td><td>${a.avgTime ? Math.floor(a.avgTime / 60) + "m " + (a.avgTime % 60) + "s" : "—"}</td></tr>`).join("")}
+    <tr><th>#</th><th>${t("an.colArticle")}</th><th>${t("an.colViews")}</th><th>${t("an.colAvgTime")}</th></tr>
+    ${stats.topArticles.map((a, i) => `<tr><td>${i + 1}</td><td>${a.title.replace(/<[^>]*>/g, "")}</td><td>${a.views.toLocaleString(nloc)}</td><td>${a.avgTime ? Math.floor(a.avgTime / 60) + "m " + (a.avgTime % 60) + "s" : "—"}</td></tr>`).join("")}
   </table>
 
-  <h2>Desempenho por Categoria</h2>
+  <h2>${t("an.pdfCategoryPerf")}</h2>
   <table>
-    <tr><th>Categoria</th><th>Views</th><th>Cliques</th><th>Artigos</th></tr>
-    ${stats.topCategories.map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString("pt-BR")}</td><td>${c.clicks.toLocaleString("pt-BR")}</td><td>${c.articles}</td></tr>`).join("")}
+    <tr><th>${t("an.colCategory")}</th><th>${t("an.colViewsShort")}</th><th>${t("an.colClicks")}</th><th>${t("an.colArticles")}</th></tr>
+    ${stats.topCategories.map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString(nloc)}</td><td>${c.clicks.toLocaleString(nloc)}</td><td>${c.articles}</td></tr>`).join("")}
   </table>
 
   ${(stats.topCities ?? []).length > 0 ? `
-  <h2>Top Cidades</h2>
+  <h2>${t("an.pdfTopCities")}</h2>
   <table>
-    <tr><th>Cidade</th><th>Views</th></tr>
-    ${(stats.topCities ?? []).map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString("pt-BR")}</td></tr>`).join("")}
+    <tr><th>${t("an.colCity")}</th><th>${t("an.colViewsShort")}</th></tr>
+    ${(stats.topCities ?? []).map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString(nloc)}</td></tr>`).join("")}
   </table>` : ""}
 
-  <div class="footer">Portal ${BRAND.name} · Relatório gerado automaticamente pelo sistema de analytics</div>
+  <div class="footer">${BRAND.name} · ${t("an.pdfFooter")}</div>
 </body>
 </html>`);
     win.document.close();
@@ -284,7 +310,7 @@ export default function Analytics() {
       <AdminLayout title="Analytics">
         <div className="flex items-center justify-center h-64 text-slate-400 gap-3">
           <div className="w-5 h-5 rounded-full border-2 border-[#2563EB] border-t-transparent animate-spin" />
-          Carregando dados…
+          {t("an.loading")}
         </div>
       </AdminLayout>
     );
@@ -294,7 +320,7 @@ export default function Analytics() {
     return (
       <AdminLayout title="Analytics">
         <div className="bg-red-50 border border-red-100 text-red-600 p-5 rounded-2xl text-sm">
-          Erro ao carregar analytics.
+          {t("an.loadError")}
         </div>
       </AdminLayout>
     );
@@ -311,7 +337,7 @@ export default function Analytics() {
   ];
 
   const chartData = (stats.dailyChart ?? []).map(d => ({
-    date:  fmtDate(d.date),
+    date:  fmtDate(d.date, lang),
     views: d.views,
   }));
   const hasChart = chartData.some(d => d.views > 0);
@@ -332,69 +358,74 @@ export default function Analytics() {
     uniqueSessions: null, avgReadTime: null, bounceRate: null,
   };
 
-  // Janela aplicada pelo servidor (ecoada) — todos os cards usam este rótulo.
-  const windowLabel = stats.period?.label ?? "Últimos 30 dias";
+  // Janela aplicada pelo servidor (ecoada) — rótulo localizado no cliente
+  // (o servidor devolve `period.label` sempre em pt-BR).
+  const windowLabel = stats.period
+    ? (stats.period.key === "custom"
+        ? stats.period.label
+        : t(WIN_TKEYS[stats.period.key as Exclude<PeriodKey, "custom">]))
+    : t("an.win30d");
   const visitorsRollout = stats.visitors && stats.period && stats.period.from < stats.visitors.since;
 
   const kpis = [
     {
-      label:   "Visualizações de página",
-      value:   (stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString("pt-BR"),
+      label:   t("an.kpiPageviews"),
+      value:   (stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString(nloc),
       delta:   tr.window ?? tr.month,
-      deltaTxt: fmtDelta(tr.window ?? tr.month, "%"),
+      deltaTxt: fmtDelta(tr.window ?? tr.month, "%", nloc),
       goodWhenUp: true,
-      sub:     "vs período anterior",
-      tip:     `Pageviews de ${windowLabel.toLowerCase()}. Bots, tráfego interno, caminhos /admin e refresh repetido (<15s) não contam.`,
+      sub:     t("an.vsPrevPeriod"),
+      tip:     `${t("an.pvTip1")} ${windowLabel.toLowerCase()}. ${t("an.pvTip2")}`,
       icon:    Eye,
       iconBg:  "#EEF4FF",
       iconClr: "#2563EB",
     },
     {
-      label:   "Visitantes únicos",
-      value:   (stats.visitors?.unique ?? 0).toLocaleString("pt-BR"),
+      label:   t("an.kpiUniqueVisitors"),
+      value:   (stats.visitors?.unique ?? 0).toLocaleString(nloc),
       delta:   tr.visitors ?? null,
-      deltaTxt: fmtDelta(tr.visitors ?? null, "%"),
+      deltaTxt: fmtDelta(tr.visitors ?? null, "%", nloc),
       goodWhenUp: true,
       sub:     stats.visitors
-        ? `${stats.visitors.new.toLocaleString("pt-BR")} novos · ${stats.visitors.returning.toLocaleString("pt-BR")} recorrentes${visitorsRollout ? ` · desde ${fmtDayBr(stats.visitors.since)}` : ""}`
-        : "vs período anterior",
-      tip:     `Visitantes anônimos persistentes (ID aleatório pós-consentimento). Coletado a partir de ${fmtDayBr(stats.visitors?.since ?? "2026-07-08")} — períodos anteriores não têm esse dado.`,
+        ? `${stats.visitors.new.toLocaleString(nloc)} ${t("an.new")} · ${stats.visitors.returning.toLocaleString(nloc)} ${t("an.returning")}${visitorsRollout ? ` · ${t("an.since")} ${fmtDayBr(stats.visitors.since)}` : ""}`
+        : t("an.vsPrevPeriod"),
+      tip:     `${t("an.visTip1")} ${fmtDayBr(stats.visitors?.since ?? "2026-07-08")}${t("an.visTip2")}`,
       icon:    Users,
       iconBg:  "#F5F3FF",
       iconClr: "#7C3AED",
     },
     {
-      label:   "Sessões únicas",
-      value:   (stats.engagement?.uniqueSessions ?? 0).toLocaleString("pt-BR"),
+      label:   t("an.kpiUniqueSessions"),
+      value:   (stats.engagement?.uniqueSessions ?? 0).toLocaleString(nloc),
       delta:   tr.uniqueSessions,
-      deltaTxt: fmtDelta(tr.uniqueSessions, "%"),
+      deltaTxt: fmtDelta(tr.uniqueSessions, "%", nloc),
       goodWhenUp: true,
-      sub:     "vs período anterior",
-      tip:     "Sessões de navegação distintas (uma por aba/visita) com ao menos 1 pageview no período.",
+      sub:     t("an.vsPrevPeriod"),
+      tip:     t("an.sessTip"),
       icon:    Users,
       iconBg:  "#ECFDF5",
       iconClr: "#16A34A",
     },
     {
-      label:   "Tempo médio por página",
+      label:   t("an.kpiAvgTime"),
       value:   fmtSecs(stats.engagement?.avgReadTime ?? 0),
       delta:   tr.avgReadTime,
-      deltaTxt: fmtDelta(tr.avgReadTime, "%"),
+      deltaTxt: fmtDelta(tr.avgReadTime, "%", nloc),
       goodWhenUp: true,
-      sub:     "vs período anterior",
-      tip:     "Tempo ATIVO com a aba visível, por página e sessão (teto de 30min). Aba em segundo plano não conta.",
+      sub:     t("an.vsPrevPeriod"),
+      tip:     t("an.avgTimeTip"),
       icon:    Clock,
       iconBg:  "#FFF7ED",
       iconClr: "#F97316",
     },
     {
-      label:   "Taxa de rejeição",
+      label:   t("an.kpiBounce"),
       value:   `${stats.engagement?.bounceRate ?? 0}%`,
       delta:   tr.bounceRate,
-      deltaTxt: fmtDelta(tr.bounceRate, " pp"),
+      deltaTxt: fmtDelta(tr.bounceRate, " pp", nloc),
       goodWhenUp: false,
-      sub:     "vs período anterior",
-      tip:     "Sessões que viram só 1 página ÷ total de sessões do período (variação em pontos percentuais).",
+      sub:     t("an.vsPrevPeriod"),
+      tip:     t("an.bounceTip"),
       icon:    TrendingDown,
       iconBg:  "#FEF2F2",
       iconClr: "#EF4444",
@@ -410,18 +441,18 @@ export default function Analytics() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5 bg-green-50 border border-green-200 text-green-700 px-3 py-1 rounded-full text-xs font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"/>
-              Ao vivo
+              {t("an.live")}
             </div>
             {lastUpdated && (
               <span className="text-xs text-slate-400">
-                Atualizado às {lastUpdated.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                {t("an.updatedAt")} {lastUpdated.toLocaleTimeString(nloc, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Seletor de período — a janela aplicada é a que o servidor ecoa */}
             <div className="flex border border-slate-200 rounded-xl overflow-hidden text-xs bg-white">
-              {PERIOD_PRESETS.map(({ key, label }) => (
+              {PERIOD_PRESETS.map(({ key, tk }) => (
                 <button
                   key={key}
                   onClick={() => setPeriodKey(key)}
@@ -429,7 +460,7 @@ export default function Analytics() {
                     periodKey === key ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
                   }`}
                 >
-                  {label}
+                  {t(tk)}
                 </button>
               ))}
             </div>
@@ -437,7 +468,7 @@ export default function Analytics() {
               <div className="flex items-center gap-1.5 text-xs">
                 <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)}
                   className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-600 bg-white"/>
-                <span className="text-slate-400">a</span>
+                <span className="text-slate-400">{t("an.rangeTo")}</span>
                 <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)}
                   className="border border-slate-200 rounded-xl px-2 py-1.5 text-xs text-slate-600 bg-white"/>
               </div>
@@ -448,14 +479,14 @@ export default function Analytics() {
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-colors"
             >
               <RefreshCw size={12} className={refreshing ? "animate-spin" : ""}/>
-              Atualizar
+              {t("an.refresh")}
             </button>
             <button
               onClick={exportPDF}
               className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-[#0B2A66] rounded-xl hover:bg-[#0a2255] transition-colors"
             >
               <Download size={12}/>
-              Exportar PDF
+              {t("an.exportPdf")}
             </button>
           </div>
         </div>
@@ -500,8 +531,8 @@ export default function Analytics() {
           {/* Line chart — Tráfego (5/10) */}
           <div className="xl:col-span-5 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2" title="Pageviews por dia (fuso de Brasília). Bots, tráfego interno e duplicados não contam.">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Tráfego ao longo do tempo</h2>
+              <div className="flex items-center gap-2" title={t("an.trafficTip")}>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.trafficOverTime")}</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
@@ -509,7 +540,7 @@ export default function Analytics() {
               </span>
             </div>
             {!hasChart ? (
-              <EmptyState label="Nenhum dado de tráfego ainda" />
+              <EmptyState label={t("an.noTrafficYet")} />
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
@@ -536,7 +567,7 @@ export default function Analytics() {
                   />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0", boxShadow: CARD_SHADOW }}
-                    formatter={(v: number) => [v.toLocaleString("pt-BR"), "visualizações"]}
+                    formatter={(v: number) => [v.toLocaleString(nloc), t("an.views")]}
                   />
                   <Area
                     type="monotone"
@@ -555,8 +586,8 @@ export default function Analytics() {
           {/* Traffic sources (3/10) */}
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-2" title="Canal de entrada de cada sessão (1× por sessão, classificado no servidor por referrer + UTM). Sessões antigas sem sinal aparecem como Direto.">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Fontes de tráfego</h2>
+              <div className="flex items-center gap-2" title={t("an.sourcesTip")}>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.trafficSources")}</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
@@ -564,7 +595,7 @@ export default function Analytics() {
               </span>
             </div>
             {referrers.length === 0 ? (
-              <EmptyState label="Sem dados de fonte" />
+              <EmptyState label={t("an.noSourceData")} />
             ) : (
               <div className="space-y-4">
                 {referrers.map(({ name, value }) => {
@@ -574,11 +605,11 @@ export default function Analytics() {
                     <div key={name}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-sm text-slate-600 font-medium">
-                          {REFERRER_LABELS[name] ?? name}
+                          {REFERRER_TKEYS[name] ? t(REFERRER_TKEYS[name]) : name}
                         </span>
                         <div className="flex items-center gap-3">
                           <span className="text-xs font-semibold text-[#0F172A]">{pct}%</span>
-                          <span className="text-xs text-slate-400">({value.toLocaleString("pt-BR")})</span>
+                          <span className="text-xs text-slate-400">({value.toLocaleString(nloc)})</span>
                         </div>
                       </div>
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -593,12 +624,12 @@ export default function Analytics() {
                 {/* Domínios de origem e campanhas UTM (quando existem) */}
                 {(stats.topRefHosts ?? []).length > 0 && (
                   <div className="pt-3 border-t border-slate-100">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Principais domínios de origem</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">{t("an.topRefHosts")}</p>
                     <div className="space-y-1.5">
                       {(stats.topRefHosts ?? []).slice(0, 5).map(({ name, views }) => (
                         <div key={name} className="flex items-center justify-between">
                           <span className="text-xs text-slate-600 truncate max-w-[170px]">{name}</span>
-                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString(nloc)}</span>
                         </div>
                       ))}
                     </div>
@@ -606,12 +637,12 @@ export default function Analytics() {
                 )}
                 {(stats.topCampaigns ?? []).length > 0 && (
                   <div className="pt-3 border-t border-slate-100">
-                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">Campanhas (utm_campaign)</p>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-2">{t("an.campaigns")}</p>
                     <div className="space-y-1.5">
                       {(stats.topCampaigns ?? []).slice(0, 5).map(({ name, views }) => (
                         <div key={name} className="flex items-center justify-between">
                           <span className="text-xs text-slate-600 truncate max-w-[170px]">{name}</span>
-                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                          <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString(nloc)}</span>
                         </div>
                       ))}
                     </div>
@@ -623,8 +654,8 @@ export default function Analytics() {
 
           {/* Devices donut (2/10) */}
           <div className="xl:col-span-2 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-            <div className="flex items-center gap-2 mb-5" title="Derivado do user-agent no servidor (mobile/desktop/tablet + família de navegador e SO). Fora do catálogo = 'outro'; nunca inventamos valor.">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Dispositivos</h2>
+            <div className="flex items-center gap-2 mb-5" title={t("an.devicesTip")}>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.devices")}</h2>
               <Info size={13} className="text-slate-400" />
             </div>
             <div className="flex flex-col items-center">
@@ -647,7 +678,7 @@ export default function Analytics() {
                 </PieChart>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <p className="text-sm font-bold text-[#0F172A] leading-none">
-                    {(stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString("pt-BR")}
+                    {(stats.totals?.window ?? stats.totals?.month ?? 0).toLocaleString(nloc)}
                   </p>
                   <p className="text-[9px] text-slate-400 mt-0.5">views</p>
                 </div>
@@ -664,12 +695,12 @@ export default function Analytics() {
               {/* Navegador / SO (parse do user-agent no servidor) */}
               {(stats.browsers ?? []).length > 0 && (
                 <div className="mt-4 pt-3 border-t border-slate-100 w-full">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Navegadores</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{t("an.browsers")}</p>
                   <div className="space-y-1">
                     {(stats.browsers ?? []).slice(0, 4).map(({ name, views }) => (
                       <div key={name} className="flex items-center justify-between">
                         <span className="text-xs text-slate-600 capitalize">{name}</span>
-                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString(nloc)}</span>
                       </div>
                     ))}
                   </div>
@@ -677,12 +708,12 @@ export default function Analytics() {
               )}
               {(stats.osList ?? []).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-slate-100 w-full">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Sistemas</p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{t("an.systems")}</p>
                   <div className="space-y-1">
                     {(stats.osList ?? []).slice(0, 4).map(({ name, views }) => (
                       <div key={name} className="flex items-center justify-between">
                         <span className="text-xs text-slate-600 capitalize">{name}</span>
-                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString(nloc)}</span>
                       </div>
                     ))}
                   </div>
@@ -699,18 +730,18 @@ export default function Analytics() {
           <div className="xl:col-span-4 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Artigos com melhor desempenho</h2>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.topArticles")}</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
             </div>
             {/* Table header — só métricas reais: views e tempo médio de leitura */}
             <div className="grid grid-cols-[1fr_90px_90px] gap-2 pb-2 mb-1 border-b border-slate-100">
-              {["Artigo","Visualizações","Tempo médio"].map(h => (
+              {[t("an.colArticle"), t("an.colViews"), t("an.colAvgTime")].map(h => (
                 <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
               ))}
             </div>
             {topArts.length === 0 ? (
-              <EmptyState label="Sem dados ainda" />
+              <EmptyState label={t("an.noDataYet")} />
             ) : (
               <div className="space-y-1">
                 {topArts.slice(0, 5).map((a) => (
@@ -725,7 +756,7 @@ export default function Analytics() {
                         </p>
                       </div>
                     </div>
-                    <p className="text-xs font-semibold text-[#0F172A]">{a.views.toLocaleString("pt-BR")}</p>
+                    <p className="text-xs font-semibold text-[#0F172A]">{a.views.toLocaleString(nloc)}</p>
                     <span className="text-[11px] font-semibold text-slate-600 bg-slate-50 px-2 py-0.5 rounded-full w-fit">
                       {a.avgTime ? fmtSecs(a.avgTime) : "—"}
                     </span>
@@ -735,7 +766,7 @@ export default function Analytics() {
             )}
             <div className="mt-4 pt-3 border-t border-slate-100">
               <Link href="/admin/artigos" className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
-                Ver todos os artigos <ArrowUpRight size={11} />
+                {t("an.seeAllArticles")} <ArrowUpRight size={11} />
               </Link>
             </div>
           </div>
@@ -744,17 +775,17 @@ export default function Analytics() {
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Top categorias</h2>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.topCategories")}</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
             </div>
             <div className="grid grid-cols-[1fr_64px_64px_64px_48px] gap-2 pb-2 mb-1 border-b border-slate-100">
-              {["Categoria","Views","Cliques","Artigos","%"].map(h => (
+              {[t("an.colCategory"), t("an.colViewsShort"), t("an.colClicks"), t("an.colArticles"), "%"].map(h => (
                 <p key={h} className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</p>
               ))}
             </div>
             {topCats.length === 0 ? (
-              <EmptyState label="Sem dados de categoria" />
+              <EmptyState label={t("an.noCategoryData")} />
             ) : (
               <div className="space-y-3 mt-2">
                 {topCats.slice(0, 6).map((cat, i) => {
@@ -771,10 +802,10 @@ export default function Analytics() {
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                           <span className="text-xs text-slate-700 capitalize font-medium truncate">{cat.name}</span>
                         </div>
-                        <p className="text-xs font-semibold text-[#0F172A]">{cat.views.toLocaleString("pt-BR")}</p>
+                        <p className="text-xs font-semibold text-[#0F172A]">{cat.views.toLocaleString(nloc)}</p>
                         <div className="flex items-center gap-1">
                           <ArrowUpRight size={10} className="text-green-500 shrink-0" />
-                          <p className="text-xs text-slate-600">{clicks.toLocaleString("pt-BR")}</p>
+                          <p className="text-xs text-slate-600">{clicks.toLocaleString(nloc)}</p>
                         </div>
                         <p className="text-xs text-slate-500">{articles}</p>
                         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md w-fit" style={{ backgroundColor: color + "22", color }}>{pct}%</span>
@@ -792,8 +823,8 @@ export default function Analytics() {
           {/* Localização: Cidades / Estados (3/10) */}
           <div className="xl:col-span-3 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2" title={`Cidade/estado por evento do período (geolocalização por IP). "Não identificado" = IP sem localização resolvida — nunca inventamos local.`}>
-                <h2 className="text-sm font-semibold text-[#0B2A66]">Localização</h2>
+              <div className="flex items-center gap-2" title={t("an.locationTip")}>
+                <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.location")}</h2>
                 <Info size={13} className="text-slate-400" />
               </div>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden text-xs">
@@ -801,13 +832,13 @@ export default function Analytics() {
                   onClick={() => setGeoTab("cidades")}
                   className={`px-3 py-1 font-medium transition-colors ${geoTab === "cidades" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}
                 >
-                  Cidades
+                  {t("an.cities")}
                 </button>
                 <button
                   onClick={() => setGeoTab("estados")}
                   className={`px-3 py-1 font-medium transition-colors ${geoTab === "estados" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}
                 >
-                  Estados
+                  {t("an.states")}
                 </button>
               </div>
             </div>
@@ -817,11 +848,11 @@ export default function Analytics() {
                 const cities = stats.topCities ?? [];
                 const maxV = cities[0]?.views || 1;
                 return cities.length === 0 ? (
-                  <EmptyState label="Aguardando dados de localização" />
+                  <EmptyState label={t("an.waitingLocation")} />
                 ) : (
                   <div className="space-y-2.5">
                     <div className="grid grid-cols-[1fr_48px_44px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
-                      <span>Cidade</span><span className="text-right">Views</span><span className="text-right">%</span>
+                      <span>{t("an.colCity")}</span><span className="text-right">{t("an.colViewsShort")}</span><span className="text-right">%</span>
                     </div>
                     {cities.map(({ name, views }, i) => {
                       const color = GEO_COLORS[i % GEO_COLORS.length]!;
@@ -830,7 +861,7 @@ export default function Analytics() {
                         <div key={name} className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                           <span className="text-xs text-slate-600 flex-1 truncate">{name}</span>
-                          <span className="text-xs font-semibold text-[#0F172A] w-10 text-right">{views.toLocaleString("pt-BR")}</span>
+                          <span className="text-xs font-semibold text-[#0F172A] w-10 text-right">{views.toLocaleString(nloc)}</span>
                           <span className="text-[11px] text-slate-400 w-8 text-right">{pct}%</span>
                         </div>
                       );
@@ -843,11 +874,11 @@ export default function Analytics() {
                 const regions = stats.topRegions ?? [];
                 const maxV = regions[0]?.views || 1;
                 return regions.length === 0 ? (
-                  <EmptyState label="Aguardando dados de localização" />
+                  <EmptyState label={t("an.waitingLocation")} />
                 ) : (
                   <div className="space-y-2.5">
                     <div className="grid grid-cols-[1fr_48px_44px] text-[10px] font-semibold text-slate-400 uppercase tracking-wide pb-1 border-b border-slate-100">
-                      <span>Estado</span><span className="text-right">Views</span><span className="text-right">%</span>
+                      <span>{t("an.colState")}</span><span className="text-right">{t("an.colViewsShort")}</span><span className="text-right">%</span>
                     </div>
                     {regions.map(({ name, views }, i) => {
                       const color = GEO_COLORS[i % GEO_COLORS.length]!;
@@ -857,7 +888,7 @@ export default function Analytics() {
                           <div className="flex items-center gap-2 mb-1">
                             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                             <span className="text-xs text-slate-600 flex-1 truncate">{name}</span>
-                            <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString("pt-BR")}</span>
+                            <span className="text-xs font-semibold text-[#0F172A]">{views.toLocaleString(nloc)}</span>
                             <span className="text-[11px] text-slate-400 w-8 text-right">{pct}%</span>
                           </div>
                           <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-4">
@@ -879,10 +910,10 @@ export default function Analytics() {
           {/* Pico por hora */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por hora (Brasília)</h2>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.peakByHour")}</h2>
               {stats.peakHour !== undefined && (stats.hourlyChart ?? []).some(h => h.views > 0) && (
                 <span className="text-[11px] font-semibold bg-blue-50 text-[#2563EB] px-2 py-0.5 rounded-full">
-                  Pico: {String(stats.peakHour).padStart(2,"0")}h
+                  {t("an.peak")} {String(stats.peakHour).padStart(2,"0")}h
                 </span>
               )}
             </div>
@@ -900,7 +931,7 @@ export default function Analytics() {
                 <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                 <Tooltip
                   contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
-                  formatter={(v: number) => [v, "views"]}
+                  formatter={(v: number) => [v, t("an.views")]}
                   labelFormatter={(h) => `${String(h).padStart(2,"0")}:00`}
                 />
                 <Bar dataKey="views" radius={[4, 4, 0, 0]}>
@@ -919,24 +950,24 @@ export default function Analytics() {
           {/* Pico por dia da semana */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Pico por dia da semana</h2>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.peakByWeekday")}</h2>
               {stats.peakDay && (stats.dayOfWeekChart ?? []).some(d => d.views > 0) && (
                 <span className="text-[11px] font-semibold bg-red-50 text-[#E71D36] px-2 py-0.5 rounded-full">
-                  Pico: {stats.peakDay}
+                  {t("an.peak")} {dow(stats.peakDay)}
                 </span>
               )}
             </div>
             {(stats.dayOfWeekChart ?? []).every(d => d.views === 0) ? (
-              <EmptyState label="Aguardando dados" />
+              <EmptyState label={t("an.waitingData")} />
             ) : (
               <ResponsiveContainer width="100%" height={150}>
                 <BarChart data={stats.dayOfWeekChart ?? []} margin={{ top: 0, right: 4, bottom: 0, left: -10 }}>
                   <CartesianGrid stroke="#F1F5F9" strokeDasharray="4 4" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} tickFormatter={dow} />
                   <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
-                    formatter={(v: number) => [v, "views"]}
+                    formatter={(v: number) => [v, t("an.views")]}
                   />
                   <Bar dataKey="views" radius={[4, 4, 0, 0]}>
                     {(stats.dayOfWeekChart ?? []).map((entry) => (
@@ -954,24 +985,24 @@ export default function Analytics() {
 
           {/* Profundidade de leitura */}
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}
-            title="Sessões únicas que atingiram cada marco do CORPO do artigo (cabeçalho/rodapé não contam). Cada marco vale 1× por sessão e artigo.">
+            title={t("an.readDepthTip")}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Profundidade de leitura</h2>
-              <span className="text-xs text-slate-400">sessões que chegaram até</span>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.readDepth")}</h2>
+              <span className="text-xs text-slate-400">{t("an.readDepthSub")}</span>
             </div>
             {(stats.scrollDepthChart ?? []).every(d => d.count === 0) ? (
-              <EmptyState label="Sem dados de scroll ainda" />
+              <EmptyState label={t("an.noScrollData")} />
             ) : (
               <div className="space-y-4">
                 {(stats.scrollDepthChart ?? []).map(({ depth, count }) => {
                   const colors: Record<number, string> = { 25: "#16A34A", 50: "#2563EB", 75: "#F97316", 100: "#E71D36" };
-                  const labels: Record<number, string> = { 25: "25% do artigo", 50: "50% do artigo", 75: "75% do artigo", 100: "Leu tudo (100%)" };
+                  const labels: Record<number, string> = { 25: t("an.depth25"), 50: t("an.depth50"), 75: t("an.depth75"), 100: t("an.depth100") };
                   const maxVal = Math.max(...(stats.scrollDepthChart ?? []).map(d => d.count), 1);
                   return (
                     <div key={depth}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-medium text-slate-600">{labels[depth]}</span>
-                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString("pt-BR")} sessões</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString(nloc)} {t("an.sessions")}</span>
                       </div>
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
@@ -991,9 +1022,9 @@ export default function Analytics() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Megaphone size={16} className="text-[#E71D36]" />
-            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">Propagandas</h2>
+            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">{t("an.ads")}</h2>
             <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100"
-              title="Números do período selecionado (histórico diário). Totais acumulados desde o início ficam em Propagandas → Gerenciar. Impressão = anúncio ≥50% visível por 1s contínuo, 1× por sessão.">
+              title={t("an.adsTip")}>
               {windowLabel}
             </span>
           </div>
@@ -1003,22 +1034,22 @@ export default function Analytics() {
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
               {[
                 {
-                  label: "Total de impressões",
-                  value: (stats.adKpis.totalImpressions).toLocaleString("pt-BR"),
+                  label: t("an.adTotalImpressions"),
+                  value: (stats.adKpis.totalImpressions).toLocaleString(nloc),
                   icon: Eye, iconBg: "#EEF4FF", iconClr: "#2563EB",
                 },
                 {
-                  label: "Total de cliques",
-                  value: (stats.adKpis.totalClicks).toLocaleString("pt-BR"),
+                  label: t("an.adTotalClicks"),
+                  value: (stats.adKpis.totalClicks).toLocaleString(nloc),
                   icon: MousePointerClick, iconBg: "#ECFDF5", iconClr: "#16A34A",
                 },
                 {
-                  label: "CTR médio",
+                  label: t("an.adAvgCtr"),
                   value: `${stats.adKpis.avgCtr.toFixed(2)}%`,
                   icon: BarChart2, iconBg: "#FFF7ED", iconClr: "#F97316",
                 },
                 {
-                  label: "Melhor anúncio",
+                  label: t("an.adBest"),
                   value: stats.adKpis.bestAdName
                     ? `${stats.adKpis.bestAdCtr.toFixed(2)}% CTR`
                     : "—",
@@ -1043,19 +1074,19 @@ export default function Analytics() {
           <div className="grid grid-cols-1 xl:grid-cols-10 gap-4">
             {/* Tabela de anúncios */}
             <div className="xl:col-span-6 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-              <h3 className="text-sm font-semibold text-[#0B2A66] mb-4">Desempenho por anúncio <span className="font-normal text-slate-400">(no período)</span></h3>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-4">{t("an.adPerformance")} <span className="font-normal text-slate-400">{t("an.adPerformanceSub")}</span></h3>
               {!stats.adStats || stats.adStats.length === 0 ? (
-                <EmptyState label="Nenhum anúncio cadastrado ainda" />
+                <EmptyState label={t("an.noAdsYet")} />
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-slate-100">
-                        <th className="text-left py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Anúncio</th>
-                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Impressões</th>
-                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Cliques</th>
+                        <th className="text-left py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">{t("an.colAd")}</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">{t("an.colImpressions")}</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">{t("an.colClicks")}</th>
                         <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">CTR</th>
-                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">Status</th>
+                        <th className="text-right py-2.5 px-3 font-semibold text-slate-500 uppercase tracking-wide text-[10px]">{t("an.colStatus")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1077,15 +1108,15 @@ export default function Analytics() {
                             {ad.hasData === false ? (
                               /* Sem registro diário no período ≠ zero real */
                               <td colSpan={3} className="py-3 px-3 text-right text-[11px] text-slate-400 italic">
-                                sem dados no período
+                                {t("an.noAdDataPeriod")}
                               </td>
                             ) : (
                               <>
                                 <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                                  {ad.impressions.toLocaleString("pt-BR")}
+                                  {ad.impressions.toLocaleString(nloc)}
                                 </td>
                                 <td className="py-3 px-3 text-right font-semibold text-slate-700">
-                                  {ad.clicks.toLocaleString("pt-BR")}
+                                  {ad.clicks.toLocaleString(nloc)}
                                 </td>
                                 <td className="py-3 px-3 text-right">
                                   <span className="font-bold text-sm" style={{ color: ctrColor }}>{ad.ctr.toFixed(2)}%</span>
@@ -1097,7 +1128,7 @@ export default function Analytics() {
                                 ad.active ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-500"
                               }`}>
                                 <span className={`w-1.5 h-1.5 rounded-full ${ad.active ? "bg-green-500" : "bg-slate-400"}`} />
-                                {ad.active ? "Ativo" : "Pausado"}
+                                {ad.active ? t("an.adActive") : t("an.adPaused")}
                               </span>
                             </td>
                           </tr>
@@ -1111,13 +1142,13 @@ export default function Analytics() {
 
             {/* Gráfico de impressões dos top 3 anúncios */}
             <div className="xl:col-span-4 bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
-              <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">Impressões — top 3 ({windowLabel.toLowerCase()})</h3>
-              <p className="text-xs text-slate-400 mb-4">Histórico diário dos anúncios com mais visualizações</p>
+              <h3 className="text-sm font-semibold text-[#0B2A66] mb-1">{t("an.adImprTop3")} ({windowLabel.toLowerCase()})</h3>
+              <p className="text-xs text-slate-400 mb-4">{t("an.adImprSub")}</p>
               {/* 3 estados distintos: coleta nunca começou / começou mas nada NESTE período / dados */}
               {stats.adHasAnyData === false ? (
-                <EmptyState label="Acumulando dados diários…" />
+                <EmptyState label={t("an.adAccruing")} />
               ) : !stats.adDailyChart || stats.adDailyChart.every(d => (stats.adTopNames ?? []).every(n => (d[n] as number) === 0)) ? (
-                <EmptyState label="Sem dados no período selecionado" />
+                <EmptyState label={t("an.noPeriodData")} />
               ) : (
                 <ResponsiveContainer width="100%" height={210}>
                   <LineChart data={stats.adDailyChart as { date: string; [key: string]: unknown }[]} margin={{ top: 4, right: 4, bottom: 0, left: -10 }}>
@@ -1128,7 +1159,7 @@ export default function Analytics() {
                       axisLine={false}
                       tickLine={false}
                       interval={6}
-                      tickFormatter={fmtDate}
+                      tickFormatter={(d) => fmtDate(d, lang)}
                     />
                     <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                     <Tooltip
@@ -1166,7 +1197,7 @@ export default function Analytics() {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <BarChart2 size={16} className="text-[#7C3AED]" />
-            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">Comportamento no site</h2>
+            <h2 className="text-sm font-bold text-[#0B2A66] uppercase tracking-wide">{t("an.behavior")}</h2>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
@@ -1178,12 +1209,12 @@ export default function Analytics() {
                   <Search size={14} className="text-[#7C3AED]" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-700">Termos mais buscados</h3>
+                  <h3 className="text-xs font-semibold text-slate-700">{t("an.topSearchTerms")}</h3>
                   <p className="text-[10px] text-slate-400">{windowLabel}</p>
                 </div>
               </div>
               {!stats.behaviorStats?.topSearchTerms.length ? (
-                <EmptyState label="Nenhuma busca registrada" />
+                <EmptyState label={t("an.noSearches")} />
               ) : (
                 <div className="space-y-2">
                   {stats.behaviorStats.topSearchTerms.slice(0, 8).map(({ term, count }, i) => {
@@ -1214,12 +1245,12 @@ export default function Analytics() {
                   <ExternalLink size={14} className="text-[#2563EB]" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-700">Links externos clicados</h3>
-                  <p className="text-[10px] text-slate-400">Domínios de destino</p>
+                  <h3 className="text-xs font-semibold text-slate-700">{t("an.externalLinks")}</h3>
+                  <p className="text-[10px] text-slate-400">{t("an.destinationDomains")}</p>
                 </div>
               </div>
               {!stats.behaviorStats?.topLinkDomains.length ? (
-                <EmptyState label="Nenhum clique externo registrado" />
+                <EmptyState label={t("an.noExternalClicks")} />
               ) : (
                 <div className="space-y-2">
                   {stats.behaviorStats.topLinkDomains.slice(0, 8).map(({ domain, count }, i) => {
@@ -1250,40 +1281,40 @@ export default function Analytics() {
                   <FileText size={14} className="text-[#F97316]" />
                 </div>
                 <div>
-                  <h3 className="text-xs font-semibold text-slate-700">Resumo de interações</h3>
+                  <h3 className="text-xs font-semibold text-slate-700">{t("an.interactionsSummary")}</h3>
                   <p className="text-[10px] text-slate-400">{windowLabel}</p>
                 </div>
               </div>
               <div className="space-y-4">
                 {[
                   {
-                    label: "Total de eventos",
-                    value: (stats.behaviorStats?.totalEvents ?? 0).toLocaleString("pt-BR"),
+                    label: t("an.totalEvents"),
+                    value: (stats.behaviorStats?.totalEvents ?? 0).toLocaleString(nloc),
                     icon: BarChart2, color: "#7C3AED", bg: "#F5F3FF",
                   },
                   {
-                    label: "Buscas realizadas",
-                    value: (stats.behaviorStats?.topSearchTerms.reduce((s, t) => s + t.count, 0) ?? 0).toLocaleString("pt-BR"),
+                    label: t("an.searchesMade"),
+                    value: (stats.behaviorStats?.topSearchTerms.reduce((s, term) => s + term.count, 0) ?? 0).toLocaleString(nloc),
                     icon: Search, color: "#2563EB", bg: "#EEF4FF",
                   },
                   {
-                    label: "Cliques externos",
-                    value: (stats.behaviorStats?.topLinkDomains.reduce((s, d) => s + d.count, 0) ?? 0).toLocaleString("pt-BR"),
+                    label: t("an.externalClicks"),
+                    value: (stats.behaviorStats?.topLinkDomains.reduce((s, d) => s + d.count, 0) ?? 0).toLocaleString(nloc),
                     icon: ExternalLink, color: "#16A34A", bg: "#ECFDF5",
                   },
                   {
-                    label: "Inscrições na newsletter",
-                    value: (stats.behaviorStats?.newsletterSignups ?? 0).toLocaleString("pt-BR"),
+                    label: t("an.newsletterSignups"),
+                    value: (stats.behaviorStats?.newsletterSignups ?? 0).toLocaleString(nloc),
                     icon: Mail, color: "#F97316", bg: "#FFF7ED",
                   },
                   {
-                    label: "Compartilhamentos",
-                    value: (stats.shareChart ?? []).reduce((s, p) => s + p.count, 0).toLocaleString("pt-BR"),
+                    label: t("an.shares"),
+                    value: (stats.shareChart ?? []).reduce((s, p) => s + p.count, 0).toLocaleString(nloc),
                     icon: ArrowUpRight, color: "#E71D36", bg: "#FEF2F2",
                   },
                   {
-                    label: "Leram 100% do artigo",
-                    value: (stats.engagement?.readCompletions ?? 0).toLocaleString("pt-BR"),
+                    label: t("an.read100"),
+                    value: (stats.engagement?.readCompletions ?? 0).toLocaleString(nloc),
                     icon: Eye, color: "#0891b2", bg: "#ECFEFF",
                   },
                 ].map(({ label, value, icon: Icon, color, bg }) => (
@@ -1307,40 +1338,40 @@ export default function Analytics() {
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center gap-2 mb-3">
               <Info size={14} className="text-slate-400" />
-              <h2 className="text-xs font-bold text-[#0B2A66] uppercase tracking-wide">Saúde da coleta</h2>
-              <span className="text-[10px] text-slate-400">(contadores desde o último reinício do servidor)</span>
+              <h2 className="text-xs font-bold text-[#0B2A66] uppercase tracking-wide">{t("an.collectionHealth")}</h2>
+              <span className="text-[10px] text-slate-400">{t("an.collectionHealthSub")}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 text-center">
               {[
-                { label: "Aceitos", value: health.received, tip: "Eventos válidos enfileirados para gravação" },
-                { label: "Gravados", value: health.flushedOk, tip: "Linhas efetivamente persistidas no banco" },
-                { label: "Bots filtrados", value: health.droppedBot, tip: "User-agent de robô/CLI ou vazio" },
-                { label: "Duplicados", value: health.droppedDuplicate, tip: "Refresh da mesma página em menos de 15s" },
-                { label: "Rate limit", value: health.droppedRate, tip: "Acima de 120 eventos/min por IP" },
-                { label: "Internos marcados", value: health.flaggedInternal, tip: "Admin logado, ambiente dev ou IP configurado — gravados, mas fora das métricas" },
+                { label: t("an.hAccepted"), value: health.received, tip: t("an.hAcceptedTip") },
+                { label: t("an.hStored"), value: health.flushedOk, tip: t("an.hStoredTip") },
+                { label: t("an.hBots"), value: health.droppedBot, tip: t("an.hBotsTip") },
+                { label: t("an.hDuplicates"), value: health.droppedDuplicate, tip: t("an.hDuplicatesTip") },
+                { label: t("an.hRateLimit"), value: health.droppedRate, tip: t("an.hRateLimitTip") },
+                { label: t("an.hInternal"), value: health.flaggedInternal, tip: t("an.hInternalTip") },
               ].map(({ label, value, tip }) => (
                 <div key={label} className="bg-slate-50 rounded-xl px-2 py-2.5" title={tip}>
-                  <p className="text-sm font-bold text-[#0F172A]">{value.toLocaleString("pt-BR")}</p>
+                  <p className="text-sm font-bold text-[#0F172A]">{value.toLocaleString(nloc)}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5">{label}</p>
                 </div>
               ))}
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11px] text-slate-400">
-              <span>Último evento: {health.lastEventAt ? new Date(health.lastEventAt).toLocaleTimeString("pt-BR") : "—"}</span>
-              <span>Última gravação: {health.lastFlushAt ? new Date(health.lastFlushAt).toLocaleTimeString("pt-BR") : "—"}</span>
-              <span>No buffer: {health.buffered}</span>
+              <span>{t("an.hLastEvent")} {health.lastEventAt ? new Date(health.lastEventAt).toLocaleTimeString(nloc) : "—"}</span>
+              <span>{t("an.hLastFlush")} {health.lastFlushAt ? new Date(health.lastFlushAt).toLocaleTimeString(nloc) : "—"}</span>
+              <span>{t("an.hBuffered")} {health.buffered}</span>
               {health.flushFailed > 0 && (
-                <span className="text-red-500 font-semibold">Falhas de gravação: {health.flushFailed}</span>
+                <span className="text-red-500 font-semibold">{t("an.hFlushFailed")} {health.flushFailed}</span>
               )}
-              <span className="font-medium text-slate-500">Dados confiáveis desde {fmtDayBr(health.reliableSince)}</span>
+              <span className="font-medium text-slate-500">{t("an.hReliableSince")} {fmtDayBr(health.reliableSince)}</span>
             </div>
           </div>
         )}
 
         <p className="text-xs text-slate-400 text-center pb-2">
-          Bots, tráfego interno, caminho /admin e refresh repetido são filtrados ·
-          Dados confiáveis desde {fmtDayBr(health?.reliableSince ?? "2026-07-08")} ·
-          Fuso de Brasília · Atualização automática a cada 30s
+          {t("an.footerNote")} ·
+          {" "}{t("an.hReliableSince")} {fmtDayBr(health?.reliableSince ?? "2026-07-08")} ·
+          {" "}{t("an.serverTz")} · {t("an.autoRefresh")}
         </p>
       </div>
     </AdminLayout>
