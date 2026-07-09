@@ -187,6 +187,10 @@ export interface SiteSettings {
   headerPaddingX?: number; headerMarginTop?: number;
   /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */
   showTopBar?: boolean; topBarBgColor?: string;
+  /** Botão de notificações push (sino) no cabeçalho (ausente/true = exibido). */
+  showPushButton?: boolean;
+  /** Ícones de redes sociais na barra utilitária do topo (ausente/true = exibidos). */
+  showTopBarSocial?: boolean;
   /** Banner HTML (sanitizado no front) exibido ao lado do logo no desktop. */
   headerBannerHtml?: string;
   /** Link de redirecionamento do banner ao lado do logo (cobre o banner todo). */

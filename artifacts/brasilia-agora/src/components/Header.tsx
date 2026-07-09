@@ -460,7 +460,7 @@ export default function Header() {
             <div className="flex-1 lg:hidden" />
 
             <div className="flex items-center gap-1 ml-auto">
-              <PushSubscribeButton />
+              {settings?.showPushButton !== false && <PushSubscribeButton />}
               <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
               {searchOpen ? (
                 <>
@@ -630,7 +630,7 @@ export default function Header() {
           <div className="flex-1 lg:hidden" />
 
           <div className="flex items-center gap-1 ml-auto">
-            <PushSubscribeButton />
+            {settings?.showPushButton !== false && <PushSubscribeButton />}
             {/* Com o menu em faixa, a busca do desktop mora na própria faixa. */}
             <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
             {searchOpen ? (

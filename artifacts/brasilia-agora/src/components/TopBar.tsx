@@ -66,7 +66,7 @@ function TopBarInner() {
         ) : (
           <div className="flex-1" />
         )}
-        {social.length > 0 && (
+        {settings?.showTopBarSocial !== false && social.length > 0 && (
           <div className="hidden md:flex items-center gap-1 shrink-0">
             {social.map(({ key, href }) => {
               const Icon = SOCIAL_ICONS[key];

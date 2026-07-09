@@ -8,6 +8,7 @@ import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type Secu
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminT, type AdminTKey } from "../../lib/adminI18n";
 import {
   Save, Globe, FileSearch, UserCircle, Image, LayoutDashboard, BarChart2,
   Monitor, Smartphone, Tag, Upload, CheckCircle, AlertCircle, Minus, Plus,
@@ -15,24 +16,24 @@ import {
   RefreshCw, Sparkles, Link2, ClipboardList, ShieldAlert, Activity, Search,
   Copy, CheckCheck, Key, AlertTriangle, XCircle, ShieldCheck, ShieldOff,
   Database, Server, Shield, Unlock, Lock, ChevronDown, ChevronRight, TrendingUp,
-  Share2, Code, Trash2, CalendarClock, Rss,
+  Share2, Code, Trash2, CalendarClock, Rss, Bell,
 } from "lucide-react";
 
 type SettingsTab = "informacoes" | "logo" | "aparencia" | "contato" | "conexoes" | "webhook" | "seguranca" | "permissoes" | "logs" | "exclusao";
 
-const TABS: { id: SettingsTab; label: string; adminOnly?: boolean }[] = [
-  { id: "informacoes", label: "Informações do Site" },
-  { id: "logo",        label: "Logo & Imagens" },
-  { id: "aparencia",   label: "Aparência" },
-  { id: "contato",     label: "Contato & Redes" },
-  { id: "conexoes",    label: "Conexões" },
+const TABS: { id: SettingsTab; labelKey: AdminTKey; adminOnly?: boolean }[] = [
+  { id: "informacoes", labelKey: "cfg.tabInfo" },
+  { id: "logo",        labelKey: "cfg.tabLogo" },
+  { id: "aparencia",   labelKey: "cfg.tabAppearance" },
+  { id: "contato",     labelKey: "cfg.tabContact" },
+  { id: "conexoes",    labelKey: "cfg.tabConnections" },
   // Abas sensíveis: só admin. Editor com settings.view gerencia o site,
   // mas nunca webhook/segurança/permissões/logs/exclusão de artigos.
-  { id: "webhook",     label: "Webhook",              adminOnly: true },
-  { id: "seguranca",   label: "Segurança",            adminOnly: true },
-  { id: "permissoes",  label: "Permissões",           adminOnly: true },
-  { id: "logs",        label: "Logs",                 adminOnly: true },
-  { id: "exclusao",    label: "Exclusão de artigos",  adminOnly: true },
+  { id: "webhook",     labelKey: "cfg.tabWebhook",     adminOnly: true },
+  { id: "seguranca",   labelKey: "cfg.tabSecurity",    adminOnly: true },
+  { id: "permissoes",  labelKey: "cfg.tabPermissions", adminOnly: true },
+  { id: "logs",        labelKey: "cfg.tabLogs",        adminOnly: true },
+  { id: "exclusao",    labelKey: "cfg.tabDeletion",    adminOnly: true },
 ];
 
 const ADMIN_ONLY_TABS = new Set<SettingsTab>(TABS.filter((t) => t.adminOnly).map((t) => t.id));
@@ -76,42 +77,42 @@ const CARD_SHADOW = { boxShadow: "0 8px 24px rgba(15,23,42,0.06)" };
 const INPUT = "w-full border border-[#E2E8F0] rounded-xl px-3 py-2.5 text-sm text-[#0F172A] bg-white placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors";
 
 const CONTACT_GROUPS: {
-  title: string; icon: React.ElementType; color: string;
-  fields: { key: keyof ContactInfo; label: string; placeholder: string; multiline?: boolean }[];
+  title: AdminTKey; icon: React.ElementType; color: string;
+  fields: { key: keyof ContactInfo; label: AdminTKey; placeholder: string; multiline?: boolean }[];
 }[] = [
   {
-    title: "Contato", icon: Mail, color: "#0B2A66",
+    title: "cfg.cgContact", icon: Mail, color: "#0B2A66",
     fields: [
-      { key: "supportEmail", label: "E-mail de Suporte (Redação)", placeholder: "suporte@portal.com.br" },
-      { key: "displayEmail", label: "E-mail de Exibição",          placeholder: "redacao@portal.com.br" },
-      { key: "phone",        label: "Telefone",                    placeholder: "(61) 99888-0000" },
-      { key: "whatsapp",     label: "WhatsApp",                    placeholder: "(61) 99888-0000" },
+      { key: "supportEmail", label: "cfg.cgSupportEmail", placeholder: "suporte@portal.com.br" },
+      { key: "displayEmail", label: "cfg.cgDisplayEmail", placeholder: "redacao@portal.com.br" },
+      { key: "phone",        label: "cfg.cgPhone",        placeholder: "(61) 99888-0000" },
+      { key: "whatsapp",     label: "cfg.cgWhatsapp",     placeholder: "(61) 99888-0000" },
     ],
   },
   {
-    title: "Redes Sociais", icon: Globe, color: "#7c3aed",
+    title: "cfg.cgSocial", icon: Globe, color: "#7c3aed",
     fields: [
-      { key: "facebook",  label: "Facebook URL",    placeholder: "https://facebook.com/..." },
-      { key: "instagram", label: "Instagram URL",   placeholder: "https://instagram.com/..." },
-      { key: "x",         label: "X / Twitter URL", placeholder: "https://x.com/..." },
-      { key: "youtube",   label: "YouTube URL",     placeholder: "https://youtube.com/..." },
-      { key: "tiktok",    label: "TikTok URL",      placeholder: "https://tiktok.com/@..." },
+      { key: "facebook",  label: "cfg.cgFacebook",  placeholder: "https://facebook.com/..." },
+      { key: "instagram", label: "cfg.cgInstagram", placeholder: "https://instagram.com/..." },
+      { key: "x",         label: "cfg.cgX",         placeholder: "https://x.com/..." },
+      { key: "youtube",   label: "cfg.cgYoutube",   placeholder: "https://youtube.com/..." },
+      { key: "tiktok",    label: "cfg.cgTiktok",    placeholder: "https://tiktok.com/@..." },
     ],
   },
   {
-    title: "Dados Legais", icon: Building2, color: "#0d9488",
+    title: "cfg.cgLegalData", icon: Building2, color: "#0d9488",
     fields: [
-      { key: "address",      label: "Endereço",                  placeholder: "Brasília, Distrito Federal" },
-      { key: "cnpj",         label: "CNPJ",                       placeholder: "00.000.000/0000-00" },
-      { key: "privacyEmail", label: "E-mail de privacidade (DPO)", placeholder: "privacy@seublog.com" },
+      { key: "address",      label: "cfg.cgAddress",      placeholder: "Brasília, Distrito Federal" },
+      { key: "cnpj",         label: "cfg.cgCnpj",         placeholder: "00.000.000/0000-00" },
+      { key: "privacyEmail", label: "cfg.cgPrivacyEmail", placeholder: "privacy@seublog.com" },
     ],
   },
   {
-    title: "Textos Legais", icon: FileText, color: "#ea580c",
+    title: "cfg.cgLegalTexts", icon: FileText, color: "#ea580c",
     fields: [
-      { key: "legalInfo",     label: "Informações Legais",      placeholder: "Editor responsável, dados legais...", multiline: true },
-      { key: "privacyPolicy", label: "Política de Privacidade", placeholder: "Conteúdo da política...",            multiline: true },
-      { key: "termsOfUse",    label: "Termos de Uso",           placeholder: "Conteúdo dos termos...",             multiline: true },
+      { key: "legalInfo",     label: "cfg.cgLegalInfo",     placeholder: "Editor responsável, dados legais...", multiline: true },
+      { key: "privacyPolicy", label: "cfg.cgPrivacyPolicy", placeholder: "Conteúdo da política...",            multiline: true },
+      { key: "termsOfUse",    label: "cfg.cgTermsOfUse",    placeholder: "Conteúdo dos termos...",             multiline: true },
     ],
   },
 ];
@@ -131,6 +132,7 @@ export default function Settings() {
   const visibleTabs = isAdmin ? TABS : TABS.filter((t) => !t.adminOnly);
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => getTabFromUrl(isAdmin));
   const { toast } = useToast();
+  const { t } = useAdminT();
 
   /* sync tab whenever the URL search string changes (sidebar links, popstate) */
   useEffect(() => {
@@ -231,9 +233,9 @@ export default function Settings() {
       const data = await r.json() as { metaDescription?: string; keywords?: string };
       if (data.metaDescription) setSettings(p => ({ ...p, seoDescription: data.metaDescription! }));
       if (data.keywords)       setSettings(p => ({ ...p, seoKeywords: data.keywords! }));
-      toast({ title: "SEO preenchido com IA!", description: "Revise e salve as sugestões." });
+      toast({ title: t("cfg.seoFilled"), description: t("cfg.seoFilledDesc") });
     } catch {
-      toast({ title: "Erro ao gerar SEO", description: "Verifique a conexão e tente novamente.", variant: "destructive" });
+      toast({ title: t("cfg.seoError"), description: t("cfg.seoErrorDesc"), variant: "destructive" });
     } finally {
       setAiSeoLoading(false);
     }
@@ -468,9 +470,9 @@ export default function Settings() {
       const { settings: updated } = await adminApi.updateSettings(settings);
       setSettings(updated);
       invalidateSiteCache();
-      toast({ title: "Configurações salvas!", duration: 2000 });
+      toast({ title: t("cfg.settingsSaved"), duration: 2000 });
     } catch {
-      toast({ title: "Erro ao salvar", variant: "destructive" });
+      toast({ title: t("cfg.saveError"), variant: "destructive" });
     } finally {
       setSavingSettings(false);
     }
@@ -494,10 +496,10 @@ export default function Settings() {
       });
       invalidateSiteCache();
       setLogoStatus("success");
-      toast({ title: "Logo salvo!", duration: 2000 });
+      toast({ title: t("cfg.logoSavedToast"), duration: 2000 });
     } catch {
       setLogoStatus("error");
-      toast({ title: "Erro ao salvar logo", variant: "destructive" });
+      toast({ title: t("cfg.logoSaveError"), variant: "destructive" });
     } finally {
       setSavingLogo(false);
     }
@@ -508,9 +510,9 @@ export default function Settings() {
     setSavingContact(true);
     try {
       await adminApi.updateContactInfo(contact);
-      toast({ title: "Contato salvo!", duration: 2000 });
+      toast({ title: t("cfg.contactSaved"), duration: 2000 });
     } catch (err) {
-      toast({ title: "Erro ao salvar", description: (err as Error).message, variant: "destructive" });
+      toast({ title: t("cfg.saveError"), description: (err as Error).message, variant: "destructive" });
     } finally {
       setSavingContact(false);
     }
@@ -532,19 +534,19 @@ export default function Settings() {
 
   /* ── render ── */
   return (
-    <AdminLayout title="Configurações">
+    <AdminLayout title={t("cfg.title")}>
       <div className="space-y-5">
 
         {/* Tab bar */}
         <div className="flex flex-wrap gap-1 p-1 bg-white rounded-2xl w-fit" style={CARD_SHADOW}>
-          {visibleTabs.map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
+          {visibleTabs.map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
-                activeTab === t.id
+                activeTab === tab.id
                   ? "bg-[#0B2A66] text-white shadow-sm"
                   : "text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]"
               }`}>
-              {t.label}
+              {t(tab.labelKey)}
             </button>
           ))}
         </div>
@@ -553,7 +555,7 @@ export default function Settings() {
         {activeTab === "informacoes" && (
           <div className="max-w-2xl xl:max-w-6xl space-y-5">
             {loadingSettings ? (
-              <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>Carregando…</div>
+              <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>{t("cfg.loading")}</div>
             ) : (
               <>
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
@@ -561,17 +563,17 @@ export default function Settings() {
                 <div className="space-y-5">
                 {/* Site info */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<Globe size={15}/>} label="Informações do Site"/>
-                  <Field label="Nome do site">
+                  <SectionHeader icon={<Globe size={15}/>} label={t("cfg.tabInfo")}/>
+                  <Field label={t("cfg.siteName")}>
                     <input value={settings.siteName} onChange={e => setField("siteName", e.target.value)}
-                      className={INPUT} placeholder={`Ex: ${BRAND.name}`}/>
+                      className={INPUT} placeholder={`${t("cfg.eg")} ${BRAND.name}`}/>
                   </Field>
-                  <Field label="Tagline / Slogan">
+                  <Field label={t("cfg.tagline")}>
                     <input value={settings.tagline} onChange={e => setField("tagline", e.target.value)}
-                      className={INPUT} placeholder="Ex: Notícia. Agora. Sempre."/>
+                      className={INPUT} placeholder={t("cfg.taglinePh")}/>
                   </Field>
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <Field label="Idioma do site público" hint="o painel continua em português">
+                    <Field label={t("cfg.sitePublicLang")} hint={t("cfg.sitePublicLangHint")}>
                       <select value={settings.siteLanguage ?? "pt-BR"}
                         onChange={e => setField("siteLanguage", e.target.value as SiteSettings["siteLanguage"])}
                         className={INPUT}>
@@ -579,7 +581,7 @@ export default function Settings() {
                         <option value="en">English</option>
                       </select>
                     </Field>
-                    <Field label="Fuso horário das datas" hint="IANA">
+                    <Field label={t("cfg.dateTimezone")} hint="IANA">
                       <select
                         value={TZ_OPTIONS.includes(settings.siteTimezone ?? "America/Sao_Paulo")
                           ? (settings.siteTimezone ?? "America/Sao_Paulo") : "custom"}
@@ -589,24 +591,23 @@ export default function Settings() {
                         <option value="UTC">UTC</option>
                         <option value="Europe/London">Europe/London</option>
                         <option value="America/New_York">America/New_York</option>
-                        <option value="custom">Outro…</option>
+                        <option value="custom">{t("cfg.other")}</option>
                       </select>
                     </Field>
                   </div>
                   {!TZ_OPTIONS.includes(settings.siteTimezone ?? "America/Sao_Paulo") && (
-                    <Field label="Fuso IANA personalizado" hint="ex.: Europe/Lisbon">
+                    <Field label={t("cfg.customTz")} hint={t("cfg.customTzHint")}>
                       <input value={settings.siteTimezone ?? ""} onChange={e => setField("siteTimezone", e.target.value)}
-                        className={INPUT} placeholder="Continente/Cidade"/>
+                        className={INPUT} placeholder={t("cfg.continentCity")}/>
                     </Field>
                   )}
-                  <Field label="IPs internos (Analytics)"
-                    hint="separados por vírgula ou espaço">
+                  <Field label={t("cfg.internalIps")}
+                    hint={t("cfg.internalIpsHint")}>
                     <textarea value={settings.internalIps ?? ""} onChange={e => setField("internalIps", e.target.value)}
                       rows={2} className={INPUT + " resize-none"}
-                      placeholder="Ex.: 200.100.50.25, 200.100.50.26"/>
+                      placeholder={t("cfg.internalIpsPh")}/>
                     <p className="text-[11px] text-[#94A3B8] mt-1.5">
-                      Acessos destes IPs (redação/escritório) são marcados como tráfego interno
-                      e ficam fora das métricas públicas do Analytics.
+                      {t("cfg.internalIpsDesc")}
                     </p>
                   </Field>
                 </div>
@@ -624,26 +625,25 @@ export default function Settings() {
                       {aiSeoLoading
                         ? <RefreshCw size={12} className="animate-spin" />
                         : <Sparkles size={12} />}
-                      {aiSeoLoading ? "Gerando…" : "Preencher com IA"}
+                      {aiSeoLoading ? t("cfg.generating") : t("cfg.fillWithAI")}
                     </button>
                   </div>
-                  <Field label="Meta descrição" hint={`${(settings.seoDescription ?? "").length}/160`}>
+                  <Field label={t("cfg.metaDescription")} hint={`${(settings.seoDescription ?? "").length}/160`}>
                     <textarea value={settings.seoDescription ?? ""} onChange={e => setField("seoDescription", e.target.value)}
                       rows={3} maxLength={160} className={INPUT + " resize-none"}
-                      placeholder="Descrição exibida nos resultados do Google (máx. 160 caracteres)"/>
+                      placeholder={t("cfg.metaDescriptionPh")}/>
                   </Field>
-                  <Field label="Palavras-chave">
+                  <Field label={t("cfg.keywords")}>
                     <input value={settings.seoKeywords ?? ""} onChange={e => setField("seoKeywords", e.target.value)}
-                      className={INPUT} placeholder="brasília, notícias, df, política"/>
+                      className={INPUT} placeholder={t("cfg.keywordsPh")}/>
                   </Field>
                 </div>
 
                 {/* Compartilhamento */}
                 <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<Share2 size={15}/>} label="Compartilhamento (Open Graph)"/>
+                  <SectionHeader icon={<Share2 size={15}/>} label={t("cfg.sharing")}/>
                   <p className="text-xs text-[#94A3B8]">
-                    Aparece ao compartilhar o link no WhatsApp, Telegram, Facebook etc.
-                    Ao salvar, o título e a descrição também atualizam automaticamente o HTML do site para que crawlers de redes sociais vejam os dados corretos.
+                    {t("cfg.sharingDesc")}
                   </p>
 
                   {/* Preview card */}
@@ -654,26 +654,26 @@ export default function Settings() {
                         : (
                           <div className="flex flex-col items-center gap-1.5 text-white/40">
                             <Image size={22}/>
-                            <span className="text-[10px] tracking-wide">Imagem de compartilhamento</span>
+                            <span className="text-[10px] tracking-wide">{t("cfg.shareImage")}</span>
                           </div>
                         )}
                       <div className="absolute inset-0 pointer-events-none" style={{boxShadow:"inset 0 -2px 8px rgba(0,0,0,0.1)"}}/>
                     </div>
                     <div className="p-3 border-t border-[#E2E8F0]">
                       <p className="text-[10px] text-[#94A3B8] uppercase tracking-wide truncate">
-                        {(() => { try { return settings.siteUrl ? new URL(settings.siteUrl).hostname : "seusite.com.br"; } catch { return settings.siteUrl || "seusite.com.br"; } })()}
+                        {(() => { try { return settings.siteUrl ? new URL(settings.siteUrl).hostname : t("cfg.yourSite"); } catch { return settings.siteUrl || t("cfg.yourSite"); } })()}
                       </p>
                       <p className="text-[13px] font-semibold text-[#0F172A] truncate mt-0.5">
-                        {settings.siteName || "Nome do portal"}{settings.tagline ? ` — ${settings.tagline}` : ""}
+                        {settings.siteName || t("cfg.portalName")}{settings.tagline ? ` — ${settings.tagline}` : ""}
                       </p>
                       <p className="text-[11px] text-[#64748B] line-clamp-2 mt-0.5">
-                        {settings.seoDescription || settings.tagline || "Descrição do portal…"}
+                        {settings.seoDescription || settings.tagline || t("cfg.portalDesc")}
                       </p>
                     </div>
                   </div>
 
                   {/* URL */}
-                  <Field label="URL do site" hint="og:url">
+                  <Field label={t("cfg.siteUrl")} hint="og:url">
                     <input
                       value={settings.siteUrl ?? ""}
                       onChange={e => setField("siteUrl", e.target.value)}
@@ -684,8 +684,8 @@ export default function Settings() {
 
                   {/* OG image upload */}
                   <div>
-                    <label className="block text-xs font-medium text-[#64748B] mb-1">Imagem de compartilhamento</label>
-                    <p className="text-[11px] text-[#94A3B8] mb-2">Recomendado: 1200 × 630 px. PNG ou JPEG.</p>
+                    <label className="block text-xs font-medium text-[#64748B] mb-1">{t("cfg.shareImage")}</label>
+                    <p className="text-[11px] text-[#94A3B8] mb-2">{t("cfg.ogRecommend")}</p>
                     <input ref={ogRef} type="file" accept="image/*" className="hidden"
                       onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("ogImageBase64", f); }}/>
                     <div className="flex items-center gap-3 flex-wrap">
@@ -693,7 +693,7 @@ export default function Settings() {
                         onClick={() => ogRef.current?.click()}
                         className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
                       >
-                        Selecionar imagem
+                        {t("cfg.selectImage")}
                       </button>
                       {settings.ogImageBase64 ? (
                         <div className="relative">
@@ -703,7 +703,7 @@ export default function Settings() {
                             className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
                           >&times;</button>
                         </div>
-                      ) : <span className="text-xs text-[#94A3B8] italic">Nenhuma imagem selecionada</span>}
+                      ) : <span className="text-xs text-[#94A3B8] italic">{t("cfg.noImageSelected")}</span>}
                     </div>
                   </div>
                 </div>
@@ -713,20 +713,20 @@ export default function Settings() {
                 <div className="space-y-5">
                 {/* Byline */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<UserCircle size={15}/>} label="Assinatura dos artigos"/>
-                  <p className="text-xs text-[#94A3B8]">Nome e foto que aparecem no cabeçalho de cada artigo publicado.</p>
-                  <Field label="Nome da assinatura">
+                  <SectionHeader icon={<UserCircle size={15}/>} label={t("cfg.byline")}/>
+                  <p className="text-xs text-[#94A3B8]">{t("cfg.bylineDesc")}</p>
+                  <Field label={t("cfg.bylineName")}>
                     <input value={settings.bylineName ?? ""} onChange={e => setField("bylineName", e.target.value)}
-                      className={INPUT} placeholder={`Padrão: ${settings.siteName || "nome do portal"}`}/>
+                      className={INPUT} placeholder={`${t("cfg.defaultColon")} ${settings.siteName || t("cfg.portalNameLower")}`}/>
                   </Field>
                   <div>
-                    <label className="block text-xs font-medium text-[#64748B] mb-2">Foto da assinatura</label>
+                    <label className="block text-xs font-medium text-[#64748B] mb-2">{t("cfg.bylinePhoto")}</label>
                     <input ref={bylineLogoRef} type="file" accept="image/*" className="hidden"
                       onChange={e => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onload = ev => setField("bylineLogoBase64", ev.target?.result as string); r.readAsDataURL(f); }}}/>
                     <div className="flex items-center gap-3">
                       <button onClick={() => bylineLogoRef.current?.click()}
                         className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                        Selecionar foto
+                        {t("cfg.selectPhoto")}
                       </button>
                       {settings.bylineLogoBase64 ? (
                         <div className="relative">
@@ -734,14 +734,14 @@ export default function Settings() {
                           <button onClick={() => setField("bylineLogoBase64", undefined)}
                             className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]">&times;</button>
                         </div>
-                      ) : <p className="text-xs text-[#94A3B8] italic">Usando logo do portal</p>}
+                      ) : <p className="text-xs text-[#94A3B8] italic">{t("cfg.usingPortalLogo")}</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Device visibility */}
                 <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<Tag size={15}/>} label="Visibilidade por dispositivo"/>
+                  <SectionHeader icon={<Tag size={15}/>} label={t("cfg.deviceVisibility")}/>
                   <div className="grid grid-cols-2 gap-3">
                     {[
                       { key: "desktopEnabled" as const, icon: <Monitor size={22}/>, label: "Desktop" },
@@ -756,7 +756,7 @@ export default function Settings() {
                         {icon}
                         <span className="text-xs font-semibold">{label}</span>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${settings[key] ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                          {settings[key] ? "Ativo" : "Inativo"}
+                          {settings[key] ? t("cfg.active") : t("cfg.inactive")}
                         </span>
                       </button>
                     ))}
@@ -765,11 +765,9 @@ export default function Settings() {
 
                 {/* Créditos da fonte */}
                 <div className={`${CARD} p-6`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<Rss size={15}/>} label="Créditos da Fonte"/>
+                  <SectionHeader icon={<Rss size={15}/>} label={t("cfg.sourceCredits")}/>
                   <p className="text-xs text-[#64748B] mb-4 mt-1">
-                    Exibe "Fonte: Nome" de forma discreta ao final das notícias importadas
-                    (apenas o nome, sem link). Também dá para forçar exibir/ocultar por
-                    notícia, na edição do artigo.
+                    {t("cfg.sourceCreditsDesc")}
                   </p>
                   <button
                     onClick={() => setField("showSourceCredit", !(settings.showSourceCredit ?? false))}
@@ -780,19 +778,19 @@ export default function Settings() {
                     }`}>
                     <Rss size={18}/>
                     <div className="flex-1 text-left">
-                      <p className="text-[13px] font-semibold">Créditos da fonte nas notícias</p>
-                      <p className="text-[11px] opacity-70">"Fonte: Agência X" ao final do artigo</p>
+                      <p className="text-[13px] font-semibold">{t("cfg.sourceCreditsToggle")}</p>
+                      <p className="text-[11px] opacity-70">{t("cfg.sourceCreditsHint")}</p>
                     </div>
                     <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showSourceCredit ?? false) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                      {(settings.showSourceCredit ?? false) ? "Ativado" : "Desativado"}
+                      {(settings.showSourceCredit ?? false) ? t("cfg.enabledM") : t("cfg.disabledM")}
                     </span>
                   </button>
                 </div>
 
                 {/* Ticker bar */}
                 <div className={`${CARD} p-6`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<TrendingUp size={15}/>} label="Barra de Cotações"/>
-                  <p className="text-xs text-[#64748B] mb-4 mt-1">Faixa rolante com cotações de moedas e criptomoedas exibida abaixo do cabeçalho.</p>
+                  <SectionHeader icon={<TrendingUp size={15}/>} label={t("cfg.tickerBar")}/>
+                  <p className="text-xs text-[#64748B] mb-4 mt-1">{t("cfg.tickerBarDesc")}</p>
                   <button
                     onClick={() => setField("showTickerBar", !(settings.showTickerBar ?? true))}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
@@ -802,19 +800,19 @@ export default function Settings() {
                     }`}>
                     <TrendingUp size={18}/>
                     <div className="flex-1 text-left">
-                      <p className="text-[13px] font-semibold">Barra de cotações</p>
+                      <p className="text-[13px] font-semibold">{t("cfg.tickerBarToggle")}</p>
                       <p className="text-[11px] opacity-70">ETH · USD · EUR · GBP · BTC</p>
                     </div>
                     <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showTickerBar ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                      {(settings.showTickerBar ?? true) ? "Ativada" : "Desativada"}
+                      {(settings.showTickerBar ?? true) ? t("cfg.enabledF") : t("cfg.disabledF")}
                     </span>
                   </button>
                 </div>
 
                 {/* Hero strip */}
                 <div className={`${CARD} p-6`} style={CARD_SHADOW}>
-                  <SectionHeader icon={<LayoutDashboard size={15}/>} label="Strip de Destaques"/>
-                  <p className="text-xs text-[#64748B] mb-4 mt-1">Faixa com 4 notícias secundárias exibida abaixo do bloco principal de capa. No mobile, aparece como carrossel deslizável.</p>
+                  <SectionHeader icon={<LayoutDashboard size={15}/>} label={t("cfg.heroStrip")}/>
+                  <p className="text-xs text-[#64748B] mb-4 mt-1">{t("cfg.heroStripDesc")}</p>
                   <button
                     onClick={() => setField("showHeroStrip", !(settings.showHeroStrip ?? true))}
                     className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
@@ -824,11 +822,48 @@ export default function Settings() {
                     }`}>
                     <LayoutDashboard size={18}/>
                     <div className="flex-1 text-left">
-                      <p className="text-[13px] font-semibold">Strip de destaques</p>
-                      <p className="text-[11px] opacity-70">4 notícias · desktop grid · mobile carrossel</p>
+                      <p className="text-[13px] font-semibold">{t("cfg.heroStripToggle")}</p>
+                      <p className="text-[11px] opacity-70">{t("cfg.heroStripHint")}</p>
                     </div>
                     <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showHeroStrip ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                      {(settings.showHeroStrip ?? true) ? "Ativado" : "Desativado"}
+                      {(settings.showHeroStrip ?? true) ? t("cfg.enabledM") : t("cfg.disabledM")}
+                    </span>
+                  </button>
+                </div>
+
+                {/* Header icons: push bell + top-bar social (per-blog) */}
+                <div className={`${CARD} p-6 space-y-3`} style={CARD_SHADOW}>
+                  <SectionHeader icon={<Bell size={15}/>} label={t("cfg.headerExtras")}/>
+                  <button
+                    onClick={() => setField("showPushButton", !(settings.showPushButton ?? true))}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                      (settings.showPushButton ?? true)
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                        : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    }`}>
+                    <Bell size={18}/>
+                    <div className="flex-1 text-left">
+                      <p className="text-[13px] font-semibold">{t("cfg.pushButtonToggle")}</p>
+                      <p className="text-[11px] opacity-70">{t("cfg.pushButtonHint")}</p>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showPushButton ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showPushButton ?? true) ? t("cfg.enabledM") : t("cfg.disabledM")}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => setField("showTopBarSocial", !(settings.showTopBarSocial ?? true))}
+                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
+                      (settings.showTopBarSocial ?? true)
+                        ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                        : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
+                    }`}>
+                    <Share2 size={18}/>
+                    <div className="flex-1 text-left">
+                      <p className="text-[13px] font-semibold">{t("cfg.topBarSocialToggle")}</p>
+                      <p className="text-[11px] opacity-70">{t("cfg.topBarSocialHint")}</p>
+                    </div>
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showTopBarSocial ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showTopBarSocial ?? true) ? t("cfg.enabledM") : t("cfg.disabledM")}
                     </span>
                   </button>
                 </div>
@@ -849,12 +884,12 @@ export default function Settings() {
             <div className="space-y-5">
             {/* Logo do portal */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
-              <SectionHeader icon={<Image size={15}/>} label="Logo do Portal"/>
-              <p className="text-xs text-[#94A3B8]">Arquivo PNG ou SVG com fundo transparente — exibido no cabeçalho do site.</p>
+              <SectionHeader icon={<Image size={15}/>} label={t("cfg.portalLogo")}/>
+              <p className="text-xs text-[#94A3B8]">{t("cfg.portalLogoDesc")}</p>
 
               {settings.logoBase64 && !logoPreview && (
                 <div>
-                  <p className="text-xs font-medium text-[#64748B] mb-2">Logo atual</p>
+                  <p className="text-xs font-medium text-[#64748B] mb-2">{t("cfg.currentLogo")}</p>
                   <div className="border border-[#F1F5F9] rounded-2xl p-6 flex items-center justify-center bg-[#F8FAFC]">
                     <img src={settings.logoBase64} alt="Logo atual" style={{ height: logoSize }} className="w-auto object-contain"/>
                   </div>
@@ -873,8 +908,8 @@ export default function Settings() {
                   <Upload size={22} className="text-[#94A3B8]"/>
                 </div>
                 <p className="text-sm text-[#64748B] text-center leading-relaxed">
-                  Clique ou arraste um arquivo aqui<br/>
-                  <span className="text-xs text-[#94A3B8]">PNG, SVG, WEBP — fundo transparente recomendado</span>
+                  {t("cfg.dropHint")}<br/>
+                  <span className="text-xs text-[#94A3B8]">{t("cfg.dropHint2")}</span>
                 </p>
                 <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoFile(f); }}/>
@@ -882,7 +917,7 @@ export default function Settings() {
 
               {logoPreview && (
                 <div>
-                  <p className="text-xs font-medium text-[#64748B] mb-2">Pré-visualização</p>
+                  <p className="text-xs font-medium text-[#64748B] mb-2">{t("cfg.preview")}</p>
                   <div className="border border-[#F1F5F9] rounded-2xl p-6 flex items-center justify-center bg-[#F8FAFC]">
                     <img src={logoPreview} alt="Logo preview" style={{ height: logoSize }} className="w-auto object-contain"/>
                   </div>
@@ -892,7 +927,7 @@ export default function Settings() {
               {/* Size control */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-xs font-medium text-[#64748B]">Tamanho da logo (desktop)</p>
+                  <p className="text-xs font-medium text-[#64748B]">{t("cfg.logoSizeDesktop")}</p>
                   <span className="text-sm font-bold text-[#0B2A66]">{logoSize}px</span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -918,12 +953,11 @@ export default function Settings() {
               {/* Mobile size control */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-xs font-medium text-[#64748B]">Tamanho da logo no celular</p>
-                  <span className="text-sm font-bold text-[#0B2A66]">{logoMobileSize > 0 ? `${logoMobileSize}px` : "Automático"}</span>
+                  <p className="text-xs font-medium text-[#64748B]">{t("cfg.logoSizeMobile")}</p>
+                  <span className="text-sm font-bold text-[#0B2A66]">{logoMobileSize > 0 ? `${logoMobileSize}px` : t("cfg.auto")}</span>
                 </div>
                 <p className="text-xs text-[#94A3B8] mb-3">
-                  "Automático" limita a altura a ~48px para a logo não estourar a tela.
-                  Arraste para definir uma altura fixa no mobile (a largura é limitada a 60% da tela).
+                  {t("cfg.logoMobileDesc")}
                 </p>
                 <div className="flex items-center gap-3">
                   <input type="range" min={0} max={96} step={4} value={logoMobileSize}
@@ -932,7 +966,7 @@ export default function Settings() {
                   {logoMobileSize > 0 && (
                     <button onClick={() => setLogoMobileSize(0)}
                       className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                      Automático
+                      {t("cfg.auto")}
                     </button>
                   )}
                 </div>
@@ -945,18 +979,16 @@ export default function Settings() {
 
               {/* Logo mobile (opcional) */}
               <div className="pt-4 border-t border-[#F1F5F9]">
-                <p className="text-xs font-medium text-[#64748B] mb-1">Logo mobile (opcional)</p>
+                <p className="text-xs font-medium text-[#64748B] mb-1">{t("cfg.logoMobileOptional")}</p>
                 <p className="text-xs text-[#94A3B8] mb-3">
-                  Versão vertical ou compacta exibida só em telas pequenas — o celular trava a
-                  altura da logo em ~48px, então logos muito largas ficam melhores com uma
-                  variante própria. Sem envio, o site usa a logo principal reduzida.
+                  {t("cfg.logoMobileOptionalDesc")}
                 </p>
                 <input ref={logoMobileRef} type="file" accept="image/*" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("logoMobileBase64", f); }}/>
                 <div className="flex items-center gap-3">
                   <button onClick={() => logoMobileRef.current?.click()}
                     className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                    Selecionar imagem
+                    {t("cfg.selectImage")}
                   </button>
                   {settings.logoMobileBase64 && (
                     <div className="relative">
@@ -970,18 +1002,16 @@ export default function Settings() {
 
               {/* Logo do rodapé (opcional) */}
               <div className="pt-4 border-t border-[#F1F5F9]">
-                <p className="text-xs font-medium text-[#64748B] mb-1">Logo do rodapé (opcional)</p>
+                <p className="text-xs font-medium text-[#64748B] mb-1">{t("cfg.footerLogoOptional")}</p>
                 <p className="text-xs text-[#94A3B8] mb-3">
-                  Exibida na parte de cima do rodapé no lugar da logo principal — útil quando o
-                  rodapé tem fundo escuro e a logo principal não contrasta. Sem envio, o rodapé
-                  usa a logo principal.
+                  {t("cfg.footerLogoOptionalDesc")}
                 </p>
                 <input ref={footerLogoRef} type="file" accept="image/*" className="hidden"
                   onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("footerLogoBase64", f); }}/>
                 <div className="flex items-center gap-3">
                   <button onClick={() => footerLogoRef.current?.click()}
                     className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                    Selecionar imagem
+                    {t("cfg.selectImage")}
                   </button>
                   {settings.footerLogoBase64 && (
                     <div className="relative">
@@ -995,19 +1025,19 @@ export default function Settings() {
 
               {logoStatus === "success" && (
                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-                  <CheckCircle size={16}/> Logo e tamanho atualizados com sucesso!
+                  <CheckCircle size={16}/> {t("cfg.logoSaved")}
                 </div>
               )}
               {logoStatus === "error" && (
                 <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-[#E71D36] rounded-xl px-4 py-3 text-sm">
-                  <AlertCircle size={16}/> Erro ao salvar
+                  <AlertCircle size={16}/> {t("cfg.saveError")}
                 </div>
               )}
 
               <button onClick={saveLogo} disabled={savingLogo}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
                 {savingLogo ? <RefreshCw size={15} className="animate-spin"/> : <Upload size={15}/>}
-                {savingLogo ? "Salvando…" : "Salvar Logo"}
+                {savingLogo ? t("cfg.saving") : t("cfg.saveLogo")}
               </button>
             </div>
             </div>
@@ -1016,14 +1046,14 @@ export default function Settings() {
             <div className="space-y-5">
             {/* OG Image */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-              <SectionHeader icon={<Image size={15}/>} label="OG Image (compartilhamento social)"/>
-              <p className="text-xs text-[#94A3B8]">Exibida ao compartilhar o site no WhatsApp, Facebook etc. Recomendado: 1200×630px.</p>
+              <SectionHeader icon={<Image size={15}/>} label={t("cfg.ogImage")}/>
+              <p className="text-xs text-[#94A3B8]">{t("cfg.ogImageDesc")}</p>
               <input ref={ogRef} type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("ogImageBase64", f); }}/>
               <div className="flex items-center gap-3">
                 <button onClick={() => ogRef.current?.click()}
                   className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                  Selecionar imagem
+                  {t("cfg.selectImage")}
                 </button>
                 {settings.ogImageBase64 && (
                   <div className="relative">
@@ -1037,14 +1067,14 @@ export default function Settings() {
 
             {/* Favicon */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-              <SectionHeader icon={<Image size={15}/>} label="Favicon (ícone da aba do navegador)"/>
-              <p className="text-xs text-[#94A3B8]">Quadrado, idealmente 512×512px. PNG ou SVG com fundo transparente.</p>
+              <SectionHeader icon={<Image size={15}/>} label={t("cfg.favicon")}/>
+              <p className="text-xs text-[#94A3B8]">{t("cfg.faviconDesc")}</p>
               <input ref={faviconRef} type="file" accept="image/*" className="hidden"
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleImageFile("faviconBase64", f); }}/>
               <div className="flex items-center gap-3">
                 <button onClick={() => faviconRef.current?.click()}
                   className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors">
-                  Selecionar favicon
+                  {t("cfg.selectFavicon")}
                 </button>
                 {settings.faviconBase64 && (
                   <div className="relative">
@@ -1058,8 +1088,8 @@ export default function Settings() {
 
             {/* Login screen logo */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-              <SectionHeader icon={<LayoutDashboard size={15}/>} label="Logo da Tela de Login"/>
-              <p className="text-xs text-[#94A3B8]">Exibido na tela de login do painel. Se não definido, usa o logo do portal. Recomendado: PNG transparente, fundo escuro.</p>
+              <SectionHeader icon={<LayoutDashboard size={15}/>} label={t("cfg.loginLogo")}/>
+              <p className="text-xs text-[#94A3B8]">{t("cfg.loginLogoDesc")}</p>
               <input
                 ref={adminLogoRef}
                 type="file"
@@ -1075,7 +1105,7 @@ export default function Settings() {
                   onClick={() => adminLogoRef.current?.click()}
                   className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
                 >
-                  Selecionar logo
+                  {t("cfg.selectLogo")}
                 </button>
                 {settings.loginLogoBase64 ? (
                   <div className="relative bg-[#0B2A66] rounded-xl p-2">
@@ -1085,14 +1115,14 @@ export default function Settings() {
                       className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
                     >&times;</button>
                   </div>
-                ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do portal</p>}
+                ) : <p className="text-xs text-[#94A3B8] italic">{t("cfg.usingDefaultLogo")}</p>}
               </div>
             </div>
 
             {/* Admin sidebar logo */}
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
-              <SectionHeader icon={<LayoutDashboard size={15}/>} label="Logo do Painel Admin (sidebar)"/>
-              <p className="text-xs text-[#94A3B8]">Exibido na barra lateral do painel. Se não definido, usa o logo do portal. Recomendado: PNG transparente, 300×80px.</p>
+              <SectionHeader icon={<LayoutDashboard size={15}/>} label={t("cfg.adminLogo")}/>
+              <p className="text-xs text-[#94A3B8]">{t("cfg.adminLogoDesc")}</p>
               <input
                 ref={bylineLogoRef}
                 type="file"
@@ -1108,7 +1138,7 @@ export default function Settings() {
                   onClick={() => bylineLogoRef.current?.click()}
                   className="px-3 py-1.5 border border-[#E2E8F0] rounded-xl text-xs text-[#64748B] hover:bg-[#F8FAFC] transition-colors"
                 >
-                  Selecionar logo
+                  {t("cfg.selectLogo")}
                 </button>
                 {settings.adminLogoBase64 ? (
                   <div className="relative bg-[#0B2A66] rounded-xl p-2">
@@ -1118,13 +1148,13 @@ export default function Settings() {
                       className="absolute -top-1 -right-1 bg-[#E71D36] text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px]"
                     >&times;</button>
                   </div>
-                ) : <p className="text-xs text-[#94A3B8] italic">Usando logo padrão do portal</p>}
+                ) : <p className="text-xs text-[#94A3B8] italic">{t("cfg.usingDefaultLogo")}</p>}
               </div>
             </div>
             </div>
             </div>
 
-            <SaveBar saving={savingSettings} onSave={saveSettings} label="Salvar imagens"/>
+            <SaveBar saving={savingSettings} onSave={saveSettings} label={t("cfg.saveImages")}/>
           </div>
         )}
 
@@ -1134,53 +1164,53 @@ export default function Settings() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             {/* Admin panel colors */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
-              <SectionHeader icon={<LayoutDashboard size={15}/>} label="Painel Administrativo"/>
+              <SectionHeader icon={<LayoutDashboard size={15}/>} label={t("cfg.adminPanel")}/>
 
               {/* Presets */}
               <div>
-                <p className="text-xs font-medium text-[#64748B] mb-2">Temas prontos</p>
+                <p className="text-xs font-medium text-[#64748B] mb-2">{t("cfg.readyThemes")}</p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: `${BRAND.name} (padrão)`, sidebar: "#0B2A66", accent: "#E71D36" },
-                    { label: "Oceano",   sidebar: "#0b3d91", accent: "#e8a020" },
-                    { label: "Floresta", sidebar: "#1a3a2a", accent: "#22c55e" },
-                    { label: "Grafite",  sidebar: "#18181b", accent: "#f59e0b" },
-                    { label: "Roxo",     sidebar: "#3b1f6e", accent: "#a855f7" },
-                  ].map(t => (
-                    <button key={t.label} onClick={() => { setField("adminSidebarColor", t.sidebar); setField("adminAccentColor", t.accent); }}
+                    { label: `${BRAND.name} ${t("cfg.defaultParen")}`, sidebar: "#0B2A66", accent: "#E71D36" },
+                    { label: t("cfg.themeOcean"),    sidebar: "#0b3d91", accent: "#e8a020" },
+                    { label: t("cfg.themeForest"),   sidebar: "#1a3a2a", accent: "#22c55e" },
+                    { label: t("cfg.themeGraphite"), sidebar: "#18181b", accent: "#f59e0b" },
+                    { label: t("cfg.themePurple"),   sidebar: "#3b1f6e", accent: "#a855f7" },
+                  ].map(preset => (
+                    <button key={preset.label} onClick={() => { setField("adminSidebarColor", preset.sidebar); setField("adminAccentColor", preset.accent); }}
                       className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#E2E8F0] hover:border-[#CBD5E1] transition-colors text-xs text-[#0F172A]">
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.sidebar }}/>
-                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: t.accent }}/>
-                      {t.label}
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: preset.sidebar }}/>
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: preset.accent }}/>
+                      {preset.label}
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <ColorField label="Cor da sidebar"
+                <ColorField label={t("cfg.sidebarColor")}
                   value={settings.adminSidebarColor ?? "#0B2A66"}
                   onChange={v => setField("adminSidebarColor", v)}
                   preview="Sidebar"/>
-                <ColorField label="Cor de destaque (links ativos)"
+                <ColorField label={t("cfg.accentColor")}
                   value={settings.adminAccentColor ?? "#E71D36"}
                   onChange={v => setField("adminAccentColor", v)}
-                  preview="Destaque"/>
+                  preview={t("cfg.accentPreview")}/>
               </div>
             </div>
 
             {/* Portal public colors */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
-              <SectionHeader icon={<Globe size={15}/>} label="Cores do Portal Público"/>
+              <SectionHeader icon={<Globe size={15}/>} label={t("cfg.publicPortalColors")}/>
               <div className="grid grid-cols-2 gap-4">
-                <ColorField label="Fundo do cabeçalho"
+                <ColorField label={t("cfg.headerBg")}
                   value={settings.headerBgColor ?? "#ffffff"}
                   onChange={v => setField("headerBgColor", v)}
-                  preview="Cabeçalho" light/>
-                <ColorField label="Fundo do rodapé"
+                  preview={t("cfg.headerPreview")} light/>
+                <ColorField label={t("cfg.footerBg")}
                   value={settings.footerBgColor ?? "#000000"}
                   onChange={v => setField("footerBgColor", v)}
-                  preview="Rodapé"/>
+                  preview={t("cfg.footerPreview")}/>
               </div>
             </div>
             </div>
@@ -1199,7 +1229,7 @@ export default function Settings() {
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<Link2 size={15}/>} label="Google Tag Manager"/>
               <p className="text-xs text-[#94A3B8]">
-                Insira o ID do contêiner GTM. O snippet será injetado automaticamente em todas as páginas.
+                {t("cfg.gtmDesc")}
               </p>
               <Field label="Container ID">
                 <input
@@ -1209,12 +1239,12 @@ export default function Settings() {
                   placeholder="GTM-XXXXXXX"
                 />
                 <p className="text-[11px] text-[#94A3B8] mt-1">
-                  Google Tag Manager → Workspace → ID do contêiner (ex: GTM-P6QN99MB)
+                  {t("cfg.gtmHint")}
                 </p>
               </Field>
               {settings.gtmId && (
                 <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-                  <CheckCircle size={15}/> GTM ativo — {settings.gtmId}
+                  <CheckCircle size={15}/> {t("cfg.gtmActive")} {settings.gtmId}
                 </div>
               )}
             </div>
@@ -1222,7 +1252,7 @@ export default function Settings() {
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<BarChart2 size={15}/>} label="Meta / Facebook Pixel"/>
               <p className="text-xs text-[#94A3B8]">
-                ID do pixel do Facebook para rastreamento de conversões e públicos no Meta Ads.
+                {t("cfg.pixelDesc")}
               </p>
               <Field label="Pixel ID">
                 <input
@@ -1232,12 +1262,12 @@ export default function Settings() {
                   placeholder="123456789012345"
                 />
                 <p className="text-[11px] text-[#94A3B8] mt-1">
-                  Meta Business Suite → Events Manager → Pixels → ID do Pixel
+                  {t("cfg.pixelHint")}
                 </p>
               </Field>
               {settings.facebookPixelId && (
                 <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 rounded-xl px-4 py-3 text-sm">
-                  <CheckCircle size={15}/> Pixel ativo — {settings.facebookPixelId}
+                  <CheckCircle size={15}/> {t("cfg.pixelActive")} {settings.facebookPixelId}
                 </div>
               )}
             </div>
@@ -1245,7 +1275,7 @@ export default function Settings() {
             <div className={`${CARD} p-6 space-y-4`} style={CARD_SHADOW}>
               <SectionHeader icon={<BarChart2 size={15}/>} label="Google Analytics 4"/>
               <p className="text-xs text-[#94A3B8]">
-                Measurement ID do GA4 para análise de tráfego e comportamento de usuários.
+                {t("cfg.ga4Desc")}
               </p>
               <Field label="Measurement ID">
                 <input
@@ -1255,12 +1285,12 @@ export default function Settings() {
                   placeholder="G-XXXXXXXXXX"
                 />
                 <p className="text-[11px] text-[#94A3B8] mt-1">
-                  GA4 → Admin → Data Streams → Web → Measurement ID
+                  {t("cfg.ga4Hint")}
                 </p>
               </Field>
               {settings.ga4MeasurementId && (
                 <div className="flex items-center gap-2 bg-orange-50 border border-orange-200 text-orange-700 rounded-xl px-4 py-3 text-sm">
-                  <CheckCircle size={15}/> GA4 ativo — {settings.ga4MeasurementId}
+                  <CheckCircle size={15}/> {t("cfg.ga4Active")} {settings.ga4MeasurementId}
                 </div>
               )}
             </div>
@@ -1326,7 +1356,7 @@ export default function Settings() {
         {activeTab === "contato" && (
           <div className="max-w-2xl xl:max-w-6xl space-y-5">
             {loadingContact ? (
-              <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>Carregando…</div>
+              <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>{t("cfg.loading")}</div>
             ) : contact ? (
               <>
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
@@ -1339,12 +1369,12 @@ export default function Settings() {
                       <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: color + "18" }}>
                         <Icon size={14} style={{ color }}/>
                       </div>
-                      <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wide">{title}</h3>
+                      <h3 className="text-xs font-bold text-[#64748B] uppercase tracking-wide">{t(title)}</h3>
                     </div>
                     <div className="space-y-4">
                       {fields.map(({ key, label, placeholder, multiline }) => (
                         <div key={key}>
-                          <label className="block text-sm font-medium text-[#0F172A] mb-1.5">{label}</label>
+                          <label className="block text-sm font-medium text-[#0F172A] mb-1.5">{t(label)}</label>
                           {multiline ? (
                             <textarea value={(contact[key] as string) ?? ""} rows={4}
                               onChange={e => updateContact(key, e.target.value as ContactInfo[typeof key])}
@@ -1365,7 +1395,7 @@ export default function Settings() {
                 <SaveBar saving={savingContact} onSave={saveContact}/>
               </>
             ) : (
-              <div className={`${CARD} p-8 text-center text-[#E71D36]`} style={CARD_SHADOW}>Erro ao carregar dados de contato.</div>
+              <div className={`${CARD} p-8 text-center text-[#E71D36]`} style={CARD_SHADOW}>{t("cfg.contactLoadError")}</div>
             )}
           </div>
         )}
@@ -2336,15 +2366,16 @@ function Badge({ color, children }: { color: "orange" | "blue"; children: React.
   );
 }
 
-function SaveBar({ saving, onSave, label = "Salvar configurações" }: {
+function SaveBar({ saving, onSave, label }: {
   saving: boolean; onSave: () => void; label?: string;
 }) {
+  const { t } = useAdminT();
   return (
     <div className="flex justify-end pt-1 pb-4">
       <button onClick={onSave} disabled={saving}
         className="inline-flex items-center gap-2 px-6 py-2.5 bg-[#0B2A66] text-white rounded-xl text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
         {saving ? <RefreshCw size={14} className="animate-spin"/> : <Save size={14}/>}
-        {saving ? "Salvando…" : label}
+        {saving ? t("cfg.saving") : (label ?? t("cfg.saveSettings"))}
       </button>
     </div>
   );
