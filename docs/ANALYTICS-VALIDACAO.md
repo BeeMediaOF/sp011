@@ -67,6 +67,11 @@ pipeline de analytics.
 3. Recarregue e repita na MESMA sessão → NÃO conta de novo (1× por sessão).
 4. Clique no anúncio → +1 clique; painel → Propagandas (período Hoje) mostra
    impressão/clique/CTR do anúncio.
+5. Bloco da home marcado "É uma propaganda" (imagem/HTML): mesmas regras — 1s
+   visível → +1 impressão (`ad_daily_stats.ad_id = 'block:<id>'`), clique em
+   qualquer link do bloco → +1 clique; aparece na tabela de anúncios do painel
+   com posição "bloco da home". Banner ao lado do logo (Configurações) NÃO é
+   medido — não é bloco nem anúncio.
 
 ## 7. Tráfego interno
 

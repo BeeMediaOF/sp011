@@ -105,6 +105,9 @@ export interface HomeBlock {
   format?: string; source?: string; itemsLimit?: number;
   imageUrl?: string; linkUrl?: string; caption?: string;
   videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
+  /** Bloco de imagem/HTML marcado "É uma propaganda" — mede impressão/clique
+   *  sob a chave block:<id> (ad_daily_stats) e entra nas métricas de anúncios. */
+  isAd?: boolean;
   /** Zona da home (blocos consecutivos formam a zona 2 colunas) e meia largura. */
   area?: "main" | "sidebar"; width?: "full" | "half";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona. */

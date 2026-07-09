@@ -85,6 +85,7 @@ no painel (`?period=today|yesterday|7d|30d|custom`), ecoado em `stats.period`.
 | Profundidade de leitura | `scroll` (25/50/75/100) | **sessões únicas** (sessão+artigo) por marco; % medido sobre o BLOCO do corpo do artigo (contentRef — cabeçalho/lateral/rodapé não contam); página curta = 100% após 3s | selecionada | sessionStorage `bee_scroll_<artigo>` — remount não redispara |
 | Leram 100% | `scroll depth=100` | tamanho do set de sessões | selecionada | idem |
 | Impressões de anúncio | `POST /api/ads/:id/impression` | IntersectionObserver ≥50% visível por **1s contínuo** (dwell IAB); anúncio inativo/expirado não conta (checado no servidor) | selecionada (`ad_daily_stats` por dia BRT) | 1× por anúncio por sessão (`bee_adimp_<id>`); admin/dev não envia |
+| Blocos "É uma propaganda" | idem, com chave `block:<id do bloco>` | blocos de imagem/HTML da home ou da lateral marcados `isAd` medem impressão (mesma regra de dwell) e clique (qualquer link do bloco); validados contra as settings no servidor; contadores só em `ad_daily_stats` (sem linha na tabela `ads`); entram em adStats/adKpis como posição "bloco da home" | selecionada | 1× por sessão; bloco oculto não conta |
 | Cliques de anúncio | `POST /api/ads/:id/click` | registrado antes do redirect (target=_blank) | selecionada | admin/dev não envia |
 | CTR | derivado | cliques válidos ÷ impressões válidas × 100, por anúncio e médio | selecionada | — |
 | Melhor anúncio | derivado | maior CTR entre anúncios com impressão > 0 na janela; `—` sem dados | selecionada | — |

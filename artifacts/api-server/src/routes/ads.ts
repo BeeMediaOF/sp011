@@ -3,8 +3,25 @@ import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
 import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
+import { store } from "../lib/store.js";
 
 const router = Router();
+
+// ─── Blocos "É uma propaganda" ────────────────────────────────────────────────
+// Blocos de imagem/HTML da home ou da lateral da notícia marcados isAd também
+// são inventário medido: chave `block:<id>`, contadores só em ad_daily_stats
+// (não existe linha na tabela ads). A validação é contra as settings — id
+// desconhecido/não marcado não vira métrica.
+const BLOCK_PREFIX = "block:";
+
+function findAdBlock(blockId: string): { visible: boolean } | null {
+  const s = store.getSettings();
+  for (const list of [s.homeBlocks ?? [], s.articleSidebarBlocks ?? []]) {
+    const b = list.find((x) => x.id === blockId && x.isAd === true);
+    if (b) return { visible: b.visible !== false };
+  }
+  return null;
+}
 
 function todayStr(): string {
   // Dia calendário de Brasília (UTC-3 fixo — sem horário de verão desde 2019).
@@ -125,6 +142,18 @@ router.post("/:id/click", async (req, res) => {
     return;
   }
 
+  // Bloco da home marcado "É uma propaganda" — só o histórico diário.
+  if (id.startsWith(BLOCK_PREFIX)) {
+    const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
+    if (!blk || !blk.visible) {
+      res.status(404).json({ ok: false, error: "Ad not found or inactive" });
+      return;
+    }
+    void upsertDailyStat(id, "clicks");
+    res.json({ ok: true, message: "Click tracked" });
+    return;
+  }
+
   const [row] = await db
     .select({ id: adsTable.id, active: adsTable.active })
     .from(adsTable)
@@ -151,6 +180,14 @@ router.post("/:id/impression", async (req, res) => {
   const id = req.params.id ?? "";
 
   if (isBotRequest(req) || overRateLimit(`adimp:${req.ip ?? ""}`, 60)) {
+    res.json({ ok: true });
+    return;
+  }
+
+  // Bloco da home marcado "É uma propaganda" — só bloco visível conta.
+  if (id.startsWith(BLOCK_PREFIX)) {
+    const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
+    if (blk && blk.visible) void upsertDailyStat(id, "impressions");
     res.json({ ok: true });
     return;
   }

@@ -23,7 +23,7 @@ import { safeTitleHtml, sanitizeArticleHtml } from "../../lib/sanitize";
 import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
 } from "../../lib/homeBlocks";
-import type { AdSlotKey } from "../ads/useAds";
+import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
 import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
 
@@ -87,6 +87,10 @@ export function ImageBlock({ block, preview, contained = true }: {
   /** false = sem o wrapper de página (uso na lateral da notícia/zonas). */
   contained?: boolean;
 }) {
+  // Bloco marcado "É uma propaganda": mede impressão viewável (≥50% por 1s,
+  // 1× por sessão) e cliques como qualquer anúncio, sob a chave block:<id>.
+  const adKey = block.isAd ? `block:${block.id}` : undefined;
+  const impressionRef = useAdImpression(adKey);
   const src = (block.imageUrl ?? "").trim();
   if (!src) {
     return <BlockPlaceholder preview={preview} label={`Bloco de imagem: ${block.name}`}
@@ -131,14 +135,16 @@ export function ImageBlock({ block, preview, contained = true }: {
     );
   }
 
+  const onAdClick = adKey ? () => { void trackClick(adKey); } : undefined;
   const inner = href
     ? (/^https?:\/\//i.test(href)
-      ? <a href={href} target="_blank" rel="noopener noreferrer" className="block hover:opacity-95 transition-opacity">{body}</a>
-      : <Link href={href} className="block hover:opacity-95 transition-opacity">{body}</Link>)
+      ? <a href={href} target="_blank" rel="noopener noreferrer" onClick={onAdClick} className="block hover:opacity-95 transition-opacity">{body}</a>
+      : <Link href={href} onClick={onAdClick} className="block hover:opacity-95 transition-opacity">{body}</Link>)
     : body;
 
   return (
-    <section className={!contained ? "" : format === "full_width_image" ? "py-4" : "max-w-[1280px] mx-auto px-4 py-6"}>
+    <section ref={adKey ? impressionRef : undefined}
+      className={!contained ? "" : format === "full_width_image" ? "py-4" : "max-w-[1280px] mx-auto px-4 py-6"}>
       {inner}
     </section>
   );
@@ -231,6 +237,10 @@ export function HtmlBlock({ block, preview, contained = true }: {
   /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas da home). */
   contained?: boolean;
 }) {
+  // Bloco marcado "É uma propaganda": impressão viewável (≥50% por 1s, 1× por
+  // sessão) + qualquer clique em link do bloco conta como clique de anúncio.
+  const adKey = block.isAd ? `block:${block.id}` : undefined;
+  const impressionRef = useAdImpression(adKey);
   const clean = sanitizeArticleHtml(block.html);
   const link = safeLinkUrl(block.linkUrl);
   if (!clean) {
@@ -239,7 +249,12 @@ export function HtmlBlock({ block, preview, contained = true }: {
   }
   const body = <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />;
   return (
-    <section className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}>
+    <section ref={adKey ? impressionRef : undefined}
+      className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}
+      onClick={adKey ? (e) => {
+        // Delegação: cobre o overlay E os <a> do próprio HTML sanitizado.
+        if ((e.target as HTMLElement).closest("a")) void trackClick(adKey);
+      } : undefined}>
       {link ? (
         // Link por overlay: o banner inteiro fica clicável sem aninhar <a>
         // dentro de possíveis <a> do próprio HTML (aninhado é HTML inválido).

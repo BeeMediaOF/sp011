@@ -619,21 +619,34 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     cur.impressions += row.impressions;
     cur.clicks      += row.clicks;
   }
-  const adStats = allAds.map((ad) => {
-    const wTot = adWindowTotals[ad.id];
+  // Blocos da home/lateral marcados "É uma propaganda" são inventário medido
+  // também: pseudo-anúncios com chave block:<id> (contadores só no diário).
+  const blockAds = new Map<string, { name: string; active: boolean }>();
+  {
+    const s = store.getSettings();
+    for (const list of [s.homeBlocks ?? [], s.articleSidebarBlocks ?? []]) {
+      for (const b of list) {
+        if (b.isAd === true && !blockAds.has(b.id)) {
+          blockAds.set(b.id, { name: b.name, active: b.visible !== false });
+        }
+      }
+    }
+  }
+  const buildAdStat = (id: string, name: string, position: string, active: boolean) => {
+    const wTot = adWindowTotals[id];
     const impressions = wTot?.impressions ?? 0;
     const clicks      = wTot?.clicks ?? 0;
     return {
-      id:          ad.id,
-      name:        ad.name,
-      position:    ad.position,
-      active:      ad.active,
-      impressions,
-      clicks,
-      ctr:         impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0,
-      hasData:     wTot !== undefined, // distingue "sem dados no período" de zero real
+      id, name, position, active, impressions, clicks,
+      ctr:     impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0,
+      hasData: wTot !== undefined, // distingue "sem dados no período" de zero real
     };
-  }).sort((a, b) => b.impressions - a.impressions);
+  };
+  const adStats = [
+    ...allAds.map((ad) => buildAdStat(ad.id, ad.name, ad.position, ad.active)),
+    ...[...blockAds.entries()].map(([bid, meta]) =>
+      buildAdStat(`block:${bid}`, meta.name, "bloco da home", meta.active)),
+  ].sort((a, b) => b.impressions - a.impressions);
 
   const top3AdIds = adStats.slice(0, 3).map((a) => a.id);
   const adDailyByDate: Record<string, Record<string, { impressions: number; clicks: number }>> = {};
