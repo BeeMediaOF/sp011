@@ -13,6 +13,7 @@ import {
   Bot, Zap, Gauge,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { useAdminT, type AdminTKey } from "../../lib/adminI18n";
 import {
   type TemplateElement,
   type ArticleData,
@@ -190,15 +191,15 @@ const PRIMARY = "#0B2A66";
 const ACCENT  = "#E71D36";
 
 /** Variáveis clicáveis para montar o template da legenda (inserem no cursor). */
-const CAPTION_VARS: { token: string; label: string }[] = [
-  { token: "{{title}}",    label: "Título" },
-  { token: "{{category}}", label: "Categoria" },
-  { token: "{{summary}}",  label: "Resumo (IA)" },
-  { token: "{{excerpt}}",  label: "Trecho do post" },
-  { token: "{{hashtags}}", label: "Tags (IA)" },
-  { token: "{{link}}",     label: "Link" },
-  { token: "{{subtitle}}", label: "Subtítulo" },
-  { token: "{{author}}",   label: "Autor" },
+const CAPTION_VARS: { token: string; label: AdminTKey }[] = [
+  { token: "{{title}}",    label: "soc.varTitle" },
+  { token: "{{category}}", label: "soc.varCategory" },
+  { token: "{{summary}}",  label: "soc.varSummary" },
+  { token: "{{excerpt}}",  label: "soc.varExcerpt" },
+  { token: "{{hashtags}}", label: "soc.varHashtags" },
+  { token: "{{link}}",     label: "soc.varLink" },
+  { token: "{{subtitle}}", label: "soc.varSubtitle" },
+  { token: "{{author}}",   label: "soc.varAuthor" },
 ];
 
 const PREVIEW_W = 360;
@@ -210,25 +211,25 @@ const FEED_SAFE_MARGIN = 60;
 const STORY_SAFE_TOP = 250;
 const STORY_SAFE_BOTTOM = 250;
 
-const ELEMENT_TYPE_LABELS: Record<string, string> = {
-  title: "Título", category: "Categoria", image: "Imagem de fundo",
-  logo: "Logo", cta: "Call to action", text: "Texto livre", overlay: "Máscara (overlay)",
-  gradient: "Degradê", shape: "Forma",
+const ELEMENT_TYPE_LABELS: Record<string, AdminTKey> = {
+  title: "soc.elTitle", category: "soc.elCategory", image: "soc.elImage",
+  logo: "soc.elLogo", cta: "soc.elCta", text: "soc.elText", overlay: "soc.elOverlay",
+  gradient: "soc.elGradient", shape: "soc.elShape",
 };
 
 const ELEMENT_TYPES: ElementType[] = ["image", "overlay", "gradient", "shape", "title", "category", "logo", "cta", "text"];
 
 /** Figuras disponíveis no seletor de forma (ícone + rótulo). */
-const SHAPE_KINDS: { kind: ShapeKind; label: string; Icon: typeof Square }[] = [
-  { kind: "rect", label: "Retângulo", Icon: Square },
-  { kind: "ellipse", label: "Elipse", Icon: Circle },
-  { kind: "triangle", label: "Triângulo", Icon: Triangle },
-  { kind: "polygon", label: "Polígono", Icon: Hexagon },
-  { kind: "star", label: "Estrela", Icon: Star },
-  { kind: "line", label: "Linha", Icon: Minus },
-  { kind: "arrow", label: "Seta", Icon: ArrowRight },
-  { kind: "chevron", label: "Chevron", Icon: ChevronRight },
-  { kind: "corners", label: "Cantos", Icon: Frame },
+const SHAPE_KINDS: { kind: ShapeKind; label: AdminTKey; Icon: typeof Square }[] = [
+  { kind: "rect", label: "soc.shpRect", Icon: Square },
+  { kind: "ellipse", label: "soc.shpEllipse", Icon: Circle },
+  { kind: "triangle", label: "soc.shpTriangle", Icon: Triangle },
+  { kind: "polygon", label: "soc.shpPolygon", Icon: Hexagon },
+  { kind: "star", label: "soc.shpStar", Icon: Star },
+  { kind: "line", label: "soc.shpLine", Icon: Minus },
+  { kind: "arrow", label: "soc.shpArrow", Icon: ArrowRight },
+  { kind: "chevron", label: "soc.shpChevron", Icon: ChevronRight },
+  { kind: "corners", label: "soc.shpCorners", Icon: Frame },
 ];
 
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
@@ -261,14 +262,14 @@ type PresetKind =
   | "feed-photo" | "story-quote" | "sport-card"
   | "sp011" | "bee-sports" | "brasilia-hoje" | "frame-dark";
 
-const PRESETS: { kind: PresetKind; label: string }[] = [
-  { kind: "sp011",         label: "SP011 · Foto + barra vermelha" },
-  { kind: "bee-sports",    label: "BeeSports · Esporte (chevron)" },
-  { kind: "brasilia-hoje", label: "Brasília Hoje · Foto emoldurada" },
-  { kind: "frame-dark",    label: "Notícia · Foto emoldurada (escuro)" },
-  { kind: "sport-card",  label: "Esporte · Card (logo + faixa)" },
-  { kind: "feed-photo",  label: "Feed · Foto + faixa" },
-  { kind: "story-quote", label: "Story · Citação" },
+const PRESETS: { kind: PresetKind; label: AdminTKey }[] = [
+  { kind: "sp011",         label: "soc.presetSp011" },
+  { kind: "bee-sports",    label: "soc.presetBeeSports" },
+  { kind: "brasilia-hoje", label: "soc.presetBsbHoje" },
+  { kind: "frame-dark",    label: "soc.presetFrameDark" },
+  { kind: "sport-card",  label: "soc.presetSportCard" },
+  { kind: "feed-photo",  label: "soc.presetFeedPhoto" },
+  { kind: "story-quote", label: "soc.presetStoryQuote" },
 ];
 
 function makePreset(kind: PresetKind): SocialTemplate {
@@ -412,9 +413,9 @@ function makePreset(kind: PresetKind): SocialTemplate {
   };
 }
 
-function fmtDate(iso?: string | null): string {
+function fmtDate(iso?: string | null, loc = "pt-BR"): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleString(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 // ─── Canvas: interação (mover/redimensionar) + snapping ────────────────────────
@@ -433,15 +434,6 @@ interface Interaction {
 const RESIZE_HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 const SNAP = 12;      // limiar de encaixe em px reais
 const MIN_SIZE = 20;
-
-/** Artigo de amostra usado no canvas quando nenhum artigo real é selecionado. */
-const SAMPLE_ARTICLE: ArticleData = {
-  title: "Prefeitura anuncia novo plano de mobilidade para a região central",
-  subtitle: "Medida promete reduzir o tempo de deslocamento no horário de pico",
-  category: "Cidade",
-  author: "Redação",
-  imageUrl: "",
-};
 
 /** Aplica o arrasto de uma alça à caixa original, mantendo tamanho mínimo. */
 function applyHandle(orig: Interaction["orig"], handle: Handle, dx: number, dy: number) {
@@ -505,6 +497,7 @@ function toRgba(hex: string, alpha: number): string {
 
 /** Editor de degradê reutilizável (fundo do canvas e de elementos). */
 function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: Gradient) => void }) {
+  const { t } = useAdminT();
   const setStop = (i: number, patch: Partial<{ color: string; pos: number }>) =>
     onChange({ ...value, stops: value.stops.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) });
 
@@ -513,7 +506,7 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
       <select value=""
         onChange={(e) => { const p = GRADIENT_PRESETS[Number(e.target.value)]; if (p) onChange(JSON.parse(JSON.stringify(p.gradient))); e.target.value = ""; }}
         className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-slate-50">
-        <option value="">★ Degradês prontos…</option>
+        <option value="">{t("soc.gradPresets")}</option>
         {GRADIENT_PRESETS.map((p, i) => <option key={p.name} value={i}>{p.name}</option>)}
       </select>
 
@@ -530,7 +523,7 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
           <div className="flex items-center gap-1">
             <input type="number" min={0} max={360} value={value.angle}
               onChange={(e) => onChange({ ...value, angle: Number(e.target.value) })}
-              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" title="Ângulo (graus)" />
+              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" title={t("soc.gradAngle")} />
             <span className="text-[10px] text-slate-400">°</span>
           </div>
         )}
@@ -545,10 +538,10 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
               className="w-7 h-7 rounded cursor-pointer border border-slate-200 shrink-0" />
             <input type="range" min={0} max={1} step={0.05} value={alpha}
               onChange={(e) => setStop(i, { color: toRgba(hex, Number(e.target.value)) })}
-              className="flex-1" title={`Opacidade ${Math.round(alpha * 100)}%`} />
+              className="flex-1" title={`${t("soc.gradOpacity")} ${Math.round(alpha * 100)}%`} />
             <input type="number" min={0} max={100} value={s.pos}
               onChange={(e) => setStop(i, { pos: Math.max(0, Math.min(100, Number(e.target.value))) })}
-              className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" title="Posição %" />
+              className="w-12 text-xs border border-slate-200 rounded-lg px-1.5 py-1.5 outline-none focus:border-[#0B2A66]" title={t("soc.gradPos")} />
             {value.stops.length > 2 && (
               <button onClick={() => onChange({ ...value, stops: value.stops.filter((_, idx) => idx !== i) })}
                 className="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-red-500 shrink-0">
@@ -562,12 +555,12 @@ function GradientControls({ value, onChange }: { value: Gradient; onChange: (g: 
       <div className="flex items-center justify-between">
         <button onClick={() => onChange({ ...value, stops: [...value.stops, { color: "rgba(0,0,0,1)", pos: 100 }] })}
           className="flex items-center gap-1 text-[11px] font-medium text-[#0B2A66] hover:underline">
-          <Plus size={11} /> Adicionar parada
+          <Plus size={11} /> {t("soc.gradAddStop")}
         </button>
         <button onClick={() => onChange(smoothGradient(value))}
-          title="Reamostra as paradas numa curva suave (sem faixa/linha visível)"
+          title={t("soc.gradSmoothTip")}
           className="flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-[#0B2A66] hover:underline">
-          <Sparkles size={11} /> Suavizar
+          <Sparkles size={11} /> {t("soc.gradSmooth")}
         </button>
       </div>
     </div>
@@ -648,6 +641,7 @@ function AccountModal({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const { t } = useAdminT();
   const [showAdvanced, setShowAdvanced] = React.useState(
     !!(editingAccount.pageId || editingAccount.instagramId || editingAccount.accessToken)
   );
@@ -670,7 +664,7 @@ function AccountModal({
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-800">
-            {editingAccount.id ? "Editar Conta" : "Adicionar Conta Meta"}
+            {editingAccount.id ? t("soc.accEdit") : t("soc.accAdd")}
           </h3>
           <button onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
@@ -680,9 +674,9 @@ function AccountModal({
 
         <div className="p-6 space-y-4">
           {/* ── Campos principais ── */}
-          <Field fieldKey="name" label="Nome da conta *" placeholder={`Ex: ${BRAND.name}`} />
-          <Field fieldKey="metaAppId" label="ID do Aplicativo Meta" placeholder="123456789012345" />
-          <Field fieldKey="metaAppSecret" label="Chave Secreta do App" placeholder="••••••••••••••••" pw />
+          <Field fieldKey="name" label={t("soc.accName")} placeholder={`${BRAND.name}`} />
+          <Field fieldKey="metaAppId" label={t("soc.accAppId")} placeholder="123456789012345" />
+          <Field fieldKey="metaAppSecret" label={t("soc.accAppSecret")} placeholder="••••••••••••••••" pw />
 
           {/* ── Avançado ── */}
           <div>
@@ -692,28 +686,27 @@ function AccountModal({
               className="flex items-center gap-1.5 text-xs font-semibold text-[#0B2A66] hover:underline"
             >
               {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              {showAdvanced ? "Ocultar campos avançados" : "Configuração avançada (Page ID, Instagram, Token)"}
+              {showAdvanced ? t("soc.accHideAdv") : t("soc.accShowAdv")}
             </button>
           </div>
 
           {showAdvanced && (
             <div className="space-y-4 border-t border-slate-100 pt-4">
               <p className="text-[11px] text-slate-400 leading-relaxed">
-                Preencha o <strong>Page Access Token</strong> com um token de longa duração obtido no Meta Business Suite
-                ou pelo fluxo OAuth. O Page ID e o Instagram ID são preenchidos automaticamente ao testar a conexão.
+                {t("soc.accAdvHintPre")} <strong>Page Access Token</strong> {t("soc.accAdvHintPost")}
               </p>
               <Field fieldKey="accessToken" label="Page Access Token (long-lived)" placeholder="EAABxx…" pw />
               <Field fieldKey="pageId" label="Facebook Page ID" placeholder="123456789012345" />
-              <Field fieldKey="pageName" label="Nome da Página (opcional)" placeholder={BRAND.name} />
+              <Field fieldKey="pageName" label={t("soc.accPageName")} placeholder={BRAND.name} />
               <Field fieldKey="instagramId" label="Instagram Business Account ID" placeholder="123456789012345" />
-              <Field fieldKey="instagramName" label="Nome do Instagram (opcional)" placeholder="@sbcagora" />
+              <Field fieldKey="instagramName" label={t("soc.accIgName")} placeholder="@sbcagora" />
             </div>
           )}
 
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="checkbox" checked={editingAccount.isActive ?? true}
               onChange={(e) => setEditingAccount((prev) => prev ? { ...prev, isActive: e.target.checked } : prev)} />
-            <span className="text-sm text-slate-700">Conta ativa</span>
+            <span className="text-sm text-slate-700">{t("soc.accActive")}</span>
           </label>
         </div>
 
@@ -722,11 +715,11 @@ function AccountModal({
             className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
             style={{ background: PRIMARY }}>
             {accountSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            {accountSaving ? "Salvando…" : "Salvar"}
+            {accountSaving ? t("soc.saving") : t("soc.save")}
           </button>
           <button onClick={onClose}
             className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-            Cancelar
+            {t("soc.cancel")}
           </button>
         </div>
       </div>
@@ -739,10 +732,11 @@ function AccountModal({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function StatusBadge({ status }: { status: "online" | "offline" | "error" }) {
+  const { t } = useAdminT();
   const map = {
-    online:  { label: "ONLINE",  cls: "bg-green-100 text-green-700" },
-    error:   { label: "ERRO",    cls: "bg-red-100 text-red-600" },
-    offline: { label: "OFFLINE", cls: "bg-slate-100 text-slate-400" },
+    online:  { label: t("soc.stOnline"),  cls: "bg-green-100 text-green-700" },
+    error:   { label: t("soc.stErrorU"),  cls: "bg-red-100 text-red-600" },
+    offline: { label: t("soc.stOffline"), cls: "bg-slate-100 text-slate-400" },
   } as const;
   const s = map[status] ?? map.offline;
   return <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold tracking-wide ${s.cls}`}>{s.label}</span>;
@@ -766,6 +760,7 @@ function ConnectionCard({
   onToggleAuto: (conn: Connection) => void;
   onDelete: (id: string) => void;
 }) {
+  const { t } = useAdminT();
   return (
     <div className="bg-white rounded-2xl p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
       <div className="flex items-start gap-3">
@@ -784,7 +779,7 @@ function ConnectionCard({
           <div className="text-xs text-slate-500 space-y-0.5 min-h-[1.25rem]">
             {conn.siteUrl && <p className="truncate">{conn.siteUrl}</p>}
             {conn.autoPublish && (
-              <p className="text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> Publicação Automática Ativa</p>
+              <p className="text-green-600 font-medium flex items-center gap-1"><CheckCircle size={12} /> {t("soc.autoPubActive")}</p>
             )}
             {conn.status === "error" && conn.lastError && <p className="text-red-500">{conn.lastError}</p>}
             {testStatus[conn.id] && (
@@ -792,25 +787,25 @@ function ConnectionCard({
             )}
           </div>
           <div className="flex items-center gap-1.5 mt-auto pt-1">
-            <button onClick={() => onTest(conn.id)} disabled={testingId === conn.id} title="Testar agora"
+            <button onClick={() => onTest(conn.id)} disabled={testingId === conn.id} title={t("soc.testNow")}
               className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 transition-colors">
-              {testingId === conn.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />} Testar
+              {testingId === conn.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />} {t("soc.test")}
             </button>
-            <button onClick={() => onToggleAuto(conn)} title="Publicação automática"
+            <button onClick={() => onToggleAuto(conn)} title={t("soc.autoPublish")}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 transition-colors">
               {conn.autoPublish ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
             </button>
             {docUrl && (
-              <a href={docUrl} target="_blank" rel="noreferrer" title="Abrir documentação"
+              <a href={docUrl} target="_blank" rel="noreferrer" title={t("soc.openDocs")}
                 className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-50 transition-colors">
                 <ExternalLink size={13} />
               </a>
             )}
-            <button onClick={() => onConfigure(conn)} title="Configurar"
+            <button onClick={() => onConfigure(conn)} title={t("soc.configure")}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors ml-auto">
               <Settings size={14} />
             </button>
-            <button onClick={() => onDelete(conn.id)} title="Desconectar"
+            <button onClick={() => onDelete(conn.id)} title={t("soc.disconnect")}
               className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
               <Trash2 size={13} />
             </button>
@@ -820,7 +815,7 @@ function ConnectionCard({
         <button onClick={() => onConfigure(null)}
           className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
           style={{ background: PRIMARY }}>
-          <Plus size={15} /> Conectar
+          <Plus size={15} /> {t("soc.connect")}
         </button>
       )}
     </div>
@@ -834,6 +829,7 @@ function MetaConnectionCard({
   metaApp: MetaAppConfig;
   onConfigure: () => void;
 }) {
+  const { t } = useAdminT();
   const connected = accounts.length;
   const status: "online" | "offline" = connected > 0 && metaApp.hasSecret ? "online" : "offline";
   return (
@@ -852,19 +848,19 @@ function MetaConnectionCard({
       </div>
       <div className="text-xs text-slate-500 space-y-0.5 min-h-[1.25rem]">
         {connected === 0
-          ? <p>Nenhuma página conectada.</p>
+          ? <p>{t("soc.noPagesConnected")}</p>
           : accounts.slice(0, 3).map((a) => (
               <p key={a.id} className="truncate flex items-center gap-1.5">
                 {a.instagramId ? <Instagram size={12} className="text-[#E1306C]" /> : <Facebook size={12} className="text-[#1877F2]" />}
                 {a.name}
               </p>
             ))}
-        {connected > 3 && <p className="text-slate-400">+{connected - 3} outras</p>}
+        {connected > 3 && <p className="text-slate-400">+{connected - 3} {t("soc.others")}</p>}
       </div>
       <button onClick={onConfigure}
         className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
         style={{ background: PRIMARY }}>
-        <Settings size={15} /> {connected > 0 ? "Gerenciar" : "Conectar"}
+        <Settings size={15} /> {connected > 0 ? t("soc.manage") : t("soc.connect")}
       </button>
     </div>
   );
@@ -906,9 +902,10 @@ function LabeledInput({ label, value, onChange, placeholder, type = "text", hint
 }
 
 function AutoPublishToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const { t } = useAdminT();
   return (
     <label className="flex items-center justify-between gap-2 cursor-pointer py-1">
-      <span className="text-sm text-slate-700 font-medium">Publicação Automática</span>
+      <span className="text-sm text-slate-700 font-medium">{t("soc.autoPublish")}</span>
       <button type="button" onClick={() => onChange(!value)}>
         {value ? <ToggleRight size={26} className="text-green-500" /> : <ToggleLeft size={26} className="text-slate-300" />}
       </button>
@@ -925,30 +922,29 @@ function ConnectionModal({
   onSave: () => void;
   onClose: () => void;
 }) {
+  const { t } = useAdminT();
   const isWp = platform === "wordpress";
   const set = (patch: Partial<Connection>) =>
     setEditingConnection((prev) => (prev ? { ...prev, ...patch } : prev));
 
   return (
-    <ModalShell title={isWp ? "Configurar WordPress" : "Configurar Site Externo"} onClose={onClose}>
+    <ModalShell title={isWp ? t("soc.cfgWordpress") : t("soc.cfgExternal")} onClose={onClose}>
       <div className="p-6 space-y-4">
-        <LabeledInput label="Nome da conexão" value={editingConnection.name ?? ""}
-          onChange={(v) => set({ name: v })} placeholder={isWp ? "WordPress" : "Site Externo"} />
-        <LabeledInput label={isWp ? "URL do Site *" : "URL / Endpoint *"} value={editingConnection.siteUrl ?? ""}
+        <LabeledInput label={t("soc.connName")} value={editingConnection.name ?? ""}
+          onChange={(v) => set({ name: v })} placeholder={isWp ? "WordPress" : t("soc.externalSite")} />
+        <LabeledInput label={isWp ? t("soc.siteUrl") : t("soc.urlEndpoint")} value={editingConnection.siteUrl ?? ""}
           onChange={(v) => set({ siteUrl: v })} placeholder="https://meusite.com" type="url" />
         {isWp && (
-          <LabeledInput label="Usuário *" value={editingConnection.username ?? ""}
-            onChange={(v) => set({ username: v })} placeholder="admin ou e-mail" />
+          <LabeledInput label={t("soc.username")} value={editingConnection.username ?? ""}
+            onChange={(v) => set({ username: v })} placeholder={t("soc.userPh")} />
         )}
         <LabeledInput
           label={isWp ? "Application Password *" : "Token / API Key"}
           value={editingConnection.secret ?? ""}
           onChange={(v) => set({ secret: v })}
-          placeholder={isWp ? "xxxx xxxx xxxx xxxx" : "Bearer token (opcional)"}
+          placeholder={isWp ? "xxxx xxxx xxxx xxxx" : t("soc.bearerPh")}
           type="password"
-          hint={isWp
-            ? "Gere em WP-Admin → Usuários → Perfil → Senhas de Aplicativo. O usuário precisa ser Admin/Editor."
-            : "Enviado como header Authorization: Bearer … no teste e na publicação (opcional)."}
+          hint={isWp ? t("soc.wpHint") : t("soc.extHint")}
         />
         <AutoPublishToggle value={editingConnection.autoPublish ?? false} onChange={(v) => set({ autoPublish: v })} />
       </div>
@@ -956,11 +952,11 @@ function ConnectionModal({
         <button onClick={onSave} disabled={!editingConnection.siteUrl || (isWp && !editingConnection.username)}
           className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
           style={{ background: PRIMARY }}>
-          <Save size={14} /> Salvar
+          <Save size={14} /> {t("soc.save")}
         </button>
         <button onClick={onClose}
           className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-          Cancelar
+          {t("soc.cancel")}
         </button>
       </div>
     </ModalShell>
@@ -984,6 +980,7 @@ function MetaModal({
   onDeleteAccount: (id: string) => void;
   onManualToken: () => void;
 }) {
+  const { t } = useAdminT();
   const [appId, setAppId]         = useState(metaApp.appId);
   const [appSecret, setAppSecret] = useState(metaApp.hasSecret ? "••••••••" : "");
   const [busy, setBusy]           = useState(false);
@@ -1004,11 +1001,11 @@ function MetaModal({
     try {
       await onSaveApp(appId.trim(), appSecret);
       const start = (await apiFetch("/meta/oauth/start")) as { url?: string; error?: string };
-      if (!start.url) throw new Error(start.error ?? "Não foi possível iniciar o OAuth.");
+      if (!start.url) throw new Error(start.error ?? t("soc.oauthStartFail"));
       const { code, state } = await openOAuthPopup(start.url);
       const ex = (await apiFetch("/meta/oauth/exchange", { method: "POST", body: JSON.stringify({ code, state }) })) as
         { sessionId?: string; pages?: OAuthPage[]; error?: string };
-      if (ex.error || !ex.sessionId) throw new Error(ex.error ?? "Falha ao obter as páginas.");
+      if (ex.error || !ex.sessionId) throw new Error(ex.error ?? t("soc.oauthPagesFail"));
       setSessionId(ex.sessionId);
       setOauthPages(ex.pages ?? []);
       setSelected(new Set((ex.pages ?? []).map((p) => p.id)));
@@ -1030,24 +1027,24 @@ function MetaModal({
   }
 
   return (
-    <ModalShell title="Configurar Meta (Facebook + Instagram)" onClose={onClose}>
+    <ModalShell title={t("soc.cfgMeta")} onClose={onClose}>
       <div className="p-6 space-y-4">
         <LabeledInput label="App ID" value={appId} onChange={setAppId} placeholder="819328061112128" />
         <LabeledInput label="App Secret" value={appSecret} onChange={setAppSecret} placeholder="••••••••••••••••" type="password" />
         <p className="text-[11px] text-slate-400 leading-relaxed">
-          No Meta for Developers, cadastre o Redirect URI do Facebook Login como:<br />
-          <span className="font-mono text-slate-500 break-all">{metaApp.redirectUri || "(defina APP_URL no servidor)"}</span>
+          {t("soc.redirectHint")}<br />
+          <span className="font-mono text-slate-500 break-all">{metaApp.redirectUri || t("soc.defineAppUrl")}</span>
         </p>
 
         <div className="flex gap-2">
           <button onClick={() => { void saveApp(); }} disabled={busy || !appId.trim()}
             className="px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 transition-colors">
-            Salvar credenciais
+            {t("soc.saveCreds")}
           </button>
           <button onClick={() => { void selectAccount(); }} disabled={busy || !appId.trim()}
             className="flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
             style={{ background: PRIMARY }}>
-            {busy ? <Loader2 size={14} className="animate-spin" /> : <Facebook size={14} />} Selecionar conta (popup Meta)
+            {busy ? <Loader2 size={14} className="animate-spin" /> : <Facebook size={14} />} {t("soc.selectAccountPopup")}
           </button>
         </div>
 
@@ -1056,10 +1053,10 @@ function MetaModal({
         {/* Seleção de páginas retornadas pelo OAuth */}
         {oauthPages && (
           <div className="border-t border-slate-100 pt-4 space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase">Escolha as páginas</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase">{t("soc.choosePages")}</p>
             {oauthPages.length === 0 ? (
               <p className="text-sm text-red-500">
-                Nenhuma Página encontrada nesta conta. Verifique se você tem uma Página do Facebook com Instagram Business vinculado.
+                {t("soc.noPagesFound")}
               </p>
             ) : oauthPages.map((p) => (
               <label key={p.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
@@ -1077,7 +1074,7 @@ function MetaModal({
               <button onClick={() => { void saveAccounts(); }} disabled={busy || selected.size === 0}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60 mt-1"
                 style={{ background: PRIMARY }}>
-                <Save size={14} /> Salvar contas selecionadas
+                <Save size={14} /> {t("soc.saveSelectedAccounts")}
               </button>
             )}
           </div>
@@ -1086,7 +1083,7 @@ function MetaModal({
         {/* Contas já conectadas */}
         {accounts.length > 0 && (
           <div className="border-t border-slate-100 pt-4 space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase">Contas conectadas</p>
+            <p className="text-xs font-semibold text-slate-500 uppercase">{t("soc.connectedAccounts")}</p>
             {accounts.map((acc) => (
               <div key={acc.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50">
                 {acc.instagramId ? <Instagram size={15} className="text-[#E1306C]" /> : <Facebook size={15} className="text-[#1877F2]" />}
@@ -1096,15 +1093,15 @@ function MetaModal({
                     <p className={`text-[11px] ${testStatus[acc.id]?.ok ? "text-green-600" : "text-red-500"}`}>{testStatus[acc.id]?.msg}</p>
                   )}
                 </div>
-                <button onClick={() => onTestAccount(acc.id)} disabled={testingId === acc.id} title="Testar"
+                <button onClick={() => onTestAccount(acc.id)} disabled={testingId === acc.id} title={t("soc.test")}
                   className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 disabled:opacity-50">
                   {testingId === acc.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />}
                 </button>
-                <button onClick={() => onToggleAccount(acc)} title="Ativar/Pausar"
+                <button onClick={() => onToggleAccount(acc)} title={t("soc.toggleActive")}
                   className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100">
                   {acc.isActive ? <ToggleRight size={14} className="text-green-500" /> : <ToggleLeft size={14} />}
                 </button>
-                <button onClick={() => onDeleteAccount(acc.id)} title="Remover"
+                <button onClick={() => onDeleteAccount(acc.id)} title={t("soc.remove")}
                   className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50">
                   <Trash2 size={12} />
                 </button>
@@ -1115,7 +1112,7 @@ function MetaModal({
 
         <div className="border-t border-slate-100 pt-3">
           <button onClick={onManualToken} className="text-xs font-semibold text-[#0B2A66] hover:underline">
-            Ou colar Page Access Token manualmente (avançado)
+            {t("soc.manualTokenLink")}
           </button>
         </div>
       </div>
@@ -1128,6 +1125,8 @@ function MetaModal({
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function SocialMedia() {
+  const { t, lang } = useAdminT();
+  const nloc = lang === "en" ? "en-US" : "pt-BR";
   const [tab, setTab] = useState<"connections" | "templates" | "queue" | "automation">("connections");
 
   // ── Accounts (Meta) ───────────────────────────────────────────────────────
@@ -1517,7 +1516,7 @@ export default function SocialMedia() {
   }
 
   async function deleteAccount(id: string) {
-    if (!window.confirm("Remover esta conta?")) return;
+    if (!window.confirm(t("soc.confirmRemoveAccount"))) return;
     await apiFetch(`/accounts/${id}`, { method: "DELETE" });
     await fetchAccounts();
   }
@@ -1526,7 +1525,7 @@ export default function SocialMedia() {
     setTestingId(id); setTestStatus((prev) => ({ ...prev, [id]: null }));
     try {
       const r = (await apiFetch(`/accounts/${id}/test`, { method: "POST" })) as { ok: boolean; name?: string; error?: string };
-      setTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? `✓ ${r.name ?? "Conectado"}` : r.error ?? "Erro" } }));
+      setTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? `✓ ${r.name ?? t("soc.connected")}` : r.error ?? t("soc.error") } }));
     } catch (e) {
       setTestStatus((prev) => ({ ...prev, [id]: { ok: false, msg: (e as Error).message } }));
     } finally { setTestingId(null); }
@@ -1560,7 +1559,7 @@ export default function SocialMedia() {
   }
 
   async function deleteConnection(id: string) {
-    if (!window.confirm("Desconectar e remover esta conexão?")) return;
+    if (!window.confirm(t("soc.confirmRemoveConnection"))) return;
     await apiFetch(`/connections/${id}`, { method: "DELETE" });
     await fetchConnections();
   }
@@ -1569,7 +1568,7 @@ export default function SocialMedia() {
     setConnTestingId(id); setConnTestStatus((prev) => ({ ...prev, [id]: null }));
     try {
       const r = (await apiFetch(`/connections/${id}/test`, { method: "POST" })) as { ok: boolean; error?: string };
-      setConnTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? "✓ Online" : r.error ?? "Erro" } }));
+      setConnTestStatus((prev) => ({ ...prev, [id]: { ok: r.ok, msg: r.ok ? `✓ ${t("soc.stOnline")}` : r.error ?? t("soc.error") } }));
       await fetchConnections();
     } catch (e) {
       setConnTestStatus((prev) => ({ ...prev, [id]: { ok: false, msg: (e as Error).message } }));
@@ -1595,7 +1594,7 @@ export default function SocialMedia() {
   function openMetaOAuthPopup(url: string): Promise<{ code: string; state: string }> {
     return new Promise((resolve, reject) => {
       const popup = window.open(url, "meta-oauth", "popup,width=640,height=740");
-      if (!popup) { reject(new Error("Popup bloqueado — libere popups para este site e tente novamente.")); return; }
+      if (!popup) { reject(new Error(t("soc.popupBlocked"))); return; }
       const onMessage = (ev: MessageEvent) => {
         if (ev.origin !== window.location.origin) return;
         const data = ev.data as { source?: string; code?: string; state?: string; error?: string };
@@ -1603,13 +1602,13 @@ export default function SocialMedia() {
         window.removeEventListener("message", onMessage);
         clearInterval(timer);
         if (data.error) { reject(new Error(data.error)); return; }
-        if (!data.code || !data.state) { reject(new Error("Autorização cancelada.")); return; }
+        if (!data.code || !data.state) { reject(new Error(t("soc.authCancelled"))); return; }
         resolve({ code: data.code, state: data.state });
       };
       window.addEventListener("message", onMessage);
       // Se o usuário fechar o popup sem autorizar.
       const timer = setInterval(() => {
-        if (popup.closed) { clearInterval(timer); window.removeEventListener("message", onMessage); reject(new Error("Janela fechada antes de concluir.")); }
+        if (popup.closed) { clearInterval(timer); window.removeEventListener("message", onMessage); reject(new Error(t("soc.windowClosed"))); }
       }, 700);
     });
   }
@@ -1618,7 +1617,7 @@ export default function SocialMedia() {
 
   function newTemplate(type: "feed" | "story") {
     setCurrentTemplate({
-      id: "", name: `Novo ${type === "feed" ? "Feed" : "Story"}`,
+      id: "", name: type === "feed" ? t("soc.newFeed") : t("soc.newStory"),
       type, width: 1080, height: type === "feed" ? 1350 : 1920,
       backgroundColor: "#1a1a1a", elements: [],
     });
@@ -1713,7 +1712,7 @@ export default function SocialMedia() {
   /** Remove a variante Story de um template Feed (o layout de feed é preservado). */
   function removeStoryVariant() {
     if (!currentTemplate) return;
-    if (!window.confirm("Remover o formato Story deste template? O layout de Feed é mantido.")) return;
+    if (!window.confirm(t("soc.confirmRemoveStory"))) return;
     if (editFormat === "story") {
       // Volta para o feed guardado e descarta o canvas de story.
       if (!inactiveVariant) return;
@@ -1743,7 +1742,7 @@ export default function SocialMedia() {
   }
 
   async function deleteTemplate(id: string) {
-    if (!window.confirm("Remover este template?")) return;
+    if (!window.confirm(t("soc.confirmRemoveTemplate"))) return;
     await apiFetch(`/templates/${id}`, { method: "DELETE" });
     if (currentTemplate?.id === id) setCurrentTemplate(null);
     await fetchTemplates();
@@ -1838,11 +1837,11 @@ export default function SocialMedia() {
         method: "POST",
         body: JSON.stringify({
           ...composeTemplatePayload(currentTemplate),
-          name: `${currentTemplate.name} (cópia)`,
+          name: `${currentTemplate.name} ${t("soc.copySuffix")}`,
         }),
       })) as SocialTemplate;
       await fetchTemplates();
-      setCurrentTemplate({ ...currentTemplate, id: saved.id, name: `${currentTemplate.name} (cópia)` });
+      setCurrentTemplate({ ...currentTemplate, id: saved.id, name: `${currentTemplate.name} ${t("soc.copySuffix")}` });
       setSelectedElId(null);
       resetHistory();
     } finally { setTemplateSaving(false); }
@@ -1870,7 +1869,7 @@ export default function SocialMedia() {
       });
       const data = (await res.json()) as { url?: string; error?: string };
       if (data.url) updateElement(elId, { content: data.url });
-      else window.alert(data.error ?? "Falha no upload da imagem");
+      else window.alert(data.error ?? t("soc.uploadFail"));
     } catch (e) {
       window.alert((e as Error).message);
     } finally { setUploadingElId(null); }
@@ -1892,7 +1891,7 @@ export default function SocialMedia() {
       };
       const r = (await apiFetch(`/templates/${id}/preview`, { method: "POST", body: JSON.stringify(body) })) as { url?: string; error?: string };
       if (r.url) setPreviewUrl(r.url);
-      else setPreviewError(r.error ?? "Falha ao gerar o preview");
+      else setPreviewError(r.error ?? t("soc.previewFail"));
     } catch (e) {
       setPreviewError((e as Error).message);
     } finally { setPreviewLoading(false); }
@@ -2094,7 +2093,7 @@ export default function SocialMedia() {
         scheduledAt: "",
       }) });
       await apiFetch("/process", { method: "POST" });
-      setManualResult({ ok: true, msg: "Enviado! O post deve aparecer no Instagram em instantes — acompanhe na aba Fila." });
+      setManualResult({ ok: true, msg: t("soc.manualSent") });
       void fetchQueue();
     } catch (e) {
       setManualResult({ ok: false, msg: (e as Error).message });
@@ -2109,6 +2108,10 @@ export default function SocialMedia() {
   const canRedo    = historyRef.current.future.length > 0;
 
   // Artigo (real ou amostra) usado para resolver os placeholders no canvas.
+  const sampleArticle: ArticleData = {
+    title: t("soc.sampleTitle"), subtitle: t("soc.sampleSubtitle"),
+    category: t("soc.sampleCategory"), author: t("soc.sampleAuthor"), imageUrl: "",
+  };
   const selectedPreviewArticle = editorArticles.find((a) => a.id === previewArticleId);
   const canvasArticle: ArticleData = selectedPreviewArticle
     ? {
@@ -2120,7 +2123,7 @@ export default function SocialMedia() {
         imageUrl: selectedPreviewArticle.imageUrl,
         publishedAt: selectedPreviewArticle.publishedAt,
       }
-    : SAMPLE_ARTICLE;
+    : sampleArticle;
 
   const HANDLE_CURSOR: Record<Handle, string> = {
     nw: "nwse-resize", n: "ns-resize", ne: "nesw-resize", e: "ew-resize",
@@ -2146,11 +2149,11 @@ export default function SocialMedia() {
       if (src) return <img src={src} alt="" style={imageInnerStyle(el) as CSSProperties} />;
       return (
         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, color: "rgba(255,255,255,0.55)", fontSize: 26, background: "rgba(255,255,255,0.05)" }}>
-          <ImageIcon size={30} /> {ELEMENT_TYPE_LABELS[el.type]}
+          <ImageIcon size={30} /> {t(ELEMENT_TYPE_LABELS[el.type])}
         </div>
       );
     }
-    const text = resolveContent(el.content, canvasArticle) || ELEMENT_TYPE_LABELS[el.type];
+    const text = resolveContent(el.content, canvasArticle) || t(ELEMENT_TYPE_LABELS[el.type]);
     return <AutoFitText el={el} text={text} />;
   }
 
@@ -2169,23 +2172,23 @@ export default function SocialMedia() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <AdminLayout title="Redes Sociais">
+    <AdminLayout title={t("nav.social")}>
 
       {/* Tab bar */}
       <div className="flex items-center gap-2 mb-6 bg-[#0B2A66] rounded-2xl p-1.5 w-fit">
-        {tabBtn("connections", "Conexões", <Link2 size={15} />)}
-        {tabBtn("templates",   "Templates", <Layers size={15} />)}
-        {tabBtn("automation",  "Automação", <Bot size={15} />)}
-        {tabBtn("queue",       "Fila",      <Clock size={15} />)}
+        {tabBtn("connections", t("soc.tabConnections"), <Link2 size={15} />)}
+        {tabBtn("templates",   t("soc.tabTemplates"), <Layers size={15} />)}
+        {tabBtn("automation",  t("soc.tabAutomation"), <Bot size={15} />)}
+        {tabBtn("queue",       t("soc.tabQueue"),      <Clock size={15} />)}
       </div>
 
       {/* ══════════ CONEXÕES ═════════════════════════════════════════════════ */}
       {tab === "connections" && (
         <div className="space-y-5">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Conexões de publicação</h2>
+            <h2 className="text-lg font-bold text-slate-800">{t("soc.connTitle")}</h2>
             <p className="text-sm text-slate-500 mt-0.5">
-              Conecte suas plataformas. Depois de testadas e online, ativamos a publicação automática.
+              {t("soc.connSubtitle")}
             </p>
           </div>
 
@@ -2203,7 +2206,7 @@ export default function SocialMedia() {
               icon={<Globe size={20} className="text-white" />}
               iconBg="#21759B"
               title="WordPress"
-              subtitle="Publicar posts via REST API"
+              subtitle={t("soc.wpSubtitle")}
               docUrl="https://wordpress.org/documentation/article/application-passwords/"
               conn={connections.find((c) => c.platform === "wordpress") ?? null}
               testStatus={connTestStatus}
@@ -2222,8 +2225,8 @@ export default function SocialMedia() {
               platform="site_externo"
               icon={<Server size={20} className="text-white" />}
               iconBg="#475569"
-              title="Site Externo"
-              subtitle="Publicar via REST API / Webhook"
+              title={t("soc.externalSite")}
+              subtitle={t("soc.extSubtitle")}
               docUrl={null}
               conn={connections.find((c) => c.platform === "site_externo") ?? null}
               testStatus={connTestStatus}
@@ -2250,7 +2253,7 @@ export default function SocialMedia() {
               value={currentTemplate?.id ?? ""}
               onChange={(e) => { if (e.target.value) void loadTemplate(e.target.value); }}
             >
-              <option value="">— Selecionar template —</option>
+              <option value="">{t("soc.selectTemplate")}</option>
               {templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.type === "story" ? "Story" : isStoryCapable(t) ? "Feed + Story" : "Feed"})</option>)}
             </select>
             <button onClick={() => newTemplate("feed")}
@@ -2265,19 +2268,19 @@ export default function SocialMedia() {
               value=""
               onChange={(e) => { if (e.target.value) applyPreset(e.target.value as PresetKind); e.target.value = ""; }}
               className="text-xs border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-slate-50 text-slate-700"
-              title="Criar a partir de um modelo pronto"
+              title={t("soc.presetsTip")}
             >
-              <option value="">★ Modelos prontos…</option>
-              {PRESETS.map((p) => <option key={p.kind} value={p.kind}>{p.label}</option>)}
+              <option value="">{t("soc.presetsMenu")}</option>
+              {PRESETS.map((p) => <option key={p.kind} value={p.kind}>{t(p.label)}</option>)}
             </select>
             {currentTemplate && (
               <div className="flex items-center gap-2 ml-auto flex-wrap">
                 <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden">
-                  <button onClick={undo} disabled={!canUndo} title="Desfazer (Ctrl+Z)"
+                  <button onClick={undo} disabled={!canUndo} title={t("soc.undoTip")}
                     className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-[#0B2A66] hover:bg-[#EEF2FF] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
                     <Undo2 size={14} />
                   </button>
-                  <button onClick={redo} disabled={!canRedo} title="Refazer (Ctrl+Shift+Z)"
+                  <button onClick={redo} disabled={!canRedo} title={t("soc.redoTip")}
                     className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-[#0B2A66] hover:bg-[#EEF2FF] disabled:opacity-30 disabled:hover:bg-transparent transition-colors border-l border-slate-200">
                     <Redo2 size={14} />
                   </button>
@@ -2285,10 +2288,10 @@ export default function SocialMedia() {
                 <input value={currentTemplate.name}
                   onChange={(e) => setCurrentTemplate((p) => p ? { ...p, name: e.target.value } : p)}
                   className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] min-w-[160px]"
-                  placeholder="Nome do template" />
+                  placeholder={t("soc.templateNamePh")} />
                 {/* Formato em edição: cada template tem layout de Feed E de Story.
                     Trocar de formato guarda o atual e abre o outro (cria na 1ª vez). */}
-                <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden" title="Cada template pode ter os dois formatos — edite cada um">
+                <div className="flex items-center rounded-xl border border-slate-200 overflow-hidden" title={t("soc.formatsTip")}>
                   {(["feed", "story"] as const).map((fmt) => {
                     const active = editFormat === fmt;
                     const exists = active || inactiveVariant !== null;
@@ -2296,19 +2299,19 @@ export default function SocialMedia() {
                       <button key={fmt} onClick={() => switchFormat(fmt)}
                         className={`px-3 py-2 text-xs font-semibold transition-colors ${fmt === "story" ? "border-l border-slate-200" : ""} ${active ? "bg-[#EEF2FF] text-[#0B2A66]" : "text-slate-500 hover:bg-slate-50"}`}>
                         {fmt === "feed" ? "Feed" : "Story"}
-                        {!exists && <span className="ml-1 text-[10px] text-slate-400">+ criar</span>}
+                        {!exists && <span className="ml-1 text-[10px] text-slate-400">{t("soc.createSuffix")}</span>}
                       </button>
                     );
                   })}
                 </div>
                 <span className="text-[11px] text-slate-400">{currentTemplate.width}×{currentTemplate.height}</span>
                 {editFormat === "story" && inactiveVariant !== null && (
-                  <button onClick={removeStoryVariant} title="Remover o formato Story deste template"
+                  <button onClick={removeStoryVariant} title={t("soc.removeStoryTip")}
                     className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                     <X size={14} />
                   </button>
                 )}
-                <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title="Duplicar template"
+                <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title={t("soc.duplicateTemplate")}
                   className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors disabled:opacity-50">
                   <Copy size={14} />
                 </button>
@@ -2322,7 +2325,7 @@ export default function SocialMedia() {
                   className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-60 ${templateSaved ? "!bg-green-500" : ""}`}
                   style={!templateSaved ? { background: ACCENT } : {}}>
                   {templateSaving ? <Loader2 size={13} className="animate-spin" /> : templateSaved ? <CheckCircle size={13} /> : <Save size={13} />}
-                  {templateSaving ? "Salvando…" : templateSaved ? "Salvo!" : "Salvar"}
+                  {templateSaving ? t("soc.saving") : templateSaved ? t("soc.saved") : t("soc.save")}
                 </button>
               </div>
             )}
@@ -2331,31 +2334,31 @@ export default function SocialMedia() {
           {!currentTemplate ? (
             <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
               <Layers size={32} className="text-slate-200 mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Selecione um template ou crie um novo para começar</p>
+              <p className="text-sm text-slate-400">{t("soc.emptyEditor")}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr_300px] gap-4">
 
               {/* LEFT — Layers */}
               <div className="bg-white rounded-2xl p-4 space-y-3" style={{ boxShadow: CARD_SHADOW }}>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">Camadas</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t("soc.layers")}</p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {ELEMENT_TYPES.map((type) => (
                     <button key={type} onClick={() => addElement(type)}
                       className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors">
-                      <Plus size={11} /> {ELEMENT_TYPE_LABELS[type]}
+                      <Plus size={11} /> {t(ELEMENT_TYPE_LABELS[type])}
                     </button>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 pt-1">
-                  <label className="text-xs text-slate-500 w-12 shrink-0">Fundo</label>
+                  <label className="text-xs text-slate-500 w-12 shrink-0">{t("soc.background")}</label>
                   <input type="color" value={currentTemplate.backgroundColor}
                     onChange={(e) => setCurrentTemplate((p) => p ? { ...p, backgroundColor: e.target.value } : p)}
                     className="w-8 h-8 rounded cursor-pointer border border-slate-200" />
                   <input type="text" value={currentTemplate.backgroundColor}
                     onChange={(e) => setCurrentTemplate((p) => p ? { ...p, backgroundColor: e.target.value } : p)}
                     className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
-                  <span className="text-[10px] text-slate-400 leading-tight">degradê?<br/>use camada "Degradê"</span>
+                  <span className="text-[10px] text-slate-400 leading-tight">{t("soc.bgGradHint1")}<br/>{t("soc.bgGradHint2")}</span>
                 </div>
                 <div className="border-t border-slate-100 pt-2 space-y-1">
                   {[...currentTemplate.elements].sort((a, b) => b.zIndex - a.zIndex).map((el) => (
@@ -2364,7 +2367,7 @@ export default function SocialMedia() {
                         selectedElId === el.id ? "bg-[#EEF2FF] border border-[#C7D2FE]" : "hover:bg-slate-50 border border-transparent"
                       }`}>
                       <span className="text-xs font-medium text-slate-700 flex-1 truncate">
-                        {ELEMENT_TYPE_LABELS[el.type] ?? el.type}
+                        {ELEMENT_TYPE_LABELS[el.type] ? t(ELEMENT_TYPE_LABELS[el.type]) : el.type}
                         {el.content ? ` — ${el.content.slice(0, 14)}` : ""}
                       </span>
                       <div className="flex items-center gap-0.5 shrink-0">
@@ -2384,7 +2387,7 @@ export default function SocialMedia() {
                     </div>
                   ))}
                   {currentTemplate.elements.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-4">Adicione elementos acima</p>
+                    <p className="text-xs text-slate-400 text-center py-4">{t("soc.addElementsAbove")}</p>
                   )}
                 </div>
               </div>
@@ -2399,16 +2402,16 @@ export default function SocialMedia() {
                     value={previewArticleId}
                     onChange={(e) => setPreviewArticleId(e.target.value)}
                     className="ml-auto text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-slate-50 max-w-[180px]"
-                    title="Pré-visualizar com um artigo real"
+                    title={t("soc.previewWithArticle")}
                   >
-                    <option value="">Artigo de amostra</option>
+                    <option value="">{t("soc.sampleArticleOpt")}</option>
                     {editorArticles.map((a) => <option key={a.id} value={a.id}>{a.title.slice(0, 40)}</option>)}
                   </select>
                   <button onClick={() => { void runPreview(); }} disabled={previewLoading}
                     className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-60"
-                    style={{ background: PRIMARY }} title="Renderiza no servidor (Playwright) — exatamente como será postado">
+                    style={{ background: PRIMARY }} title={t("soc.realPreviewTip")}>
                     {previewLoading ? <Loader2 size={12} className="animate-spin" /> : <Eye size={12} />}
-                    Preview real
+                    {t("soc.realPreview")}
                   </button>
                 </div>
 
@@ -2473,7 +2476,7 @@ export default function SocialMedia() {
                         }}>
                           {/* haste + alça de rotação */}
                           <div style={{ position: "absolute", left: selectedEl.width / 2 - stem / 2, top: -rotOffset, width: stem, height: rotOffset, background: "#2563EB" }} />
-                          <div onMouseDown={(e) => startInteraction(e, selectedEl, "rotate")} title="Girar"
+                          <div onMouseDown={(e) => startInteraction(e, selectedEl, "rotate")} title={t("soc.rotation")}
                             style={{ position: "absolute", left: selectedEl.width / 2 - rotSize / 2, top: -rotOffset - rotSize / 2, width: rotSize, height: rotSize, background: "#ffffff", border: `${bw}px solid #2563EB`, borderRadius: "50%", cursor: "grab", pointerEvents: "auto" }} />
                           {/* 8 alças de redimensionar */}
                           {RESIZE_HANDLES.map((h) => {
@@ -2503,11 +2506,11 @@ export default function SocialMedia() {
               <div className="bg-white rounded-2xl p-4 space-y-3 overflow-y-auto max-h-[700px]" style={{ boxShadow: CARD_SHADOW }}>
                 {!selectedEl ? (
                   <div className="flex items-center justify-center h-40 text-slate-300 text-sm text-center">
-                    Clique num elemento no canvas para editar suas propriedades
+                    {t("soc.clickElement")}
                   </div>
                 ) : (
                   <>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{ELEMENT_TYPE_LABELS[selectedEl.type]}</p>
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{t(ELEMENT_TYPE_LABELS[selectedEl.type])}</p>
 
                     {/* Posição */}
                     <div className="grid grid-cols-2 gap-2">
@@ -2523,7 +2526,7 @@ export default function SocialMedia() {
                     {/* Tamanho + trava de proporção */}
                     <div className="flex items-end gap-1.5">
                       <div className="flex-1">
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Largura</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.width")}</label>
                         <input type="number" value={selectedEl.width}
                           onChange={(e) => {
                             const v = Math.max(1, Number(e.target.value));
@@ -2532,12 +2535,12 @@ export default function SocialMedia() {
                           }}
                           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                       </div>
-                      <button onClick={() => setAspectLock((v) => !v)} title={aspectLock ? "Proporção travada" : "Travar proporção"}
+                      <button onClick={() => setAspectLock((v) => !v)} title={aspectLock ? t("soc.ratioLocked") : t("soc.ratioLock")}
                         className={`w-8 h-[30px] flex items-center justify-center rounded-lg border transition-colors shrink-0 ${aspectLock ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-slate-200 text-slate-400 hover:text-[#0B2A66]"}`}>
                         {aspectLock ? <Lock size={12} /> : <Unlock size={12} />}
                       </button>
                       <div className="flex-1">
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Altura</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.height")}</label>
                         <input type="number" value={selectedEl.height}
                           onChange={(e) => {
                             const v = Math.max(1, Number(e.target.value));
@@ -2549,7 +2552,7 @@ export default function SocialMedia() {
                     </div>
                     {/* Rotação */}
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0 flex items-center gap-1"><RotateCw size={11} /> Rotação</label>
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0 flex items-center gap-1"><RotateCw size={11} /> {t("soc.rotation")}</label>
                       <input type="range" min={0} max={360} value={selectedEl.rotation ?? 0}
                         onChange={(e) => updateElement(selectedEl.id, { rotation: Number(e.target.value) })}
                         className="flex-1" />
@@ -2559,22 +2562,22 @@ export default function SocialMedia() {
                     </div>
                     {/* Organizar: alinhar à página + ordem + duplicar */}
                     <div>
-                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Organizar</label>
+                      <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.arrange")}</label>
                       <div className="flex items-center gap-1 mb-1.5">
                         {([["left", AlignLeft], ["hcenter", AlignCenter], ["right", AlignRight], ["top", ArrowUpToLine], ["vcenter", FoldVertical], ["bottom", ArrowDownToLine]] as const).map(([d, Icon]) => (
-                          <button key={d} onClick={() => alignToPage(selectedEl.id, d)} title="Alinhar à página"
+                          <button key={d} onClick={() => alignToPage(selectedEl.id, d)} title={t("soc.alignToPage")}
                             className="flex-1 h-7 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors">
                             <Icon size={12} />
                           </button>
                         ))}
                       </div>
                       <div className="flex items-center gap-1">
-                        <button onClick={() => bringElementZ(selectedEl.id, "front")} title="Trazer para frente"
-                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsUp size={12} /> Frente</button>
-                        <button onClick={() => bringElementZ(selectedEl.id, "back")} title="Enviar para o fundo"
-                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsDown size={12} /> Fundo</button>
-                        <button onClick={() => duplicateElement(selectedEl.id)} title="Duplicar (Ctrl+D)"
-                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><Copy size={12} /> Duplicar</button>
+                        <button onClick={() => bringElementZ(selectedEl.id, "front")} title={t("soc.bringFront")}
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsUp size={12} /> {t("soc.front")}</button>
+                        <button onClick={() => bringElementZ(selectedEl.id, "back")} title={t("soc.sendBack")}
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><ChevronsDown size={12} /> {t("soc.back")}</button>
+                        <button onClick={() => duplicateElement(selectedEl.id)} title={t("soc.duplicateShortcut")}
+                          className="flex-1 h-7 flex items-center justify-center gap-1 rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] transition-colors text-[11px]"><Copy size={12} /> {t("soc.duplicate")}</button>
                       </div>
                     </div>
 
@@ -2582,15 +2585,15 @@ export default function SocialMedia() {
                     {selectedEl.type !== "gradient" && selectedEl.type !== "shape" && (
                     <div>
                       <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                        {isImageType(selectedEl.type) ? "Imagem (URL ou upload)" : "Conteúdo"}
+                        {isImageType(selectedEl.type) ? t("soc.imageUrlUpload") : t("soc.content")}
                       </label>
                       {isImageType(selectedEl.type) ? (
                         <div className="flex items-center gap-1.5">
                           <input type="text" value={selectedEl.content}
                             onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
                             className="flex-1 text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]"
-                            placeholder={selectedEl.type === "image" ? "URL de fallback (usa a imagem do artigo)" : selectedEl.type === "overlay" ? "PNG transparente (máscara do Canva)" : "https://…/logo.png"} />
-                          <label className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] cursor-pointer shrink-0" title="Enviar imagem">
+                            placeholder={selectedEl.type === "image" ? t("soc.imageFallbackPh") : selectedEl.type === "overlay" ? t("soc.overlayPh") : "https://…/logo.png"} />
+                          <label className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66] cursor-pointer shrink-0" title={t("soc.uploadImage")}>
                             <input type="file" accept="image/png,image/jpeg,image/webp" hidden
                               onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadImage(selectedEl.id, f); e.target.value = ""; }} />
                             {uploadingElId === selectedEl.id ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
@@ -2600,13 +2603,13 @@ export default function SocialMedia() {
                         <textarea rows={2} value={selectedEl.content}
                           onChange={(e) => updateElement(selectedEl.id, { content: e.target.value })}
                           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] resize-none"
-                          placeholder={selectedEl.type === "title" ? "{{title}}" : selectedEl.type === "category" ? "{{category}}" : "Texto…"} />
+                          placeholder={selectedEl.type === "title" ? "{{title}}" : selectedEl.type === "category" ? "{{category}}" : t("soc.textPh")} />
                       )}
                       {selectedEl.type === "overlay" && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">Moldura/arte em PNG transparente. Use z-index alto para ficar sobre a foto.</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{t("soc.overlayHint")}</p>
                       )}
                       {!isImageType(selectedEl.type) && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">Variáveis: {"{{title}} {{subtitle}} {{category}} {{date}} {{author}}"}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">{t("soc.varsHint")} {"{{title}} {{subtitle}} {{category}} {{date}} {{author}}"}</p>
                       )}
                     </div>
                     )}
@@ -2615,10 +2618,10 @@ export default function SocialMedia() {
                     {selectedEl.type === "shape" && (
                       <>
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Figura</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.figure")}</label>
                           <div className="grid grid-cols-4 gap-1">
                             {SHAPE_KINDS.map(({ kind, label, Icon }) => (
-                              <button key={kind} onClick={() => updateElement(selectedEl.id, { shapeKind: kind })} title={label}
+                              <button key={kind} onClick={() => updateElement(selectedEl.id, { shapeKind: kind })} title={t(label)}
                                 className={`h-8 flex items-center justify-center rounded-lg border transition-colors ${(selectedEl.shapeKind ?? "rect") === kind ? "bg-[#0B2A66] text-white border-[#0B2A66]" : "border-slate-200 text-slate-500 hover:text-[#0B2A66] hover:border-[#0B2A66]"}`}>
                                 <Icon size={14} />
                               </button>
@@ -2627,18 +2630,18 @@ export default function SocialMedia() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Traço</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.stroke")}</label>
                             <select value={selectedEl.strokeStyle ?? "solid"}
                               onChange={(e) => updateElement(selectedEl.id, { strokeStyle: e.target.value as StrokeStyle })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
-                              <option value="solid">Sólido</option>
-                              <option value="dashed">Tracejado</option>
-                              <option value="dotted">Pontilhado</option>
+                              <option value="solid">{t("soc.solid")}</option>
+                              <option value="dashed">{t("soc.dashed")}</option>
+                              <option value="dotted">{t("soc.dotted")}</option>
                             </select>
                           </div>
                           {(selectedEl.shapeKind === "polygon" || selectedEl.shapeKind === "star") && (
                             <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{selectedEl.shapeKind === "star" ? "Pontas" : "Lados"}</label>
+                              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{selectedEl.shapeKind === "star" ? t("soc.points") : t("soc.sides")}</label>
                               <input type="number" min={3} max={12}
                                 value={selectedEl.shapeKind === "star" ? (selectedEl.points ?? 5) : (selectedEl.sides ?? 6)}
                                 onChange={(e) => {
@@ -2649,7 +2652,7 @@ export default function SocialMedia() {
                             </div>
                           )}
                         </div>
-                        <p className="text-[10px] text-slate-400 -mt-1">Linha/seta: a espessura e a cor vêm de “Borda” (abaixo). Demais figuras usam Preenchimento + Borda.</p>
+                        <p className="text-[10px] text-slate-400 -mt-1">{t("soc.shapeHint")}</p>
                       </>
                     )}
 
@@ -2658,7 +2661,7 @@ export default function SocialMedia() {
                       <>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Fonte</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.font")}</label>
                             <select value={selectedEl.fontFamily}
                               onChange={(e) => updateElement(selectedEl.id, { fontFamily: e.target.value })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
@@ -2666,7 +2669,7 @@ export default function SocialMedia() {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Tamanho</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.size")}</label>
                             <input type="number" value={selectedEl.fontSize}
                               onChange={(e) => updateElement(selectedEl.id, { fontSize: Number(e.target.value) })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
@@ -2674,7 +2677,7 @@ export default function SocialMedia() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Peso</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.weight")}</label>
                             <select value={selectedEl.fontWeight}
                               onChange={(e) => updateElement(selectedEl.id, { fontWeight: e.target.value })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
@@ -2682,7 +2685,7 @@ export default function SocialMedia() {
                             </select>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Alinhamento</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.align")}</label>
                             <div className="flex rounded-lg border border-slate-200 overflow-hidden">
                               {(["left","center","right"] as const).map((a) => (
                                 <button key={a} onClick={() => updateElement(selectedEl.id, { textAlign: a })}
@@ -2696,7 +2699,7 @@ export default function SocialMedia() {
                           </div>
                         </div>
                         <div>
-                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Alinhamento vertical</label>
+                          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.valign")}</label>
                           <div className="flex rounded-lg border border-slate-200 overflow-hidden">
                             {([["top", ArrowUpToLine], ["middle", FoldVertical], ["bottom", ArrowDownToLine]] as const).map(([v, Icon]) => (
                               <button key={v} onClick={() => updateElement(selectedEl.id, { verticalAlign: v })}
@@ -2710,7 +2713,7 @@ export default function SocialMedia() {
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor do texto</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.textColor")}</label>
                             <div className="flex items-center gap-1.5">
                               <input type="color" value={selectedEl.color}
                                 onChange={(e) => updateElement(selectedEl.id, { color: e.target.value })}
@@ -2721,7 +2724,7 @@ export default function SocialMedia() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Espaç. letras</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.letterSpacing")}</label>
                             <input type="number" step={0.5} value={selectedEl.letterSpacing ?? 0}
                               onChange={(e) => updateElement(selectedEl.id, { letterSpacing: Number(e.target.value) })}
                               className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
@@ -2729,7 +2732,7 @@ export default function SocialMedia() {
                         </div>
                         {/* Entrelinha (line-height) */}
                         <div className="flex items-center gap-2">
-                          <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0">Entrelinha</label>
+                          <label className="text-[10px] font-semibold text-slate-500 uppercase shrink-0">{t("soc.lineHeight")}</label>
                           <input type="range" min={0.8} max={2} step={0.01} value={selectedEl.lineHeight ?? 1.3}
                             onChange={(e) => updateElement(selectedEl.id, { lineHeight: Number(e.target.value) })}
                             className="flex-1" />
@@ -2740,17 +2743,17 @@ export default function SocialMedia() {
                         {/* Estilos inline: itálico / sublinhado / tachado / maiúsculas */}
                         <div className="flex rounded-lg border border-slate-200 overflow-hidden">
                           <button onClick={() => updateElement(selectedEl.id, { fontStyle: selectedEl.fontStyle === "italic" ? "normal" : "italic" })}
-                            title="Itálico" className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${selectedEl.fontStyle === "italic" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Italic size={12} /></button>
+                            title={t("soc.italic")} className={`flex-1 py-1.5 flex items-center justify-center transition-colors ${selectedEl.fontStyle === "italic" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Italic size={12} /></button>
                           <button onClick={() => updateElement(selectedEl.id, { textDecoration: selectedEl.textDecoration === "underline" ? "none" : "underline" })}
-                            title="Sublinhado" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "underline" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Underline size={12} /></button>
+                            title={t("soc.underline")} className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "underline" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Underline size={12} /></button>
                           <button onClick={() => updateElement(selectedEl.id, { textDecoration: selectedEl.textDecoration === "line-through" ? "none" : "line-through" })}
-                            title="Tachado" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "line-through" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Strikethrough size={12} /></button>
+                            title={t("soc.strike")} className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 transition-colors ${selectedEl.textDecoration === "line-through" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}><Strikethrough size={12} /></button>
                           <button onClick={() => updateElement(selectedEl.id, { textTransform: selectedEl.textTransform === "uppercase" ? "none" : "uppercase" })}
-                            title="Maiúsculas" className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 text-[11px] font-bold transition-colors ${selectedEl.textTransform === "uppercase" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}>AA</button>
+                            title={t("soc.uppercase")} className={`flex-1 py-1.5 flex items-center justify-center border-l border-slate-200 text-[11px] font-bold transition-colors ${selectedEl.textTransform === "uppercase" ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"}`}>AA</button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor de destaque</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.accentColor")}</label>
                             <div className="flex items-center gap-1.5">
                               <input type="color" value={selectedEl.accentColor || DEFAULT_ACCENT}
                                 onChange={(e) => updateElement(selectedEl.id, { accentColor: e.target.value })}
@@ -2762,23 +2765,23 @@ export default function SocialMedia() {
                             </div>
                           </div>
                           <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Auto-ajustar</label>
+                            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.autoFit")}</label>
                             <button onClick={() => updateElement(selectedEl.id, { autoFit: !selectedEl.autoFit })}
                               className={`w-full py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                                 selectedEl.autoFit ? "bg-[#0B2A66] text-white" : "border border-slate-200 text-slate-500 hover:bg-slate-50"
                               }`}>
-                              {selectedEl.autoFit ? "Ligado (não corta)" : "Desligado"}
+                              {selectedEl.autoFit ? t("soc.autoFitOn") : t("soc.autoFitOff")}
                             </button>
                           </div>
                         </div>
-                        <p className="text-[10px] text-slate-400 -mt-1">Destaque um trecho com *asteriscos* (ex.: WWW.*SEUSITE*.COM.BR). "Auto-ajustar" reduz a fonte p/ caber sem cortar.</p>
+                        <p className="text-[10px] text-slate-400 -mt-1">{t("soc.highlightHint")}</p>
                       </>
                     )}
 
                     {/* Preenchimento do fundo — sólido ou degradê (todo elemento de caixa) */}
                     {!isImageType(selectedEl.type) && (
                       <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Preenchimento (fundo)</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.fill")}</label>
                         <div className="flex rounded-lg border border-slate-200 overflow-hidden mb-2">
                           {(["solid", "gradient"] as const).map((f) => (
                             <button key={f}
@@ -2788,7 +2791,7 @@ export default function SocialMedia() {
                               className={`flex-1 py-1.5 text-xs font-medium transition-colors ${
                                 (selectedEl.fill ?? "solid") === f ? "bg-[#0B2A66] text-white" : "text-slate-500 hover:bg-slate-50"
                               }`}>
-                              {f === "solid" ? "Sólido" : "Degradê"}
+                              {f === "solid" ? t("soc.solid") : t("soc.gradient")}
                             </button>
                           ))}
                         </div>
@@ -2814,7 +2817,7 @@ export default function SocialMedia() {
                     {/* objectFit */}
                     {isImageType(selectedEl.type) && (
                       <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Ajuste de imagem</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.imageFit")}</label>
                         <select value={selectedEl.objectFit ?? "cover"}
                           onChange={(e) => updateElement(selectedEl.id, { objectFit: e.target.value as "cover" | "contain" | "fill" })}
                           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66] bg-white">
@@ -2826,13 +2829,13 @@ export default function SocialMedia() {
                     {/* Borda (contorno) — útil p/ pílulas de URL e molduras */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Borda (px)</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.borderPx")}</label>
                         <input type="number" min={0} value={selectedEl.borderWidth ?? 0}
                           onChange={(e) => updateElement(selectedEl.id, { borderWidth: Number(e.target.value) })}
                           className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 outline-none focus:border-[#0B2A66]" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Cor da borda</label>
+                        <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{t("soc.borderColor")}</label>
                         <div className="flex items-center gap-1.5">
                           <input type="color" value={selectedEl.borderColor || "#ffffff"}
                             onChange={(e) => updateElement(selectedEl.id, { borderColor: e.target.value })}
@@ -2850,7 +2853,7 @@ export default function SocialMedia() {
                       {(["padding","borderRadius","opacity","zIndex"] as const).map((prop) => (
                         <div key={prop}>
                           <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
-                            {prop === "padding" ? "Padding" : prop === "borderRadius" ? "Raio borda" : prop === "opacity" ? "Opacidade" : "Z-Index"}
+                            {prop === "padding" ? "Padding" : prop === "borderRadius" ? t("soc.radius") : prop === "opacity" ? t("soc.opacity") : "Z-Index"}
                           </label>
                           <input type="number"
                             step={prop === "opacity" ? 0.1 : 1} min={0} max={prop === "opacity" ? 1 : undefined}
@@ -2872,45 +2875,45 @@ export default function SocialMedia() {
       {tab === "queue" && (
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-lg font-bold text-slate-800 flex-1">Fila de publicação</h2>
+            <h2 className="text-lg font-bold text-slate-800 flex-1">{t("soc.queueTitle")}</h2>
             <select value={queueFilter} onChange={(e) => setQueueFilter(e.target.value)}
               className="text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-              <option value="all">Todos</option>
-              <option value="pending">Aguardando</option>
-              <option value="processing">Processando</option>
-              <option value="published">Publicado</option>
-              <option value="failed">Falhou</option>
+              <option value="all">{t("soc.fltAll")}</option>
+              <option value="pending">{t("soc.stPending")}</option>
+              <option value="processing">{t("soc.stProcessing")}</option>
+              <option value="published">{t("soc.stPublished")}</option>
+              <option value="failed">{t("soc.stFailed")}</option>
             </select>
             <button onClick={() => { void processQueue(); }} disabled={processing}
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
               style={{ background: "#16A34A" }}>
               {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-              {processing ? "Processando…" : "Processar agora"}
+              {processing ? t("soc.processing") : t("soc.processNow")}
             </button>
-            <button onClick={() => { void fetchQueue(); }} title="Atualizar"
+            <button onClick={() => { void fetchQueue(); }} title={t("soc.refresh")}
               className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
               <RefreshCw size={14} />
             </button>
             <button onClick={() => { void openQueueModal(); }}
               className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
               style={{ background: PRIMARY }}>
-              <Plus size={15} /> Adicionar à fila
+              <Plus size={15} /> {t("soc.addToQueue")}
             </button>
           </div>
 
           {queueLoading ? (
-            <div className="flex items-center gap-2 text-slate-400 py-8"><Loader2 size={18} className="animate-spin" /> Carregando…</div>
+            <div className="flex items-center gap-2 text-slate-400 py-8"><Loader2 size={18} className="animate-spin" /> {t("soc.loading")}</div>
           ) : queue.length === 0 ? (
             <div className="bg-white rounded-2xl p-12 text-center" style={{ boxShadow: CARD_SHADOW }}>
               <Clock size={32} className="text-slate-200 mx-auto mb-3" />
-              <p className="text-sm text-slate-400">Nenhum item na fila</p>
+              <p className="text-sm text-slate-400">{t("soc.queueEmpty")}</p>
             </div>
           ) : (
             <div className="bg-white rounded-2xl overflow-hidden overflow-x-auto" style={{ boxShadow: CARD_SHADOW }}>
               <table className="w-full min-w-[720px]">
                 <thead>
                   <tr className="border-b border-slate-100">
-                    {["Artigo","Conta","Tipo","Status","Agendado","Ações"].map((h) => (
+                    {[t("soc.colArticle"), t("soc.colAccount"), t("soc.colType"), t("soc.colStatus"), t("soc.colScheduled"), t("soc.colActions")].map((h) => (
                       <th key={h} className="px-4 py-3 text-left text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
                     ))}
                   </tr>
@@ -2918,7 +2921,7 @@ export default function SocialMedia() {
                 <tbody className="divide-y divide-slate-50">
                   {queue.map((item) => {
                     const sc: Record<string, string> = { pending:"bg-amber-50 text-amber-600", processing:"bg-blue-50 text-blue-600", published:"bg-green-50 text-green-700", failed:"bg-red-50 text-red-600" };
-                    const sl: Record<string, string> = { pending:"Aguardando", processing:"Processando", published:"Publicado", failed:"Falhou" };
+                    const sl: Record<string, string> = { pending:t("soc.stPending"), processing:t("soc.stProcessing"), published:t("soc.stPublished"), failed:t("soc.stFailed") };
                     return (
                       <tr key={item.id} className="hover:bg-slate-50/60 group transition-colors">
                         <td className="px-4 py-3">
@@ -2941,12 +2944,12 @@ export default function SocialMedia() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
-                          {item.status === "published" ? fmtDate(item.publishedAt) : fmtDate(item.scheduledAt)}
+                          {item.status === "published" ? fmtDate(item.publishedAt, nloc) : fmtDate(item.scheduledAt, nloc)}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {item.status === "failed" && (
-                              <button onClick={() => { void retryQueueItem(item.id); }} title="Tentar novamente"
+                              <button onClick={() => { void retryQueueItem(item.id); }} title={t("soc.retry")}
                                 className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors">
                                 <RefreshCw size={12} />
                               </button>
@@ -2957,7 +2960,7 @@ export default function SocialMedia() {
                                 <Link2 size={12} />
                               </a>
                             )}
-                            <button onClick={() => { void removeFromQueue(item.id); }} title="Remover"
+                            <button onClick={() => { void removeFromQueue(item.id); }} title={t("soc.remove")}
                               className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
                               <Trash2 size={12} />
                             </button>
@@ -2986,30 +2989,29 @@ export default function SocialMedia() {
                 <Bot size={22} />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-bold text-slate-800">Publicação automática no Instagram</h2>
+                <h2 className="text-lg font-bold text-slate-800">{t("soc.autoTitle")}</h2>
                 <p className="text-sm text-slate-500 mt-0.5">
-                  O robô pega as notícias mais recentes do blog, aplica uma das máscaras selecionadas
-                  (alternando entre elas) e publica no feed automaticamente.
+                  {t("soc.autoDesc")}
                 </p>
               </div>
               <button
                 onClick={() => patchAutomation({ enabled: !automation.enabled })}
                 className="shrink-0 flex items-center gap-2 text-sm font-semibold"
                 style={{ color: automation.enabled ? "#16A34A" : "#94A3B8" }}
-                title={automation.enabled ? "Ativa — clique para desligar" : "Desligada — clique para ligar"}
+                title={automation.enabled ? t("soc.onTip") : t("soc.offTip")}
               >
                 {automation.enabled ? <ToggleRight size={34} /> : <ToggleLeft size={34} />}
-                {automation.enabled ? "Ativa" : "Desligada"}
+                {automation.enabled ? t("soc.on") : t("soc.offF")}
               </button>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-1 text-xs text-slate-500">
-              <span>Última execução: <b className="text-slate-700">{automation.lastRunAt ? fmtDate(automation.lastRunAt) : "—"}</b></span>
-              <span>Próxima: <b className="text-slate-700">{automation.enabled && automation.nextRunAt ? fmtDate(automation.nextRunAt) : "—"}</b></span>
-              <span>Último ciclo: <b className="text-slate-700">{automation.lastCount ?? 0} post(s)</b></span>
+              <span>{t("soc.lastRun")} <b className="text-slate-700">{automation.lastRunAt ? fmtDate(automation.lastRunAt, nloc) : "—"}</b></span>
+              <span>{t("soc.nextRun")} <b className="text-slate-700">{automation.enabled && automation.nextRunAt ? fmtDate(automation.nextRunAt, nloc) : "—"}</b></span>
+              <span>{t("soc.lastCycle")} <b className="text-slate-700">{automation.lastCount ?? 0} {t("soc.posts")}</b></span>
             </div>
             {!automation.enabled && (
               <p className="mt-3 text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                Ao ligar, só serão postadas notícias publicadas <b>a partir deste momento</b> — o acervo antigo é ignorado.
+                {t("soc.enableWarn1")} <b>{t("soc.enableWarn2")}</b> {t("soc.enableWarn3")}
               </p>
             )}
           </div>
@@ -3021,10 +3023,9 @@ export default function SocialMedia() {
                 <Gauge size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-700">Limite de postagens disponíveis</h3>
+                <h3 className="text-sm font-bold text-slate-700">{t("soc.quotaTitle")}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  O Instagram permite um número máximo de publicações por janela de 24h por conta.
-                  Verifique quanto ainda resta antes de programar a automação.
+                  {t("soc.quotaDesc")}
                 </p>
               </div>
               <button
@@ -3033,13 +3034,13 @@ export default function SocialMedia() {
                 className="shrink-0 flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
               >
                 {quotaLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                Verificar
+                {t("soc.check")}
               </button>
             </div>
 
             <div className="mt-4 space-y-3">
               {accounts.filter((a) => a.instagramId).length === 0 && (
-                <p className="text-xs text-slate-400">Nenhuma conta com Instagram vinculado.</p>
+                <p className="text-xs text-slate-400">{t("soc.noIgAccount")}</p>
               )}
               {accounts.filter((a) => a.instagramId).map((acc) => {
                 const q = quotas[acc.id];
@@ -3057,7 +3058,7 @@ export default function SocialMedia() {
                       </span>
                       {q && q.ok && (
                         <span className="text-xs font-semibold shrink-0" style={{ color: barColor }}>
-                          {remaining} restante(s)
+                          {remaining} {t("soc.remaining")}
                         </span>
                       )}
                     </div>
@@ -3067,15 +3068,15 @@ export default function SocialMedia() {
                           <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: barColor }} />
                         </div>
                         <p className="mt-1.5 text-xs text-slate-500">
-                          <b className="text-slate-700">{used}</b> de <b className="text-slate-700">{total}</b> usados nas últimas {Math.round((q.quotaDuration ?? 86400) / 3600)}h
+                          <b className="text-slate-700">{used}</b> {t("soc.of")} <b className="text-slate-700">{total}</b> {t("soc.usedInLast")} {Math.round((q.quotaDuration ?? 86400) / 3600)}h
                         </p>
                       </>
                     ) : q && !q.ok ? (
                       <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
-                        <AlertCircle size={12} /> {q.error || "Não foi possível consultar."}
+                        <AlertCircle size={12} /> {q.error || t("soc.quotaFail")}
                       </p>
                     ) : (
-                      <p className="mt-2 text-xs text-slate-400">Clique em “Verificar” para consultar o limite.</p>
+                      <p className="mt-2 text-xs text-slate-400">{t("soc.quotaClickCheck")}</p>
                     )}
                   </div>
                 );
@@ -3085,43 +3086,43 @@ export default function SocialMedia() {
 
           {/* Configuração */}
           <div className="bg-white rounded-2xl p-5 space-y-5" style={{ boxShadow: CARD_SHADOW }}>
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Configuração</h3>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t("soc.config")}</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Intervalo entre ciclos</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.cycleInterval")}</span>
                 <select
                   value={automation.intervalMinutes}
                   onChange={(e) => patchAutomation({ intervalMinutes: Number(e.target.value) })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  <option value={30}>A cada 30 min</option>
-                  <option value={60}>A cada 1 hora</option>
-                  <option value={120}>A cada 2 horas</option>
-                  <option value={240}>A cada 4 horas</option>
-                  <option value={360}>A cada 6 horas</option>
-                  <option value={720}>A cada 12 horas</option>
-                  <option value={1440}>1 vez por dia</option>
+                  <option value={30}>{t("soc.every30m")}</option>
+                  <option value={60}>{t("soc.every1h")}</option>
+                  <option value={120}>{t("soc.every2h")}</option>
+                  <option value={240}>{t("soc.every4h")}</option>
+                  <option value={360}>{t("soc.every6h")}</option>
+                  <option value={720}>{t("soc.every12h")}</option>
+                  <option value={1440}>{t("soc.onceDaily")}</option>
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Máx. por ciclo</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.maxPerCycle")}</span>
                 <input
                   type="number" min={1} max={20} value={automation.maxPerRun}
                   onChange={(e) => patchAutomation({ maxPerRun: Math.max(1, Number(e.target.value) || 1) })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Intervalo entre posts</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.postSpacing")}</span>
                 <select
                   value={automation.spacingMinutes ?? 5}
                   onChange={(e) => patchAutomation({ spacingMinutes: Number(e.target.value) })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  <option value={0}>Todos de uma vez</option>
-                  <option value={5}>1 a cada 5 min</option>
-                  <option value={10}>1 a cada 10 min</option>
-                  <option value={15}>1 a cada 15 min</option>
-                  <option value={30}>1 a cada 30 min</option>
-                  <option value={60}>1 a cada 1 hora</option>
+                  <option value={0}>{t("soc.allAtOnce")}</option>
+                  <option value={5}>{t("soc.oneEvery5")}</option>
+                  <option value={10}>{t("soc.oneEvery10")}</option>
+                  <option value={15}>{t("soc.oneEvery15")}</option>
+                  <option value={30}>{t("soc.oneEvery30")}</option>
+                  <option value={60}>{t("soc.oneEvery60")}</option>
                 </select>
               </label>
             </div>
@@ -3131,21 +3132,21 @@ export default function SocialMedia() {
                 style={{ color: automation.onlyWithImage ? "#16A34A" : "#94A3B8" }}>
                 {automation.onlyWithImage ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
               </button>
-              <span className="text-xs font-semibold text-slate-600">Só notícias com imagem</span>
+              <span className="text-xs font-semibold text-slate-600">{t("soc.onlyWithImage")}</span>
             </label>
 
             <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
-              A cada ciclo o robô seleciona até <b>{automation.maxPerRun}</b> notícia(s) e,
+              {t("soc.cycleExpl1")} <b>{automation.maxPerRun}</b> {t("soc.cycleExplNews")}
               {(automation.spacingMinutes ?? 5) > 0
-                ? <> em vez de postar tudo junto, publica <b>1 a cada {automation.spacingMinutes ?? 5} min</b> (sem spam).</>
-                : <> publica <b>todas de uma vez</b>.</>}
+                ? <> {t("soc.cycleExplSpaced")} <b>{t("soc.cycleExplEvery")} {automation.spacingMinutes ?? 5} min</b> {t("soc.noSpam")}</>
+                : <> {t("soc.publishes")} <b>{t("soc.allAtOnceB")}</b>.</>}
             </p>
 
             {/* Contas Meta */}
             <div>
-              <span className="text-xs font-semibold text-slate-500">Conta(s) de destino</span>
+              <span className="text-xs font-semibold text-slate-500">{t("soc.targetAccounts")}</span>
               {accounts.length === 0 ? (
-                <p className="mt-1 text-xs text-slate-400">Nenhuma conta conectada. Conecte na aba <b>Conexões</b>.</p>
+                <p className="mt-1 text-xs text-slate-400">{t("soc.noAccountsConn")} <b>{t("soc.tabConnections")}</b>.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {accounts.map((acc) => {
@@ -3164,9 +3165,9 @@ export default function SocialMedia() {
 
             {/* Máscaras */}
             <div>
-              <span className="text-xs font-semibold text-slate-500">Máscaras (o robô alterna entre as selecionadas)</span>
+              <span className="text-xs font-semibold text-slate-500">{t("soc.masksLabel")}</span>
               {templates.length === 0 ? (
-                <p className="mt-1 text-xs text-slate-400">Nenhuma máscara criada. Crie na aba <b>Templates</b>.</p>
+                <p className="mt-1 text-xs text-slate-400">{t("soc.noMasks")} <b>{t("soc.tabTemplates")}</b>.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {templates.map((t) => {
@@ -3186,7 +3187,7 @@ export default function SocialMedia() {
 
             {/* Legenda / Template */}
             <div>
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Legenda / Template</span>
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t("soc.captionTpl")}</span>
               <textarea
                 ref={captionTplRef}
                 value={captionTemplate} onChange={(e) => setCaptionTemplate(e.target.value)} rows={5}
@@ -3194,15 +3195,14 @@ export default function SocialMedia() {
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {CAPTION_VARS.map((v) => (
                   <button key={v.token} type="button" onClick={() => insertCaptionVar(v.token)}
-                    title={`Inserir ${v.token}`}
+                    title={`${t("soc.insertVar")} ${v.token}`}
                     className="px-2.5 py-1 rounded-lg text-xs font-medium border border-slate-200 text-slate-600 hover:bg-[#EEF2FF] hover:border-[#0B2A66] hover:text-[#0B2A66] transition-colors">
-                    {v.label}
+                    {t(v.label)}
                   </button>
                 ))}
               </div>
               <p className="text-[11px] text-slate-400 mt-1.5">
-                Clique num campo para inserir na legenda — são preenchidos automaticamente na publicação.
-                <b> Resumo</b> e <b>Tags</b> são criados pela IA; <b>Trecho do post</b> é o início real da matéria; <b>Link</b> abre a notícia.
+                {t("soc.captionHint1")} {t("soc.captionHint2")}
               </p>
             </div>
 
@@ -3211,9 +3211,9 @@ export default function SocialMedia() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? "Salvando…" : "Salvar configuração"}
+                {autoSaving ? t("soc.saving") : t("soc.saveConfig")}
               </button>
-              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
 
@@ -3224,9 +3224,9 @@ export default function SocialMedia() {
                 <Instagram size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-700">Onde publicar</h3>
+                <h3 className="text-sm font-bold text-slate-700">{t("soc.wherePublish")}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Escolha os formatos que o robô publica para cada notícia do ciclo.
+                  {t("soc.wherePublishDesc")}
                 </p>
               </div>
             </div>
@@ -3239,7 +3239,7 @@ export default function SocialMedia() {
                 </button>
                 <div>
                   <span className="text-xs font-semibold text-slate-600 block">Feed</span>
-                  <span className="text-[11px] text-slate-400">Post no feed com a máscara de Feed + legenda completa.</span>
+                  <span className="text-[11px] text-slate-400">{t("soc.feedDesc")}</span>
                 </div>
               </label>
               <label className="flex items-center gap-2">
@@ -3250,7 +3250,7 @@ export default function SocialMedia() {
                 <div>
                   <span className="text-xs font-semibold text-slate-600 block">Stories</span>
                   <span className="text-[11px] text-slate-400">
-                    Story (1080×1920) com o formato Story da máscara. Stories não têm legenda no Instagram.
+                    {t("soc.storyDesc")}
                   </span>
                 </div>
               </label>
@@ -3259,31 +3259,31 @@ export default function SocialMedia() {
               {automation.types.includes("story") && (
                 <div className="ml-9 bg-slate-50 rounded-xl px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                    <span>No máximo</span>
+                    <span>{t("soc.atMost")}</span>
                     <input
                       type="number" min={0} max={20}
                       value={automation.storiesMax ?? 1}
                       onChange={(e) => patchAutomation({ storiesMax: Math.max(0, Number(e.target.value) || 0) })}
                       className="w-14 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
-                    <span>story(s)</span>
+                    <span>{t("soc.storyUnit")}</span>
                     <select
                       value={automation.storiesWindowHours ?? 0}
                       onChange={(e) => patchAutomation({ storiesWindowHours: Number(e.target.value) })}
                       className="text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white">
-                      <option value={0}>por ciclo</option>
-                      <option value={2}>a cada 2 horas</option>
-                      <option value={4}>a cada 4 horas</option>
-                      <option value={6}>a cada 6 horas</option>
-                      <option value={12}>a cada 12 horas</option>
-                      <option value={24}>a cada 24 horas</option>
+                      <option value={0}>{t("soc.perCycle")}</option>
+                      <option value={2}>{t("soc.every2hF")}</option>
+                      <option value={4}>{t("soc.every4hF")}</option>
+                      <option value={6}>{t("soc.every6hF")}</option>
+                      <option value={12}>{t("soc.every12hF")}</option>
+                      <option value={24}>{t("soc.every24hF")}</option>
                     </select>
                   </div>
                   <p className="mt-1.5 text-[11px] text-slate-400">
                     {(automation.storiesMax ?? 1) === 0
-                      ? "0 = stories pausados (nenhum story será postado)."
+                      ? t("soc.storiesPaused")
                       : (automation.storiesWindowHours ?? 0) > 0
-                        ? `O robô conta os stories já postados nas últimas ${automation.storiesWindowHours}h antes de criar novos.`
-                        : "As notícias com maior prioridade do ciclo são as que ganham story."}
+                        ? `${t("soc.storiesWindowHint1")} ${automation.storiesWindowHours}${t("soc.storiesWindowHint2")}`
+                        : t("soc.storiesPriorityHint")}
                   </p>
                 </div>
               )}
@@ -3292,14 +3292,12 @@ export default function SocialMedia() {
             {automation.types.includes("story") &&
               !automation.templateIds.some((id) => { const t = templates.find((x) => x.id === id); return t ? isStoryCapable(t) : false; }) && (
               <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                Nenhuma máscara selecionada tem formato <b>Story</b>. Abra o template na aba
-                <b> Templates</b> e crie o formato Story (botão Feed/Story na barra), ou selecione uma máscara de Story.
+                {t("soc.noStoryMask")}
               </p>
             )}
             {automation.types.length === 2 && (
               <p className="text-[11px] text-slate-400">
-                Feed e Stories contam na mesma cota de 24h, e o intervalo entre posts
-                também se aplica entre eles.
+                {t("soc.sameQuota")}
               </p>
             )}
 
@@ -3308,9 +3306,9 @@ export default function SocialMedia() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? "Salvando…" : "Salvar formatos"}
+                {autoSaving ? t("soc.saving") : t("soc.saveFormats")}
               </button>
-              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
 
@@ -3321,14 +3319,14 @@ export default function SocialMedia() {
                 <Clock size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-700">Horário de funcionamento</h3>
+                <h3 className="text-sm font-bold text-slate-700">{t("soc.hoursTitle")}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Fora da janela o robô pausa e retoma sozinho quando ela abre — nada de post de madrugada.
+                  {t("soc.hoursDesc")}
                 </p>
               </div>
               <button type="button" onClick={() => patchAutomation({ activeHoursEnabled: !automation.activeHoursEnabled })}
                 className="shrink-0" style={{ color: automation.activeHoursEnabled ? "#16A34A" : "#94A3B8" }}
-                title={automation.activeHoursEnabled ? "Janela ativa — clique para postar 24h" : "Desligado (posta 24h) — clique para limitar"}>
+                title={automation.activeHoursEnabled ? t("soc.hoursOnTip") : t("soc.hoursOffTip")}>
                 {automation.activeHoursEnabled ? <ToggleRight size={30} /> : <ToggleLeft size={30} />}
               </button>
             </div>
@@ -3336,7 +3334,7 @@ export default function SocialMedia() {
             {automation.activeHoursEnabled ? (
               <>
                 <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                  <span>Postar somente entre</span>
+                  <span>{t("soc.postOnlyBetween")}</span>
                   <select
                     value={automation.activeHoursStart ?? 7}
                     onChange={(e) => patchAutomation({ activeHoursStart: Number(e.target.value) })}
@@ -3345,7 +3343,7 @@ export default function SocialMedia() {
                       <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
                     ))}
                   </select>
-                  <span>e</span>
+                  <span>{t("soc.and")}</span>
                   <select
                     value={automation.activeHoursEnd ?? 23}
                     onChange={(e) => patchAutomation({ activeHoursEnd: Number(e.target.value) })}
@@ -3354,19 +3352,19 @@ export default function SocialMedia() {
                       <option key={h} value={h}>{String(h).padStart(2, "0")}:00</option>
                     ))}
                   </select>
-                  <span className="text-slate-400">(horário de Brasília)</span>
+                  <span className="text-slate-400">{t("soc.serverTime")}</span>
                 </div>
                 <p className="text-[11px] text-slate-400">
                   {(automation.activeHoursStart ?? 7) === (automation.activeHoursEnd ?? 23)
-                    ? "Início igual ao fim = funciona 24h."
+                    ? t("soc.hoursEqual")
                     : (automation.activeHoursStart ?? 7) > (automation.activeHoursEnd ?? 23)
-                      ? "Janela virando a madrugada: posta da hora inicial até a final do dia seguinte."
-                      : "O intervalo entre posts também respeita a janela — o que não couber fica para o próximo ciclo."}
-                  {" "}O botão “Rodar agora” ignora a janela (é teste manual).
+                      ? t("soc.hoursOvernight")
+                      : t("soc.hoursSpacing")}
+                  {" "}{t("soc.runIgnoresWindow")}
                 </p>
               </>
             ) : (
-              <p className="text-xs text-slate-400">Desligado — o robô pode postar em qualquer horário.</p>
+              <p className="text-xs text-slate-400">{t("soc.hoursOff")}</p>
             )}
 
             <div className="flex items-center gap-3 pt-1">
@@ -3374,9 +3372,9 @@ export default function SocialMedia() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? "Salvando…" : "Salvar horário"}
+                {autoSaving ? t("soc.saving") : t("soc.saveHours")}
               </button>
-              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
 
@@ -3387,42 +3385,42 @@ export default function SocialMedia() {
                 <Sparkles size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slate-700">Prioridade de seleção</h3>
+                <h3 className="text-sm font-bold text-slate-700">{t("soc.priorityTitle")}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Define quais notícias o robô escolhe primeiro a cada ciclo.
+                  {t("soc.priorityDesc")}
                 </p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Ordenar por</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.orderBy")}</span>
                 <select
                   value={automation.priority?.order ?? "recent"}
                   onChange={(e) => patchPriority({ order: e.target.value as Priority["order"] })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  <option value="recent">Mais recentes primeiro</option>
-                  <option value="popular">Mais populares (mais vistas)</option>
-                  <option value="random">Aleatória</option>
+                  <option value="recent">{t("soc.orderRecent")}</option>
+                  <option value="popular">{t("soc.orderPopular")}</option>
+                  <option value="random">{t("soc.orderRandom")}</option>
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Postar só notícias das últimas (h)</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.freshness")}</span>
                 <input
                   type="number" min={0} max={168}
                   value={automation.priority?.freshnessHours ?? 0}
                   onChange={(e) => patchPriority({ freshnessHours: Math.max(0, Number(e.target.value) || 0) })}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
-                <span className="text-[11px] text-slate-400">0 = sem limite. Não afeta as garantias abaixo.</span>
+                <span className="text-[11px] text-slate-400">{t("soc.freshnessHint")}</span>
               </label>
             </div>
 
             {/* Categorias prioritárias (peso leve) */}
             <div>
-              <span className="text-xs font-semibold text-slate-500">Categorias prioritárias</span>
-              <p className="text-[11px] text-slate-400 mb-1.5">Sobem na fila quando houver, mas não obrigam.</p>
+              <span className="text-xs font-semibold text-slate-500">{t("soc.prefCats")}</span>
+              <p className="text-[11px] text-slate-400 mb-1.5">{t("soc.prefCatsHint")}</p>
               <div className="flex flex-wrap gap-1.5">
-                {categories.length === 0 && <span className="text-xs text-slate-400">Carregando categorias…</span>}
+                {categories.length === 0 && <span className="text-xs text-slate-400">{t("soc.loadingCats")}</span>}
                 {categories.map((c) => {
                   const on = (automation.priority?.preferredCategories ?? []).includes(c.value);
                   return (
@@ -3441,27 +3439,27 @@ export default function SocialMedia() {
             {/* Garantias por categoria (com janela própria) */}
             <div>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-500">Garantias por categoria</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.catGuarantees")}</span>
                 <button type="button" onClick={addCategoryRule}
                   className="flex items-center gap-1 text-xs font-semibold text-[#0B2A66] hover:underline">
-                  <Plus size={13} /> Adicionar regra
+                  <Plus size={13} /> {t("soc.addRule")}
                 </button>
               </div>
               <p className="text-[11px] text-slate-400 mb-2">
-                Ex.: “pelo menos 1 de Esportes das últimas 5h” — o robô garante essa cota (se houver notícia na janela), sem puxar matéria antiga.
+                {t("soc.rulesHint")}
               </p>
               <div className="space-y-2">
                 {(automation.priority?.categoryRules ?? []).length === 0 && (
-                  <p className="text-xs text-slate-400">Nenhuma regra — o robô só usa a ordenação acima.</p>
+                  <p className="text-xs text-slate-400">{t("soc.noRules")}</p>
                 )}
                 {(automation.priority?.categoryRules ?? []).map((rule, idx) => (
                   <div key={idx} className="flex flex-wrap items-center gap-2 bg-slate-50 rounded-xl px-3 py-2">
-                    <span className="text-xs text-slate-500">Pelo menos</span>
+                    <span className="text-xs text-slate-500">{t("soc.atLeast")}</span>
                     <input
                       type="number" min={1} max={10} value={rule.minPerRun}
                       onChange={(e) => updateCategoryRule(idx, { minPerRun: Math.max(1, Number(e.target.value) || 1) })}
                       className="w-14 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
-                    <span className="text-xs text-slate-500">de</span>
+                    <span className="text-xs text-slate-500">{t("soc.fromCat")}</span>
                     <select
                       value={rule.category}
                       onChange={(e) => updateCategoryRule(idx, { category: e.target.value })}
@@ -3471,14 +3469,14 @@ export default function SocialMedia() {
                       )}
                       {categories.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
-                    <span className="text-xs text-slate-500">das últimas</span>
+                    <span className="text-xs text-slate-500">{t("soc.fromLast")}</span>
                     <input
                       type="number" min={1} max={168} value={rule.windowHours}
                       onChange={(e) => updateCategoryRule(idx, { windowHours: Math.max(1, Number(e.target.value) || 1) })}
                       className="w-16 text-sm border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-[#0B2A66] bg-white" />
                     <span className="text-xs text-slate-500">h</span>
                     <button type="button" onClick={() => removeCategoryRule(idx)}
-                      className="ml-auto text-slate-400 hover:text-red-500" title="Remover regra">
+                      className="ml-auto text-slate-400 hover:text-red-500" title={t("soc.removeRule")}>
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -3491,41 +3489,41 @@ export default function SocialMedia() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: PRIMARY }}>
                 {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? "Salvando…" : "Salvar prioridade"}
+                {autoSaving ? t("soc.saving") : t("soc.savePriority")}
               </button>
-              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> Salvo</span>}
+              {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
 
           {/* Testar automação */}
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
-            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Testar agora</h3>
-            <p className="text-sm text-slate-500 mt-1">Roda um ciclo imediatamente (ignora o intervalo), enfileira e publica.</p>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t("soc.testNow")}</h3>
+            <p className="text-sm text-slate-500 mt-1">{t("soc.testDesc")}</p>
             <div className="mt-3 flex items-center gap-3 flex-wrap">
               <label className="flex items-center gap-2 text-xs text-slate-600">
                 <input type="checkbox" checked={autoBackfill} onChange={(e) => setAutoBackfill(e.target.checked)} />
-                Incluir notícias das últimas 24h
+                {t("soc.backfill24")}
               </label>
               <button onClick={() => { void runAutomationNow(); }} disabled={autoRunning}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: "#16A34A" }}>
                 {autoRunning ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {autoRunning ? "Rodando…" : "Rodar agora"}
+                {autoRunning ? t("soc.running") : t("soc.runNow")}
               </button>
             </div>
             {autoRunResult && (
               <div className="mt-3 space-y-2">
                 <div className={`text-sm rounded-lg px-3 py-2 ${autoRunResult.enqueued > 0 ? "bg-green-50 text-green-700" : "bg-slate-50 text-slate-500"}`}>
                   {autoRunResult.enqueued > 0
-                    ? <>Enfileirados <b>{autoRunResult.enqueued}</b> post(s){autoRunResult.articles?.length ? `: ${autoRunResult.articles.map((a) => a.title).join(", ")}` : ""}. Veja na aba <b>Fila</b>.</>
-                    : <>Nada enfileirado{autoRunResult.reason ? ` — ${autoRunResult.reason}` : ""}.</>}
+                    ? <>{t("soc.enqueued")} <b>{autoRunResult.enqueued}</b> {t("soc.posts")}{autoRunResult.articles?.length ? `: ${autoRunResult.articles.map((a) => a.title).join(", ")}` : ""}. {t("soc.seeTabPre")} <b>{t("soc.tabQueue")}</b> {t("soc.seeTabPost")}</>
+                    : <>{t("soc.nothingEnqueued")}{autoRunResult.reason ? ` — ${autoRunResult.reason}` : ""}.</>}
                 </div>
                 {autoRunResult.skipped && autoRunResult.skipped.length > 0 && (
                   <div className="text-xs rounded-lg px-3 py-2 bg-amber-50 text-amber-700">
-                    <b>{autoRunResult.skipped.length}</b> não publicado(s) por legenda incompleta (verificação):
+                    <b>{autoRunResult.skipped.length}</b> {t("soc.skippedCaption")}
                     <ul className="mt-1 list-disc list-inside">
                       {autoRunResult.skipped.slice(0, 5).map((s) => (
-                        <li key={s.id} className="truncate">{s.title} <span className="text-amber-500">— falta {s.missing.join(", ")}</span></li>
+                        <li key={s.id} className="truncate">{s.title} <span className="text-amber-500">{t("soc.missing")} {s.missing.join(", ")}</span></li>
                       ))}
                     </ul>
                   </div>
@@ -3537,35 +3535,35 @@ export default function SocialMedia() {
           {/* Publicar manualmente */}
           <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
             <div>
-              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Publicar uma notícia agora (manual)</h3>
-              <p className="text-sm text-slate-500 mt-1">Escolha a notícia, a máscara e a conta — publica na hora pela conexão Meta.</p>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">{t("soc.manualTitle")}</h3>
+              <p className="text-sm text-slate-500 mt-1">{t("soc.manualDesc")}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <label className="block sm:col-span-3">
-                <span className="text-xs font-semibold text-slate-500">Notícia</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.newsLabel")}</span>
                 <select value={manualArticleId}
                   onChange={(e) => { const id = e.target.value; setManualArticleId(id); void prefillManualCaption(id); }}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  <option value="">Selecione uma notícia…</option>
+                  <option value="">{t("soc.selectNews")}</option>
                   {editorArticles.map((a) => <option key={a.id} value={a.id}>{a.title.slice(0, 70)}</option>)}
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Máscara</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.mask")}</span>
                 <select value={manualTemplateId} onChange={(e) => setManualTemplateId(e.target.value)}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
-                  {(manualType === "story" ? templates.filter(isStoryCapable) : templates).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {(manualType === "story" ? templates.filter(isStoryCapable) : templates).map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                 </select>
               </label>
               <label className="block">
-                <span className="text-xs font-semibold text-slate-500">Conta</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.account")}</span>
                 <select value={manualAccountId} onChange={(e) => setManualAccountId(e.target.value)}
                   className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white">
                   {accounts.map((a) => <option key={a.id} value={a.id}>{a.instagramName || a.pageName || a.name}</option>)}
                 </select>
               </label>
               <div className="block">
-                <span className="text-xs font-semibold text-slate-500">Formato</span>
+                <span className="text-xs font-semibold text-slate-500">{t("soc.format")}</span>
                 <div className="mt-1 flex gap-2">
                   {(["feed", "story"] as const).map((tp) => (
                     <button key={tp} type="button" onClick={() => setManualType(tp)}
@@ -3577,7 +3575,7 @@ export default function SocialMedia() {
               </div>
             </div>
             <label className="block">
-              <span className="text-xs font-semibold text-slate-500">Legenda</span>
+              <span className="text-xs font-semibold text-slate-500">{t("soc.caption")}</span>
               <textarea value={manualCaption} onChange={(e) => setManualCaption(e.target.value)} rows={4}
                 className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
             </label>
@@ -3586,7 +3584,7 @@ export default function SocialMedia() {
                 className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
                 style={{ background: ACCENT }}>
                 {manualPublishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                {manualPublishing ? "Publicando…" : "Publicar agora"}
+                {manualPublishing ? t("soc.publishing") : t("soc.publishNow")}
               </button>
               {manualResult && (
                 <span className={`text-xs flex items-center gap-1 ${manualResult.ok ? "text-green-600" : "text-red-500"}`}>
@@ -3647,7 +3645,7 @@ export default function SocialMedia() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">Adicionar à fila de publicação</h3>
+              <h3 className="text-base font-bold text-slate-800">{t("soc.qmTitle")}</h3>
               <button onClick={() => setShowQueueModal(false)}
                 className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
                 <X size={16} />
@@ -3655,17 +3653,17 @@ export default function SocialMedia() {
             </div>
             <div className="p-6 space-y-5">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Artigo *</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmArticle")}</label>
                 <input
                   type="text"
                   value={articleSearch}
                   onChange={(e) => setArticleSearch(e.target.value)}
-                  placeholder="Buscar por título ou editoria…"
+                  placeholder={t("soc.qmSearchPh")}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] bg-slate-50 mb-2"
                 />
                 <div className="border border-slate-200 rounded-xl overflow-hidden max-h-52 overflow-y-auto bg-slate-50">
                   {articles.length === 0 && (
-                    <p className="text-sm text-slate-400 p-3 text-center">Nenhum artigo publicado encontrado.</p>
+                    <p className="text-sm text-slate-400 p-3 text-center">{t("soc.qmNoArticles")}</p>
                   )}
                   {articles
                     .filter((a) => {
@@ -3695,7 +3693,7 @@ export default function SocialMedia() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Contas *</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmAccounts")}</label>
                 <div className="space-y-2">
                   {accounts.filter((a) => a.isActive).map((acc) => (
                     <label key={acc.id} className="flex items-center gap-2.5 cursor-pointer">
@@ -3712,60 +3710,60 @@ export default function SocialMedia() {
                     </label>
                   ))}
                   {accounts.filter((a) => a.isActive).length === 0 && (
-                    <p className="text-sm text-slate-400">Nenhuma conta ativa. Adicione contas na aba "Contas".</p>
+                    <p className="text-sm text-slate-400">{t("soc.qmNoActive")}</p>
                   )}
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Tipo</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmType")}</label>
                 <div className="flex gap-4">
-                  {(["feed","story"] as const).map((t) => (
-                    <label key={t} className="flex items-center gap-2 cursor-pointer">
+                  {(["feed","story"] as const).map((fmt) => (
+                    <label key={fmt} className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox"
-                        checked={queueForm.types.includes(t)}
+                        checked={queueForm.types.includes(fmt)}
                         onChange={(e) => setQueueForm((f) => ({
-                          ...f, types: e.target.checked ? [...f.types, t] : f.types.filter((x) => x !== t),
+                          ...f, types: e.target.checked ? [...f.types, fmt] : f.types.filter((x) => x !== fmt),
                         }))} />
-                      <span className="text-sm text-slate-700">{t === "feed" ? "Feed (1080×1350)" : "Story (1080×1920)"}</span>
+                      <span className="text-sm text-slate-700">{fmt === "feed" ? "Feed (1080×1350)" : "Story (1080×1920)"}</span>
                     </label>
                   ))}
                 </div>
               </div>
               {queueForm.types.includes("feed") && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Template Feed</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmTemplateFeed")}</label>
                   <select value={queueForm.templateFeedId}
                     onChange={(e) => setQueueForm((f) => ({ ...f, templateFeedId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
-                    <option value="">Sem template (sem arte)</option>
-                    {templates.filter((t) => t.type === "feed").map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="">{t("soc.qmNoTemplate")}</option>
+                    {templates.filter((tpl) => tpl.type === "feed").map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                   </select>
                 </div>
               )}
               {queueForm.types.includes("story") && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Template Story</label>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmTemplateStory")}</label>
                   <select value={queueForm.templateStoryId}
                     onChange={(e) => setQueueForm((f) => ({ ...f, templateStoryId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50">
-                    <option value="">Sem template (sem arte)</option>
-                    {templates.filter(isStoryCapable).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    <option value="">{t("soc.qmNoTemplate")}</option>
+                    {templates.filter(isStoryCapable).map((tpl) => <option key={tpl.id} value={tpl.id}>{tpl.name}</option>)}
                   </select>
                 </div>
               )}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Legenda</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.caption")}</label>
                 <textarea rows={3} value={queueForm.caption}
                   onChange={(e) => setQueueForm((f) => ({ ...f, caption: e.target.value }))}
-                  placeholder="Escreva a legenda que acompanhará a publicação…"
+                  placeholder={t("soc.qmCaptionPh")}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#0B2A66] resize-none bg-slate-50" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">Agendar para</label>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1.5">{t("soc.qmSchedule")}</label>
                 <input type="datetime-local" value={queueForm.scheduledAt}
                   onChange={(e) => setQueueForm((f) => ({ ...f, scheduledAt: e.target.value }))}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0B2A66] bg-slate-50" />
-                <p className="text-[11px] text-slate-400 mt-1">Deixe em branco para publicar imediatamente (na próxima execução do cron)</p>
+                <p className="text-[11px] text-slate-400 mt-1">{t("soc.qmScheduleHint")}</p>
               </div>
             </div>
             <div className="flex gap-2 p-6 pt-0">
@@ -3774,11 +3772,11 @@ export default function SocialMedia() {
                 disabled={!queueForm.articleId || !queueForm.accountIds.length || !queueForm.types.length}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
                 style={{ background: PRIMARY }}>
-                <Send size={14} /> Adicionar à fila
+                <Send size={14} /> {t("soc.addToQueue")}
               </button>
               <button onClick={() => setShowQueueModal(false)}
                 className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
-                Cancelar
+                {t("soc.cancel")}
               </button>
             </div>
           </div>
@@ -3794,11 +3792,11 @@ export default function SocialMedia() {
             <div className="flex items-center gap-2">
               <a href={previewUrl} target="_blank" rel="noreferrer"
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-100 transition-colors">
-                <Eye size={13} /> Abrir em nova aba
+                <Eye size={13} /> {t("soc.openNewTab")}
               </a>
               <button onClick={() => setPreviewUrl(null)}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-white text-slate-700 hover:bg-slate-100 transition-colors">
-                <X size={13} /> Fechar
+                <X size={13} /> {t("soc.close")}
               </button>
             </div>
           </div>
