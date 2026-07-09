@@ -9,6 +9,7 @@ import { Link } from "wouter";
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
+import { useAdminT, resolveAdminLang } from "../../lib/adminI18n";
 
 const CAT_COLORS: Record<string, string> = {
   cidades:    "#2563EB",
@@ -29,9 +30,10 @@ function catColor(name?: string, idx = 0) {
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "";
+  const loc = resolveAdminLang() === "en" ? "en-US" : "pt-BR";
   const d = new Date(dateStr);
-  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })
-    + " · " + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" })
+    + " · " + d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" });
 }
 
 function timeAgo(dateStr?: string) {
@@ -48,6 +50,7 @@ function timeAgo(dateStr?: string) {
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
 export default function Dashboard() {
+  const { t } = useAdminT();
   const [articles, setArticles] = useState<Article[]>([]);
   const [stats, setStats]       = useState<AnalyticsStats | null>(null);
   const [ads, setAds]           = useState<Ad[]>([]);
@@ -110,40 +113,40 @@ export default function Dashboard() {
 
   const kpis = [
     {
-      label: "Publicados",
+      label: t("dash.kpiPublished"),
       value: published.length,
       icon: FileText,
       iconBg: "#DCFCE7",
       iconColor: "#16A34A",
       delta: null as number | null,
-      sub: "total no portal",
+      sub: t("dash.kpiPublishedSub"),
     },
     {
-      label: "Rascunhos",
+      label: t("dash.kpiDrafts"),
       value: drafts.length,
       icon: FileText,
       iconBg: "#FEF3C7",
       iconColor: "#F59E0B",
       delta: null as number | null,
-      sub: "aguardando revisão",
+      sub: t("dash.kpiDraftsSub"),
     },
     {
-      label: "Views hoje",
+      label: t("dash.kpiViewsToday"),
       value: todayViews,
       icon: Eye,
       iconBg: "#FEE2E2",
       iconColor: "#E71D36",
       delta: stats?.trends?.today ?? null,
-      sub: "vs ontem",
+      sub: t("dash.vsYesterday"),
     },
     {
-      label: "Views · 7 dias",
+      label: t("dash.kpiViews7d"),
       value: weekViews,
       icon: TrendingUp,
       iconBg: "#DBEAFE",
       iconColor: "#2563EB",
       delta: stats?.trends?.week ?? null,
-      sub: "vs 7 dias anteriores",
+      sub: t("dash.vsPrev7d"),
     },
   ];
 
@@ -165,11 +168,11 @@ export default function Dashboard() {
               <Signal size={18} className="text-[#0B2A66]" />
             </div>
             <div>
-              <p className="font-semibold text-[#0B2A66] text-sm">Portal no ar</p>
+              <p className="font-semibold text-[#0B2A66] text-sm">{t("dash.portalUp")}</p>
               <p className="text-slate-500 text-xs mt-0.5">
                 {loading
-                  ? "Carregando…"
-                  : `Seu portal está online e funcionando normalmente. ${published.length} artigos publicados · ${activeAds.length} propagandas ativas`}
+                  ? t("common.loading")
+                  : `${t("dash.online")} ${published.length} ${t("dash.publishedArticles")} · ${activeAds.length} ${t("dash.activeAds")}`}
               </p>
             </div>
           </div>
@@ -179,7 +182,7 @@ export default function Dashboard() {
             rel="noreferrer"
             className="flex items-center gap-2 bg-white text-[#0B2A66] text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#0B2A66] hover:text-white transition-colors shadow-sm shrink-0"
           >
-            Ver site <ArrowUpRight size={14} />
+            {t("shell.viewSite")} <ArrowUpRight size={14} />
           </a>
         </div>
 
@@ -229,15 +232,15 @@ export default function Dashboard() {
             style={{ boxShadow: CARD_SHADOW }}
           >
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Pageviews — últimos 7 dias</h2>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("dash.pageviews7d")}</h2>
               <span className="text-xs text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                Últimos 7 dias
+                {t("dash.last7days")}
               </span>
             </div>
             {!hasChart ? (
               <div className="h-[200px] flex items-center justify-center text-slate-300 flex-col gap-2">
                 <TrendingUp size={28} />
-                <p className="text-sm">Sem dados de acesso ainda</p>
+                <p className="text-sm">{t("dash.noAccessData")}</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={200}>
@@ -268,9 +271,9 @@ export default function Dashboard() {
             style={{ boxShadow: CARD_SHADOW }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Artigos recentes</h2>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("dash.recentArticles")}</h2>
               <Link href="/admin/artigos" className="text-xs text-[#2563EB] hover:underline">
-                Ver todos
+                {t("dash.seeAll")}
               </Link>
             </div>
             {loading ? (
@@ -282,7 +285,7 @@ export default function Dashboard() {
             ) : recentArticles.length === 0 ? (
               <div className="text-center py-10 text-slate-300 flex flex-col items-center gap-2">
                 <FileText size={28} />
-                <p className="text-sm">Nenhum artigo ainda</p>
+                <p className="text-sm">{t("dash.noArticles")}</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -312,7 +315,7 @@ export default function Dashboard() {
                           : "bg-amber-50 text-amber-600"
                       }`}
                     >
-                      {a.status === "published" ? "Publicado" : "Rascunho"}
+                      {a.status === "published" ? t("dash.published") : t("dash.draft")}
                     </span>
                   </Link>
                 ))}
@@ -326,13 +329,13 @@ export default function Dashboard() {
             style={{ boxShadow: CARD_SHADOW }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-[#0B2A66]">Top categorias</h2>
-              <span className="text-[10px] text-slate-400">por acessos</span>
+              <h2 className="text-sm font-semibold text-[#0B2A66]">{t("dash.topCategories")}</h2>
+              <span className="text-[10px] text-slate-400">{t("dash.byViews")}</span>
             </div>
             {!stats || (stats.topCategories?.length ?? 0) === 0 ? (
               <div className="h-[180px] flex items-center justify-center text-slate-300 flex-col gap-2">
                 <TrendingUp size={24} />
-                <p className="text-xs">Sem dados</p>
+                <p className="text-xs">{t("dash.noData")}</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -375,20 +378,20 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-sm font-semibold text-[#0B2A66] flex items-center gap-2">
-                <Megaphone size={15} className="text-[#7C3AED]" /> Propagandas
+                <Megaphone size={15} className="text-[#7C3AED]" /> {t("nav.ads")}
               </h2>
               <Link href="/admin/propagandas" className="text-xs text-[#2563EB] hover:underline flex items-center gap-1">
-                Ver todas <ArrowUpRight size={11} />
+                {t("dash.seeAllFem")} <ArrowUpRight size={11} />
               </Link>
             </div>
             <div className="grid grid-cols-4 gap-4">
               {[
                 // Sem % fake aqui: totais de anúncio são acumulados (all-time),
                 // não há janela anterior comparável neste card.
-                { label: "Ativas",      value: activeAds.length.toString(),              up: null },
-                { label: "Impressões",  value: totalImpressions.toLocaleString("pt-BR"), up: null },
-                { label: "Cliques",     value: totalClicks.toLocaleString("pt-BR"),      up: null },
-                { label: "CTR",         value: `${ctr}%`,                                up: null },
+                { label: t("dash.adsActiveShort"), value: activeAds.length.toString(),              up: null },
+                { label: t("dash.impressions"),    value: totalImpressions.toLocaleString("pt-BR"), up: null },
+                { label: t("dash.clicks"),         value: totalClicks.toLocaleString("pt-BR"),      up: null },
+                { label: "CTR",                    value: `${ctr}%`,                                up: null },
               ].map(({ label, value, up }) => (
                 <div key={label} className="text-center">
                   <p className="text-xl font-bold text-[#0B2A66]">{loading ? "—" : value}</p>
@@ -404,13 +407,13 @@ export default function Dashboard() {
             className="bg-white rounded-2xl p-6"
             style={{ boxShadow: CARD_SHADOW }}
           >
-            <h2 className="text-sm font-semibold text-[#0B2A66] mb-4">Ações rápidas</h2>
+            <h2 className="text-sm font-semibold text-[#0B2A66] mb-4">{t("dash.quickActions")}</h2>
             <div className="grid grid-cols-4 gap-3">
               {[
-                { label: "Novo artigo",      icon: Edit,       color: "#E71D36", bg: "#FEE2E2",  href: "/admin/artigos/novo" },
-                { label: "Blocos da home",   icon: LayoutGrid, color: "#2563EB", bg: "#DBEAFE",  href: "/admin/home-blocos" },
-                { label: "Nova propaganda",  icon: Megaphone,  color: "#7C3AED", bg: "#EDE9FE",  href: "/admin/propagandas" },
-                { label: "Adicionar RSS",    icon: Rss,        color: "#16A34A", bg: "#DCFCE7",  href: "/admin/rss" },
+                { label: t("dash.qaNewArticle"), icon: Edit,       color: "#E71D36", bg: "#FEE2E2",  href: "/admin/artigos/novo" },
+                { label: t("dash.qaHomeBlocks"), icon: LayoutGrid, color: "#2563EB", bg: "#DBEAFE",  href: "/admin/home-blocos" },
+                { label: t("dash.qaNewAd"),      icon: Megaphone,  color: "#7C3AED", bg: "#EDE9FE",  href: "/admin/propagandas" },
+                { label: t("dash.qaAddRss"),     icon: Rss,        color: "#16A34A", bg: "#DCFCE7",  href: "/admin/rss" },
               ].map(({ label, icon: Icon, color, bg, href }) => (
                 <Link
                   key={href}
