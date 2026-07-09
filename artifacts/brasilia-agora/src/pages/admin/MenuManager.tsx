@@ -9,6 +9,7 @@ import {
   Search, ChevronDown, ChevronRight, Pencil, Monitor, Tablet,
   Smartphone, FileText, Home, LayoutGrid, Check, Link2, Loader2,
 } from "lucide-react";
+import { useAdminT, type AdminTKey } from "../../lib/adminI18n";
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
@@ -17,13 +18,13 @@ type PagesTab = "paginas" | "categorias" | "links";
 
 /** Páginas institucionais reais do site (rotas fixas do App.tsx) — qualquer
  * outra coisa cai na rota de categoria dinâmica. Categorias vêm do cadastro
- * do blog (aba Categorias), nunca de lista fixa. */
-const AVAILABLE_PAGES: { label: string; path: string }[] = [
-  { label: "Página Inicial", path: "/" },
-  { label: "Arquivo de notícias", path: "/arquivo" },
-  { label: "Contato", path: "/contato" },
-  { label: "Termos de Uso", path: "/termos" },
-  { label: "Política de Privacidade", path: "/privacidade" },
+ * do blog (aba Categorias), nunca de lista fixa. `tk` = rótulo traduzido. */
+const AVAILABLE_PAGES: { tk: AdminTKey; path: string }[] = [
+  { tk: "menuPage.home", path: "/" },
+  { tk: "menuPage.archive", path: "/arquivo" },
+  { tk: "menuPage.contact", path: "/contato" },
+  { tk: "menuPage.terms", path: "/termos" },
+  { tk: "menuPage.privacy", path: "/privacidade" },
 ];
 const PAGE_PATHS = new Set(AVAILABLE_PAGES.map((p) => p.path));
 
@@ -46,6 +47,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 export default function MenuManager() {
+  const { t } = useAdminT();
   const [items, setItems]       = useState<MenuItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -114,7 +116,7 @@ export default function MenuManager() {
   async function applyEditToSelected() {
     if (!selected) return;
     const patch: Partial<MenuItem> = {
-      label: editLabel.trim() || "Item sem nome",
+      label: editLabel.trim() || t("menu.defUnnamed"),
       path: editPath.trim() || "/",
       visible: editVisible,
     };
@@ -145,7 +147,7 @@ export default function MenuManager() {
     const id = crypto.randomUUID();
     const child: MenuItem = {
       id,
-      label: "Novo subitem",
+      label: t("menu.defNewSubitem"),
       path: `${parent.path === "/" ? "" : parent.path}-sub`,
       order: parent.children?.length ?? 0,
       visible: true,
@@ -159,7 +161,7 @@ export default function MenuManager() {
   }
 
   async function removeItem(id: string) {
-    if (!confirm("Remover este item do menu?")) return;
+    if (!confirm(t("menu.confirmRemove"))) return;
     // Persiste a exclusão na hora — antes o item só sumia da tela e voltava
     // ao recarregar se o usuário esquecesse de clicar em "Salvar".
     // Remove do topo (com a subárvore) ou de dentro de um submenu.
@@ -226,7 +228,7 @@ export default function MenuManager() {
   })();
 
   const filteredPages = AVAILABLE_PAGES.filter((p) =>
-    !pageSearch || p.label.toLowerCase().includes(pageSearch.toLowerCase())
+    !pageSearch || t(p.tk).toLowerCase().includes(pageSearch.toLowerCase())
   );
   const filteredCategories = categories.filter((c) =>
     !pageSearch || c.label.toLowerCase().includes(pageSearch.toLowerCase())
@@ -239,11 +241,11 @@ export default function MenuManager() {
         {/* ── Page header — título + actions ───────────────────── */}
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1 min-w-[300px]">
-            <h2 className="text-base font-bold text-[#0B2A66]">Menu principal</h2>
+            <h2 className="text-base font-bold text-[#0B2A66]">{t("menu.mainTitle")}</h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Menu exibido no cabeçalho do site. A barra superior e o rodapé são editados em{" "}
+              {t("menu.headerDescA")}{" "}
               <Link href="/admin/home-blocos" className="text-[#2563EB] font-medium hover:underline">
-                Blocos da Home
+                {t("menu.homeBlocksLink")}
               </Link>.
             </p>
           </div>
@@ -252,15 +254,15 @@ export default function MenuManager() {
           <div className="flex items-center gap-2 shrink-0">
             {saveError && (
               <span className="text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
-                Erro ao salvar — tente novamente
+                {t("menu.errSave")}
               </span>
             )}
             <button
-              onClick={() => addItem("Novo item", "/")}
+              onClick={() => addItem(t("menu.defNewItem"), "/")}
               className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-slate-300 transition-colors"
               style={{ boxShadow: CARD_SHADOW }}
             >
-              <PlusCircle size={15} /> Criar novo menu
+              <PlusCircle size={15} /> {t("menu.createNew")}
             </button>
             <button
               onClick={handleSave}
@@ -269,7 +271,7 @@ export default function MenuManager() {
               style={{ background: saved ? "#16A34A" : "#E71D36" }}
             >
               {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <Check size={15} /> : <Save size={15} />}
-              {saved ? "Salvo!" : saving ? "Salvando…" : "Salvar alterações"}
+              {saved ? t("menu.savedBang") : saving ? t("menu.saving") : t("menu.saveChanges")}
             </button>
           </div>
         </div>
@@ -277,9 +279,9 @@ export default function MenuManager() {
         {/* ── Menu preview ─────────────────────────────────────── */}
         <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-            <p className="text-sm font-semibold text-[#0B2A66]">Pré-visualização do menu principal</p>
+            <p className="text-sm font-semibold text-[#0B2A66]">{t("menu.previewTitle")}</p>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">Responsivo:</span>
+              <span className="text-xs text-slate-400">{t("menu.responsive")}</span>
               <div className="flex border border-slate-200 rounded-lg overflow-hidden text-slate-500">
                 {([
                   { key: "desktop",  Icon: Monitor,    w: 18 },
@@ -308,7 +310,7 @@ export default function MenuManager() {
             )}
             <div className="flex items-center gap-1 flex-wrap">
               <span className="flex items-center gap-1 text-xs font-semibold text-[#0B2A66] bg-[#EEF2FF] px-3 py-1.5 rounded-full cursor-pointer">
-                <Home size={11} /> Página inicial
+                <Home size={11} /> {t("menu.homeItem")}
               </span>
               {items.filter((it) => it.visible).slice(0, device === "desktop" ? 8 : device === "tablet" ? 5 : 2).map((it) => (
                 <span
@@ -325,7 +327,7 @@ export default function MenuManager() {
               ))}
               {items.filter((it) => it.visible).length > (device === "desktop" ? 8 : device === "tablet" ? 5 : 2) && (
                 <span className="flex items-center gap-1 text-xs font-medium text-slate-500 px-3 py-1.5 rounded-full hover:bg-slate-100 cursor-pointer">
-                  Mais <ChevronDown size={10} />
+                  {t("menu.more")} <ChevronDown size={10} />
                 </span>
               )}
               <span className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -341,16 +343,16 @@ export default function MenuManager() {
           {/* ── Column 1: Available items ── */}
           <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
             <div className="px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-[#0B2A66]">Itens disponíveis</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Páginas, categorias e links que podem ser adicionados ao menu.</p>
+              <h3 className="text-sm font-semibold text-[#0B2A66]">{t("menu.availableItems")}</h3>
+              <p className="text-xs text-slate-400 mt-0.5">{t("menu.availableDesc")}</p>
             </div>
 
             {/* Inner tabs */}
             <div className="flex border-b border-slate-100 px-5">
               {([
-                { key: "paginas",    label: "Páginas" },
-                { key: "categorias", label: "Categorias" },
-                { key: "links",      label: "Links personalizados" },
+                { key: "paginas",    label: t("menu.tabPages") },
+                { key: "categorias", label: t("menu.tabCategories") },
+                { key: "links",      label: t("menu.tabLinks") },
               ] as { key: PagesTab; label: string }[]).map(({ key, label }) => (
                 <button
                   key={key}
@@ -373,7 +375,7 @@ export default function MenuManager() {
                 <input
                   value={pageSearch}
                   onChange={(e) => setPageSearch(e.target.value)}
-                  placeholder="Buscar páginas..."
+                  placeholder={t("menu.searchPages")}
                   className="w-full pl-8 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] placeholder:text-slate-400"
                 />
               </div>
@@ -386,11 +388,11 @@ export default function MenuManager() {
                       <FileText size={12} className="text-slate-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-700 truncate">{page.label}</p>
+                      <p className="text-xs font-medium text-slate-700 truncate">{t(page.tk)}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{page.path}</p>
                     </div>
                     <button
-                      onClick={() => addItem(page.label, page.path)}
+                      onClick={() => addItem(t(page.tk), page.path)}
                       className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                     >
                       <Plus size={11} />
@@ -399,7 +401,7 @@ export default function MenuManager() {
                 ))}
                 {pagesTab === "categorias" && (
                   filteredCategories.length === 0 ? (
-                    <p className="text-xs text-slate-400 pt-1">Nenhuma categoria cadastrada ainda.</p>
+                    <p className="text-xs text-slate-400 pt-1">{t("menu.noCategories")}</p>
                   ) : (
                     filteredCategories.map((cat) => (
                       <div key={cat.value} className="flex items-center gap-2 p-2.5 rounded-xl hover:bg-slate-50 group cursor-pointer">
@@ -422,12 +424,12 @@ export default function MenuManager() {
                 )}
                 {pagesTab === "links" && (
                   <div className="pt-1">
-                    <p className="text-xs text-slate-400 mb-3">Adicione um link externo ou personalizado.</p>
+                    <p className="text-xs text-slate-400 mb-3">{t("menu.addExternalDesc")}</p>
                     <button
-                      onClick={() => addItem("Link externo", "https://")}
+                      onClick={() => addItem(t("menu.defExternalLink"), "https://")}
                       className="flex items-center gap-2 text-xs font-medium text-[#2563EB] hover:underline"
                     >
-                      <Link2 size={12} /> Adicionar link personalizado
+                      <Link2 size={12} /> {t("menu.addCustomLink")}
                     </button>
                   </div>
                 )}
@@ -437,7 +439,7 @@ export default function MenuManager() {
             {pagesTab === "categorias" && (
               <div className="border-t border-slate-100 px-4 py-3">
                 <Link href="/admin/categorias" className="flex items-center gap-1 text-xs text-[#2563EB] hover:underline">
-                  Gerenciar categorias <ChevronRight size={12} />
+                  {t("menu.manageCategories")} <ChevronRight size={12} />
                 </Link>
               </div>
             )}
@@ -447,26 +449,26 @@ export default function MenuManager() {
           <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
             <div className="px-5 pt-5 pb-3 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-[#0B2A66]">Estrutura do menu</h3>
-                <p className="text-xs text-slate-400 mt-0.5">Arraste e solte para reordenar. Expanda um item para criar subitens (dropdown no site).</p>
+                <h3 className="text-sm font-semibold text-[#0B2A66]">{t("menu.structure")}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{t("menu.structureDesc")}</p>
               </div>
               <button
-                onClick={() => addItem("Novo item", "/")}
+                onClick={() => addItem(t("menu.defNewItem"), "/")}
                 className="flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors shrink-0"
               >
-                <Plus size={12} /> Adicionar item
+                <Plus size={12} /> {t("menu.addItem")}
               </button>
             </div>
 
             <div className="p-4">
               {loading ? (
                 <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
-                  <Loader2 size={18} className="animate-spin" /> Carregando…
+                  <Loader2 size={18} className="animate-spin" /> {t("common.loading")}
                 </div>
               ) : items.length === 0 ? (
                 <div className="text-center py-10 text-slate-400">
                   <LayoutGrid size={24} className="mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">Nenhum item no menu</p>
+                  <p className="text-sm">{t("menu.noItems")}</p>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -516,7 +518,7 @@ export default function MenuManager() {
                               ? "bg-slate-100 text-slate-500"
                               : "bg-blue-50 text-blue-600"
                           }`}>
-                            {item.path.startsWith("http") ? "Link" : PAGE_PATHS.has(item.path) ? "Página" : "Categoria"}
+                            {item.path.startsWith("http") ? t("menu.badgeLink") : PAGE_PATHS.has(item.path) ? t("menu.badgePage") : t("menu.badgeCategory")}
                           </span>
 
                           {/* Row actions */}
@@ -588,7 +590,7 @@ export default function MenuManager() {
                               onClick={() => addChild(item)}
                               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 hover:border-[#0B2A66] hover:text-[#0B2A66] cursor-pointer transition-colors text-xs"
                             >
-                              <Plus size={10} /> Adicionar subitem
+                              <Plus size={10} /> {t("menu.addSubitem")}
                             </div>
                           </div>
                         )}
@@ -603,9 +605,9 @@ export default function MenuManager() {
           {/* ── Column 3: Item settings ── */}
           <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
             <div className="px-5 pt-5 pb-3 border-b border-slate-100">
-              <h3 className="text-sm font-semibold text-[#0B2A66]">Configurações do item</h3>
+              <h3 className="text-sm font-semibold text-[#0B2A66]">{t("menu.itemSettings")}</h3>
               <p className="text-xs text-slate-400 mt-0.5">
-                {selectedItem ? `Editando: ${selectedItem.label || "item sem nome"}` : "Selecione um item para editar."}
+                {selectedItem ? `${t("menu.editingPrefix")}${selectedItem.label || t("menu.defUnnamedLower")}` : t("menu.selectItem")}
               </p>
             </div>
 
@@ -613,27 +615,27 @@ export default function MenuManager() {
               <div className="p-5 space-y-4">
                 {/* Texto do menu */}
                 <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">Texto do menu</label>
+                  <label className="text-xs font-semibold text-slate-600 block mb-1.5">{t("menu.menuText")}</label>
                   <input
                     value={editLabel}
                     onChange={(e) => setEditLabel(e.target.value)}
                     onBlur={() => updateSelected({ label: editLabel })}
                     className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] transition-colors"
-                    placeholder="Ex: Notícias"
+                    placeholder={t("menu.egNews")}
                   />
                 </div>
 
                 {/* Categoria / URL */}
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1.5">
-                    {selectedItem.path.startsWith("http") ? "URL" : "Caminho"}
+                    {selectedItem.path.startsWith("http") ? "URL" : t("menu.path")}
                   </label>
                   <input
                     value={editPath}
                     onChange={(e) => setEditPath(e.target.value)}
                     onBlur={() => updateSelected({ path: editPath })}
                     className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] font-mono text-xs"
-                    placeholder="/categoria"
+                    placeholder={t("menu.pathPlaceholder")}
                   />
                 </div>
 
@@ -643,8 +645,8 @@ export default function MenuManager() {
                 {/* Toggle: Visível no menu */}
                 <div className="flex items-center justify-between py-1">
                   <div>
-                    <p className="text-xs font-semibold text-slate-700">Visível no menu</p>
-                    <p className="text-[11px] text-slate-400">Exibe este item no menu do site.</p>
+                    <p className="text-xs font-semibold text-slate-700">{t("menu.visibleInMenu")}</p>
+                    <p className="text-[11px] text-slate-400">{t("menu.visibleDesc")}</p>
                   </div>
                   <Toggle
                     checked={editVisible}
@@ -658,8 +660,7 @@ export default function MenuManager() {
                     <span className="text-white text-[9px] font-black">i</span>
                   </div>
                   <p className="text-[11px] text-blue-600 leading-relaxed">
-                    Dica: arraste os itens de topo para definir a ordem; expanda um item e use
-                    "Adicionar subitem" para montar o dropdown exibido no site.
+                    {t("menu.tip")}
                   </p>
                 </div>
 
@@ -671,17 +672,17 @@ export default function MenuManager() {
                   style={{ background: applied ? "#16A34A" : "#0B2A66" }}
                 >
                   {applying
-                    ? <><Loader2 size={14} className="animate-spin" /> Salvando…</>
+                    ? <><Loader2 size={14} className="animate-spin" /> {t("menu.saving")}</>
                     : applied
-                    ? <><Check size={14} /> Salvo!</>
-                    : <><Check size={14} /> Aplicar alterações</>
+                    ? <><Check size={14} /> {t("menu.savedBang")}</>
+                    : <><Check size={14} /> {t("menu.applyChanges")}</>
                   }
                 </button>
               </div>
             ) : (
               <div className="p-8 text-center text-slate-400">
                 <Pencil size={24} className="mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Selecione um item na estrutura do menu para editar suas configurações.</p>
+                <p className="text-sm">{t("menu.selectItemLong")}</p>
               </div>
             )}
           </div>
