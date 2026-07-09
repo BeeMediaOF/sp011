@@ -5,6 +5,8 @@ import Footer from "../components/Footer";
 import { Link } from "wouter";
 import { Shield, Eye, Lock, Database, UserCheck, Mail, RefreshCw, ChevronRight } from "lucide-react";
 import { useT } from "../lib/i18n";
+import { useSite } from "../hooks/useSite";
+import { sanitizeArticleHtml } from "../lib/sanitize";
 
 const LAST_UPDATE = "23 de junho de 2025";
 const LAST_UPDATE_EN = "June 23, 2025";
@@ -270,8 +272,15 @@ const SUMMARY_EN = [
 
 export default function Privacidade() {
   const { lang } = useT();
+  const { settings } = useSite();
   const en = lang === "en";
-  const sections = en ? SECTIONS_EN : SECTIONS;
+  // Política própria do blog (ex.: KSports/NDPA em inglês) definida no painel →
+  // vira UMA seção com o HTML sanitizado; senão, o template padrão do sistema.
+  const customPolicy = settings?.contact?.privacyPolicy?.trim();
+  const sections: Section[] = customPolicy
+    ? [{ id: "policy", title: en ? "Privacy Policy" : "Política de Privacidade", icon: Shield, color: "#0B2A66", content: sanitizeArticleHtml(customPolicy) }]
+    : (en ? SECTIONS_EN : SECTIONS);
+  const summary = customPolicy ? [] : (en ? SUMMARY_EN : SUMMARY_PT);
   return (
     <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col">
       <TopBar />
@@ -340,13 +349,14 @@ export default function Privacidade() {
             {/* Artigo principal */}
             <article className="flex-1 min-w-0 space-y-5">
 
-              {/* Resumo rápido */}
+              {/* Resumo rápido (só no template padrão) */}
+              {summary.length > 0 && (
               <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-2xl p-6">
                 <h2 className="text-[15px] font-black text-[#1E3A8A] mb-3 flex items-center gap-2">
                   <Shield size={16} /> {en ? "Summary — what you need to know" : "Resumo — o que você precisa saber"}
                 </h2>
                 <ul className="space-y-2 text-[13px] text-[#1E40AF] leading-relaxed">
-                  {(en ? SUMMARY_EN : SUMMARY_PT).map((item) => (
+                  {summary.map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <span className="mt-[6px] w-1.5 h-1.5 rounded-full bg-[#2563EB] shrink-0" />
                       {item}
@@ -354,6 +364,7 @@ export default function Privacidade() {
                   ))}
                 </ul>
               </div>
+              )}
 
               {/* Seções */}
               {sections.map((s) => (

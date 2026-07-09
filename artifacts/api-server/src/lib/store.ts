@@ -274,6 +274,8 @@ export interface ContactInfo {
   supportEmail: string; displayEmail: string; phone: string; whatsapp: string;
   facebook: string; instagram: string; x: string; youtube: string; tiktok: string;
   address: string; cnpj: string; legalInfo: string; privacyPolicy: string; termsOfUse: string;
+  /** Contato do responsável por dados/DPO (NDPA/LGPD). Vazio = usa displayEmail. */
+  privacyEmail: string;
 }
 
 export type RssAutoMode = "none" | "draft" | "publish" | "rewrite_draft" | "rewrite_publish";
@@ -408,6 +410,7 @@ const DEFAULT_CONTACT: ContactInfo = {
   phone: "(61) 99888-0000", whatsapp: "(61) 99888-0000",
   facebook: "", instagram: "", x: "", youtube: "", tiktok: "",
   address: "Brasília, Distrito Federal", cnpj: "", legalInfo: "", privacyPolicy: "", termsOfUse: "",
+  privacyEmail: "",
 };
 
 const DEFAULT_RSS_SOURCES: Omit<RssSource, "id" | "createdAt">[] = [

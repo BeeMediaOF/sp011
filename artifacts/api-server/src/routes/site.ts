@@ -27,13 +27,17 @@ router.get("/site", (_req, res) => {
   const menuItems = store.getMenuItems()
     .filter((m) => m.visible)
     .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));
-  // Subconjunto público do hub de Contato: rodapé (telefone/e-mail/redes) e
-  // bloco "Redes Sociais" da home. supportEmail e textos legais ficam de fora.
+  // Subconjunto público do hub de Contato: rodapé (telefone/e-mail/redes) +
+  // textos legais (Política de Privacidade/Termos/Info legal) e contato de
+  // privacidade — todos exibidos publicamente nas páginas /privacidade, /termos
+  // e /contato. supportEmail (interno) continua de fora.
   const c = store.getContactInfo();
   const contact = {
     displayEmail: c.displayEmail, phone: c.phone, whatsapp: c.whatsapp,
     facebook: c.facebook, instagram: c.instagram, x: c.x,
     youtube: c.youtube, tiktok: c.tiktok, address: c.address, cnpj: c.cnpj,
+    legalInfo: c.legalInfo, privacyPolicy: c.privacyPolicy, termsOfUse: c.termsOfUse,
+    privacyEmail: c.privacyEmail,
   };
   // no-cache: o navegador/Nginx sempre revalida antes de usar. Garante que edições
   // de blocos/menu/tema apareçam no site imediatamente (sem janela de cache servindo

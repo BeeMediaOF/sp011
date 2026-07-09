@@ -487,4 +487,6 @@ export interface ContactInfo {
   legalInfo: string;
   privacyPolicy: string;
   termsOfUse: string;
+  /** Contato do responsável por dados/DPO (NDPA/LGPD). Vazio = usa displayEmail. */
+  privacyEmail: string;
 }

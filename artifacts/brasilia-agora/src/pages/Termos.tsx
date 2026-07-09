@@ -4,11 +4,37 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
+import { sanitizeArticleHtml } from "../lib/sanitize";
 
 export default function Termos() {
   const { settings } = useSite();
   const { lang } = useT();
   const siteName = settings?.siteName || BRAND.name;
+
+  // Termos próprios do blog definidos no painel → substituem o texto padrão.
+  const customTerms = settings?.contact?.termsOfUse?.trim();
+  if (customTerms) {
+    return (
+      <div className="min-h-screen w-full bg-[#fcfcfc] flex flex-col">
+        <TopBar />
+        <Header />
+        <main className="flex-1 bg-white py-12">
+          <div className="max-w-[860px] mx-auto px-4">
+            <div style={{ borderColor: "#c8102e" }} className="border-l-4 pl-5 mb-8">
+              <h1 className="text-3xl md:text-4xl font-black text-[#1a2448] uppercase tracking-tight">
+                {lang === "en" ? "Terms of Use" : "Termos de Uso"}
+              </h1>
+            </div>
+            <div
+              className="prose prose-lg max-w-none text-[#1a1a1a] space-y-4"
+              dangerouslySetInnerHTML={{ __html: sanitizeArticleHtml(customTerms) }}
+            />
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   // Versão EN genérica (site público em inglês); pt-BR mantém o texto original.
   if (lang === "en") {

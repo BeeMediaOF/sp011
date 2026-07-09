@@ -12,6 +12,12 @@ export default function Contato() {
   const { lang } = useT();
   const en = lang === "en";
   const siteName = settings?.siteName || BRAND.name;
+  // Contato dirigido por settings (fallback = valores padrão do template).
+  const contact = settings?.contact;
+  const contactEmail = contact?.displayEmail || "redacao@brasiliaagora.com.br";
+  const contactPhone = contact?.phone || "(61) 99888-0000";
+  const contactAddress = contact?.address || "Brasília, Distrito Federal";
+  const privacyEmail = contact?.privacyEmail?.trim();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [subject, setSubject] = useState("");
@@ -89,7 +95,7 @@ export default function Contato() {
                   </div>
                   <div className="text-xs text-gray-400">{en ? "* Required fields" : "* Campos obrigatórios"}</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{en ? "Sent to" : "Enviar para"}: <b>suporte@beemedia.ai</b></span>
+                    <span className="text-xs text-gray-400">{en ? "Sent to" : "Enviar para"}: <b>{contactEmail}</b></span>
                     <button type="submit" disabled={sending} className="flex items-center gap-2 px-6 py-2 bg-[#F5A623] text-[#1a2448] rounded-lg font-semibold text-sm hover:bg-[#e09520] disabled:opacity-50">
                       <Send size={16} /> {sending ? (en ? "Sending..." : "Enviando...") : (en ? "Send Message" : "Enviar Mensagem")}
                     </button>
@@ -101,17 +107,19 @@ export default function Contato() {
             {/* Sidebar Info */}
             <div className="space-y-6">
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Mail size={18} /> E-mail</h3>
-                <p className="text-sm text-gray-600">redacao@brasiliaagora.com.br</p>
-                <p className="text-sm text-gray-500 mt-1">suporte@beemedia.ai</p>
+                <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Mail size={18} /> {en ? "Email" : "E-mail"}</h3>
+                <p className="text-sm text-gray-600">{contactEmail}</p>
+                {privacyEmail && (
+                  <p className="text-sm text-gray-500 mt-1">{en ? "Privacy" : "Privacidade"}: {privacyEmail}</p>
+                )}
               </div>
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
                 <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Phone size={18} /> {en ? "Phone" : "Telefone"}</h3>
-                <p className="text-sm text-gray-600">(61) 99888-0000</p>
+                <p className="text-sm text-gray-600">{contactPhone}</p>
               </div>
               <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
                 <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><MapPin size={18} /> {en ? "Address" : "Endereço"}</h3>
-                <p className="text-sm text-gray-600">Brasília, Distrito Federal</p>
+                <p className="text-sm text-gray-600">{contactAddress}</p>
               </div>
             </div>
           </div>

@@ -58,6 +58,12 @@ export interface PublicContact {
   linkedin?: string;
   address?: string;
   cnpj?: string;
+  /** Textos legais + contato de privacidade exibidos nas páginas /privacidade,
+   *  /termos e /contato. Vazio/ausente = usa o texto padrão do template. */
+  legalInfo?: string;
+  privacyPolicy?: string;
+  termsOfUse?: string;
+  privacyEmail?: string;
 }
 
 export interface ResolvedFooterSocial {

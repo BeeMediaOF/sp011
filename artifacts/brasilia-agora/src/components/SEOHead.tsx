@@ -1,6 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSite } from "../hooks/useSite";
+
+// Consentimento de cookies (mesma chave/evento do banner LGPDConsent). Scripts de
+// terceiros (GTM/GA4/Pixel/código custom) só carregam após "Aceitar" — exigência
+// de consentimento (NDPA/LGPD). Lido cru p/ não acoplar ao componente lazy.
+const CONSENT_KEY = "bee_analytics_consent";
+function hasTrackingConsent(): boolean {
+  try { return localStorage.getItem(CONSENT_KEY) === "accepted"; } catch { return false; }
+}
 
 /**
  * IDs de rastreamento (GTM-XXXX, G-XXXX, pixel numérico) vão interpolados em
@@ -100,9 +108,24 @@ export default function SEOHead() {
   // externas com navegação interna da redação (o analytics próprio já filtra).
   const isAdmin = /^\/admin(\/|$)/.test(location);
 
+  // Consentimento: re-renderiza quando o visitante Aceita (banner dispara o
+  // evento) ou quando muda em outra aba (storage).
+  const [consented, setConsented] = useState<boolean>(() => hasTrackingConsent());
+  useEffect(() => {
+    const sync = () => setConsented(hasTrackingConsent());
+    window.addEventListener("bee_consent_change", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("bee_consent_change", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
   // ── Scripts de terceiros (pesados) → adiados para o idle, fora do TBT ────────
   useEffect(() => {
     if (!settings || isAdmin) return;
+    // Sem consentimento explícito, nenhum script de terceiro é carregado.
+    if (!consented) return;
     const gtmId   = cleanTrackingId(settings.gtmId);
     const ga4Id   = cleanTrackingId(settings.ga4MeasurementId);
     const pixelId = cleanTrackingId(settings.facebookPixelId);
@@ -170,7 +193,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     });
 
     return cancel;
-  }, [settings, isAdmin]);
+  }, [settings, isAdmin, consented]);
 
   // ── Title / meta / favicon → síncrono (barato e relevante para SEO/SPA) ──────
   useEffect(() => {

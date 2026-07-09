@@ -101,8 +101,9 @@ const CONTACT_GROUPS: {
   {
     title: "Dados Legais", icon: Building2, color: "#0d9488",
     fields: [
-      { key: "address", label: "Endereço", placeholder: "Brasília, Distrito Federal" },
-      { key: "cnpj",    label: "CNPJ",     placeholder: "00.000.000/0000-00" },
+      { key: "address",      label: "Endereço",                  placeholder: "Brasília, Distrito Federal" },
+      { key: "cnpj",         label: "CNPJ",                       placeholder: "00.000.000/0000-00" },
+      { key: "privacyEmail", label: "E-mail de privacidade (DPO)", placeholder: "privacy@seublog.com" },
     ],
   },
   {
