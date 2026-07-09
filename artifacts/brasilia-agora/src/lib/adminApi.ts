@@ -37,7 +37,7 @@ async function req<T>(method: string, path: string, body?: unknown): Promise<T> 
 
 export const adminApi = {
   login: (email: string, password: string) =>
-    req<{ token: string; email: string; role: string; name: string }>("POST", "/login", { email, password }),
+    req<{ token: string; email: string; role: string; name: string; avatarBase64?: string | null; language?: string; requiresTwoFactor?: boolean; tempToken?: string }>("POST", "/login", { email, password }),
 
   logout: () => req<{ success: boolean }>("POST", "/logout", {}),
 
@@ -75,8 +75,8 @@ export const adminApi = {
   getSettings: () => req<{ settings: SiteSettings }>("GET", "/settings"),
   updateSettings: (settings: Partial<SiteSettings>) => req<{ settings: SiteSettings }>("PUT", "/settings", settings),
   uploadLogo: (logoBase64: string) => req<{ settings: SiteSettings }>("POST", "/logo", { logoBase64 }),
-  updateMyProfile: (data: { name?: string; avatarBase64?: string | null }) =>
-    req<{ user: { id: number; name: string; email: string; role: string; avatarBase64?: string | null } }>("PUT", "/me", data),
+  updateMyProfile: (data: { name?: string; avatarBase64?: string | null; language?: string }) =>
+    req<{ user: { id: number; name: string; email: string; role: string; avatarBase64?: string | null; language: string } }>("PUT", "/me", data),
 
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
@@ -93,7 +93,7 @@ export const adminApi = {
   twoFaVerify: (code: string) => req<{ ok: boolean; message: string }>("POST", "/2fa/verify", { code }),
   twoFaDisable: (code: string) => req<{ ok: boolean; message: string }>("POST", "/2fa/disable", { code }),
   twoFaLogin: (tempToken: string, code: string) =>
-    req<{ token: string; email: string; role: string; name: string; avatarBase64: string | null }>("POST", "/2fa/login", { tempToken, code }),
+    req<{ token: string; email: string; role: string; name: string; avatarBase64: string | null; language?: string }>("POST", "/2fa/login", { tempToken, code }),
 
   // Columnists
   getColumnists: () => req<{ columnists: Columnist[] }>("GET", "/columnists"),
@@ -206,6 +206,7 @@ export interface AdminUser {
   updatedAt: string;
   lastLogin: string | null;
   mustChangePassword: number;
+  language?: string;
 }
 
 export interface AuditLog {

@@ -1,12 +1,13 @@
 import React, { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useEditorPermissions } from "../lib/permissionsCache";
+import { useAdminT } from "../lib/adminI18n";
 
 export function getStoredRole(): string {
   return localStorage.getItem("admin_role") ?? "";
 }
 
-export interface StoredUser { email: string; name: string; role: string; avatarBase64?: string; }
+export interface StoredUser { email: string; name: string; role: string; avatarBase64?: string; language?: string; }
 
 export function getStoredUser(): StoredUser | null {
   const raw = localStorage.getItem("admin_user");
@@ -38,19 +39,20 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 
 function AccessDenied() {
   const [, navigate] = useLocation();
+  const { t } = useAdminT();
   return (
     <div className="h-full min-h-[50vh] flex items-center justify-center bg-[#F8FAFC]">
       <div className="text-center p-8 bg-white rounded-2xl shadow-lg max-w-md">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
           <span className="text-2xl">🚫</span>
         </div>
-        <h2 className="text-xl font-bold text-slate-800 mb-2">Acesso Restrito</h2>
-        <p className="text-slate-500 text-sm">Você não tem permissão para visualizar esta página.</p>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">{t("access.title")}</h2>
+        <p className="text-slate-500 text-sm">{t("access.msg")}</p>
         <button
           onClick={() => navigate("/admin")}
           className="mt-4 px-6 py-2 bg-[#0B2A66] text-white rounded-lg text-sm font-medium hover:opacity-90"
         >
-          Voltar ao Dashboard
+          {t("access.back")}
         </button>
       </div>
     </div>

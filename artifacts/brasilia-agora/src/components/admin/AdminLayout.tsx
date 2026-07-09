@@ -15,24 +15,25 @@ import { adminApi } from "../../lib/adminApi";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { getAdminDarkMode, setAdminDarkMode } from "../../lib/adminDarkMode";
 import { useEditorPermissions, invalidatePermissionsCache } from "../../lib/permissionsCache";
+import { useAdminT } from "../../lib/adminI18n";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 // permKey: null  → admin-only, never shown to editors
 // permKey: string → editor needs that permission enabled
 
 const NAV_MAIN = [
-  { label: "Dashboard",     icon: LayoutDashboard, path: "/admin",               permKey: "dashboard.view" },
-  { label: "Analytics",     icon: BarChart2,        path: "/admin/analytics",    permKey: "analytics.view" },
-  { label: "Artigos",       icon: FileText,         path: "/admin/artigos",      permKey: "articles.view" },
-  { label: "Menu",          icon: Menu,             path: "/admin/menu",         permKey: "menu.view" },
-  { label: "Blocos Home",   icon: LayoutGrid,       path: "/admin/home-blocos",  permKey: "home_blocks.view" },
-  { label: "Categorias",    icon: FolderOpen,       path: "/admin/categorias",   permKey: "home_blocks.view" },
-  { label: "Propagandas",   icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
-  { label: "Colunistas",    icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
-  { label: "Fontes RSS",    icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
-  { label: "Usuários",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
-  { label: "Redes Sociais", icon: Share2,           path: "/admin/social",       permKey: "social.view" },
-];
+  { tk: "nav.dashboard",  icon: LayoutDashboard, path: "/admin",               permKey: "dashboard.view" },
+  { tk: "nav.analytics",  icon: BarChart2,        path: "/admin/analytics",    permKey: "analytics.view" },
+  { tk: "nav.articles",   icon: FileText,         path: "/admin/artigos",      permKey: "articles.view" },
+  { tk: "nav.menu",       icon: Menu,             path: "/admin/menu",         permKey: "menu.view" },
+  { tk: "nav.homeBlocks", icon: LayoutGrid,       path: "/admin/home-blocos",  permKey: "home_blocks.view" },
+  { tk: "nav.categories", icon: FolderOpen,       path: "/admin/categorias",   permKey: "home_blocks.view" },
+  { tk: "nav.ads",        icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
+  { tk: "nav.columnists", icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
+  { tk: "nav.rss",        icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
+  { tk: "nav.users",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
+  { tk: "nav.social",     icon: Share2,           path: "/admin/social",       permKey: "social.view" },
+] as const;
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -73,8 +74,8 @@ function usePanelTheme() {
   return { accent, logo };
 }
 
-function formatDate() {
-  return new Date().toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+function formatDate(lang: "pt-BR" | "en") {
+  return new Date().toLocaleDateString(lang === "en" ? "en-US" : "pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
 
 // ─── Notification types ───────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ function NotificationBell({ accent }: { accent: string }) {
   const [notifs, setNotifs] = useState(INITIAL_NOTIFICATIONS);
   const ref               = useRef<HTMLDivElement>(null);
   const unread            = notifs.filter((n) => !n.read).length;
+  const { t }             = useAdminT();
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -141,20 +143,20 @@ function NotificationBell({ accent }: { accent: string }) {
           style={{ boxShadow: "0 8px 24px rgba(15,23,42,0.18)" }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-700">
             <div className="flex items-center gap-2">
-              <span className="text-[13px] font-bold text-slate-800 dark:text-slate-100">Notificações</span>
+              <span className="text-[13px] font-bold text-slate-800 dark:text-slate-100">{t("notif.title")}</span>
               {unread > 0 && (
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: accent }}>{unread}</span>
               )}
             </div>
             {unread > 0 && (
               <button onClick={markAllRead} className="flex items-center gap-1 text-[11px] font-medium text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-400 transition-colors">
-                <CheckCheck size={13} /> Marcar todas como lidas
+                <CheckCheck size={13} /> {t("notif.markAll")}
               </button>
             )}
           </div>
           <div className="max-h-[340px] overflow-y-auto">
             {notifs.length === 0 ? (
-              <div className="py-10 text-center text-slate-400 text-sm">Nenhuma notificação</div>
+              <div className="py-10 text-center text-slate-400 text-sm">{t("notif.empty")}</div>
             ) : notifs.map((n) => {
               const NIcon = NOTIF_ICON[n.type];
               return (
@@ -175,7 +177,7 @@ function NotificationBell({ accent }: { accent: string }) {
             })}
           </div>
           <div className="px-4 py-2.5 border-t border-slate-100 dark:border-slate-700 text-center">
-            <button className="text-[11px] font-medium text-[#0B2A66] dark:text-blue-400 hover:underline">Ver todas as notificações</button>
+            <button className="text-[11px] font-medium text-[#0B2A66] dark:text-blue-400 hover:underline">{t("notif.viewAll")}</button>
           </div>
         </div>
       )}
@@ -191,8 +193,10 @@ function Avatar({ src, initials, size = 9 }: { src?: string | null; initials: st
 
 function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSaved: (name: string, avatar: string | null) => void; isDark: boolean }) {
   const stored  = getStoredUser();
+  const { t }   = useAdminT();
   const [name, setName]       = useState(stored?.name ?? "");
   const [preview, setPreview] = useState<string | null>(stored?.avatarBase64 ?? null);
+  const [language, setLanguage] = useState<"pt-BR" | "en">(stored?.language === "en" ? "en" : "pt-BR");
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState("");
   const fileRef               = useRef<HTMLInputElement>(null);
@@ -223,11 +227,22 @@ function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSav
   async function save() {
     setSaving(true); setError("");
     try {
-      const res = await adminApi.updateMyProfile({ name: name.trim() || undefined, avatarBase64: preview });
+      const res = await adminApi.updateMyProfile({ name: name.trim() || undefined, avatarBase64: preview, language });
+      const langChanged = (stored?.language ?? "pt-BR") !== res.user.language;
+      // Persiste o snapshot com o idioma novo (name/avatar também).
+      setStoredUser({
+        email: stored?.email ?? res.user.email,
+        role: stored?.role ?? res.user.role,
+        name: res.user.name,
+        avatarBase64: res.user.avatarBase64 ?? undefined,
+        language: res.user.language,
+      });
+      // Trocar o idioma re-renderiza o painel inteiro: recarrega.
+      if (langChanged) { window.location.reload(); return; }
       onSaved(res.user.name, res.user.avatarBase64 ?? null);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar");
+      setError(err instanceof Error ? err.message : t("profile.errorSave"));
     } finally { setSaving(false); }
   }
 
@@ -237,7 +252,7 @@ function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSav
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(15,23,42,0.55)" }} onClick={onClose}>
       <div className={`${isDark ? "bg-slate-900 border border-slate-700" : "bg-white"} rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-5`} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
-          <h2 className={`text-base font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>Meu Perfil</h2>
+          <h2 className={`text-base font-bold ${isDark ? "text-slate-100" : "text-slate-800"}`}>{t("profile.title")}</h2>
           <button onClick={onClose} className={`${isDark ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-600"}`}><X size={18}/></button>
         </div>
 
@@ -252,21 +267,36 @@ function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSav
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickFile}/>
           {preview && (
             <button onClick={() => setPreview(null)} className="text-[11px] text-red-400 hover:text-red-600 underline">
-              Remover foto
+              {t("profile.removePhoto")}
             </button>
           )}
         </div>
 
         <div className="space-y-1">
-          <label className={`block text-xs font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Nome de exibição</label>
+          <label className={`block text-xs font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>{t("profile.displayName")}</label>
           <div className="relative">
             <Pencil size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`}/>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={`w-full pl-8 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 ${isDark ? "bg-slate-800 border-slate-600 text-slate-100 placeholder:text-slate-500" : "border-slate-200 text-slate-800"}`}
-              placeholder="Seu nome"
+              placeholder={t("profile.yourName")}
             />
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className={`block text-xs font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>{t("profile.language")}</label>
+          <div className="relative">
+            <Globe size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? "text-slate-500" : "text-slate-400"}`}/>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value === "en" ? "en" : "pt-BR")}
+              className={`w-full pl-8 pr-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 ${isDark ? "bg-slate-800 border-slate-600 text-slate-100" : "border-slate-200 text-slate-800 bg-white"}`}
+            >
+              <option value="pt-BR">Português</option>
+              <option value="en">English</option>
+            </select>
           </div>
         </div>
 
@@ -274,13 +304,13 @@ function ProfileModal({ onClose, onSaved, isDark }: { onClose: () => void; onSav
 
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm transition-colors ${isDark ? "border-slate-700 text-slate-300 hover:bg-slate-800" : "border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-            Cancelar
+            {t("profile.cancel")}
           </button>
           <button
             onClick={save} disabled={saving}
             className="flex-1 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-medium hover:bg-[#0a2255] disabled:opacity-60 transition-colors"
           >
-            {saving ? "Salvando…" : "Salvar"}
+            {saving ? t("profile.saving") : t("profile.save")}
           </button>
         </div>
       </div>
@@ -293,8 +323,9 @@ function UserMenu({ onLogout, isDark, onToggleDark }: { onLogout: () => void; is
   const [showProfile, setShowProfile] = useState(false);
   const [localUser, setLocalUser]     = useState(getStoredUser);
   const ref                     = useRef<HTMLDivElement>(null);
+  const { t }                   = useAdminT();
   const initials = (localUser?.name ?? "AD").split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
-  const roleLabel = localUser?.role === "admin" ? "Administrador" : "Editor";
+  const roleLabel = localUser?.role === "admin" ? t("role.admin") : t("role.editor");
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -345,17 +376,17 @@ function UserMenu({ onLogout, isDark, onToggleDark }: { onLogout: () => void; is
             <div className="py-1">
               <button onClick={() => { setShowProfile(true); setOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0B2A66] dark:hover:text-blue-400 transition-colors text-left">
-                <UserCircle size={15} className="text-slate-400 dark:text-slate-500"/> Meu Perfil
+                <UserCircle size={15} className="text-slate-400 dark:text-slate-500"/> {t("menu.myProfile")}
               </button>
               <button onClick={() => { window.open("/", "_blank"); setOpen(false); }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-[#0B2A66] dark:hover:text-blue-400 transition-colors text-left">
-                <Eye size={15} className="text-slate-400 dark:text-slate-500"/> Ver portal
+                <Eye size={15} className="text-slate-400 dark:text-slate-500"/> {t("menu.viewPortal")}
               </button>
               <button onClick={() => { onToggleDark(); }}
                 className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-[13px] text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left">
                 <span className="flex items-center gap-3">
                   {isDark ? <Sun size={15} className="text-amber-400"/> : <Moon size={15} className="text-slate-400"/>}
-                  {isDark ? "Modo Claro" : "Modo Escuro"}
+                  {isDark ? t("menu.toLight") : t("menu.toDark")}
                 </span>
                 <span className={`w-8 h-4 rounded-full relative transition-colors ${isDark ? "bg-[#0B2A66]" : "bg-slate-200"}`}>
                   <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${isDark ? "translate-x-4" : "translate-x-0.5"}`}/>
@@ -391,6 +422,7 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
   }
 
   const { permSet, loaded } = useEditorPermissions(role);
+  const { t, lang } = useAdminT();
 
   function canSee(permKey: string | null): boolean {
     if (role === "admin") return true;
@@ -440,27 +472,27 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
         {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-700">
           <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
-          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 tracking-wide">A notícia em tempo real</p>
+          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 tracking-wide">{t("nav.tagline")}</p>
         </div>
 
         {/* Papel do usuário */}
         {role === "editor" && (
           <div className="mx-3 mt-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50">
-            <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">Acesso Editor</p>
+            <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">{t("shell.editorAccess")}</p>
             <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">
-              {loaded ? `${permSet.size} permissões ativas` : "Carregando permissões..."}
+              {loaded ? `${permSet.size} ${t("shell.permsActive")}` : t("shell.loadingPerms")}
             </p>
           </div>
         )}
 
         {/* Nav */}
         <nav className="flex-1 py-4 space-y-0.5 pr-2 overflow-y-auto min-h-0">
-          {visibleMain.map(({ label, icon: Icon, path }) => navItem(label, Icon, path))}
+          {visibleMain.map(({ tk, icon: Icon, path }) => navItem(t(tk), Icon, path))}
 
           {/* Configurações — single direct link */}
           {canSeeConfig && (
             <div className="pt-3">
-              {navItem("Configurações", Settings, "/admin/configuracoes")}
+              {navItem(t("nav.settings"), Settings, "/admin/configuracoes")}
             </div>
           )}
         </nav>
@@ -470,12 +502,12 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
           <a href="/" target="_blank" rel="noreferrer"
             className="flex items-center gap-3 pl-5 pr-4 py-2.5 rounded-r-xl text-sm text-slate-500 dark:text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-300 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
             <ExternalLink size={16} className="text-slate-400 dark:text-slate-500" />
-            <span>Ver site</span>
+            <span>{t("shell.viewSite")}</span>
           </a>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 pl-5 pr-4 py-2.5 rounded-r-xl text-sm text-slate-500 dark:text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors">
             <LogOut size={16} className="text-slate-400 dark:text-slate-500" />
-            <span>Sair</span>
+            <span>{t("shell.logout")}</span>
           </button>
         </div>
       </aside>
@@ -489,7 +521,7 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
           <div className="flex-1 max-w-sm">
             <div className="relative">
               <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" />
-              <input type="text" placeholder="Buscar no portal..."
+              <input type="text" placeholder={t("shell.searchPlaceholder")}
                 className="w-full pl-9 pr-4 py-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl outline-none focus:border-[#0B2A66] dark:focus:border-blue-500 transition-colors placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-800 dark:text-slate-200"
               />
             </div>
@@ -498,10 +530,10 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
             {topbarExtra ? topbarExtra : (
               <>
                 <span className="text-sm text-slate-500 dark:text-slate-400 hidden lg:flex items-center gap-2">
-                  <span className="text-slate-400">📅</span> {formatDate()}
+                  <span className="text-slate-400">📅</span> {formatDate(lang)}
                 </span>
                 <button onClick={toggleDark}
-                  title={isDark ? "Modo claro" : "Modo escuro"}
+                  title={isDark ? t("topbar.lightMode") : t("topbar.darkMode")}
                   className="p-2 rounded-xl text-slate-500 dark:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
                   {isDark ? <Sun size={18}/> : <Moon size={18}/>}
                 </button>

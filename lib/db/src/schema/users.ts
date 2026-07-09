@@ -20,6 +20,9 @@ export const usersTable = pgTable("users", {
   passwordChangedAt: timestamp("password_changed_at"),
   mustChangePassword: integer("must_change_password").notNull().default(0),
   avatarBase64: text("avatar_base64"),
+  /** Idioma do PAINEL admin, por usuário (não confundir com settings.siteLanguage,
+   *  que é do site público). "pt-BR" | "en"; default pt-BR. */
+  language: text("language").notNull().default("pt-BR"),
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),

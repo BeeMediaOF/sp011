@@ -116,7 +116,7 @@ router.post("/login", async (req, res) => {
         ipAddress: ip, userAgent: ua,
       });
       const token = generateToken(user.id, user.role);
-      res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null });
+      res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null, language: user.language });
       return;
     }
 
@@ -229,7 +229,7 @@ router.post("/2fa/login", async (req, res) => {
       description: `Login com 2FA: ${user.email}`, ipAddress: ip, userAgent: req.headers["user-agent"] ?? "",
     });
     const token = generateToken(user.id, user.role);
-    res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null });
+    res.json({ token, email: user.email, role: user.role, name: user.name, avatarBase64: user.avatarBase64 ?? null, language: user.language });
   } catch (err) {
     req.log.error({ err }, "2FA login error");
     res.status(500).json({ error: "Erro interno" });
@@ -244,7 +244,7 @@ router.get("/me", authMiddleware, async (req, res) => {
       id: usersTable.id, name: usersTable.name, email: usersTable.email,
       role: usersTable.role, status: usersTable.status,
       lastLogin: usersTable.lastLogin, mustChangePassword: usersTable.mustChangePassword,
-      avatarBase64: usersTable.avatarBase64,
+      avatarBase64: usersTable.avatarBase64, language: usersTable.language,
     }).from(usersTable).where(eq(usersTable.id, req.userId));
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
     res.json({ user });
@@ -257,15 +257,17 @@ router.get("/me", authMiddleware, async (req, res) => {
 /** PUT /api/admin/me — update own name and avatar */
 router.put("/me", authMiddleware, async (req, res) => {
   if (!req.userId) { res.status(401).json({ error: "Não autorizado" }); return; }
-  const { name, avatarBase64 } = req.body as { name?: string; avatarBase64?: string | null };
+  const { name, avatarBase64, language } = req.body as { name?: string; avatarBase64?: string | null; language?: string };
   try {
     const updates: Record<string, unknown> = { updatedAt: new Date() };
     if (typeof name === "string" && name.trim()) updates["name"] = name.trim();
     if (avatarBase64 !== undefined) updates["avatarBase64"] = avatarBase64 ?? null;
+    // Só o próprio usuário troca seu idioma do painel; valores fechados.
+    if (language === "pt-BR" || language === "en") updates["language"] = language;
     await db.update(usersTable).set(updates).where(eq(usersTable.id, req.userId));
     const [updated] = await db.select({
       id: usersTable.id, name: usersTable.name, email: usersTable.email,
-      role: usersTable.role, avatarBase64: usersTable.avatarBase64,
+      role: usersTable.role, avatarBase64: usersTable.avatarBase64, language: usersTable.language,
     }).from(usersTable).where(eq(usersTable.id, req.userId));
     await logAudit({
       userId: req.userId, action: "update_profile", module: "auth",

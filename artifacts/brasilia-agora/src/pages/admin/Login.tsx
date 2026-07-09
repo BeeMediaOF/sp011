@@ -56,7 +56,7 @@ export default function Login() {
     try {
       const res = await adminApi.login(email, password) as {
         token?: string; email?: string; role?: string; name?: string; avatarBase64?: string | null;
-        requiresTwoFactor?: boolean; tempToken?: string;
+        requiresTwoFactor?: boolean; tempToken?: string; language?: string;
       };
 
       if (res.requiresTwoFactor && res.tempToken) {
@@ -73,6 +73,7 @@ export default function Login() {
           name: res.name ?? "Usuário",
           role: res.role ?? "editor",
           avatarBase64: res.avatarBase64 ?? undefined,
+          language: res.language ?? "pt-BR",
         }));
         navigate("/admin");
       }
@@ -102,6 +103,7 @@ export default function Login() {
         name: res.name,
         role: res.role ?? "editor",
         avatarBase64: res.avatarBase64 ?? undefined,
+        language: res.language ?? "pt-BR",
       }));
       navigate("/admin");
     } catch (err: unknown) {
