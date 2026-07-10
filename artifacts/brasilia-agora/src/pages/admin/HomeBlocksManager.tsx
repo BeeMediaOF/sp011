@@ -531,6 +531,90 @@ const KSPORTS_FOOTER: FooterConfig = {
   ],
 };
 
+// ─── Esporte Agora (portal esportivo pt-BR) ──────────────────────────────────
+// Mesmo arranjo do starter KSports, com a identidade visual das logos do
+// Esporte Agora: roxo #5b2d8e (letras), verde-limão #4bce10 (setas/acentos) e
+// roxo bem escuro #241243 (fundo da versão dark). Menu/rodapé/blocos em
+// português; os paths do menu são os slugs usados no targetCategory das
+// regras do painel central (deploy/esporteagora/sources_pt.sql) — não mude
+// um sem o outro. Sem parceiro fechado, os banners nascem como "Anuncie
+// aqui" (troque o HTML quando houver patrocinador).
+const EA_DARK   = "#241243"; // roxo escuro (fundo da logo dark)
+const EA_PURPLE = "#5b2d8e"; // roxo das letras
+const EA_GREEN  = "#4bce10"; // verde-limão das setas
+const EA_MID    = "#3a1c6e"; // roxo médio (gradientes)
+
+// Marca em texto puro no estilo da logo (Esporte branco + Agora verde);
+// substituível pela PNG branca via upload no Storage + edição do bloco.
+const EA_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;">Esporte<span style="color:${EA_GREEN};">Agora</span></span>`;
+const EA_AD_BG = `border:1px solid #3b2a63;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(75,206,16,.32), transparent 42%), radial-gradient(circle at 10% 60%, rgba(91,45,142,.6), transparent 46%), linear-gradient(135deg, ${EA_DARK}, ${EA_MID} 60%, ${EA_DARK});`;
+
+const EA_AD_BONUS = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;${EA_AD_BG}">
+  ${EA_AD_BRAND}
+  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">ANUNCIE <span style="color:${EA_GREEN};">AQUI</span></span><br/><span style="font-size:13px;font-weight:600;color:#cdc3e8;">SUA MARCA NA TORCIDA DO ESPORTE AGORA</span></span>
+  <span style="background:${EA_GREEN};color:#0c2601;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">FALE CONOSCO</span>
+</div>`;
+
+const EA_AD_HEADER = `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;${EA_AD_BG}">
+  <span style="font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;">Esporte<span style="color:${EA_GREEN};">Agora</span></span>
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">SUA MARCA <span style="color:${EA_GREEN};">AQUI.</span></span><br/><span style="font-size:10px;font-weight:600;color:#cdc3e8;">SEJA O PARCEIRO OFICIAL DO ESPORTE AGORA</span></span>
+  <span style="background:${EA_GREEN};color:#0c2601;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;">ANUNCIE</span>
+</div>`;
+
+const EA_AD_BOX = `<div style="max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;${EA_AD_BG}">
+  <div style="color:#cdc3e8;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;">PARCEIRO OFICIAL</div>
+  <div style="margin-bottom:12px;">${EA_AD_BRAND}</div>
+  <div style="color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;">SUA MARCA<br/>NESTE ESPAÇO</div>
+  <div style="display:inline-block;background:${EA_GREEN};color:#0c2601;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;">ANUNCIE AQUI</div>
+</div>`;
+
+// Menu do Esporte Agora — paths = slugs das regras da central (PROPOSITALMENTE
+// diferentes dos slugs EN do KSports; ver sources_pt.sql).
+const EA_MENU: TemplateMenuItem[] = [
+  { id: "ea-menu-home",     label: "HOME",           path: "/",                  order: 0, visible: true },
+  { id: "ea-menu-copa",     label: "COPA DO MUNDO",  path: "/copa-do-mundo",     order: 1, visible: true },
+  { id: "ea-menu-futebol",  label: "FUTEBOL",        path: "/futebol",           order: 2, visible: true },
+  { id: "ea-menu-volei",    label: "VÔLEI",          path: "/volei",             order: 3, visible: true },
+  { id: "ea-menu-tenis",    label: "TÊNIS",          path: "/tenis",             order: 4, visible: true },
+  { id: "ea-menu-f1",       label: "FÓRMULA 1",      path: "/f1",                order: 5, visible: true },
+  { id: "ea-menu-futam",    label: "FUT. AMERICANO", path: "/futebol-americano", order: 6, visible: true },
+  { id: "ea-menu-esports",  label: "E-SPORTS",       path: "/e-sports",          order: 7, visible: true },
+  { id: "ea-menu-outros",   label: "OUTROS",         path: "/outros",            order: 8, visible: true },
+];
+
+const EA_FOOTER: FooterConfig = {
+  description: "Notícias. Análises. Paixão pelo esporte.",
+  showSocial: true,
+  columns: [
+    { id: "ea-nav", title: "Navegação", links: [
+      { id: "ea-nav-home",    label: "Home",           href: "/" },
+      { id: "ea-nav-copa",    label: "Copa do Mundo",  href: "/copa-do-mundo" },
+      { id: "ea-nav-futebol", label: "Futebol",        href: "/futebol" },
+      { id: "ea-nav-volei",   label: "Vôlei",          href: "/volei" },
+      { id: "ea-nav-tenis",   label: "Tênis",          href: "/tenis" },
+      { id: "ea-nav-f1",      label: "Fórmula 1",      href: "/f1" },
+      { id: "ea-nav-futam",   label: "Fut. Americano", href: "/futebol-americano" },
+      { id: "ea-nav-esports", label: "e-Sports",       href: "/e-sports" },
+    ] },
+    { id: "ea-inst", title: "Institucional", links: [
+      { id: "ea-i-about",     label: "Sobre nós",                href: "/contato" },
+      { id: "ea-i-advertise", label: "Anuncie",                  href: "/contato" },
+      { id: "ea-i-privacy",   label: "Política de Privacidade",  href: "/privacidade" },
+      { id: "ea-i-terms",     label: "Termos de Uso",            href: "/termos" },
+      { id: "ea-i-contact",   label: "Contato",                  href: "/contato" },
+    ] },
+  ],
+  showContact: false,
+  showNewsletter: true,
+  newsletterTitle: "Receba as principais notícias do esporte no seu e-mail",
+  copyright: "© {year} {site}. Todos os direitos reservados.",
+  legalLinks: [
+    { id: "ea-l-privacy", label: "Política de Privacidade", href: "/privacidade" },
+    { id: "ea-l-terms",   label: "Termos de Uso",           href: "/termos" },
+    { id: "ea-l-contact", label: "Contato",                 href: "/contato" },
+  ],
+};
+
 const STARTER_TEMPLATES: HomeTemplate[] = [
   {
     id: "starter-ksports",
@@ -573,6 +657,56 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
       { id: "content-ksports-nfl",      name: "NFL",       visible: true, order: 8,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "nfl",       color: KSPORTS_PURPLE, width: "quarter", linkLabel: "VIEW ALL →" },
       { id: "content-ksports-f1",       name: "Formula 1", visible: true, order: 9,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "formula-1", color: KSPORTS_PINK, width: "quarter", linkLabel: "VIEW ALL →" },
       { id: "content-ksports-esports",  name: "e-Sports",  visible: true, order: 10, custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "esports",   color: KSPORTS_PURPLE, width: "quarter", linkLabel: "VIEW ALL →" },
+      // Blocos padrão do portal ficam ocultos (reative na aba Blocos se quiser)
+      { id: "brasil",     name: "Brasil",           visible: false, order: 11, layout: "grid",    color: "#16a34a", category: "brasil" },
+      { id: "mundo",      name: "Mundo",            visible: false, order: 12, layout: "grid",    color: "#6b21a8", category: "mundo" },
+      { id: "esporte",    name: "Esporte",          visible: false, order: 13, layout: "cultura", color: "#dc2626", category: "esportes" },
+      { id: "cultura",    name: "Cultura",          visible: false, order: 14, layout: "cultura", color: "#0d9488", category: "cultura" },
+      { id: "df",         name: "DF",               visible: false, order: 15, layout: "duplo",   color: "#0b3d91", category: "cidade" },
+      { id: "saude",      name: "Saúde",            visible: false, order: 16, layout: "grid",    color: "#16a34a", category: "saude" },
+      { id: "tecnologia", name: "Tecnologia",       visible: false, order: 17, layout: "grid",    color: "#0284c7", category: "tecnologia" },
+      { id: "colunistas", name: "Colunistas",       visible: false, order: 18 },
+      { id: "ultimas",    name: "Últimas Notícias", visible: false, order: 19 },
+    ],
+  },
+  {
+    id: "starter-esporteagora",
+    name: "Esporte Agora — Portal Esportivo (PT)",
+    createdAt: "2026-07-10T00:00:00.000Z",
+    accentColor: EA_PURPLE,
+    builtin: true,
+    headerStyle: "standard", footerStyle: "dark",
+    headerBgColor: "#ffffff", footerBgColor: EA_DARK,
+    menuTextColor: "#101418", menuActiveColor: EA_GREEN,
+    menuFontSize: 13, menuFontWeight: 800,
+    showTickerBar: false, showHeroStrip: true,
+    showTopBar: true, topBarBgColor: EA_DARK,
+    menuBarStyle: "bar", menuBarBgColor: EA_DARK,
+    footerAccentColor: EA_GREEN,
+    // pt-BR/São Paulo já são o padrão da plataforma, mas o starter grava
+    // explicitamente: aplicar por cima de um site EN (ex.: teste com o
+    // starter KSports) volta idioma e fuso junto com o layout.
+    siteLanguage: "pt-BR", siteTimezone: "America/Sao_Paulo",
+    headerBannerHtml: EA_AD_HEADER,
+    menuItems: EA_MENU,
+    footerConfig: EA_FOOTER,
+    blocks: [
+      // ── Zona 2 colunas: hero portal + Mais Lidas na lateral (mesma regra do
+      //    KSports: só ele na sidebar para não abrir buraco na coluna main) ──
+      { id: "hero",                name: "Principais Notícias", visible: true, order: 0, layout: "portal", area: "main" },
+      { id: "mais-lidas",          name: "Mais Lidas",          visible: true, order: 1, color: EA_PURPLE, area: "sidebar" },
+      // ── Faixa EM ALTA + banner "Anuncie aqui" ──
+      { id: "ticker-ea",           name: "Em Alta",             visible: true, order: 2, custom: true, blockType: "ticker", format: "grid", source: "latest", itemsLimit: 8, color: EA_GREEN },
+      { id: "html-ea-ad-bonus",    name: "Anuncie — Faixa",     visible: true, order: 3, custom: true, blockType: "html", format: "grid", html: EA_AD_BONUS, color: EA_PURPLE, isAd: true },
+      // ── Zona 2 colunas: Notícias Recentes em grade + lateral Últimas/banner ──
+      { id: "content-ea-recentes", name: "Notícias Recentes",   visible: true, order: 4, custom: true, blockType: "content", format: "grid", layout: "grid", source: "latest", itemsLimit: 8, color: EA_PURPLE, area: "main" },
+      { id: "list-ea-ultimas",     name: "Últimas Notícias",    visible: true, order: 5, custom: true, blockType: "list", format: "list_compact", source: "latest", itemsLimit: 5, color: EA_PURPLE, area: "sidebar" },
+      { id: "html-ea-ad-box",      name: "Anuncie — Lateral",   visible: true, order: 6, custom: true, blockType: "html", format: "grid", html: EA_AD_BOX, color: EA_GREEN, area: "sidebar", isAd: true },
+      // ── Seções por modalidade em fileira de 4 (slugs das regras da central) ──
+      { id: "content-ea-futebol",  name: "Futebol",        visible: true, order: 7,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "futebol",           color: EA_PURPLE, width: "quarter", linkLabel: "VER TODAS →" },
+      { id: "content-ea-futam",    name: "Fut. Americano", visible: true, order: 8,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "futebol-americano", color: EA_GREEN,  width: "quarter", linkLabel: "VER TODAS →" },
+      { id: "content-ea-f1",       name: "Fórmula 1",      visible: true, order: 9,  custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "f1",                color: EA_PURPLE, width: "quarter", linkLabel: "VER TODAS →" },
+      { id: "content-ea-esports",  name: "e-Sports",       visible: true, order: 10, custom: true, blockType: "content", format: "featured", layout: "featured", source: "automatic_by_category", category: "e-sports",          color: EA_GREEN,  width: "quarter", linkLabel: "VER TODAS →" },
       // Blocos padrão do portal ficam ocultos (reative na aba Blocos se quiser)
       { id: "brasil",     name: "Brasil",           visible: false, order: 11, layout: "grid",    color: "#16a34a", category: "brasil" },
       { id: "mundo",      name: "Mundo",            visible: false, order: 12, layout: "grid",    color: "#6b21a8", category: "mundo" },

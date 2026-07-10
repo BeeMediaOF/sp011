@@ -126,16 +126,16 @@ Em `https://esporteagora.midia.run/admin`:
 1. **Configurações → Informações**: nome "Esporte Agora", tagline, logos,
    autor padrão/byline (ex.: "Redação Esporte Agora"). Idioma do site
    público: **Português** e fuso **America/Sao_Paulo** (já são o padrão).
-2. **Menu** (slugs = os das regras):
-   Home · Copa do Mundo (`copa-do-mundo`) · Futebol (`futebol`) · Vôlei
-   (`volei`) · Tênis (`tenis`) · Fórmula 1 (`f1`) · Fut. Americano
-   (`futebol-americano`) · e-Sports (`e-sports`) · Outros (`outros`).
-3. **Home**: se quiser o layout de portal esportivo, aplique o starter
-   "KSports — Portal Esportivo" (aba Templates) e **desfaça o que é do
-   KSports**: ele seta idioma EN + fuso UTC (volte para Português/São Paulo
-   em Configurações), nomes de blocos/menu em inglês (renomeie) e banners
-   do parceiro KBET (remova ou troque os blocos HTML). Alternativa: montar
-   com os presets PT normais.
+2. **Home + menu**: aba Templates → aplicar o starter
+   **"Esporte Agora — Portal Esportivo (PT)"** (existe a partir da imagem
+   v23; réplica do layout do KSports nas cores da marca — roxo `#5b2d8e`,
+   verde `#4bce10`, fundo escuro `#241243`). Ele já instala o menu em
+   português com os slugs das regras (`copa-do-mundo`, `futebol`, `volei`,
+   `tenis`, `f1`, `futebol-americano`, `e-sports`, `outros`), rodapé escuro
+   PT e grava idioma pt-BR + fuso São Paulo. Os banners nascem como
+   "Anuncie aqui" — troque o HTML quando houver patrocinador.
+   (Imagem antiga sem o starter? Alternativa: aplicar o do KSports e
+   desfazer idioma EN/fuso UTC, nomes em inglês e banners KBET.)
 
 ## 8) Verificação
 
