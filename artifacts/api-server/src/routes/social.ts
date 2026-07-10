@@ -756,8 +756,8 @@ router.post("/meta/app", (req, res) => {
   const b = req.body as { appId?: string; appSecret?: string };
   const updates: { metaAppId?: string; metaAppSecret?: string } = {};
   if (typeof b.appId === "string") updates.metaAppId = b.appId.trim();
-  if (typeof b.appSecret === "string" && b.appSecret && !b.appSecret.includes("••")) {
-    updates.metaAppSecret = b.appSecret;
+  if (typeof b.appSecret === "string" && b.appSecret.trim() && !b.appSecret.includes("••")) {
+    updates.metaAppSecret = b.appSecret.trim();
   }
   store.updateSocialConfig(updates);
   const cfg = store.getSocialConfig();
