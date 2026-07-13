@@ -112,8 +112,12 @@ services:
     image: ollama/ollama:latest
     restart: unless-stopped
     environment:
-      OLLAMA_KEEP_ALIVE: "-1"    # mantém o modelo na RAM (não recarrega a cada artigo)
-      OLLAMA_NUM_PARALLEL: "1"   # 1 geração por vez (CPU não paraleliza bem)
+      # 30m: o modelo (~5-7 GiB) descarrega quando a reescrita fica ociosa (ex.:
+      # madrugada, fora da janela BR de coleta) e recarrega em segundos no 1º
+      # artigo seguinte. "-1" (para sempre) segurava a RAM 24/7 e deixava o
+      # processo de longa vida acumular memória (visto 12,9 GiB p/ modelo de 5,1).
+      OLLAMA_KEEP_ALIVE: "30m"
+      OLLAMA_NUM_PARALLEL: "1"   # 1 geração por vez (CPU não paraleliza bem; a central também manda 1 por vez)
     volumes:
       - ollama_models:/root/.ollama
 
