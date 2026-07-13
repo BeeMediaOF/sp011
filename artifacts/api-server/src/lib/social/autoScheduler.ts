@@ -12,10 +12,11 @@ import { randomUUID } from "crypto";
 import { db } from "@workspace/db";
 import {
   articlesTable,
+  socialAccountsTable,
   socialPublicationQueueTable,
   socialTemplatesTable,
 } from "@workspace/db";
-import { and, eq, gte, lte, ne, inArray, desc, count } from "drizzle-orm";
+import { and, eq, gte, lte, ne, inArray, isNotNull, desc, count } from "drizzle-orm";
 import { store } from "../store.js";
 import { logger } from "../logger.js";
 import { processSocialQueue, getPublicBase } from "./queueProcessor.js";
@@ -91,7 +92,7 @@ export async function runAutomationCycle(
     if (!auto) return { enqueued: 0, articles: [], reason: "automação não configurada" };
     if (!auto.enabled && !opts.force) return { enqueued: 0, articles: [], reason: "automação desligada" };
 
-    const accountIds = auto.accountIds ?? [];
+    const configuredAccountIds = auto.accountIds ?? [];
     const templateIds = auto.templateIds ?? [];
     const types = (auto.types?.length ? auto.types : ["feed"]) as ("feed" | "story")[];
     const maxPerRun = Math.max(1, auto.maxPerRun || 3);
@@ -99,7 +100,7 @@ export async function runAutomationCycle(
     // de uma vez (spam). 0 = todos com scheduledAt=now (publica todos já).
     const spacingMs = Math.max(0, auto.spacingMinutes ?? 5) * 60 * 1000;
 
-    if (!accountIds.length) return { enqueued: 0, articles: [], reason: "nenhuma conta selecionada" };
+    if (!configuredAccountIds.length) return { enqueued: 0, articles: [], reason: "nenhuma conta selecionada" };
     if (!templateIds.length) return { enqueued: 0, articles: [], reason: "nenhuma máscara selecionada" };
 
     const now = new Date();
@@ -108,6 +109,30 @@ export async function runAutomationCycle(
     // lastRunAt → dispara assim que a janela abrir). "Rodar agora" (force) ignora.
     if (!opts.force && !inActiveHours(auto, now)) {
       return { enqueued: 0, articles: [], reason: "fora do horário de funcionamento" };
+    }
+
+    // Conta apagada/reconectada pode sobrar na config (a UI só lista contas
+    // existentes, então um ID órfão fica invisível e re-salvar não o remove).
+    // Sem este filtro, o ID fantasma enfileira posts fadados a falhar e consome
+    // o orçamento de stories do ciclo. Só entram contas que existem e têm token.
+    const liveRows = await db
+      .select({ id: socialAccountsTable.id })
+      .from(socialAccountsTable)
+      .where(and(
+        inArray(socialAccountsTable.id, configuredAccountIds),
+        isNotNull(socialAccountsTable.accessToken),
+      ));
+    const live = new Set(liveRows.map((r) => r.id));
+    const accountIds = configuredAccountIds.filter((id) => live.has(id));
+    const staleAccountIds = configuredAccountIds.filter((id) => !live.has(id));
+    if (staleAccountIds.length) {
+      logger.warn(
+        { staleAccountIds },
+        "Social automation: contas selecionadas que não existem mais (ou sem token) — ignoradas",
+      );
+    }
+    if (!accountIds.length) {
+      return { enqueued: 0, articles: [], reason: "nenhuma conta selecionada existe ou tem token — reconecte em Contas e salve a Automação" };
     }
 
     // Janela elegível. Normal: só artigos publicados a partir de quando a
@@ -367,9 +392,15 @@ export async function runAutomationCycle(
     }
 
     // Atualiza a agenda apenas em ciclo normal (force = teste, não mexe no ritmo).
+    // Aproveita a escrita para sanear a config quando havia IDs fantasma.
     if (!opts.force) {
       store.updateSocialConfig({
-        automation: { ...auto, lastRunAt: now.toISOString(), lastCount: enqueued },
+        automation: {
+          ...auto,
+          ...(staleAccountIds.length ? { accountIds } : {}),
+          lastRunAt: now.toISOString(),
+          lastCount: enqueued,
+        },
       });
     }
 

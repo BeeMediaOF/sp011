@@ -211,7 +211,26 @@ router.put("/accounts/:id", async (req, res) => {
 });
 
 router.delete("/accounts/:id", async (req, res) => {
-  await db.delete(socialAccountsTable).where(eq(socialAccountsTable.id, req.params["id"]!));
+  const id = req.params["id"]!;
+  await db.delete(socialAccountsTable).where(eq(socialAccountsTable.id, id));
+  // O ID não pode sobrar na automação: a UI só lista contas existentes, então um
+  // ID órfão fica invisível lá (re-salvar não o removeria) e cada ciclo enfileiraria
+  // posts fadados a falhar, consumindo inclusive o orçamento de stories.
+  const auto = store.getSocialConfig().automation;
+  const autoIds = auto?.accountIds ?? [];
+  if (auto && autoIds.includes(id)) {
+    store.updateSocialConfig({
+      automation: { ...auto, accountIds: autoIds.filter((a) => a !== id) },
+    });
+  }
+  // Itens já na fila para essa conta falhariam um a um — encerra com motivo claro.
+  await db
+    .update(socialPublicationQueueTable)
+    .set({ status: "failed", errorMessage: "Conta removida" })
+    .where(and(
+      eq(socialPublicationQueueTable.socialAccountId, id),
+      inArray(socialPublicationQueueTable.status, ["pending", "processing"]),
+    ));
   res.json({ ok: true });
 });
 
