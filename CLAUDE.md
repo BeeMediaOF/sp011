@@ -274,25 +274,30 @@ centralId; backoff 1m→5m→15m→1h→6h, 5 tentativas → dead).
   de `max_posts_per_day`.
 - **Publicar agora**: `POST /deliveries/:id/publish-now` (pending ou
   awaiting_approval) — também via botão na página Entregas.
-- IA da central: pools de chaves Gemini/OpenAI/Perplexity (criptografadas)
-  com rodízio; prompt padrão de reescrita PT em
+- IA da central: provider primário configurável (`aiProvider` nas
+  Configurações) — em produção é o **Ollama** self-hosted
+  (`qwen2.5:7b-instruct`, serviço `ollama` do compose raiz,
+  `http://ollama:11434`; ~13 GB de RAM residentes, maior consumidor da VPS),
+  com fallback e lane de reforço nos pools de chaves Gemini/OpenAI/Perplexity
+  (criptografadas, rodízio). Prompt padrão de reescrita PT em
   `lib/news-engine/src/prompts.ts` — **espelhar sempre** com
   `api-server/src/lib/rssProcessor.ts` (diff deve dar idêntico); versão EN em
-  `deploy/ksports/sources_en.sql`.
+  `deploy/ksports/sources_en.sql`. Reescrita é COMPARTILHADA entre blogs
+  (1 notícia = 1 reescrita, N entregas) — custo de IA não cresce por blog.
 - Dedup global (guid/URL/título normalizado + overlap 500 recentes) — feeds
   sobrepostos entre irmãos são seguros.
 
-## 11. Pipeline interno do blog (modo standalone — hoje só o sp011 usa)
+## 11. Pipeline interno do blog (modo standalone — DORMENTE desde jul/2026)
 
-`startScheduler()` no api-server: scheduler (20 min) → rssProcessor (RSS ou
-scrape) salva rascunho → rewriteQueue reescreve com IA e publica. **Nada
-publica sem reescrita.** Provider primário: **Ollama** self-hosted
-(`qwen2.5:7b-instruct`, serviço `ollama` no compose, api fala
-`http://ollama:11434`); fallback Gemini (chaves `AIzaSy...` no painel,
-criptografadas) e Perplexity; lane de reforço (boost) configurável no painel.
-Backpressure: coleta adia quando o backlog de rascunhos ≥
-`rssMaxPendingRewrites`. Configuração de coleta/janela/tetos no card do
-RSSManager.
+Desde ~2026-07 **nenhum blog usa o pipeline interno**: o sp011 também passou a
+ser alimentado pela central (central-push, como os irmãos). O código continua
+como fallback de emergência: `startScheduler()` no api-server: scheduler
+(20 min) → rssProcessor (RSS ou scrape) salva rascunho → rewriteQueue reescreve
+com IA e publica. **Nada publica sem reescrita.** Providers do blog: Ollama
+self-hosted (mesmo serviço do compose), Gemini e Perplexity (chaves no painel,
+criptografadas); lane de reforço (boost) configurável. Backpressure: coleta
+adia quando o backlog de rascunhos ≥ `rssMaxPendingRewrites`. Configuração de
+coleta/janela/tetos no card do RSSManager.
 
 ## 12. Acesso aos bancos (padrões prontos para a VPS)
 
