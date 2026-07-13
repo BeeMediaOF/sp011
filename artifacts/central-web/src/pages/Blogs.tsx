@@ -1,6 +1,11 @@
 import { useState } from "react";
+import {
+  Plus, Globe, ExternalLink, Pencil, Trash2, KeyRound, PlugZap, RefreshCw,
+  ShieldCheck, Languages, Gauge, Timer, Radio, Eye,
+} from "lucide-react";
 import { api } from "../api";
-import { fmtDate, statusClass, statusLabel, useLoad } from "../hooks";
+import { nameColor, statusLabel, timeAgo, useLoad } from "../hooks";
+import { fmtNum } from "../charts";
 
 export interface BlogCategory { slug: string; hint?: string }
 
@@ -59,8 +64,12 @@ const KSPORTS_CATEGORIES_TEXT = [
   "others: anything that does not fit the categories above",
 ].join("\n");
 
+function initials(name: string): string {
+  return name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
+}
+
 export default function Blogs() {
-  const { data: blogs, error, reload } = useLoad(() => api<Blog[]>("/blogs"));
+  const { data: blogs, error, loading, reload } = useLoad(() => api<Blog[]>("/blogs"));
   const [editing, setEditing] = useState<Partial<Blog> | null>(null);
   const [form, setForm] = useState<typeof EMPTY>(EMPTY);
   const [secret, setSecret] = useState<string | null>(null);
@@ -135,15 +144,26 @@ export default function Blogs() {
     reload();
   };
 
+  const list = blogs ?? [];
+  const online = list.filter((b) => b.status === "online").length;
+
   return (
     <>
       <div className="toolbar">
+        <span className="muted" style={{ fontSize: 13 }}>
+          {loading && list.length === 0
+            ? "Carregando…"
+            : `${fmtNum(list.length)} blog(s) · ${fmtNum(online)} online`}
+        </span>
         <div className="grow" />
-        <button onClick={openNew}>+ Novo blog</button>
+        <button className="iconbtn" title="Atualizar" aria-label="Atualizar lista" onClick={reload}>
+          <RefreshCw size={15} className={loading ? "spin-anim" : undefined} />
+        </button>
+        <button onClick={openNew}><Plus size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Novo blog</button>
       </div>
 
       {error && <div className="error-box">{error}</div>}
-      {msg && <div className="card">{msg}</div>}
+      {msg && <div className="card" role="status">{msg}</div>}
 
       {secret && (
         <div className="card">
@@ -157,47 +177,100 @@ export default function Blogs() {
         </div>
       )}
 
-      <div className="card">
-        <table>
-          <thead>
-            <tr>
-              <th>Nome</th><th>API</th><th>Status</th><th>Modo</th><th>Aprovação</th><th>Visto por último</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {(blogs ?? []).map((b) => (
-              <tr key={b.id}>
-                <td>
-                  <b>{b.name}</b>
-                  {b.language === "en" && <span className="badge" style={{ marginLeft: 6 }}>EN</span>}
-                  {!b.isActive && <span className="badge err" style={{ marginLeft: 6 }}>inativo</span>}
-                  <div className="muted">{b.domain}</div>
-                  {(b.categories?.length ?? 0) > 0 && (
-                    <div className="muted" title={(b.categories ?? []).map((c) => c.slug).join(", ")}>
-                      {(b.categories ?? []).length} categoria(s): {(b.categories ?? []).slice(0, 4).map((c) => c.slug).join(", ")}
-                      {(b.categories?.length ?? 0) > 4 ? "…" : ""}
-                    </div>
-                  )}
-                </td>
-                <td className="mono">{b.apiUrl}</td>
-                <td>
-                  <span className={`badge ${statusClass(b.status)}`}>{statusLabel(b.status)}</span>
-                  {b.lastError && <div className="muted" title={b.lastError}>{b.lastError.slice(0, 60)}</div>}
-                </td>
-                <td>{b.deliveryMode === "draft" ? "rascunho" : "publica"}</td>
-                <td>{b.requireApproval ? "manual" : "automática"}</td>
-                <td>{fmtDate(b.lastSeenAt)}</td>
-                <td style={{ whiteSpace: "nowrap" }}>
-                  <button className="secondary small" onClick={() => test(b)}>Testar</button>{" "}
-                  <button className="secondary small" onClick={() => openEdit(b)}>Editar</button>{" "}
-                  <button className="secondary small" onClick={() => rotate(b)}>Rotacionar segredo</button>{" "}
-                  <button className="danger small" onClick={() => remove(b)}>Remover</button>
-                </td>
-              </tr>
-            ))}
-            {blogs?.length === 0 && <tr><td colSpan={7} className="muted">Nenhum blog cadastrado ainda.</td></tr>}
-          </tbody>
-        </table>
+      {!loading && list.length === 0 && !error && (
+        <div className="tcard">
+          <div className="tcard-empty">
+            <Globe size={32} style={{ display: "block", margin: "0 auto" }} />
+            <p>Nenhum blog cadastrado ainda. Clique em "Novo blog" para conectar o primeiro.</p>
+          </div>
+        </div>
+      )}
+
+      <div className={`blog-grid ${loading && list.length > 0 ? "is-stale" : ""}`}>
+        {list.map((b) => {
+          const color = nameColor(b.name);
+          const cats = b.categories ?? [];
+          return (
+            <div className="blog-card" key={b.id}>
+              <div className="bc-head">
+                <div className="bc-avatar" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
+                  {initials(b.name)}
+                </div>
+                <div className="bc-id">
+                  <div className="bc-name">
+                    {b.name}
+                    {b.language === "en" && <span className="badge info">EN</span>}
+                    {!b.isActive && <span className="badge err">inativo</span>}
+                  </div>
+                  <div className="bc-domain">
+                    {b.domain ? (
+                      <a href={`https://${b.domain.replace(/^https?:\/\//, "")}`} target="_blank" rel="noreferrer">
+                        {b.domain} <ExternalLink size={10} />
+                      </a>
+                    ) : (
+                      <span className="mono" style={{ fontSize: 11 }}>{b.apiUrl}</span>
+                    )}
+                  </div>
+                </div>
+                <span className={`hp ${b.status === "online" ? "ok" : b.status === "error" ? "err" : "warn"}`}>
+                  {statusLabel(b.status)}
+                </span>
+              </div>
+
+              <div className="bc-meta">
+                <div className="bc-kv">
+                  <span><Radio size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Visto por último</span>
+                  <b>{timeAgo(b.lastSeenAt)}</b>
+                </div>
+                <div className="bc-kv">
+                  <span><Eye size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Modo de entrega</span>
+                  <b>{b.deliveryMode === "draft" ? "Cria rascunho" : "Publica direto"}</b>
+                </div>
+                <div className="bc-kv">
+                  <span><ShieldCheck size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Aprovação</span>
+                  <b>{b.requireApproval ? "Manual" : "Automática"}</b>
+                </div>
+                <div className="bc-kv">
+                  <span><Languages size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Idioma</span>
+                  <b>{b.language === "en" ? "Inglês" : "Português (BR)"}</b>
+                </div>
+                <div className="bc-kv">
+                  <span><Gauge size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Teto diário</span>
+                  <b>{b.maxPostsPerDay != null ? `${fmtNum(b.maxPostsPerDay)} posts/dia` : "sem limite"}</b>
+                </div>
+                <div className="bc-kv">
+                  <span><Timer size={9} style={{ verticalAlign: "-0.5px", marginRight: 3 }} />Intervalo mínimo</span>
+                  <b>{b.minMinutesBetweenPosts != null ? `${fmtNum(b.minMinutesBetweenPosts)} min` : "—"}</b>
+                </div>
+              </div>
+
+              {cats.length > 0 && (
+                <div className="bc-cats" title={cats.map((c) => c.slug).join(", ")}>
+                  {cats.slice(0, 6).map((c) => <span className="chip" key={c.slug}>{c.slug}</span>)}
+                  {cats.length > 6 && <span className="chip">+{cats.length - 6}</span>}
+                </div>
+              )}
+
+              {b.lastError && <div className="bc-err" title={b.lastError}>{b.lastError.slice(0, 140)}</div>}
+
+              <div className="bc-actions">
+                <button className="secondary small" onClick={() => void test(b)}>
+                  <PlugZap size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Testar
+                </button>
+                <button className="secondary small" onClick={() => openEdit(b)}>
+                  <Pencil size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Editar
+                </button>
+                <div className="spacer" />
+                <button className="iconbtn amber" title="Rotacionar segredo de integração" aria-label="Rotacionar segredo" onClick={() => void rotate(b)}>
+                  <KeyRound size={15} />
+                </button>
+                <button className="iconbtn red" title="Remover blog" aria-label="Remover blog" onClick={() => void remove(b)}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {editing !== null && (

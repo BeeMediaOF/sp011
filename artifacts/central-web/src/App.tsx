@@ -19,16 +19,16 @@ import Usage from "./pages/Usage";
 import Logs from "./pages/Logs";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/blogs", label: "Blogs", icon: Globe },
-  { href: "/regras", label: "Regras", icon: SlidersHorizontal },
-  { href: "/fontes", label: "Fontes RSS", icon: Rss },
-  { href: "/noticias", label: "Notícias", icon: FileText },
-  { href: "/revisao", label: "Revisão", icon: ClipboardCheck },
-  { href: "/entregas", label: "Entregas", icon: Send },
-  { href: "/consumo", label: "Consumo IA", icon: BarChart2 },
-  { href: "/logs", label: "Logs", icon: ScrollText },
-  { href: "/configuracoes", label: "Configurações", icon: SettingsIcon },
+  { href: "/", label: "Dashboard", sub: "Visão geral do sistema em tempo real", icon: LayoutDashboard },
+  { href: "/blogs", label: "Blogs", sub: "Blogs conectados à central", icon: Globe },
+  { href: "/regras", label: "Regras", sub: "Distribuição por fonte e categoria", icon: SlidersHorizontal },
+  { href: "/fontes", label: "Fontes RSS", sub: "Coleta de notícias", icon: Rss },
+  { href: "/noticias", label: "Notícias", sub: "Coletadas, reescritas e distribuídas", icon: FileText },
+  { href: "/revisao", label: "Revisão", sub: "Aprovação de entregas", icon: ClipboardCheck },
+  { href: "/entregas", label: "Entregas", sub: "Fila de envio para os blogs", icon: Send },
+  { href: "/consumo", label: "Consumo IA", sub: "Chamadas, tokens e custo", icon: BarChart2 },
+  { href: "/logs", label: "Logs", sub: "Eventos do pipeline", icon: ScrollText },
+  { href: "/configuracoes", label: "Configurações", sub: "Ajustes da central", icon: SettingsIcon },
 ];
 
 // Modo escuro persistido — mesmo comportamento do painel do blog (toggle no topbar).
@@ -65,7 +65,8 @@ export default function App() {
   const user = getStoredUser();
   const name = user?.name || "Administrador";
   const initials = name.split(" ").filter(Boolean).map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "AD";
-  const title = NAV.find((i) => i.href === location)?.label ?? "Painel Central";
+  const current = NAV.find((i) => i.href === location);
+  const title = current?.label ?? "Painel Central";
 
   return (
     <div className="app">
@@ -94,13 +95,17 @@ export default function App() {
 
       <div className="main">
         <header className="topbar">
-          <h1>{title}</h1>
+          <div className="tb-title">
+            <h1>{title}</h1>
+            {current?.sub && <p className="tb-sub">{current.sub}</p>}
+          </div>
           <div className="tb-right">
             <span className="tb-date">📅 {formatDate()}</span>
             <button
               type="button"
               className="icon-btn"
               title={dark ? "Modo claro" : "Modo escuro"}
+              aria-label={dark ? "Ativar modo claro" : "Ativar modo escuro"}
               onClick={() => setDark((d) => !d)}
             >
               {dark ? <Sun size={18} /> : <Moon size={18} />}
