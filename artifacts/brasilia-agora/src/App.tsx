@@ -200,6 +200,36 @@ function LangSync() {
   return null;
 }
 
+/** Placeholder neutro para imagem quebrada (URL morta/bloqueada na origem). */
+const BROKEN_IMG_PLACEHOLDER =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 675'>" +
+    "<rect width='1200' height='675' fill='#e5e7eb'/>" +
+    "<path d='M540 296h120a8 8 0 0 1 8 8v80a8 8 0 0 1-8 8H540a8 8 0 0 1-8-8v-80a8 8 0 0 1 8-8zm10 74 26-32 18 22 12-14 24 24z' fill='#9ca3af'/>" +
+    "<circle cx='560' cy='318' r='9' fill='#9ca3af'/>" +
+    "</svg>",
+  );
+
+/** Troca <img> quebradas pelo placeholder — listener delegado em fase de
+    captura (o evento error de imagem não borbulha); vale para o site inteiro,
+    inclusive cards de notícia com imagem de origem que morreu depois. */
+function BrokenImageFallback() {
+  useEffect(() => {
+    function onError(e: Event) {
+      const el = e.target;
+      if (!(el instanceof HTMLImageElement)) return;
+      if (el.dataset["brokenFallback"] === "1") return;
+      el.dataset["brokenFallback"] = "1";
+      el.srcset = "";
+      el.src = BROKEN_IMG_PLACEHOLDER;
+    }
+    document.addEventListener("error", onError, true);
+    return () => document.removeEventListener("error", onError, true);
+  }, []);
+  return null;
+}
+
 function Router() {
   const [location] = useLocation();
   const isAdminArea =
@@ -327,6 +357,7 @@ function App({ ssrPath }: { ssrPath?: string } = {}) {
           <AnalyticsProvider />
           <ScrollToTop />
           <LangSync />
+          <BrokenImageFallback />
           <SEOHead />
           <Router />
           <Suspense fallback={null}><LGPDConsent /></Suspense>
