@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { rssParser, sourceFetchLimit, DEFAULT_FETCH_LIMIT } from "../src/rss.ts";
+import { rssParser, sourceFetchLimit, pickFreshItems, DEFAULT_FETCH_LIMIT } from "../src/rss.ts";
 import { extractRssImage } from "../src/scrape.ts";
 
 const FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -43,5 +43,50 @@ describe("sourceFetchLimit", () => {
     assert.equal(sourceFetchLimit({ ...base, fetchLimit: 0 }), DEFAULT_FETCH_LIMIT);
     assert.equal(sourceFetchLimit({ ...base, fetchLimit: -2 }), 1);
     assert.equal(sourceFetchLimit({ ...base, fetchLimit: 99 }), 20);
+  });
+});
+
+describe("pickFreshItems", () => {
+  const items = ["a", "b", "c", "d", "e"];
+  const probe = (url: string) => ({ url });
+
+  it("sem isKnown mantém o corte clássico slice(0, limit)", async () => {
+    assert.deepEqual(await pickFreshItems(items, 2, probe), ["a", "b"]);
+  });
+
+  it("pula itens conhecidos e completa com os próximos novos", async () => {
+    const known = new Set(["a", "b"]);
+    const picked = await pickFreshItems(items, 2, probe, {
+      isKnown: async (p) => known.has(p.url ?? ""),
+      scanLimit: 10,
+    });
+    assert.deepEqual(picked, ["c", "d"]);
+  });
+
+  it("scanLimit limita a profundidade da varredura", async () => {
+    const known = new Set(["a", "b", "c"]);
+    const picked = await pickFreshItems(items, 2, probe, {
+      isKnown: async (p) => known.has(p.url ?? ""),
+      scanLimit: 3, // só examina a, b, c — todos conhecidos
+    });
+    assert.deepEqual(picked, []);
+  });
+
+  it("scanLimit nunca fica abaixo do limit", async () => {
+    const picked = await pickFreshItems(items, 3, probe, {
+      isKnown: async () => false,
+      scanLimit: 1,
+    });
+    assert.deepEqual(picked, ["a", "b", "c"]);
+  });
+
+  it("item sem título, guid nem url não consome slot nem scrape", async () => {
+    const picked = await pickFreshItems(
+      ["", "x", "y"],
+      2,
+      (s) => ({ url: s || undefined }),
+      { isKnown: async () => false, scanLimit: 10 },
+    );
+    assert.deepEqual(picked, ["x", "y"]);
   });
 });

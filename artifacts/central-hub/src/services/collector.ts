@@ -19,7 +19,7 @@ import { count, eq, gte, and } from "drizzle-orm";
 import { getSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
-import { isDuplicateNews } from "../lib/newsDedup.js";
+import { isDuplicateNews, makeNewsDedupChecker } from "../lib/newsDedup.js";
 import { dailyQuotaFilledReason } from "../lib/dailyQuota.js";
 
 const TICK_MS = 60_000;
@@ -97,15 +97,25 @@ async function countCollectedToday(): Promise<number> {
  * Coleta uma fonte agora, respeitando um teto opcional de itens.
  * Retorna quantas notícias novas entraram na fila.
  */
+/** Profundidade da varredura do feed atrás de itens NOVOS (dedup pré-scrape). */
+const FEED_SCAN_LIMIT = 25;
+
 export async function collectSource(src: CentralSourceRow, maxItems?: number): Promise<number> {
   const s = getSettings();
   const cap = maxItems ?? Number.POSITIVE_INFINITY;
   let collected = 0;
 
   try {
+    // Dedup ANTES do scrape: o fetch_limit passa a valer para itens NOVOS.
+    // Sem isso, fonte com fetch_limit=1 e feed de ritmo lento (futebol
+    // americano, e-sports, vôlei) ficava presa no item do topo já coletado
+    // e rendia zero por ciclo.
+    const probeKnown = await makeNewsDedupChecker();
     const articles = await fetchSourceArticles(toEngineSource(src), {
       defaultFetchLimit: s.collectionDefaultFetchLimit,
       userAgent: s.userAgent,
+      scanLimit: FEED_SCAN_LIMIT,
+      isKnown: probeKnown,
     });
 
     for (const art of articles) {
@@ -218,7 +228,11 @@ export async function runCollectorCycle(force = false): Promise<{ collected: num
     .select()
     .from(centralSourcesTable)
     .where(and(eq(centralSourcesTable.active, true)));
-  const due = sources.filter(isDue);
+  // Fonte há mais tempo sem coleta vai primeiro: com orçamento apertado, a
+  // ordem arbitrária do SELECT deixava sempre as mesmas fontes de fora.
+  const due = sources
+    .filter(isDue)
+    .sort((a, b) => (a.lastFetchedAt?.getTime() ?? 0) - (b.lastFetchedAt?.getTime() ?? 0));
 
   let total = 0;
   for (const src of due) {

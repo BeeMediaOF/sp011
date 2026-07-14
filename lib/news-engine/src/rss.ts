@@ -36,6 +36,49 @@ export interface FetchOptions {
   /** Limite default global (equivalente ao `collectionDefaultFetchLimit` do blog). */
   defaultFetchLimit?: number;
   userAgent?: string;
+  /**
+   * Dedup ANTES do scrape, com os campos que o próprio feed já traz (título/
+   * guid/link — custo zero). Quando presente, o fetchLimit passa a valer para
+   * itens NOVOS: a varredura avança pelo feed (até scanLimit) pulando os já
+   * conhecidos. Sem ele, fonte com fetchLimit baixo fica presa nos itens do
+   * topo já coletados e rende zero em feed de ritmo lento.
+   */
+  isKnown?: (probe: FeedProbe) => Promise<boolean>;
+  /** Profundidade da varredura atrás de itens novos (default: fetchLimit; teto 50). */
+  scanLimit?: number;
+}
+
+/** Sonda de dedup pré-scrape: só campos disponíveis antes de baixar a página. */
+export interface FeedProbe {
+  title?: string;
+  guid?: string;
+  url?: string;
+}
+
+/**
+ * Seleciona até `limit` itens novos entre os `scanLimit` primeiros, na ordem
+ * do feed, pulando os que `isKnown` reconhecer. Sem `isKnown`, degrada para o
+ * corte clássico `slice(0, limit)` (comportamento histórico).
+ */
+export async function pickFreshItems<T>(
+  items: T[],
+  limit: number,
+  probe: (item: T) => FeedProbe,
+  opts?: Pick<FetchOptions, "isKnown" | "scanLimit">,
+): Promise<T[]> {
+  const isKnown = opts?.isKnown;
+  if (!isKnown) return items.slice(0, limit);
+  const scan = Math.max(limit, Math.min(Math.floor(opts?.scanLimit ?? limit) || limit, 50));
+  const fresh: T[] = [];
+  for (const item of items.slice(0, scan)) {
+    if (fresh.length >= limit) break;
+    const p = probe(item);
+    // Sem título, guid nem link não há como deduplicar — nem vale um scrape.
+    if (!p.title && !p.guid && !p.url) continue;
+    if (await isKnown(p)) continue;
+    fresh.push(item);
+  }
+  return fresh;
 }
 
 /** Limite de artigos por rodada desta fonte: fonte > default do chamador > padrão (3). */
@@ -89,7 +132,12 @@ async function scrapeNewsHomepage(src: EngineSource, opts?: FetchOptions): Promi
     throw new Error("Nenhum link de artigo encontrado na página. Verifique se a URL aponta para um portal de notícias.");
   }
 
-  const toScrape = links.slice(0, sourceFetchLimit(src, opts?.defaultFetchLimit));
+  const toScrape = await pickFreshItems(
+    links,
+    sourceFetchLimit(src, opts?.defaultFetchLimit),
+    (link) => ({ url: link }),
+    opts,
+  );
 
   const results: FetchedArticle[] = [];
   await Promise.allSettled(toScrape.map(async (link) => {
@@ -151,7 +199,16 @@ export async function fetchSourceArticles(src: EngineSource, opts?: FetchOptions
     // Parse RSS/Atom falhou — cai para scraping HTML da homepage
     return scrapeNewsHomepage(src, opts);
   }
-  const items = feed.items.slice(0, sourceFetchLimit(src, opts?.defaultFetchLimit));
+  const items = await pickFreshItems(
+    feed.items,
+    sourceFetchLimit(src, opts?.defaultFetchLimit),
+    (item) => ({
+      title: item.title?.trim() || undefined,
+      guid: item.guid ?? (item as { id?: string }).id ?? undefined,
+      url: item.link || undefined,
+    }),
+    opts,
+  );
   const userAgent = opts?.userAgent ?? DEFAULT_USER_AGENT;
 
   const results: FetchedArticle[] = [];
