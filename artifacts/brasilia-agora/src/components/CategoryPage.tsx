@@ -44,7 +44,6 @@ export default function CategoryPage({
     <div className="w-full pb-12">
       {/* Category Header Bar */}
       <div className="w-full border-b border-gray-200 bg-white">
-        <div style={{ backgroundColor: color }} className="h-[3px] w-full" />
         <div className="max-w-[1280px] mx-auto px-4 py-3">
           <div className="text-gray-400 text-[11px] font-medium flex items-center gap-1">
             <Link href="/" className="hover:text-gray-600 transition-colors">{t("common.home")}</Link>
