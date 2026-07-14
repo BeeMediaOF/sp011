@@ -100,3 +100,16 @@ export function extractFromRawAI(raw: string): ExtractedAI | null {
 export function isContentRenderable(content: string): boolean {
   return extractFromRawAI(content) !== null;
 }
+
+/**
+ * Comprimento do texto visível de um HTML (sem tags, espaços colapsados) —
+ * régua dos gates de "matéria curta demais" (fonte incompleta ou reescrita
+ * que saiu um toco).
+ */
+export function plainTextLength(html: string): number {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&[a-z#0-9]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
+}

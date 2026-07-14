@@ -87,6 +87,19 @@ export function sourceFetchLimit(src: EngineSource, defaultFetchLimit?: number):
   return Math.max(1, Math.min(Math.floor(n) || DEFAULT_FETCH_LIMIT, 20));
 }
 
+/**
+ * Higieniza título vindo do feed: alguns veículos anexam o próprio crédito no
+ * título ("... - @BBCSportTopStories") e ele vazava para o título reescrito e
+ * para a arte social. Conservador de propósito: só remove sufixo de @handle —
+ * títulos legítimos com hífen ficam intactos.
+ */
+export function cleanFeedTitle(title: string): string {
+  return title
+    .replace(/(?:\s*[-–—|:]?\s*@[\w.]+)+\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Raspa a homepage de um portal, extraindo links de artigos e seus conteúdos. */
 async function scrapeNewsHomepage(src: EngineSource, opts?: FetchOptions): Promise<FetchedArticle[]> {
   const userAgent = opts?.userAgent ?? DEFAULT_USER_AGENT;
@@ -203,7 +216,7 @@ export async function fetchSourceArticles(src: EngineSource, opts?: FetchOptions
     feed.items,
     sourceFetchLimit(src, opts?.defaultFetchLimit),
     (item) => ({
-      title: item.title?.trim() || undefined,
+      title: item.title ? cleanFeedTitle(item.title) || undefined : undefined,
       guid: item.guid ?? (item as { id?: string }).id ?? undefined,
       url: item.link || undefined,
     }),
@@ -224,7 +237,7 @@ export async function fetchSourceArticles(src: EngineSource, opts?: FetchOptions
 
     results.push({
       sourceId: src.id, sourceName: src.name, category: src.category,
-      title: item.title ?? "Sem título",
+      title: item.title ? cleanFeedTitle(item.title) || "Sem título" : "Sem título",
       link,
       guid: item.guid ?? (item as { id?: string }).id ?? undefined,
       pubDate: item.pubDate ?? item.isoDate ?? new Date().toISOString(),

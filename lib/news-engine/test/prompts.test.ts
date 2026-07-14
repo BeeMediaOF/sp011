@@ -15,9 +15,10 @@ describe("applyPromptTemplate", () => {
     assert.ok(!out.includes("{{"));
   });
 
-  it("sem crédito usa a linha de dispensa", () => {
+  it("sem crédito proíbe citar o veículo de origem no texto", () => {
     const out = applyPromptTemplate("{{CREDITO}}", "t", "x", "Fonte", false);
-    assert.ok(out.includes("Não é necessário citar a fonte"));
+    assert.ok(out.includes("Em hipótese alguma cite o veículo/site de origem"));
+    assert.ok(!out.includes("cite obrigatoriamente a fonte"));
   });
 
   it("corta o texto da fonte em 7000 caracteres", () => {

@@ -26,6 +26,7 @@ Conteúdo da fonte:
 **TÍTULO (title):**
 - Crie um título único de cauda longa com cerca de 150 caracteres.
 - Estilo viral e chamativo, otimizado para Google Discover, mas sem clickbait enganoso: o título precisa entregar o que o texto contém. Nada de CAIXA ALTA (exceto siglas).
+- Em hipótese alguma inclua nome de veículo/portal/blog (o da fonte ou qualquer outro), programa de TV ou handle de rede social (@usuario) no título: se a pauta vier com sufixo do tipo "- Nome do Veículo" ou "- @usuario", descarte esse sufixo.
 - Inclua a palavra-chave-alvo e as entidades mais importantes da pauta (pessoas, marcas, times, lugares, produtos, instituições).
 - O título deve despertar curiosidade e tocar em interesses reais do público brasileiro.
 - Em hipótese alguma repita o conteúdo do title dentro do content_html.
@@ -39,6 +40,7 @@ Conteúdo da fonte:
 - Priorize entidades fortes (nomes, clubes, órgãos, cidades) e complete a manchete com o desdobramento ou a consequência do fato (o "e daí?" da notícia) para alcançar o tamanho, sem encher linguiça.
 - Chamativo sem clickbait enganoso: nada de "você não vai acreditar"; tudo que a manchete promete precisa estar na matéria.
 - NÃO use reticências, NUNCA corte uma palavra no meio e não termine em preposição ou artigo solto.
+- Nunca inclua nome de veículo/portal/blog nem handle de rede social (@usuario) na manchete.
 - Envolva com asteriscos (*assim*) APENAS o trecho de maior força da manchete, ou seja, o principal gancho: o nome, acontecimento, resultado, prazo, valor ou consequência mais relevante.
 - A posição do destaque depende do conteúdo (pode ser no início, no meio ou no fim) e NÃO deve seguir uma regra fixa.
 - Destaque um único trecho curto; nunca destaque a manchete inteira nem palavras genéricas (preposições, "para", "com", "após", artigos).
@@ -78,7 +80,7 @@ Regras estruturais:
 
 **CITAÇÕES E DADOS DA FONTE:**
 - Extraia da fonte citações diretas e dados estatísticos, quando existirem, e reproduza-os com 100% de fidelidade ao original.
-- Atribua corretamente a origem das informações ao longo do texto. Em hipótese alguma escreva como se você fosse redator do veículo fonte.
+- Atribua declarações e dados a quem os produziu (pessoa, cargo, clube, órgão, pesquisa). Em hipótese alguma escreva como se você fosse redator do veículo fonte.
 - Somente use informações presentes no conteúdo da fonte, nunca invente dados.
 - Citações em língua estrangeira devem ser traduzidas para o Português do Brasil, mantendo o sentido exato da declaração original.
 
@@ -110,7 +112,7 @@ export function applyPromptTemplate(
 ): string {
   const creditLine = giveCredit
     ? `- Ao final da lead/introdução, cite obrigatoriamente a fonte com a frase: "conforme informação divulgada por ${sourceName}".`
-    : `- Não é necessário citar a fonte original no texto.`;
+    : `- Em hipótese alguma cite o veículo/site de origem no texto: nada de "conforme informação divulgada por", "segundo o portal" ou variações. Atribua declarações diretamente a quem as fez.`;
   return template
     .replace(/\{\{TITULO\}\}/g, title)
     .replace(/\{\{TEXTO\}\}/g, text.slice(0, 7000))
@@ -169,6 +171,10 @@ Conteúdo HTML:
 Escolha UMA categoria para esta matéria entre as opções abaixo (use o slug exato):
 {{CATEGORIAS}}
 
+Regras da escolha de categoria:
+- A categoria deve corresponder ao ESPORTE/TEMA REAL da matéria, não a palavras soltas do texto. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
+- Na dúvida entre uma categoria específica e a categoria residual ("others"/"outros"), escolha SEMPRE a residual.
+
 ## REGRAS DA TRADUÇÃO
 - Traduza TODO o texto para {{IDIOMA_DESTINO}} com naturalidade de falante nativo; nada de tradução literal palavra a palavra.
 - PRESERVE exatamente a estrutura HTML do conteúdo: as mesmas tags (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), na mesma ordem e quantidade. Traduza apenas o texto dentro delas.
@@ -211,6 +217,10 @@ Resumo: {{RESUMO}}
 
 Categorias possíveis (slug — descrição):
 {{CATEGORIAS}}
+
+Regras:
+- A categoria deve corresponder ao ESPORTE/TEMA REAL da notícia, não a palavras soltas. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
+- Na dúvida entre uma categoria específica e a residual ("others"/"outros"), escolha SEMPRE a residual.
 
 Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug"}, usando o slug EXATO de UMA categoria da lista. Sem markdown, sem explicações.`;
 

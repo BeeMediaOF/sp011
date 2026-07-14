@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { rssParser, sourceFetchLimit, pickFreshItems, DEFAULT_FETCH_LIMIT } from "../src/rss.ts";
+import { rssParser, sourceFetchLimit, pickFreshItems, cleanFeedTitle, DEFAULT_FETCH_LIMIT } from "../src/rss.ts";
 import { extractRssImage } from "../src/scrape.ts";
 
 const FIXTURE = `<?xml version="1.0" encoding="UTF-8"?>
@@ -88,5 +88,22 @@ describe("pickFreshItems", () => {
       { isKnown: async () => false, scanLimit: 10 },
     );
     assert.deepEqual(picked, ["x", "y"]);
+  });
+});
+
+describe("cleanFeedTitle", () => {
+  it("remove sufixo de @handle com separador", () => {
+    assert.equal(
+      cleanFeedTitle("Semi-finals set for World Cup glory but who will claim it - @BBCSportTopStories"),
+      "Semi-finals set for World Cup glory but who will claim it",
+    );
+    assert.equal(cleanFeedTitle("Título | @portal.oficial"), "Título");
+    assert.equal(cleanFeedTitle("Título @handle"), "Título");
+  });
+
+  it("preserva títulos legítimos com hífen, e-mail-like e @ no meio", () => {
+    assert.equal(cleanFeedTitle("Flamengo vence - e assume a liderança"), "Flamengo vence - e assume a liderança");
+    assert.equal(cleanFeedTitle("O que muda com o novo @ do Instagram na bio"), "O que muda com o novo @ do Instagram na bio");
+    assert.equal(cleanFeedTitle("  Espaços   duplos  "), "Espaços duplos");
   });
 });

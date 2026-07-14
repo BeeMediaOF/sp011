@@ -24,6 +24,7 @@ import {
 import {
   extractFromRawAI,
   isKeyAuthError,
+  plainTextLength,
   resolvePrompt,
   rewriteNews,
   rewriteWithPerplexity,
@@ -39,6 +40,12 @@ import { logEvent } from "../lib/eventLog.js";
 
 const POLL_MS = 10_000;
 const MAX_ATTEMPTS = 3;
+/**
+ * Reescrita com menos texto visível que isto é um toco (matéria incompleta):
+ * não publica — retenta e, persistindo, marca failed. Uma matéria no formato
+ * do prompt (lead + seções + FAQ) passa disto com folga.
+ */
+const MIN_REWRITE_PLAIN_CHARS = 700;
 const MAX_CONCURRENCY = 6;
 /** Quantos artigos o reforço processa em paralelo (além da lane principal). */
 const HELPER_CONCURRENCY = 2;
@@ -210,8 +217,9 @@ async function runPerplexity(item: NewsItemRow, src: SourceCtx, s: HubSettings):
 
 /**
  * Valida (quality gate), grava a reescrita + consumo e marca o item como
- * rewritten. Devolve "unrenderable" quando o conteúdo é irrecuperável — cada
- * lane decide o que fazer (principal: failed; apoio/fallback: volta à fila).
+ * rewritten. Devolve "unrenderable" quando o conteúdo é irrecuperável e
+ * "too_short" quando saiu um toco — cada lane decide o que fazer (principal:
+ * failed/retry; apoio/fallback: volta à fila).
  */
 async function saveRewrite(
   item: NewsItemRow,
@@ -220,9 +228,10 @@ async function saveRewrite(
   via?: string,
   /** Idioma do texto reescrito = idioma da fonte (o prompt não traduz). */
   language = "pt-BR",
-): Promise<"ok" | "unrenderable"> {
+): Promise<"ok" | "unrenderable" | "too_short"> {
   const extracted = extractFromRawAI(out.content);
   if (!extracted) return "unrenderable";
+  if (plainTextLength(extracted.content) < MIN_REWRITE_PLAIN_CHARS) return "too_short";
 
   const rewriteId = randomUUID();
   await db.insert(rewritesTable).values({
@@ -347,6 +356,33 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
         module: "rewriter", level: "warn", refType: "news_item", refId: item.id,
         message: `Reescrita ilegível descartada: ${item.title}`,
       });
+      return;
+    }
+
+    if (saved === "too_short") {
+      if (isHelper) {
+        await requeue(item);
+        logger.warn({ newsItemId: item.id, helperProvider }, "Reforço: reescrita curta demais — item devolvido à lane principal");
+        return;
+      }
+      // Toco na lane principal: retenta (outra chamada pode render matéria
+      // inteira); persistindo, marca failed para não publicar incompleta.
+      const attempts = (_attempts.get(item.id) ?? 0) + 1;
+      _attempts.set(item.id, attempts);
+      if (attempts >= MAX_ATTEMPTS) {
+        await db
+          .update(newsItemsTable)
+          .set({ status: "failed", failReason: "short_rewrite", updatedAt: new Date() })
+          .where(eq(newsItemsTable.id, item.id));
+        _attempts.delete(item.id);
+        logEvent({
+          module: "rewriter", level: "warn", refType: "news_item", refId: item.id,
+          message: `Reescrita saiu curta demais ${MAX_ATTEMPTS}x — descartada: ${item.title}`,
+        });
+      } else {
+        await requeue(item);
+        logger.warn({ newsItemId: item.id, attempts }, "Reescrita curta demais — retentará");
+      }
       return;
     }
 

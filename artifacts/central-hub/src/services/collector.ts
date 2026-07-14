@@ -100,6 +100,41 @@ async function countCollectedToday(): Promise<number> {
 /** Profundidade da varredura do feed atrás de itens NOVOS (dedup pré-scrape). */
 const FEED_SCAN_LIMIT = 25;
 
+/**
+ * Texto da fonte abaixo disto costuma ser scrape incompleto (só o excerpt de
+ * ~300 chars do feed): reescrever geraria matéria "incompleta" no blog. O
+ * item fica registrado (status collected/short_content — segura o dedup) mas
+ * não entra na fila de reescrita.
+ */
+const MIN_SOURCE_CONTENT_CHARS = 400;
+
+/**
+ * Sonda rápida da imagem da notícia: URL morta/bloqueada não entra no item
+ * (o blog publicaria card com imagem quebrada). HEAD com fallback para GET
+ * de 1 byte (CDNs que rejeitam HEAD); erro/timeout → imagem descartada.
+ */
+async function imageUrlAlive(url: string): Promise<boolean> {
+  const okResponse = (r: Response): boolean => {
+    if (!r.ok) return false;
+    const ct = r.headers.get("content-type") ?? "";
+    return ct === "" || ct.startsWith("image/") || ct === "application/octet-stream";
+  };
+  try {
+    const head = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(5_000) });
+    if (okResponse(head)) return true;
+    if (head.status !== 405 && head.status !== 403 && head.status !== 501) return false;
+  } catch { /* tenta GET */ }
+  try {
+    const get = await fetch(url, {
+      headers: { Range: "bytes=0-0" },
+      signal: AbortSignal.timeout(5_000),
+    });
+    return okResponse(get) || get.status === 206;
+  } catch {
+    return false;
+  }
+}
+
 export async function collectSource(src: CentralSourceRow, maxItems?: number): Promise<number> {
   const s = getSettings();
   const cap = maxItems ?? Number.POSITIVE_INFINITY;
@@ -130,13 +165,30 @@ export async function collectSource(src: CentralSourceRow, maxItems?: number): P
         continue;
       }
 
-      const hasText = !!art.fullText?.trim();
-      if (!hasText && !art.imageUrl) {
+      const text = art.fullText?.trim() ?? "";
+      const hasText = text.length > 0;
+      // Só texto "inteiro" vai para a reescrita — curto demais é matéria capada.
+      const usableText = text.length >= MIN_SOURCE_CONTENT_CHARS;
+      let imageUrl = art.imageUrl || null;
+      if (imageUrl && !(await imageUrlAlive(imageUrl))) {
+        logEvent({
+          module: "collector", level: "warn", refType: "source", refId: src.id,
+          message: `Imagem inacessível, removida da notícia: ${art.title} (${imageUrl})`,
+        });
+        imageUrl = null;
+      }
+      if (!hasText && !imageUrl) {
         logEvent({
           module: "collector", level: "warn", refType: "source", refId: src.id,
           message: `Sem conteúdo nem imagem, descartada: ${art.title}`,
         });
         continue;
+      }
+      if (hasText && !usableText) {
+        logEvent({
+          module: "collector", level: "warn", refType: "source", refId: src.id,
+          message: `Texto curto demais (${text.length} chars, mínimo ${MIN_SOURCE_CONTENT_CHARS}) — não vai para reescrita: ${art.title}`,
+        });
       }
 
       const id = randomUUID();
@@ -150,12 +202,12 @@ export async function collectSource(src: CentralSourceRow, maxItems?: number): P
         titleNorm: normalizeTitle(art.title),
         description: art.excerpt || null,
         contentRaw: art.fullText || null,
-        imageUrl: art.imageUrl || null,
+        imageUrl,
         category: src.category,
         publishedAtSource: art.pubDate ? new Date(art.pubDate) : null,
-        // Sem texto não há o que reescrever — item fica só coletado.
-        status: hasText ? "queued" : "collected",
-        failReason: hasText ? null : "no_content",
+        // Sem texto (ou texto capado) não há o que reescrever — fica só coletado.
+        status: usableText ? "queued" : "collected",
+        failReason: usableText ? null : (hasText ? "short_content" : "no_content"),
       });
       collected++;
 

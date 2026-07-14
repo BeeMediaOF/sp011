@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractFromRawAI, isContentRenderable } from "../src/quality.ts";
+import { extractFromRawAI, isContentRenderable, plainTextLength } from "../src/quality.ts";
 
 const GOOD_HTML = "<h2>Subtítulo da matéria</h2><p>Primeiro parágrafo com conteúdo suficiente.</p>";
 
@@ -51,5 +51,14 @@ describe("isContentRenderable", () => {
   it("true para HTML, false para JSON sem content_html", () => {
     assert.equal(isContentRenderable(GOOD_HTML), true);
     assert.equal(isContentRenderable('{"foo": "bar"}'), false);
+  });
+});
+
+describe("plainTextLength", () => {
+  it("conta só o texto visível (sem tags, entidades e espaços repetidos)", () => {
+    assert.equal(plainTextLength("<p>abc</p>"), 3);
+    assert.equal(plainTextLength("<h2>ab</h2>\n\n<p>cd&nbsp;ef</p>"), "ab cd ef".length);
+    assert.equal(plainTextLength(""), 0);
+    assert.equal(plainTextLength("<div><img src='x'/></div>"), 0);
   });
 });

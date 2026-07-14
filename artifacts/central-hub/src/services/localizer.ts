@@ -31,6 +31,7 @@ import {
 import {
   classifyArticle,
   extractFromRawAI,
+  plainTextLength,
   translateRewrite,
   type RewriteEngineConfig,
   type TokenUsage,
@@ -187,6 +188,13 @@ async function ensureTranslatedRewrite(
   const extracted = extractFromRawAI(out.content);
   if (!extracted || !out.title) {
     throw new Error("tradução ilegível (quality gate)");
+  }
+  // Tradução não pode encolher a matéria para um toco (modelo que "resume"
+  // em vez de traduzir): falha → retry com backoff, igual às demais falhas.
+  const srcLen = plainTextLength(shared.contentHtml ?? "");
+  const outLen = plainTextLength(extracted.content);
+  if (outLen < Math.min(700, Math.floor(srcLen * 0.5))) {
+    throw new Error(`tradução curta demais (${outLen} chars visíveis; original ${srcLen})`);
   }
 
   // 4. Insere a variação; corrida com outro tick → re-select da vencedora
