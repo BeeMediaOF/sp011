@@ -3,6 +3,7 @@ import { Link, Route, Switch, useLocation } from "wouter";
 import {
   LayoutDashboard, Globe, SlidersHorizontal, Rss, FileText, ClipboardCheck,
   Send, BarChart2, ScrollText, Settings as SettingsIcon, LogOut, Moon, Sun, Radio,
+  PenSquare,
 } from "lucide-react";
 import { getToken, setToken, api } from "./api";
 import { getStoredUser, clearStoredUser } from "./user";
@@ -12,6 +13,7 @@ import Blogs from "./pages/Blogs";
 import Rules from "./pages/Rules";
 import Sources from "./pages/Sources";
 import News from "./pages/News";
+import NewArticle from "./pages/NewArticle";
 import Review from "./pages/Review";
 import Deliveries from "./pages/Deliveries";
 import Settings from "./pages/Settings";
@@ -24,6 +26,7 @@ const NAV = [
   { href: "/regras", label: "Regras", sub: "Distribuição por fonte e categoria", icon: SlidersHorizontal },
   { href: "/fontes", label: "Fontes RSS", sub: "Coleta de notícias", icon: Rss },
   { href: "/noticias", label: "Notícias", sub: "Coletadas, reescritas e distribuídas", icon: FileText },
+  { href: "/nova-noticia", label: "Nova notícia", sub: "Criar e publicar manualmente em vários blogs", icon: PenSquare },
   { href: "/revisao", label: "Revisão", sub: "Aprovação de entregas", icon: ClipboardCheck },
   { href: "/entregas", label: "Entregas", sub: "Fila de envio para os blogs", icon: Send },
   { href: "/consumo", label: "Consumo IA", sub: "Chamadas, tokens e custo", icon: BarChart2 },
@@ -127,6 +130,7 @@ export default function App() {
             <Route path="/regras" component={Rules} />
             <Route path="/fontes" component={Sources} />
             <Route path="/noticias" component={News} />
+            <Route path="/nova-noticia" component={NewArticle} />
             <Route path="/revisao" component={Review} />
             <Route path="/entregas" component={Deliveries} />
             <Route path="/consumo" component={Usage} />
