@@ -20,6 +20,10 @@ export interface Article {
   canonicalUrl?: string;
   /** Crédito da fonte: true/false força; null/ausente segue settings.showSourceCredit. */
   showSourceCredit?: boolean | null;
+  /** Crédito da foto principal; vazio/ausente cai em rssSourceName. */
+  imageCredit?: string;
+  /** Crédito da foto: true/false força; null/ausente segue settings.showImageCredit. */
+  showImageCredit?: boolean | null;
   /** Leituras registradas pelo analytics — ordena os blocos "Mais lidas". */
   views?: number;
 }

@@ -139,6 +139,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     .subtitle { font-size: 17px; color: #555; border-left: 4px solid #c8102e; padding-left: 14px; margin-bottom: 16px; font-style: italic; }
     .meta { font-family: sans-serif; font-size: 12px; color: #888; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #eee; }
     amp-img { width: 100%; margin-bottom: 20px; }
+    .photo-credit { font-family: sans-serif; font-size: 11px; color: #aaa; text-align: right; margin: -14px 0 20px; }
     p { font-size: 17px; line-height: 1.75; margin: 0 0 18px; color: #2a2a2a; }
     h2 { font-size: 20px; color: #1a2448; border-left: 4px solid #c8102e; padding-left: 10px; margin: 28px 0 12px; }
     .source { font-size: 12px; color: #aaa; margin-top: 24px; border-top: 1px solid #eee; padding-top: 12px; font-family: sans-serif; }
@@ -156,6 +157,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     ${article.subtitle ? `<p class="subtitle">${escHtml(stripHtml(article.subtitle))}</p>` : ""}
     <div class="meta">${authorName}${dateStr ? ` · ${dateStr}` : ""}</div>
     ${imageUrl ? `<amp-img src="${escHtml(imageUrl)}" alt="${title}" width="800" height="450" layout="responsive"></amp-img>` : ""}
+    ${imageUrl && (article.showImageCredit ?? siteCfg.showImageCredit) === true && (article.imageCredit?.trim() || article.rssSourceName) ? `<p class="photo-credit">${en ? "Photo" : "Foto"}: ${escHtml(article.imageCredit?.trim() || article.rssSourceName || "")}</p>` : ""}
     <div>${bodyHtml}</div>
     ${(article.showSourceCredit ?? siteCfg.showSourceCredit) === true && article.rssSourceName ? `<p class="source">${en ? "Source" : "Fonte"}: ${escHtml(article.rssSourceName)}</p>` : ""}
     <a class="back" href="${escHtml(canonicalUrl)}">${en ? "← View full version" : "← Ver versão completa"}</a>

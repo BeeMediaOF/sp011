@@ -696,19 +696,29 @@ export default function Artigo() {
 
                   {/* Imagem principal — LCP candidate: eager + fetchpriority + srcset */}
                   {article.imageUrl && (
-                    <figure className="w-full mb-6 overflow-hidden bg-gray-100" style={{ aspectRatio: "16/9", position: "relative" }}>
-                      <img
-                        src={article.imageUrl}
-                        srcSet={buildSrcSet(article.imageUrl, HERO_WIDTHS) || undefined}
-                        sizes="(max-width: 1024px) 100vw, 800px"
-                        alt={article.title.replace(/<[^>]*>/g, "")}
-                        width={800}
-                        height={450}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="eager"
-                        fetchPriority="high"
-                        decoding="sync"
-                      />
+                    <figure className="w-full mb-6">
+                      <div className="w-full overflow-hidden bg-gray-100" style={{ aspectRatio: "16/9", position: "relative" }}>
+                        <img
+                          src={article.imageUrl}
+                          srcSet={buildSrcSet(article.imageUrl, HERO_WIDTHS) || undefined}
+                          sizes="(max-width: 1024px) 100vw, 800px"
+                          alt={article.title.replace(/<[^>]*>/g, "")}
+                          width={800}
+                          height={450}
+                          className="absolute inset-0 w-full h-full object-cover"
+                          loading="eager"
+                          fetchPriority="high"
+                          decoding="sync"
+                        />
+                      </div>
+                      {/* Crédito da foto — padrão do painel (global) com override por
+                          notícia; crédito manual > nome da fonte importada. */}
+                      {(article.showImageCredit ?? settings?.showImageCredit) === true
+                        && (article.imageCredit?.trim() || article.rssSourceName) && (
+                        <figcaption className="text-[11px] text-gray-400 mt-1.5 text-right">
+                          {t("article.photoLabel")}{" "}{article.imageCredit?.trim() || article.rssSourceName}
+                        </figcaption>
+                      )}
                     </figure>
                   )}
 

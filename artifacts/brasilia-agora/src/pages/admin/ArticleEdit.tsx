@@ -1312,6 +1312,34 @@ export default function ArticleEdit() {
                 </p>
               </div>
             )}
+
+            {/* Crédito da foto — legenda "Foto: …" sob a imagem principal */}
+            <div className="pt-1">
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Crédito da foto</label>
+              <input
+                type="text"
+                value={form.imageCredit ?? ""}
+                onChange={(e) => setField("imageCredit", e.target.value)}
+                placeholder={form.rssSourceName ? `Vazio = ${form.rssSourceName}` : "Ex.: Reprodução/Instagram"}
+                className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 text-slate-700 mb-2"
+              />
+              <div className="relative">
+                <select
+                  value={form.showImageCredit == null ? "default" : form.showImageCredit ? "show" : "hide"}
+                  onChange={(e) => setField("showImageCredit",
+                    e.target.value === "default" ? null : e.target.value === "show")}
+                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700"
+                >
+                  <option value="default">Padrão do site</option>
+                  <option value="show">Exibir nesta notícia</option>
+                  <option value="hide">Ocultar nesta notícia</option>
+                </select>
+                <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                "Foto: crédito" discreto sob a imagem principal. Campo vazio usa o nome da fonte importada; o padrão do site fica em Configurações → Informações.
+              </p>
+            </div>
           </div>
 
           {/* ── SEO card ──────────────────────────────────────────── */}

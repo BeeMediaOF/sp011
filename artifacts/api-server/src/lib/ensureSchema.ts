@@ -31,6 +31,10 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS central_id text`,
     // Crédito da fonte por notícia (NULL = segue settings.showSourceCredit).
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS show_source_credit boolean`,
+    // Crédito da foto principal: texto livre + override por notícia
+    // (NULL = segue settings.showImageCredit; texto vazio cai na fonte).
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS image_credit text`,
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS show_image_credit boolean`,
     // Idioma do painel admin por usuário (KSports: editor em inglês).
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'pt-BR'`,
     sql`CREATE UNIQUE INDEX IF NOT EXISTS articles_central_id_uniq ON articles (central_id) WHERE central_id IS NOT NULL`,

@@ -61,6 +61,7 @@ const PT = {
   "article.notFound": "Artigo não encontrado",
   "article.backHome": "Voltar à página inicial",
   "article.sourceLabel": "Fonte:",
+  "article.photoLabel": "Foto:",
   "article.related": "Relacionadas",
   "article.mostRead": "Mais Lidas",
 
@@ -150,6 +151,7 @@ const EN: Record<TKey, string> = {
   "article.notFound": "Article not found",
   "article.backHome": "Back to home page",
   "article.sourceLabel": "Source:",
+  "article.photoLabel": "Photo:",
   "article.related": "Related",
   "article.mostRead": "Most Read",
 

@@ -135,6 +135,10 @@ export interface Article {
   canonicalUrl?: string;
   /** Crédito da fonte no rodapé: true/false força; null/ausente segue o padrão do site. */
   showSourceCredit?: boolean | null;
+  /** Crédito da foto principal ("Foto: …"); vazio/ausente cai em rssSourceName. */
+  imageCredit?: string;
+  /** Exibição do crédito da foto: true/false força; null/ausente segue o padrão do site. */
+  showImageCredit?: boolean | null;
 }
 
 function rowToArticle(row: ArticleRow): Article {
@@ -164,6 +168,8 @@ function rowToArticle(row: ArticleRow): Article {
     draftReason:   row.draftReason ?? undefined,
     canonicalUrl:  row.canonicalUrl ?? undefined,
     showSourceCredit: row.showSourceCredit,
+    imageCredit:   row.imageCredit ?? undefined,
+    showImageCredit: row.showImageCredit,
   };
 }
 
@@ -344,6 +350,8 @@ export const articleService = {
         draftReason:   data.draftReason ?? null,
         canonicalUrl:  data.canonicalUrl ?? null,
         showSourceCredit: data.showSourceCredit ?? null,
+        imageCredit:   data.imageCredit ?? null,
+        showImageCredit: data.showImageCredit ?? null,
         createdAt:     now,
         updatedAt:     now,
       })
@@ -382,6 +390,8 @@ export const articleService = {
         ...(data.draftReason   !== undefined && { draftReason:   data.draftReason }),
         ...(data.canonicalUrl  !== undefined && { canonicalUrl:  data.canonicalUrl }),
         ...(data.showSourceCredit !== undefined && { showSourceCredit: data.showSourceCredit }),
+        ...(data.imageCredit   !== undefined && { imageCredit:   data.imageCredit }),
+        ...(data.showImageCredit !== undefined && { showImageCredit: data.showImageCredit }),
         updatedAt: new Date(),
       })
       .where(eq(articlesTable.id, id))

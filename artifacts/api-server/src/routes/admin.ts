@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { BRAND } from "../lib/brand.js";
-import { eq, sql } from "drizzle-orm";
+import { eq, like, sql } from "drizzle-orm";
 import { writeFileSync } from "fs";
 import { resolve } from "path";
-import { db, usersTable, adsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
+import { db, usersTable, adsTable, adDailyStatsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
   authMiddleware, requireAdmin, generateToken, generateTempToken, verifyTempToken,
   verifyPassword, checkRateLimit, resetRateLimit,
@@ -319,9 +319,10 @@ router.get("/articles/:id", requirePermission("articles.view"), async (req, res)
 
 /** POST /api/admin/articles */
 router.post("/articles", requirePermission("articles.create"), async (req, res) => {
-  const { title, subtitle, content, category, tag, imageUrl, author, status } = req.body as {
+  const { title, subtitle, content, category, tag, imageUrl, author, status, imageCredit, showImageCredit } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
+    imageCredit?: string; showImageCredit?: boolean | null;
   };
   if (!title) { res.status(400).json({ error: "title is required" }); return; }
   const article = await articleService.createArticle({
@@ -334,6 +335,8 @@ router.post("/articles", requirePermission("articles.create"), async (req, res) 
     author: author ?? BRAND.author,
     publishedAt: new Date().toISOString(),
     status: (status === "published" ? "published" : "draft"),
+    imageCredit: imageCredit || undefined,
+    showImageCredit: showImageCredit ?? null,
   });
   res.status(201).json({ article });
 });
@@ -955,6 +958,28 @@ function adRowToPublic(r: typeof adsTable.$inferSelect) {
 router.get("/ads", async (_req, res) => {
   const rows = await db.select().from(adsTable).orderBy(adsTable.createdAt);
   res.json({ ads: rows.map(adRowToPublic) });
+});
+
+/**
+ * GET /api/admin/ads/block-stats — totais de impressões/cliques dos blocos
+ * marcados "É uma propaganda" (chaves `block:<id>` em ad_daily_stats; inclui
+ * `block:header-banner`). Precisa vir ANTES de /ads/:id na ordem das rotas.
+ */
+router.get("/ads/block-stats", async (_req, res) => {
+  const rows = await db
+    .select({
+      adId: adDailyStatsTable.adId,
+      impressions: sql<number>`sum(${adDailyStatsTable.impressions})::int`,
+      clicks: sql<number>`sum(${adDailyStatsTable.clicks})::int`,
+    })
+    .from(adDailyStatsTable)
+    .where(like(adDailyStatsTable.adId, "block:%"))
+    .groupBy(adDailyStatsTable.adId);
+  const stats: Record<string, { impressions: number; clicks: number }> = {};
+  for (const r of rows) {
+    stats[r.adId.slice("block:".length)] = { impressions: r.impressions ?? 0, clicks: r.clicks ?? 0 };
+  }
+  res.json({ stats });
 });
 
 /** GET /api/admin/ads/:id */

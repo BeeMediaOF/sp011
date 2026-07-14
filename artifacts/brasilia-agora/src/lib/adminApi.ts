@@ -80,6 +80,8 @@ export const adminApi = {
 
   // Ads
   getAds: () => req<{ ads: Ad[] }>("GET", "/ads"),
+  /** Totais dos blocos "É uma propaganda" (chave = id do bloco; "header-banner" = banner do cabeçalho). */
+  getAdBlockStats: () => req<{ stats: Record<string, { impressions: number; clicks: number }> }>("GET", "/ads/block-stats"),
   getAd: (id: string) => req<{ ad: Ad }>("GET", `/ads/${id}`),
   createAd: (data: { name: string; imageBase64: string; link: string; position: Ad["position"]; active: boolean; targetDevices?: ("desktop" | "mobile" | "tablet")[]; expiresAt?: string | null }) =>
     req<{ ad: Ad }>("POST", "/ads", data),
@@ -266,6 +268,10 @@ export interface Article {
   canonicalUrl?: string;
   /** Crédito da fonte no rodapé da notícia: true/false força; null/ausente segue o padrão do site. */
   showSourceCredit?: boolean | null;
+  /** Crédito da foto principal ("Foto: …"); vazio/ausente cai no nome da fonte importada. */
+  imageCredit?: string;
+  /** Crédito da foto: true/false força; null/ausente segue o padrão do site. */
+  showImageCredit?: boolean | null;
 }
 
 export interface MenuItem {
@@ -308,6 +314,8 @@ export interface SiteSettings {
   footerLogoSize?: number;
   /** Exibe "Fonte: Nome" discreto ao final das notícias importadas. */
   showSourceCredit?: boolean;
+  /** Exibe "Foto: crédito" discreto sob a imagem principal das notícias. */
+  showImageCredit?: boolean;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */

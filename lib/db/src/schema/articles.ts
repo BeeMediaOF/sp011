@@ -40,6 +40,18 @@ export const articlesTable = pgTable("articles", {
    */
   showSourceCredit: boolean("show_source_credit"),
   /**
+   * Crédito da foto principal ("Foto: …") exibido sob a imagem do artigo.
+   * Texto livre; vazio/NULL cai no nome da fonte importada (rssSourceName).
+   * Coluna criada por ensureSchema (ADD COLUMN IF NOT EXISTS).
+   */
+  imageCredit: text("image_credit"),
+  /**
+   * Exibição do crédito da foto: true/false força exibir/ocultar nesta
+   * notícia; NULL segue o padrão do site (settings.showImageCredit).
+   * Coluna criada por ensureSchema (ADD COLUMN IF NOT EXISTS).
+   */
+  showImageCredit: boolean("show_image_credit"),
+  /**
    * id da notícia no painel central quando o artigo chegou via /api/ingest.
    * Âncora de idempotência (reenvio do central → replay, nunca duplica).
    * Nulo para artigos locais (manuais, RSS local, Perplexity).

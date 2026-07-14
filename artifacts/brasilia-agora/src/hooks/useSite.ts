@@ -31,6 +31,8 @@ export interface SiteSettings {
   footerLogoSize?: number;
   /** Exibe "Fonte: Nome" discreto ao final das notícias importadas. */
   showSourceCredit?: boolean;
+  /** Exibe "Foto: crédito" discreto sob a imagem principal das notícias. */
+  showImageCredit?: boolean;
   /** Idioma do site público (chrome/datas). O admin continua pt-BR. */
   siteLanguage?: "pt-BR" | "en";
   /** Fuso IANA das datas públicas (default: America/Sao_Paulo). */
