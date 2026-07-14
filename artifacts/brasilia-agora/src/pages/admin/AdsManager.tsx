@@ -557,6 +557,9 @@ export default function AdsManager() {
   const [articleBlocks, setArticleBlocks] = useState<HomeBlock[]>([]);
   const [headerBannerHtml, setHeaderBannerHtml] = useState("");
   const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
+  // Impressões/cliques dos blocos-propaganda (ad_daily_stats, chave block:<id>);
+  // "header-banner" é o banner do cabeçalho.
+  const [blockStats, setBlockStats] = useState<Record<string, { impressions: number; clicks: number }>>({});
   const [adEdit, setAdEdit] = useState<{ scope: "home" | "article"; block: HomeBlock } | "header" | null>(null);
   const homeAdBlocks = homeBlocks.filter((b) => b.isAd === true);
   const articleAdBlocks = articleBlocks.filter((b) => b.isAd === true);
@@ -577,6 +580,10 @@ export default function AdsManager() {
       setArticleBlocks(settings.articleSidebarBlocks ?? []);
       setHeaderBannerHtml(settings.headerBannerHtml ?? "");
       setHeaderBannerLinkUrl(settings.headerBannerLinkUrl ?? "");
+    } catch { }
+    try {
+      const { stats } = await adminApi.getAdBlockStats();
+      setBlockStats(stats);
     } catch { }
   };
 
@@ -605,16 +612,20 @@ export default function AdsManager() {
 
   useEffect(() => { void load(); }, []);
 
-  // ── Stats ────────────────────────────────────────────────────────────────────
+  // ── Stats (propagandas clássicas + blocos-propaganda somados) ───────────────
   const stats = useMemo(() => {
-    const active           = ads.filter((a) => a.active).length;
-    const totalImpressions = ads.reduce((s, a) => s + (a.impressions ?? 0), 0);
-    const totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
-    const ctr              = totalImpressions > 0
+    const active = ads.filter((a) => a.active).length;
+    let totalImpressions = ads.reduce((s, a) => s + (a.impressions ?? 0), 0);
+    let totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
+    for (const b of Object.values(blockStats)) {
+      totalImpressions += b.impressions;
+      totalClicks      += b.clicks;
+    }
+    const ctr = totalImpressions > 0
       ? ((totalClicks / totalImpressions) * 100).toFixed(2).replace(".", ",") + "%"
       : "0%";
     return { active, totalImpressions, totalClicks, ctr };
-  }, [ads]);
+  }, [ads, blockStats]);
 
   // ── Filtered + paginated ─────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -816,71 +827,99 @@ export default function AdsManager() {
                 <Pencil size={12} /> Editar em Blocos da Home
               </a>
             </div>
-            <div className="divide-y divide-gray-100">
-              {hasHeaderBanner && (
-                <div className="flex items-center gap-3 py-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                    <Code size={14} className="text-amber-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#0F172A] truncate">Banner do cabeçalho</p>
-                    <p className="text-[11px] text-gray-400">HTML · ao lado da logo (só desktop)</p>
-                  </div>
-                  <StatusBadge active />
-                  <button onClick={() => setAdEdit("header")} title="Editar banner"
-                    className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
-                    <Pencil size={14} />
-                  </button>
+            {(() => {
+              // Linhas unificadas (banner do cabeçalho + blocos), com as MESMAS
+              // colunas da tabela de propagandas clássicas abaixo.
+              const rows: Array<{
+                key: string; name: string; imageUrl?: string; typeLabel: string;
+                pos: string; active: boolean; statsKey: string; onEdit: () => void;
+              }> = [];
+              if (hasHeaderBanner) {
+                rows.push({
+                  key: "header", name: "Banner do cabeçalho", typeLabel: "HTML",
+                  pos: "Cabeçalho (só desktop)", active: true, statsKey: "header-banner",
+                  onEdit: () => setAdEdit("header"),
+                });
+              }
+              for (const b of homeAdBlocks) {
+                const type = inferBlockType(b);
+                const pos = b.area === "sidebar" ? "Home · coluna lateral"
+                  : b.area === "main" ? "Home · coluna principal"
+                  : b.width === "half" ? "Home · meia largura"
+                  : b.width === "quarter" ? "Home · 1/4 de largura"
+                  : "Home · largura total";
+                rows.push({
+                  key: b.id, name: b.name, imageUrl: type === "image" ? b.imageUrl : undefined,
+                  typeLabel: type === "image" ? "Imagem" : "HTML", pos,
+                  active: b.visible !== false, statsKey: b.id,
+                  onEdit: () => setAdEdit({ scope: "home", block: b }),
+                });
+              }
+              for (const b of articleAdBlocks) {
+                const type = inferBlockType(b);
+                rows.push({
+                  key: `art-${b.id}`, name: b.name, imageUrl: type === "image" ? b.imageUrl : undefined,
+                  typeLabel: type === "image" ? "Imagem" : "HTML", pos: "Lateral da notícia",
+                  active: b.visible !== false, statsKey: b.id,
+                  onEdit: () => setAdEdit({ scope: "article", block: b }),
+                });
+              }
+              return (
+                <div className="overflow-x-auto -mx-5 px-5">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
+                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Status</th>
+                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r, i) => {
+                        const st = blockStats[r.statsKey] ?? { impressions: 0, clicks: 0 };
+                        return (
+                          <tr key={r.key} className={`hover:bg-gray-50/50 transition-colors ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}>
+                            <td className="px-5 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-amber-50 shrink-0 flex items-center justify-center">
+                                  {r.imageUrl ? (
+                                    <img src={r.imageUrl} alt={r.name} className="w-full h-full object-cover" />
+                                  ) : r.typeLabel === "Imagem" ? (
+                                    <ImageIcon size={14} className="text-amber-600" />
+                                  ) : (
+                                    <Code size={14} className="text-amber-600" />
+                                  )}
+                                </div>
+                                <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{r.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{r.pos}</td>
+                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{r.typeLabel}</td>
+                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(st.impressions)}</td>
+                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(st.clicks)}</td>
+                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{calcCTR(st.clicks, st.impressions)}</td>
+                            <td className="px-4 py-3 text-center"><StatusBadge active={r.active} /></td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center">
+                                <button onClick={r.onEdit} title="Editar propaganda"
+                                  className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors">
+                                  <Pencil size={13} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              )}
-              {homeAdBlocks.map((b) => {
-                const type = inferBlockType(b);
-                const pos = b.area === "sidebar" ? "home · coluna lateral"
-                  : b.area === "main" ? "home · coluna principal"
-                  : b.width === "half" ? "home · meia largura"
-                  : b.width === "quarter" ? "home · 1/4 de largura"
-                  : "home · largura total";
-                return (
-                  <div key={b.id} className="flex items-center gap-3 py-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                      {type === "image"
-                        ? <ImageIcon size={14} className="text-amber-600" />
-                        : <Code size={14} className="text-amber-600" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#0F172A] truncate">{b.name}</p>
-                      <p className="text-[11px] text-gray-400">{type === "image" ? "Imagem" : "HTML"} · {pos}</p>
-                    </div>
-                    <StatusBadge active={b.visible} />
-                    <button onClick={() => setAdEdit({ scope: "home", block: b })} title="Editar propaganda"
-                      className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-              {articleAdBlocks.map((b) => {
-                const type = inferBlockType(b);
-                return (
-                  <div key={`art-${b.id}`} className="flex items-center gap-3 py-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
-                      {type === "image"
-                        ? <ImageIcon size={14} className="text-amber-600" />
-                        : <Code size={14} className="text-amber-600" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#0F172A] truncate">{b.name}</p>
-                      <p className="text-[11px] text-gray-400">{type === "image" ? "Imagem" : "HTML"} · lateral da notícia</p>
-                    </div>
-                    <StatusBadge active={b.visible} />
-                    <button onClick={() => setAdEdit({ scope: "article", block: b })} title="Editar propaganda"
-                      className="p-2 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
-                      <Pencil size={14} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })()}
           </div>
         )}
 

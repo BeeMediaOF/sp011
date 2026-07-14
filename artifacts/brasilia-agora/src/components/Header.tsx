@@ -7,6 +7,7 @@ import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
 import { safeLinkUrl } from "../lib/homeBlocks";
+import { useAdImpression, trackClick } from "./ads/useAds";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_sbc_agora.png";
 
@@ -352,12 +353,16 @@ export default function Header() {
   // Link de redirecionamento do banner (painel → Cabeçalho ou aba Propagandas):
   // overlay que cobre o banner inteiro, sem aninhar <a> no HTML do usuário.
   const headerBannerLink = safeLinkUrl(settings?.headerBannerLinkUrl);
+  // O banner do cabeçalho é inventário medido como os blocos-propaganda:
+  // impressão viewável + clique sob a chave fixa block:header-banner.
+  const headerBannerImpRef = useAdImpression(headerBannerClean ? "block:header-banner" : undefined);
   const headerBanner = headerBannerClean ? (
-    <div className="hidden lg:flex flex-1 min-w-0 items-center justify-end relative" style={{ minHeight: 48 }}>
+    <div ref={headerBannerImpRef} className="hidden lg:flex flex-1 min-w-0 items-center justify-end relative" style={{ minHeight: 48 }}>
       <div className="w-full min-w-0 flex items-center justify-end"
         dangerouslySetInnerHTML={{ __html: headerBannerClean }} />
       {headerBannerLink && (
         <a href={headerBannerLink} target="_blank" rel="noopener noreferrer sponsored"
+          onClick={() => { void trackClick("block:header-banner"); }}
           className="absolute inset-0 z-10" aria-label={settings?.siteName ? `Banner — ${settings.siteName}` : "Banner"} />
       )}
     </div>

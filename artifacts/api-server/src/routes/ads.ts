@@ -16,6 +16,11 @@ const BLOCK_PREFIX = "block:";
 
 function findAdBlock(blockId: string): { visible: boolean } | null {
   const s = store.getSettings();
+  // Pseudo-bloco: banner do cabeçalho (settings.headerBannerHtml) — também é
+  // inventário medido, sob a chave fixa block:header-banner.
+  if (blockId === "header-banner") {
+    return s.headerBannerHtml?.trim() ? { visible: true } : null;
+  }
   for (const list of [s.homeBlocks ?? [], s.articleSidebarBlocks ?? []]) {
     const b = list.find((x) => x.id === blockId && x.isAd === true);
     if (b) return { visible: b.visible !== false };
