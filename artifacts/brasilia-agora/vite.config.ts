@@ -423,12 +423,39 @@ function ssrHomePlugin(apiBase: string): Plugin {
       /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
          para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
          inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
-         recentes — cobrem todas as seções sem perda visível. */
+         recentes — cobrem as seções quentes sem perda visível. */
       const rawArticles = (a && Array.isArray(a.articles)) ? (a.articles as Array<Record<string, unknown>>) : [];
-      const articles = rawArticles
+      const sorted = rawArticles
         .map((art) => { const copy = { ...art }; delete copy["keywords"]; return copy; })
-        .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime())
-        .slice(0, 100);
+        .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime());
+      const articles = sorted.slice(0, 100);
+      /* O corte acima é só "mais recentes": editoria de baixo volume (ex.: NFL,
+         e-sports) cujos artigos saíram do top-100 sumia da home no público e
+         virava "EXEMPLO" no preview do admin. Completa o pool com até 8 artigos
+         por categoria referenciada pelos blocos visíveis — mesmo critério de
+         match do getArticles da Home (includes, case-insensitive). */
+      const homeBlocks = site?.["homeBlocks"];
+      if (Array.isArray(homeBlocks)) {
+        const have = new Set(articles.map((art) => String(art["id"])));
+        const cats = new Set<string>();
+        for (const b of homeBlocks) {
+          if (!b || typeof b !== "object") continue;
+          const blk = b as Record<string, unknown>;
+          if (blk["visible"] === false) continue;
+          const cat = typeof blk["category"] === "string" ? blk["category"].trim().toLowerCase() : "";
+          if (cat) cats.add(cat);
+        }
+        for (const cat of cats) {
+          let covered = 0;
+          for (const art of sorted) {
+            if (covered >= 8) break;
+            if (!String(art["category"] ?? "").toLowerCase().includes(cat)) continue;
+            covered++;
+            const id = String(art["id"]);
+            if (!have.has(id)) { have.add(id); articles.push(art); }
+          }
+        }
+      }
 
       const data = { articles, site, ads: d?.ads ?? [] };
 
