@@ -55,11 +55,18 @@ export function useEditorPermissions(role: string): { permSet: Set<string>; load
         .then(({ permissions }) => {
           _cachedPerms = new Set(permissions);
           try { localStorage.setItem(LS_PERMS, JSON.stringify(permissions)); } catch {}
-          setPermSet(_cachedPerms);
-          setLoaded(true);
         })
-        .catch(() => { _permPromise = null; setLoaded(true); });
+        .catch(() => { _permPromise = null; });
     }
+    // TODA instância se inscreve na promise compartilhada. Se só quem a cria
+    // recebesse setState, o outro consumidor (menu lateral ou guarda de rota,
+    // conforme a ordem de montagem) ficaria em "Carregando permissões..." para
+    // sempre. Em falha, `loaded=true` com o cache local — a próxima montagem
+    // tenta de novo (a promise foi zerada no catch).
+    _permPromise.then(() => {
+      if (_cachedPerms) setPermSet(_cachedPerms);
+      setLoaded(true);
+    });
   }, [role]);
 
   useEffect(() => { fetchPerms(); }, [fetchPerms]);
