@@ -47,27 +47,94 @@ function stripHtml(s: string): string {
 
 type SiteLang = "pt-BR" | "en";
 
+/** Identidade pública do blog para as meta tags servidas ao crawler. */
+interface SiteMeta {
+  lang: SiteLang;
+  siteName: string;
+  tagline: string;
+  seoDescription: string;
+  /** Caminho relativo da imagem OG (asset das settings ou /opengraph.jpg). */
+  ogImagePath: string;
+}
+
 /**
- * Idioma público do site com cache (~5min), para o socialOgPlugin decidir
- * lang/og:locale/sufixo sem pagar 1 fetch por crawler hit. Qualquer falha →
- * pt-BR (comportamento anterior).
+ * Identidade do site com cache (~5min). A imagem `blog-web` é COMPARTILHADA
+ * entre os blogs — o index.html buildado traz a marca do blog que buildou.
+ * Todo <head> servido a crawler precisa vir daqui (API do próprio blog), nunca
+ * do template. Falha de API → última leitura boa, ou BRAND como último recurso.
  */
-function makeSiteLangResolver(apiBase: string): () => Promise<SiteLang> {
+function makeSiteMetaResolver(apiBase: string): () => Promise<SiteMeta> {
   const TTL_MS = 5 * 60_000;
-  let cached: { lang: SiteLang; at: number } | null = null;
+  const FALLBACK: SiteMeta = {
+    lang: "pt-BR",
+    siteName: BRAND.name,
+    tagline: BRAND.tagline,
+    seoDescription: BRAND.description,
+    ogImagePath: "/opengraph.jpg",
+  };
+  let cached: { meta: SiteMeta; at: number } | null = null;
   return async () => {
     const now = Date.now();
-    if (cached && now - cached.at < TTL_MS) return cached.lang;
+    if (cached && now - cached.at < TTL_MS) return cached.meta;
     try {
       const r = await fetch(`${apiBase}/api/site`);
-      const s = r.ok ? ((await r.json()) as { siteLanguage?: string }) : null;
-      const lang: SiteLang = s?.siteLanguage === "en" ? "en" : "pt-BR";
-      cached = { lang, at: now };
-      return lang;
+      const s = r.ok ? ((await r.json()) as Record<string, unknown>) : null;
+      const meta = s ? metaFromSitePayload(s) : null;
+      if (!meta) return cached?.meta ?? FALLBACK;
+      cached = { meta, at: now };
+      return meta;
     } catch {
-      return cached?.lang ?? "pt-BR";
+      return cached?.meta ?? FALLBACK;
     }
   };
+}
+
+/**
+ * Monta o SiteMeta a partir do payload público de /api/site (null se o payload
+ * não tiver nem siteName — API fora/instalação incompleta). Imagem OG: a das
+ * settings; sem ela, a logo do blog (payload publica ambas como URL
+ * /api/site-asset/…); por último o /opengraph.jpg buildado — que é o do blog
+ * que gerou a imagem Docker, o pior dos fallbacks.
+ */
+function metaFromSitePayload(s: Record<string, unknown>): SiteMeta | null {
+  const siteName = typeof s["siteName"] === "string" ? (s["siteName"] as string).trim() : "";
+  if (!siteName) return null;
+  const tagline = typeof s["tagline"] === "string" ? (s["tagline"] as string).trim() : "";
+  const seoDescription =
+    (typeof s["seoDescription"] === "string" && (s["seoDescription"] as string).trim()) || tagline || siteName;
+  const ogRaw = typeof s["ogImageBase64"] === "string" ? (s["ogImageBase64"] as string) : "";
+  const logoRaw = typeof s["logoBase64"] === "string" ? (s["logoBase64"] as string) : "";
+  return {
+    lang: s["siteLanguage"] === "en" ? "en" : "pt-BR",
+    siteName,
+    tagline,
+    seoDescription,
+    ogImagePath: ogRaw.startsWith("/") ? ogRaw : logoRaw.startsWith("/") ? logoRaw : "/opengraph.jpg",
+  };
+}
+
+/**
+ * Reescreve título/descrição/OG/Twitter do index.html buildado com a identidade
+ * do blog dono do container (o template traz a marca de quem buildou a imagem).
+ * `origin` = proto://host da requisição — og:url e og:image precisam ser absolutos.
+ */
+function rewriteHeadMeta(html: string, meta: SiteMeta, origin: string, pathOnly: string): string {
+  const title = meta.tagline ? `${meta.siteName} — ${meta.tagline}` : meta.siteName;
+  const desc = meta.seoDescription;
+  const ogImage = `${origin}${meta.ogImagePath}`;
+  const url = `${origin}${pathOnly}`;
+  return html
+    .replace(/<html lang="[^"]*"/, `<html lang="${meta.lang}"`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
+    .replace(/(<meta property="og:site_name" content=")[^"]*(")/, `$1${esc(meta.siteName)}$2`)
+    .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${esc(url)}$2`)
+    .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(title)}$2`)
+    .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
+    .replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${esc(ogImage)}$2`)
+    .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(title)}$2`)
+    .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
+    .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(ogImage)}$2`);
 }
 
 function buildOgHtml(params: {
@@ -78,18 +145,19 @@ function buildOgHtml(params: {
   category: string;
   publishedAt: string;
   lang: SiteLang;
+  siteName: string;
 }): string {
-  const { title, description, imageUrl, canonicalUrl, category, publishedAt, lang } =
+  const { title, description, imageUrl, canonicalUrl, category, publishedAt, lang, siteName } =
     params;
   return `<!DOCTYPE html>
 <html lang="${lang}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(title)} — ${BRAND.titleSuffix}</title>
+<title>${esc(title)} — ${esc(siteName)}</title>
 <meta name="description" content="${esc(description)}">
 <meta property="og:type" content="article">
-<meta property="og:site_name" content="${BRAND.name}">
+<meta property="og:site_name" content="${esc(siteName)}">
 <meta property="og:locale" content="${lang === "en" ? "en_US" : "pt_BR"}">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
@@ -191,7 +259,7 @@ function staticCachePlugin(): Plugin {
 }
 
 function socialOgPlugin(apiBase: string): Plugin {
-  const resolveSiteLang = makeSiteLangResolver(apiBase);
+  const resolveSiteMeta = makeSiteMetaResolver(apiBase);
 
   async function handleCrawler(
     req: IncomingMessage,
@@ -239,7 +307,8 @@ function socialOgPlugin(apiBase: string): Plugin {
       const artSlug = article.slug ?? article.id ?? slug;
       const canonicalUrl = `${proto}://${host}/artigo/${artSlug}`;
 
-      const lang = await resolveSiteLang();
+      const meta = await resolveSiteMeta();
+      const lang = meta.lang;
       const rawTitle = stripHtml(article.title);
       const rawSubtitle = stripHtml(article.subtitle ?? "");
       const baseDesc = rawSubtitle || rawTitle;
@@ -255,6 +324,7 @@ function socialOgPlugin(apiBase: string): Plugin {
         category: article.category ?? "",
         publishedAt: article.publishedAt ?? "",
         lang,
+        siteName: meta.siteName,
       });
 
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -364,12 +434,22 @@ function ssrHomePlugin(apiBase: string): Plugin {
 
       const appHtml = renderFn("/", data);
       const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
-      // <html lang> segue o idioma do site (o template buildado traz pt-BR fixo).
-      const lang = site?.["siteLanguage"] === "en" ? "en" : "pt-BR";
-      const html = template
-        .replace(/<html lang="[^"]*"/, `<html lang="${lang}"`)
+      let html = template
         .replace("<head>", `<head>\n    <script>window.__SSR_DATA__=${serialized}</script>`)
         .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+      // Título/descrição/OG do template são do blog que buildou a imagem
+      // compartilhada — reescreve com a identidade DESTE blog (o crawler do
+      // WhatsApp/Facebook lê a home daqui; sem isso o preview sai com a marca
+      // errada). Também ajusta <html lang> e og:url/og:image absolutos.
+      const meta = site ? metaFromSitePayload(site) : null;
+      if (meta) {
+        const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+        const host = req.headers.host ?? BRAND.domain;
+        html = rewriteHeadMeta(html, meta, `${proto}://${host}`, "/");
+      } else {
+        const lang = site?.["siteLanguage"] === "en" ? "en" : "pt-BR";
+        html = html.replace(/<html lang="[^"]*"/, `<html lang="${lang}"`);
+      }
 
       htmlCache = { html, at: now };
       res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -392,12 +472,63 @@ function ssrHomePlugin(apiBase: string): Plugin {
   };
 }
 
+/**
+ * spaHeadPlugin — fallback SPA com <head> do blog certo. Toda rota sem extensão
+ * (categorias, /artigo/* para usuários, páginas institucionais) cairia no
+ * index.html buildado, cujo título/OG são do blog que gerou a imagem Docker
+ * compartilhada — link compartilhado dessas páginas mostrava a marca errada.
+ * Serve o mesmo index.html com o head reescrito pela identidade do blog
+ * (API própria, cache de 5min). Registrar DEPOIS do ssrHomePlugin: a home
+ * continua com SSR completo; aqui só passa o resto. Falha → index.html cru.
+ */
+function spaHeadPlugin(apiBase: string): Plugin {
+  const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
+  const resolveSiteMeta = makeSiteMetaResolver(apiBase);
+  let template: string | null = null;
+
+  async function handleSpaRoute(
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ): Promise<void> {
+    const pathOnly = (req.url ?? "").split("?")[0] ?? "";
+    // Só rotas de página: com extensão (assets, /opengraph.jpg, /sw.js…) ou
+    // /api/* seguem o fluxo normal do servidor estático.
+    if (req.method !== "GET" || pathOnly.startsWith("/api/") || /\.[a-zA-Z0-9]+$/.test(pathOnly)) {
+      next();
+      return;
+    }
+    try {
+      if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
+      const meta = await resolveSiteMeta();
+      const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+      const host = req.headers.host ?? BRAND.domain;
+      const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, must-revalidate");
+      res.end(html);
+    } catch {
+      next();
+    }
+  }
+
+  return {
+    name: "spa-head-meta",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleSpaRoute(req, res, next);
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     staticCachePlugin(),
     socialOgPlugin(process.env.API_URL ?? "http://localhost:8080"),
     ssrHomePlugin(process.env.API_URL ?? "http://localhost:8080"),
+    spaHeadPlugin(process.env.API_URL ?? "http://localhost:8080"),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
