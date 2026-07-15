@@ -104,7 +104,11 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   editorias vêm das propostas Bee Media (PDFs "Proposta_PontoFarma" e
   "Proposta_Portal_CreditoVC"); mock HTML/JSON de referência em
   `docs/Guia_Claude_Code_Base.md` (movido de public/ — ali seria servido no
-  site de todos os blogs).
+  site de todos os blogs). ⚠️ O template desses dois é LAYOUT PRÓPRIO do
+  mock (header/rodapé claros, hero de boas-vindas, zona main+sidebar,
+  bloco newsletter) — NÃO é a família KSports-Final; os template_final.sql
+  deles também fazem bootstrap do site_settings com os defaults do app
+  (espelho do store.ts) quando a linha não existe (blog recém-instalado).
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
   sozinho — ksports mora em ksports.bebee.me).
@@ -216,7 +220,8 @@ blog, active=false).
 
 ## 8. Replicar/clonar template de home
 
-O layout da rede é a família "KSports - Final" (22 blocos): top bar escura,
+O layout dos blogs de ESPORTE é a família "KSports - Final" (pontofarma e
+creditovc têm layout próprio do mock — ver §4) (22 blocos): top bar escura,
 hero portal com sidebar Mais Lidas/Últimas, faixa de anúncio, Últimas, grade
 de recentes, box de anúncio lateral, 4 colunas por categoria, seção
 horizontal, "mais notícias", + 9 blocos padrão ocultos. Cada blog tem um

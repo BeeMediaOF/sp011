@@ -1,28 +1,33 @@
 -- =============================================================================
--- Crédito.vc — importa o template "Crédito.vc - Final" (clone do snapshot
--- "KSports - Final" na identidade Crédito.vc, gerado em 2026-07-15 a partir
--- do template do Bee Esportes)
+-- Crédito.vc — importa o template "Crédito.vc - Final" (layout PRÓPRIO,
+-- clonado do mock da proposta Bee Media / docs/Guia_Claude_Code_Base.md —
+-- NÃO é o layout da família KSports dos blogs de esporte)
 -- =============================================================================
--- Identidade (Proposta Bee Media / mock da home): verde vivo #0ec76d
--- (acentos/CTA), verde escuro #0a9455, navy #0f2446 (top bar/menu/banners),
--- rodapé #0a1630. Wordmark: "crédito" branco + ".vc" verde (minúsculas).
--- Tagline: "Educação financeira para a vida real" (pt-BR).
--- Editorias/slugs DESTE blog (diferentes dos blogs de esporte — as regras da
--- central casam por slug): sair-das-dividas, credito, score,
--- organizar-financas, renda-extra, planejar-o-futuro, investimentos,
--- outros (fallback). Slugs custom resolvem via DynamicCategory — POR ISSO
--- todo slug precisa de menuItem VISÍVEL.
---   * Banners nascem como "publicidade da própria casa" (identidade da
---     marca, sem link) — a proposta prevê que os espaços de anúncio são do
---     próprio Crédito.vc. Troque o HTML dos blocos pelo banner do SIMULADOR
---     DE CRÉDITO quando ele existir. Artes de upload de OUTROS blogs nunca
---     funcionam aqui (bucket por blog).
---   * siteLanguage=pt-BR e fuso America/Sao_Paulo gravados ao aplicar.
---   * Ticker "Em Alta" continua OCULTO e a hero strip desligada (como no
---     "Final" do ksports).
+-- Estrutura da home (espelha o mock):
+--   1. Hero em 2 colunas: card branco de boas-vindas (eyebrow verde + título
+--      + busca) | "Destaques" (1 matéria grande + 3 empilhadas)
+--   2. Zona principal+lateral: Mais Recentes (grade) → Temas em Destaque
+--      (ícones por editoria) → Leitura Essencial (card grande + lista) →
+--      Escolha do Editor (mais lidas) ‖ lateral: Mais Lidas + box CTA navy
+--      da casa ("Precisando de crédito?") + Últimas Notícias
+--   3. Negócios & Trabalho | Crédito & Score (3 cards cada)
+--   4. Faixa navy de newsletter (formulário funcional)
+-- Identidade: verde #12a75c (CTA) / verde vivo #0ec76d (acentos) + navy
+-- #0f2446; header BRANCO sem top bar escura (menu claro estilo mock);
+-- rodapé claro (light).
+-- Editorias/slugs: sair-das-dividas, credito, score, organizar-financas,
+-- renda-extra, planejar-o-futuro, investimentos, outros — todo slug tem
+-- menuItem VISÍVEL (rota custom via DynamicCategory).
+--   * O box CTA da lateral é estático por enquanto — troque pelo banner do
+--     SIMULADOR DE CRÉDITO (com link) quando ele existir.
+--
+-- Bootstrap: se a linha settings.site_settings ainda NÃO existir (blog
+-- recém-instalado — ela só nasce no 1º Salvar do admin), o script a cria com
+-- os defaults do app (espelho de DEFAULT_SETTINGS/DEFAULT_HOME_BLOCKS em
+-- api-server/src/lib/store.ts) + o siteName/tagline do Crédito.vc.
 --
 -- Idempotente: remove versão anterior do mesmo template (id) antes de anexar.
--- Pré-requisito: wizard /admin/setup concluído (tabela settings populada).
+-- Pré-requisito: wizard /admin/setup concluído (tabela settings existe).
 -- O app relê site_settings a cada 15s — o template aparece em
 -- "Meus templates" sem restart. Não salve Configurações no admin no mesmo
 -- instante da importação.
@@ -35,12 +40,14 @@
 
 BEGIN;
 
-DO $$
-BEGIN
-  IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'site_settings') THEN
-    RAISE EXCEPTION 'site_settings nao existe neste banco — conclua o wizard /admin/setup do Credito.vc antes de importar o template.';
-  END IF;
-END $$;
+-- Blog recém-instalado: cria site_settings com os defaults do app (o objeto
+-- gravado SUBSTITUI os defaults em memória — por isso precisa vir completo,
+-- não só com homeTemplates).
+INSERT INTO settings (key, value, updated_at)
+SELECT 'site_settings',
+'{"siteName":"Crédito.vc","tagline":"Educação financeira para a vida real","logoSize":101,"mobileEnabled":true,"desktopEnabled":true,"showTickerBar":true,"showHeroStrip":true,"homeBlocks":[{"id":"hero","name":"Hero / Destaques","visible":true,"order":0},{"id":"brasil","name":"Brasil","visible":true,"order":1},{"id":"mais-lidas","name":"Mais Lidas","visible":true,"order":2},{"id":"mundo","name":"Mundo","visible":true,"order":3},{"id":"esporte","name":"Esporte","visible":true,"order":4},{"id":"cultura","name":"Cultura","visible":true,"order":5},{"id":"df","name":"DF","visible":true,"order":6},{"id":"saude","name":"Saúde","visible":true,"order":7},{"id":"tecnologia","name":"Tecnologia","visible":true,"order":8},{"id":"colunistas","name":"Colunistas","visible":true,"order":9},{"id":"ultimas","name":"Últimas Notícias","visible":true,"order":10}]}',
+now()
+WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'site_settings');
 
 UPDATE settings s
 SET value = jsonb_set(
@@ -54,53 +61,50 @@ SET value = jsonb_set(
 {
   "id": "tpl-creditovc-final",
   "name": "Crédito.vc - Final",
-  "createdAt": "2026-07-15T12:00:00.000Z",
-  "accentColor": "#0a9455",
+  "createdAt": "2026-07-15T18:00:00.000Z",
+  "accentColor": "#12a75c",
   "headerStyle": "standard",
-  "footerStyle": "dark",
+  "footerStyle": "light",
   "headerBgColor": "#ffffff",
-  "footerBgColor": "#0a1630",
-  "menuTextColor": "#101418",
-  "menuActiveColor": "#0ec76d",
-  "menuFontSize": 12,
-  "menuFontWeight": 800,
+  "footerBgColor": "#ffffff",
+  "menuTextColor": "#334155",
+  "menuActiveColor": "#12a75c",
+  "menuFontSize": 14,
+  "menuFontWeight": 700,
   "showTickerBar": false,
   "showHeroStrip": false,
-  "showTopBar": true,
-  "topBarBgColor": "#0f2446",
-  "menuBarStyle": "bar",
-  "menuBarBgColor": "#0f2446",
-  "footerAccentColor": "#0ec76d",
+  "showTopBar": false,
+  "menuBarStyle": "attached",
+  "menuBarBgColor": "#ffffff",
+  "footerAccentColor": "#12a75c",
   "headerPaddingX": 16,
   "headerMarginTop": 0,
   "siteLanguage": "pt-BR",
   "siteTimezone": "America/Sao_Paulo",
-  "headerBannerHtml": "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;border:1px solid #1d3f66;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(14,199,109,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(10,148,85,.55), transparent 46%), linear-gradient(135deg, #0f2446, #123a6b 60%, #0a1630);\"><span style=\"font-weight:900;font-size:19px;letter-spacing:.01em;color:#ffffff;\">crédito<span style=\"color:#0ec76d;\">.vc</span></span><span style=\"flex:1;text-align:center;color:#ffffff;line-height:1.15;\"><span style=\"font-size:15px;font-weight:900;letter-spacing:.02em;\">EDUCAÇÃO FINANCEIRA <span style=\"color:#0ec76d;\">PARA A VIDA REAL.</span></span><br/><span style=\"font-size:10px;font-weight:600;color:#cbd8ea;\">CONTEÚDO GRATUITO PARA CUIDAR DO SEU DINHEIRO</span></span><span style=\"background:#0ec76d;color:#06301d;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;\">CRÉDITO.VC</span></div>",
   "menuItems": [
-    { "id": "cvc-menu-home",    "label": "HOME",               "path": "/",                   "order": 0, "visible": true },
-    { "id": "cvc-menu-dividas", "label": "SAIR DAS DÍVIDAS",   "path": "/sair-das-dividas",   "order": 1, "visible": true },
-    { "id": "cvc-menu-credito", "label": "CRÉDITO",            "path": "/credito",            "order": 2, "visible": true },
-    { "id": "cvc-menu-score",   "label": "SCORE",              "path": "/score",              "order": 3, "visible": true },
-    { "id": "cvc-menu-organizar","label": "ORGANIZAR FINANÇAS","path": "/organizar-financas", "order": 4, "visible": true },
-    { "id": "cvc-menu-renda",   "label": "RENDA EXTRA",        "path": "/renda-extra",        "order": 5, "visible": true },
-    { "id": "cvc-menu-futuro",  "label": "PLANEJAR O FUTURO",  "path": "/planejar-o-futuro",  "order": 6, "visible": true },
-    { "id": "cvc-menu-invest",  "label": "INVESTIMENTOS",      "path": "/investimentos",      "order": 7, "visible": true },
-    { "id": "cvc-menu-outros",  "label": "OUTROS",             "path": "/outros",             "order": 8, "visible": true }
+    { "id": "cvc-menu-home",     "label": "Home",               "path": "/",                   "order": 0, "visible": true },
+    { "id": "cvc-menu-dividas",  "label": "Sair das Dívidas",   "path": "/sair-das-dividas",   "order": 1, "visible": true },
+    { "id": "cvc-menu-credito",  "label": "Crédito",            "path": "/credito",            "order": 2, "visible": true },
+    { "id": "cvc-menu-score",    "label": "Score",              "path": "/score",              "order": 3, "visible": true },
+    { "id": "cvc-menu-organizar","label": "Organizar Finanças", "path": "/organizar-financas", "order": 4, "visible": true },
+    { "id": "cvc-menu-renda",    "label": "Renda Extra",        "path": "/renda-extra",        "order": 5, "visible": true },
+    { "id": "cvc-menu-futuro",   "label": "Planejar o Futuro",  "path": "/planejar-o-futuro",  "order": 6, "visible": true },
+    { "id": "cvc-menu-invest",   "label": "Investimentos",      "path": "/investimentos",      "order": 7, "visible": true },
+    { "id": "cvc-menu-outros",   "label": "Outros",             "path": "/outros",             "order": 8, "visible": true }
   ],
   "footerConfig": {
-    "description": "Educação financeira para a vida real: dicas práticas para cuidar do seu dinheiro, conquistar crédito e realizar seus sonhos.",
+    "description": "Seu guia de educação financeira para conquistar estabilidade, crédito e liberdade para realizar seus sonhos.",
     "showSocial": false,
     "socialEnabled": {},
     "columns": [
       { "id": "cvc-nav", "title": "Conteúdos", "links": [
-        { "id": "cvc-nav-home",    "label": "Home",               "href": "/" },
-        { "id": "cvc-nav-dividas", "label": "Sair das Dívidas",   "href": "/sair-das-dividas" },
-        { "id": "cvc-nav-credito", "label": "Crédito",            "href": "/credito" },
-        { "id": "cvc-nav-score",   "label": "Score",              "href": "/score" },
-        { "id": "cvc-nav-organizar","label": "Organizar Finanças","href": "/organizar-financas" },
-        { "id": "cvc-nav-renda",   "label": "Renda Extra",        "href": "/renda-extra" },
-        { "id": "cvc-nav-futuro",  "label": "Planejar o Futuro",  "href": "/planejar-o-futuro" },
-        { "id": "cvc-nav-invest",  "label": "Investimentos",      "href": "/investimentos" }
+        { "id": "cvc-nav-dividas",  "label": "Sair das Dívidas",   "href": "/sair-das-dividas" },
+        { "id": "cvc-nav-credito",  "label": "Crédito",            "href": "/credito" },
+        { "id": "cvc-nav-score",    "label": "Score",              "href": "/score" },
+        { "id": "cvc-nav-organizar","label": "Organizar Finanças", "href": "/organizar-financas" },
+        { "id": "cvc-nav-renda",    "label": "Renda Extra",        "href": "/renda-extra" },
+        { "id": "cvc-nav-futuro",   "label": "Planejar o Futuro",  "href": "/planejar-o-futuro" },
+        { "id": "cvc-nav-invest",   "label": "Investimentos",      "href": "/investimentos" }
       ] },
       { "id": "cvc-inst", "title": "Institucional", "links": [
         { "id": "cvc-i-about",     "label": "Sobre o Crédito.vc",      "href": "/contato" },
@@ -111,8 +115,7 @@ SET value = jsonb_set(
       ] }
     ],
     "showContact": false,
-    "showNewsletter": true,
-    "newsletterTitle": "Receba dicas de finanças e crédito toda semana no seu e-mail",
+    "showNewsletter": false,
     "copyright": "© {year} {site}. Todos os direitos reservados.",
     "legalLinks": [
       { "id": "cvc-l-privacy", "label": "Política de Privacidade", "href": "/privacidade" },
@@ -121,19 +124,19 @@ SET value = jsonb_set(
     ]
   },
   "blocks": [
-    { "id": "hero",       "area": "main",    "name": "Principais Notícias", "order": 0, "layout": "portal", "visible": true },
-    { "id": "mais-lidas", "area": "sidebar", "name": "Mais Lidas", "color": "#0a9455", "order": 1, "visible": true },
-    { "id": "ticker-cvc", "name": "Em Alta", "color": "#0ec76d", "order": 2, "custom": true, "format": "grid", "source": "latest", "visible": false, "blockType": "ticker", "itemsLimit": 8 },
-    { "id": "html-cvc-ad-faixa", "area": "main", "isAd": true, "name": "Casa — Faixa", "color": "#0a9455", "order": 3, "custom": true, "format": "grid", "visible": true, "blockType": "html", "html": "<div style=\"display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;border:1px solid #1d3f66;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(14,199,109,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(10,148,85,.55), transparent 46%), linear-gradient(135deg, #0f2446, #123a6b 60%, #0a1630);\"><span style=\"font-weight:900;font-size:26px;letter-spacing:.01em;color:#ffffff;\">crédito<span style=\"color:#0ec76d;\">.vc</span></span><span style=\"flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;\"><span style=\"font-size:20px;font-weight:900;letter-spacing:.02em;\">SAIA DO <span style=\"color:#0ec76d;\">VERMELHO</span></span><br/><span style=\"font-size:13px;font-weight:600;color:#cbd8ea;\">GUIAS PRÁTICOS PARA ORGANIZAR AS CONTAS, LIMPAR O NOME E CONQUISTAR CRÉDITO</span></span><span style=\"background:#0ec76d;color:#06301d;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;\">CRÉDITO.VC</span></div>" },
-    { "id": "list-cvc-ultimas", "area": "sidebar", "name": "Últimas Notícias", "color": "#0a9455", "order": 4, "custom": true, "format": "list_compact", "source": "latest", "reverse": false, "visible": true, "blockType": "list", "itemsLimit": 5 },
-    { "id": "content-cvc-recentes", "area": "main", "name": "Mais Recentes", "color": "#0a9455", "order": 5, "custom": true, "format": "grid", "layout": "grid", "source": "latest", "reverse": false, "visible": true, "blockType": "content", "itemsLimit": 8 },
-    { "id": "html-cvc-ad-box", "area": "sidebar", "isAd": true, "name": "Casa — Lateral", "color": "#0ec76d", "order": 6, "custom": true, "format": "grid", "visible": true, "blockType": "html", "html": "<div style=\"max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;border:1px solid #1d3f66;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(14,199,109,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(10,148,85,.55), transparent 46%), linear-gradient(135deg, #0f2446, #123a6b 60%, #0a1630);\"><div style=\"color:#cbd8ea;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;\">PUBLICIDADE DA CASA</div><div style=\"margin-bottom:12px;\"><span style=\"font-weight:900;font-size:26px;letter-spacing:.01em;color:#ffffff;\">crédito<span style=\"color:#0ec76d;\">.vc</span></span></div><div style=\"color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;\">SEU DINHEIRO<br/>NO CONTROLE</div><div style=\"display:inline-block;background:#0ec76d;color:#06301d;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;\">CRÉDITO.VC</div></div>" },
-    { "id": "content-cvc-credito", "name": "Crédito",            "color": "#0a9455", "order": 7,  "width": "quarter", "custom": true, "format": "featured", "layout": "featured", "source": "automatic_by_category", "visible": true, "category": "credito",            "blockType": "content", "linkLabel": "VER TODOS →" },
-    { "id": "content-cvc-score",   "name": "Score",              "color": "#0ec76d", "order": 8,  "width": "quarter", "custom": true, "format": "featured", "layout": "featured", "source": "automatic_by_category", "visible": true, "category": "score",              "blockType": "content", "linkLabel": "VER TODOS →" },
-    { "id": "content-cvc-organizar","name": "Organizar Finanças","color": "#0a9455", "order": 9,  "width": "quarter", "custom": true, "format": "featured", "layout": "featured", "source": "automatic_by_category", "visible": true, "category": "organizar-financas","blockType": "content", "linkLabel": "VER TODOS →" },
-    { "id": "content-cvc-renda",   "name": "Renda Extra",        "color": "#0ec76d", "order": 10, "width": "quarter", "custom": true, "format": "featured", "layout": "featured", "source": "automatic_by_category", "visible": true, "category": "renda-extra",        "blockType": "content", "linkLabel": "VER TODOS →" },
-    { "id": "content-cvc-dividas", "name": "Sair das Dívidas", "color": "#0a9455", "order": 11, "custom": true, "format": "cultura", "layout": "cultura", "source": "automatic_by_category", "reverse": false, "visible": true, "category": "sair-das-dividas", "blockType": "content", "itemsLimit": 4 },
-    { "id": "content-cvc-mais", "name": "Mais Notícias", "color": "#0a9455", "order": 12, "custom": true, "format": "grid", "layout": "grid", "source": "latest", "reverse": false, "visible": true, "blockType": "content", "itemsLimit": 4 },
+    { "id": "html-cvc-hero", "name": "Bem-vindo ao Crédito.vc", "width": "half", "order": 0, "custom": true, "format": "grid", "visible": true, "blockType": "html", "html": "<div style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:18px;padding:32px 30px;box-shadow:0 8px 28px rgba(15,23,42,.06);height:100%;display:flex;flex-direction:column;justify-content:center;\"><div style=\"color:#12a75c;font-weight:800;letter-spacing:.08em;font-size:13px;text-transform:uppercase;margin-bottom:14px;\">Bem-vindo ao Crédito.vc</div><div style=\"font-size:36px;line-height:1.08;color:#0f2446;font-weight:800;margin-bottom:14px;\">Educação financeira para a vida real</div><div style=\"color:#6b7280;font-size:16px;line-height:1.5;margin-bottom:22px;\">Dicas práticas e confiáveis para cuidar do seu dinheiro, conquistar crédito, investir melhor e realizar seus sonhos.</div><a href=\"/arquivo\" style=\"display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #e5e7eb;border-radius:14px;padding:13px 16px;color:#6b7280;font-size:14px;text-decoration:none;background:#ffffff;\"><span>Buscar artigos, guias e ferramentas...</span><span style=\"background:#12a75c;color:#ffffff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:13px;\">Buscar</span></a><div style=\"color:#6b7280;font-size:13px;margin-top:14px;\">✉️ Receba conteúdos exclusivos no seu e-mail — <span style=\"color:#12a75c;font-weight:700;\">inscreva-se no fim da página</span>.</div></div>" },
+    { "id": "content-cvc-destaques", "name": "Destaques", "width": "half", "order": 1, "custom": true, "format": "featured", "layout": "featured", "source": "latest", "visible": true, "blockType": "content" },
+    { "id": "content-cvc-recentes", "name": "Mais Recentes", "area": "main", "order": 2, "color": "#12a75c", "custom": true, "format": "grid", "layout": "grid", "source": "latest", "visible": true, "blockType": "content", "itemsLimit": 8 },
+    { "id": "html-cvc-temas", "name": "Temas em Destaque", "area": "main", "order": 3, "custom": true, "format": "grid", "visible": true, "blockType": "html", "html": "<div><div style=\"display:flex;align-items:center;gap:10px;margin-bottom:16px;\"><span style=\"width:4px;height:20px;background:#12a75c;display:inline-block;\"></span><span style=\"font-size:15px;font-weight:800;color:#1a1a1a;text-transform:uppercase;letter-spacing:.05em;\">Temas em Destaque</span></div><div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;\"><a href=\"/sair-das-dividas\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💰</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Sair das Dívidas</span></a><a href=\"/credito\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💳</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Crédito</span></a><a href=\"/score\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🎯</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Score</span></a><a href=\"/organizar-financas\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📊</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Organizar Finanças</span></a><a href=\"/renda-extra\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💼</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Renda Extra</span></a><a href=\"/planejar-o-futuro\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🛡️</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Planejar o Futuro</span></a><a href=\"/investimentos\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📈</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Investimentos</span></a></div></div>" },
+    { "id": "content-cvc-essencial", "name": "Leitura Essencial", "area": "main", "order": 4, "color": "#12a75c", "custom": true, "format": "cultura", "layout": "cultura", "source": "automatic_by_category", "category": "sair-das-dividas", "caption": "Guia completo", "visible": true, "blockType": "content", "itemsLimit": 4, "linkLabel": "Ver todos →" },
+    { "id": "content-cvc-editor", "name": "Escolha do Editor", "area": "main", "order": 5, "color": "#12a75c", "custom": true, "format": "grid", "layout": "grid", "source": "most_read", "visible": true, "blockType": "content", "itemsLimit": 4 },
+    { "id": "mais-lidas", "name": "Mais Lidas", "area": "sidebar", "order": 6, "color": "#12a75c", "visible": true, "itemsLimit": 5 },
+    { "id": "html-cvc-cta", "name": "Publicidade da casa", "area": "sidebar", "order": 7, "isAd": true, "custom": true, "format": "grid", "visible": true, "blockType": "html", "html": "<div style=\"background:linear-gradient(180deg,#0f2446,#0a1630);color:#ffffff;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.06);\"><span style=\"display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);color:#d1fae5;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;\">Publicidade</span><div style=\"font-size:24px;line-height:1.15;font-weight:800;margin-bottom:10px;\">Precisando de crédito? A gente te ajuda.</div><div style=\"color:#cbd5e1;font-size:14px;line-height:1.5;margin-bottom:16px;\">Guias e ferramentas para você conquistar crédito com segurança e nas melhores condições.</div><span style=\"display:inline-block;background:#12a75c;color:#ffffff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;\">Simulador em breve</span></div>" },
+    { "id": "list-cvc-ultimas", "name": "Últimas Notícias", "area": "sidebar", "order": 8, "color": "#12a75c", "custom": true, "format": "list_compact", "source": "latest", "visible": true, "blockType": "list", "itemsLimit": 5 },
+    { "id": "content-cvc-negocios", "name": "Negócios & Trabalho", "width": "half", "order": 9, "color": "#12a75c", "custom": true, "format": "trio", "layout": "trio", "source": "automatic_by_category", "category": "renda-extra", "visible": true, "blockType": "content", "linkLabel": "Ver todos →" },
+    { "id": "content-cvc-creditoscore", "name": "Crédito & Score", "width": "half", "order": 10, "color": "#0ec76d", "custom": true, "format": "trio", "layout": "trio", "source": "automatic_by_category", "category": "credito", "visible": true, "blockType": "content", "linkLabel": "Ver todos →" },
+    { "id": "newsletter-cvc-assine", "name": "Inscreva-se na nossa newsletter", "order": 11, "color": "#0f2446", "custom": true, "format": "grid", "visible": true, "blockType": "newsletter", "caption": "Dicas semanais, guias práticos e ferramentas para você cuidar melhor do seu dinheiro." },
+    { "id": "hero",       "name": "Principais Notícias", "order": 12, "layout": "portal",  "visible": false },
     { "id": "brasil",     "name": "Brasil",           "color": "#16a34a", "order": 13, "layout": "grid",    "visible": false, "category": "brasil" },
     { "id": "mundo",      "name": "Mundo",            "color": "#6b21a8", "order": 14, "layout": "grid",    "visible": false, "category": "mundo" },
     { "id": "esporte",    "name": "Esporte",          "color": "#dc2626", "order": 15, "layout": "cultura", "visible": false, "category": "esportes" },

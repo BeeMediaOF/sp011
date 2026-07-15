@@ -145,16 +145,22 @@ docker compose exec -T pg-blogs psql -U postgres -d creditovc -v ON_ERROR_STOP=1
 Em `https://<dominio>/admin` (o template aparece em Home + menu → aba
 Templates → "Meus templates" em ≤15s, sem restart):
 
-1. Aplicar **"Crédito.vc - Final"** — instala os 22 blocos, menu com as 7
-   editorias, rodapé navy, banners de publicidade da própria casa
-   (verde+navy), idioma pt-BR + fuso SP.
+1. Aplicar **"Crédito.vc - Final"** — layout próprio do mock da proposta
+   (NÃO é o da família de esporte): hero de boas-vindas + Destaques, Mais
+   Recentes, Temas em Destaque (ícones), Leitura Essencial, Escolha do
+   Editor, lateral com Mais Lidas + box da casa "Precisando de crédito?" +
+   Últimas, Negócios & Trabalho | Crédito & Score, faixa de newsletter;
+   header e rodapé CLAROS, idioma pt-BR + fuso SP. O script também cria o
+   `site_settings` com os defaults quando o blog é recém-instalado (não
+   precisa salvar Configurações antes).
 2. **Configurações → Informações**: nome "Crédito.vc", tagline "Educação
    financeira para a vida real", **upload das logos** (horizontal p/ header,
    monograma p/ favicon), autor padrão (ex.: "Redação Crédito.vc"). Nunca
    reaproveitar caminho `/api/uploads/` de outro blog — bucket é por blog.
-3. Quando o **simulador de crédito** existir, trocar o HTML dos 3 blocos de
-   banner pelo banner do simulador (a proposta prevê os espaços de anúncio
-   como publicidade da própria casa).
+3. Quando o **simulador de crédito** existir, trocar o box CTA da lateral
+   ("Precisando de crédito? / Simulador em breve") pelo banner real com
+   link (a proposta prevê os espaços de anúncio como publicidade da
+   própria casa).
 
 ## 8) Primeiras notícias (sem backfill)
 
