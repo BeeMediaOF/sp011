@@ -22,9 +22,11 @@ import {
   type NewsItemRow,
 } from "@workspace/central-db";
 import {
+  bestSocialTitle,
   extractFromRawAI,
   isKeyAuthError,
   plainTextLength,
+  plainTextOf,
   resolvePrompt,
   rewriteNews,
   rewriteWithPerplexity,
@@ -233,15 +235,25 @@ async function saveRewrite(
   if (!extracted) return "unrenderable";
   if (plainTextLength(extracted.content) < MIN_REWRITE_PLAIN_CHARS) return "too_short";
 
+  // Manchete da arte: guarda contra palavra inventada/colada pelo modelo
+  // ("garantivaga") — se não bater com o material, cai no próprio título.
+  const finalTitle = out.title || extracted.title || item.title;
+  const finalSubtitle = out.subtitle || extracted.subtitle || null;
+  const safeSocialTitle = bestSocialTitle(
+    out.socialTitle ?? extracted.socialTitle ?? null,
+    finalTitle,
+    `${finalTitle}\n${finalSubtitle ?? ""}\n${plainTextOf(extracted.content)}`,
+  );
+
   const rewriteId = randomUUID();
   await db.insert(rewritesTable).values({
     id: rewriteId,
     newsItemId: item.id,
     blogId: null, // reescrita compartilhada (MVP)
     language,
-    title: out.title || extracted.title || item.title,
-    subtitle: out.subtitle || extracted.subtitle || null,
-    socialTitle: out.socialTitle ?? extracted.socialTitle ?? null,
+    title: finalTitle,
+    subtitle: finalSubtitle,
+    socialTitle: safeSocialTitle,
     socialSummary: out.socialSummary ?? extracted.socialSummary ?? null,
     socialHashtags: out.socialHashtags ?? extracted.socialHashtags ?? null,
     contentHtml: extracted.content,

@@ -12,6 +12,33 @@ import { decryptSecret } from "../crypto.js";
 const _dir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "data", "social-temp");
 if (!existsSync(_dir)) mkdirSync(_dir, { recursive: true });
 
+// ── Guarda da manchete da arte (espelho de news-engine/quality.ts) ────────────
+// Incidente 2026-07: arte publicada com palavra colada pela IA ("garantivaga"
+// em vez de "garante vaga"). Toda palavra com 5+ letras do socialTitle precisa
+// existir no material da matéria (título+subtítulo+corpo); senão a arte usa o
+// título real. Cobre também socialTitles ruins JÁ gravados no banco.
+function normForCompare(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+export function socialTitleMatchesSource(socialTitle: string, sourceText: string): boolean {
+  const hay = normForCompare(sourceText);
+  const words = normForCompare(socialTitle).match(/[a-z]{5,}/g) ?? [];
+  return words.every((w) => hay.includes(w));
+}
+
+export function safeArtTitle(article: {
+  title: string;
+  subtitle?: string | null;
+  socialTitle?: string | null;
+  content?: string | null;
+}): string {
+  const cand = article.socialTitle?.trim();
+  if (!cand) return article.title;
+  const source = `${article.title}\n${article.subtitle ?? ""}\n${(article.content ?? "").replace(/<[^>]+>/g, " ")}`;
+  return socialTitleMatchesSource(cand, source) ? cand : article.title;
+}
+
 const _tempImages = new Map<string, { path: string; expires: number }>();
 
 export function getPublicBase(): string | null {
@@ -149,8 +176,9 @@ async function publishItem(queueId: string): Promise<void> {
         const imgBuf = await renderArt(
           spec,
           {
-            // Imagem usa o título compacto da IA (se houver); o blog mantém o longo.
-            title: article.socialTitle || article.title,
+            // Imagem usa o título compacto da IA (se houver E se passar na
+            // guarda de palavra inventada); o blog mantém o longo.
+            title: safeArtTitle(article),
             category: article.category,
             subtitle: article.subtitle || undefined,
             author: article.author || undefined,

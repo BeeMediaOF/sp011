@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractFromRawAI, isContentRenderable, plainTextLength } from "../src/quality.ts";
+import {
+  bestSocialTitle,
+  extractFromRawAI,
+  isContentRenderable,
+  plainTextLength,
+  socialTitleFromTitle,
+  socialTitleMatchesSource,
+} from "../src/quality.ts";
 
 const GOOD_HTML = "<h2>Subtítulo da matéria</h2><p>Primeiro parágrafo com conteúdo suficiente.</p>";
 
@@ -60,5 +67,41 @@ describe("plainTextLength", () => {
     assert.equal(plainTextLength("<h2>ab</h2>\n\n<p>cd&nbsp;ef</p>"), "ab cd ef".length);
     assert.equal(plainTextLength(""), 0);
     assert.equal(plainTextLength("<div><img src='x'/></div>"), 0);
+  });
+});
+
+describe("socialTitleMatchesSource (guarda de palavra inventada)", () => {
+  const SOURCE = "Espanha garante vaga na final com apenas um gol sofrido. A defesa espanhola foi impecável na semifinal.";
+
+  it("caso real do incidente: 'garantivaga' não existe no material → reprova", () => {
+    assert.equal(socialTitleMatchesSource("Espanha garantivaga na final com apenas um gol sofrido", SOURCE), false);
+  });
+
+  it("manchete com palavras do material passa (caixa/acentos ignorados)", () => {
+    assert.equal(socialTitleMatchesSource("ESPANHA GARANTE VAGA NA FINAL", SOURCE), true);
+    assert.equal(socialTitleMatchesSource("Defesa ESPANHOLA impecável na *semifinal*", SOURCE), true);
+  });
+
+  it("palavras curtas (≤4 letras) e números são ignorados", () => {
+    assert.equal(socialTitleMatchesSource("Gol aos 90: Espanha na final", SOURCE), true);
+  });
+});
+
+describe("socialTitleFromTitle / bestSocialTitle", () => {
+  it("título curto passa inteiro; longo corta em palavra", () => {
+    assert.equal(socialTitleFromTitle("Título curto"), "Título curto");
+    const longo = "Palavra ".repeat(20).trim(); // 159 chars
+    const out = socialTitleFromTitle(longo);
+    assert.ok(out.length <= 85);
+    assert.ok(!out.endsWith("Palavr")); // não corta no meio
+  });
+
+  it("manchete suja cai no título; manchete limpa é mantida", () => {
+    const title = "Espanha garante vaga na final";
+    const source = `${title}\nA defesa segurou o resultado.`;
+    assert.equal(bestSocialTitle("Espanha garantivaga na final", title, source), title);
+    assert.equal(bestSocialTitle("ESPANHA GARANTE VAGA", title, source), "ESPANHA GARANTE VAGA");
+    assert.equal(bestSocialTitle(null, title, source), title);
+    assert.equal(bestSocialTitle("", "", ""), null);
   });
 });

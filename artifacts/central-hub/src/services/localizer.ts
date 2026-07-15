@@ -29,9 +29,11 @@ import {
   type RewriteRow,
 } from "@workspace/central-db";
 import {
+  bestSocialTitle,
   classifyArticle,
   extractFromRawAI,
   plainTextLength,
+  plainTextOf,
   translateRewrite,
   type RewriteEngineConfig,
   type TokenUsage,
@@ -208,7 +210,13 @@ async function ensureTranslatedRewrite(
       language: blog.language,
       title: out.title,
       subtitle: out.subtitle || null,
-      socialTitle: out.socialTitle ?? null,
+      // Mesma guarda do rewriter: manchete com palavra colada/inventada pelo
+      // modelo não passa — cai no título traduzido.
+      socialTitle: bestSocialTitle(
+        out.socialTitle ?? null,
+        out.title,
+        `${out.title}\n${out.subtitle ?? ""}\n${plainTextOf(extracted.content)}`,
+      ),
       socialSummary: out.socialSummary ?? null,
       socialHashtags: out.socialHashtags ?? null,
       contentHtml: extracted.content,

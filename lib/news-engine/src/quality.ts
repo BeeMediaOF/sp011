@@ -101,15 +101,62 @@ export function isContentRenderable(content: string): boolean {
   return extractFromRawAI(content) !== null;
 }
 
+/** Texto visível de um HTML (sem tags/entidades, espaços colapsados). */
+export function plainTextOf(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&[a-z#0-9]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Comprimento do texto visível de um HTML (sem tags, espaços colapsados) —
  * régua dos gates de "matéria curta demais" (fonte incompleta ou reescrita
  * que saiu um toco).
  */
 export function plainTextLength(html: string): number {
-  return html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&[a-z#0-9]+;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim().length;
+  return plainTextOf(html).length;
+}
+
+/** Normalização p/ comparação: minúsculas e sem acentos (NFD - combining). */
+function normForCompare(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/**
+ * Guarda contra manchete social com palavra inventada/colada pelo modelo
+ * (incidente sp011 2026-07: arte publicada com "garantivaga" em vez de
+ * "garante vaga"): toda palavra com 5+ letras da manchete precisa aparecer no
+ * material da própria matéria (título + subtítulo + corpo). Comparação sem
+ * acentos/caixa; asteriscos do *destaque* separam palavras e não interferem.
+ */
+export function socialTitleMatchesSource(socialTitle: string, sourceText: string): boolean {
+  const hay = normForCompare(sourceText);
+  const words = normForCompare(socialTitle).match(/[a-z]{5,}/g) ?? [];
+  return words.every((w) => hay.includes(w));
+}
+
+/** Título cortado no limite da arte (85), sem cortar palavra no meio. */
+export function socialTitleFromTitle(title: string, max = 85): string {
+  const t = title.trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max + 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  return (lastSpace > 40 ? cut.slice(0, lastSpace) : t.slice(0, max)).trim();
+}
+
+/**
+ * Escolhe a manchete social SEGURA para a arte: a da IA quando todas as
+ * palavras batem com o material; senão o próprio título (cortado). Fallback
+ * benigno — perde o "punch" da manchete, nunca publica palavra colada.
+ */
+export function bestSocialTitle(
+  candidate: string | null | undefined,
+  title: string,
+  sourceText: string,
+): string | null {
+  const cand = candidate?.trim();
+  if (cand && socialTitleMatchesSource(cand, sourceText)) return cand;
+  return socialTitleFromTitle(title) || cand || null;
 }

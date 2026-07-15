@@ -12,7 +12,7 @@ import type { SocialConnectionRow } from "@workspace/db";
 import { eq, desc, and, inArray, gte, ne } from "drizzle-orm";
 import { store } from "../lib/store.js";
 import type { SocialAutomation, SocialPriority, SocialCategoryRule } from "../lib/store.js";
-import { getTempImage, saveTempImage, getPublicBase, processSocialQueue } from "../lib/social/queueProcessor.js";
+import { getTempImage, saveTempImage, getPublicBase, processSocialQueue, safeArtTitle } from "../lib/social/queueProcessor.js";
 import { runAutomationCycle, inActiveHours } from "../lib/social/autoScheduler.js";
 import { buildArticleCaption } from "../lib/social/caption.js";
 import { renderArt } from "../lib/social/renderTemplate.js";
@@ -365,8 +365,9 @@ router.post("/templates/:id/preview", async (req, res) => {
     const [a] = await db.select().from(articlesTable).where(eq(articlesTable.id, b.articleId)).limit(1);
     if (a) {
       article = {
-        // Preview usa o mesmo título compacto da publicação real (WYSIWYG).
-        title: a.socialTitle || a.title,
+        // Preview usa o mesmo título compacto da publicação real (WYSIWYG),
+        // com a mesma guarda de palavra inventada pela IA.
+        title: safeArtTitle(a),
         category: a.category,
         subtitle: a.subtitle || undefined,
         author: a.author || undefined,
