@@ -8,6 +8,8 @@ import { startRewriteWorker } from "./services/rewriter.js";
 import { startDistributor } from "./services/distributor.js";
 import { startLocalizer } from "./services/localizer.js";
 import { startDeliveryWorker } from "./services/deliveryWorker.js";
+import { startVideoDownloader } from "./services/videoDownloader.js";
+import { startVideoPublisher } from "./services/videoPublisher.js";
 
 process.once("SIGTERM", () => process.exit(0));
 process.once("SIGINT", () => process.exit(0));
@@ -35,6 +37,9 @@ app.listen(port, async (err?: Error) => {
   startDistributor();
   startLocalizer();
   startDeliveryWorker();
+  // Automação Social (vídeos) — só trabalham com socialEnabled ligado
+  startVideoDownloader();
+  startVideoPublisher();
 
-  logger.info("Pipeline central ativo: collector + rewriter + distributor + localizer + delivery");
+  logger.info("Pipeline central ativo: collector + rewriter + distributor + localizer + delivery + social");
 });

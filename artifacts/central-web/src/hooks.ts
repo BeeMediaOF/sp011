@@ -59,6 +59,8 @@ const STATUS_CLASS: Record<string, string> = {
   localizing: "info",
   awaiting_approval: "warn", awaiting_localization: "warn", offline: "warn",
   failed: "err", dead: "err", error: "err", discarded: "err", cancelled: "err",
+  // Automação Social (vídeos)
+  downloading: "info", ready: "info", scheduled: "warn", publishing: "info", sent: "ok",
 };
 
 export function statusClass(status: string): string {
@@ -72,6 +74,8 @@ export const STATUS_LABEL: Record<string, string> = {
   awaiting_approval: "aguardando aprovação", pending: "pendente", delivering: "enviando",
   delivered: "entregue", duplicate: "duplicada no blog", dead: "esgotou tentativas", cancelled: "cancelada",
   online: "online", offline: "offline", error: "erro",
+  // Automação Social (vídeos)
+  downloading: "baixando", ready: "pronto", scheduled: "agendado", publishing: "publicando", sent: "postado",
 };
 
 export function statusLabel(status: string): string {

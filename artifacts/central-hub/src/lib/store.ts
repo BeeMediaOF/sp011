@@ -74,6 +74,32 @@ export interface HubSettings {
   translationPromptTemplate?: string;
   /** Teto diário de traduções (0/ausente = sem teto) — guarda de quota. */
   translationMaxPerDay?: number;
+
+  // ── Automação Social (repostagem de vídeos TikTok/Instagram) ───────────────
+  /** Liga os workers de download/publicação de vídeos (default false). */
+  socialEnabled?: boolean;
+  apifyToken?: string;
+  /** Token reserva do Apify (assume em 402/429/quota). */
+  apifyTokenBackup?: string;
+  /** Actor do TikTok (default "clockworks/tiktok-scraper"). */
+  apifyTiktokActor?: string;
+  /** Actor do Instagram (default "apify/instagram-scraper"). */
+  apifyInstagramActor?: string;
+  /** App Meta usado no OAuth por blog (mesmo app dos blogs). */
+  metaAppId?: string;
+  metaAppSecret?: string;
+  /** API key global do Buffer (override por blog em blog_social_accounts). */
+  bufferApiKey?: string;
+  /** Modelo Gemini da legenda (default "gemini-2.5-flash"). */
+  captionModel?: string;
+  /** Template custom do prompt de legenda ({{LEGENDA}} {{CREATOR}}). */
+  socialCaptionPromptTemplate?: string;
+  /** Dias que o mp4 fica no disco após publicado (default 7). */
+  socialVideoRetentionDays?: number;
+  /** Teto de tamanho do vídeo baixado em MB (default 300). */
+  socialMaxVideoMB?: number;
+  /** Teto de publicações por dia (0/ausente = sem teto). */
+  socialDailyPostLimit?: number;
 }
 
 const DEFAULT_SETTINGS: HubSettings = {
@@ -88,7 +114,14 @@ const DEFAULT_SETTINGS: HubSettings = {
 };
 
 /** Campos secretos do blob hub_settings (criptografados at-rest). */
-const SECRET_STRING_FIELDS = ["openaiApiKey", "perplexityApiKey"] as const;
+const SECRET_STRING_FIELDS = [
+  "openaiApiKey",
+  "perplexityApiKey",
+  "apifyToken",
+  "apifyTokenBackup",
+  "metaAppSecret",
+  "bufferApiKey",
+] as const;
 
 const SETTINGS_KEY = "hub_settings";
 const PROMPTS_KEY = "rss_prompts";

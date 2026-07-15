@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Conectando com a Meta…</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+           display: flex; align-items: center; justify-content: center; min-height: 100vh;
+           background: #0B2A66; color: #fff; }
+    .box { text-align: center; padding: 32px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,.3);
+               border-top-color: #fff; border-radius: 50%; margin: 0 auto 16px;
+               animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { font-size: 14px; opacity: .9; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="spinner"></div>
+    <p id="msg">Concluindo a conexão com a Meta… você pode fechar esta janela.</p>
+  </div>
+  <script>
+    (function () {
+      var params = new URLSearchParams(window.location.search);
+      var payload = {
+        source: "meta-oauth",
+        code: params.get("code") || null,
+        state: params.get("state") || null,
+        error: params.get("error_description") || params.get("error") || null,
+      };
+      try {
+        if (window.opener) {
+          // Envia o resultado de volta para a aba do admin (mesma origem).
+          window.opener.postMessage(payload, window.location.origin);
+        }
+      } catch (e) { /* ignore */ }
+      if (payload.error) {
+        document.getElementById("msg").textContent = "Erro na autorização: " + payload.error;
+      }
+      // Fecha o popup logo após enviar a mensagem.
+      setTimeout(function () { try { window.close(); } catch (e) {} }, 400);
+    })();
+  </script>
+</body>
+</html>

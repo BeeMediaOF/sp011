@@ -36,6 +36,19 @@ interface MaskedSettings {
   translationModel?: string;
   translationPromptTemplate?: string;
   translationMaxPerDay?: number;
+  socialEnabled?: boolean;
+  apifyTiktokActor?: string;
+  apifyInstagramActor?: string;
+  metaAppId?: string;
+  captionModel?: string;
+  socialCaptionPromptTemplate?: string;
+  socialVideoRetentionDays?: number;
+  socialMaxVideoMB?: number;
+  socialDailyPostLimit?: number;
+  hasApifyToken: boolean;
+  hasApifyTokenBackup: boolean;
+  hasMetaAppSecret: boolean;
+  hasBufferApiKey: boolean;
 }
 
 interface Quota {
@@ -50,7 +63,11 @@ export default function Settings() {
   const { data: quota } = useLoad(() => api<Quota>("/settings/ai-quota"));
   const { data: prompts, reload: reloadPrompts } = useLoad(() => api<Prompts>("/settings/prompts"));
 
-  const [form, setForm] = useState<Partial<MaskedSettings> & { openaiApiKey?: string; perplexityApiKey?: string }>({});
+  const [form, setForm] = useState<Partial<MaskedSettings> & {
+    openaiApiKey?: string; perplexityApiKey?: string;
+    apifyToken?: string; apifyTokenBackup?: string; metaAppSecret?: string; bufferApiKey?: string;
+  }>({});
+  const { data: metaApp } = useLoad(() => api<{ redirectUri: string }>("/social/meta/app"));
   const [newKey, setNewKey] = useState("");
   const [newOpenaiKey, setNewOpenaiKey] = useState("");
   const [newPplxKey, setNewPplxKey] = useState("");
@@ -98,10 +115,23 @@ export default function Settings() {
           translationModel: form.translationModel || undefined,
           translationPromptTemplate: form.translationPromptTemplate || undefined,
           translationMaxPerDay: num(form.translationMaxPerDay),
+          socialEnabled: form.socialEnabled,
+          apifyToken: form.apifyToken || undefined,
+          apifyTokenBackup: form.apifyTokenBackup || undefined,
+          apifyTiktokActor: form.apifyTiktokActor ?? "",
+          apifyInstagramActor: form.apifyInstagramActor ?? "",
+          metaAppId: form.metaAppId ?? "",
+          metaAppSecret: form.metaAppSecret || undefined,
+          bufferApiKey: form.bufferApiKey || undefined,
+          captionModel: form.captionModel ?? "",
+          socialCaptionPromptTemplate: form.socialCaptionPromptTemplate ?? "",
+          socialVideoRetentionDays: num(form.socialVideoRetentionDays),
+          socialMaxVideoMB: num(form.socialMaxVideoMB),
+          socialDailyPostLimit: num(form.socialDailyPostLimit),
         },
       });
       setMsg("✔ Configurações salvas");
-      setForm({ ...form, openaiApiKey: "", perplexityApiKey: "" });
+      setForm({ ...form, openaiApiKey: "", perplexityApiKey: "", apifyToken: "", apifyTokenBackup: "", metaAppSecret: "", bufferApiKey: "" });
       reload();
     } catch (err) {
       setMsg(String((err as Error).message));
@@ -348,6 +378,82 @@ export default function Settings() {
           value={form.translationPromptTemplate ?? ""}
           onChange={(e) => setForm({ ...form, translationPromptTemplate: e.target.value })}
           placeholder="Use {{IDIOMA_DESTINO}}, {{TITULO}}, {{SUBTITULO}}, {{CONTEUDO}}, {{CATEGORIAS}}…"
+        />
+      </div>
+
+      <div className="card">
+        <h3>Automação Social (vídeos)</h3>
+        <p className="muted">
+          Repostagem de vídeos TikTok/Instagram nos blogs: coleta via Apify, legenda por IA,
+          Instagram direto pela Meta e TikTok via Buffer. Conexão por blog fica em
+          Blogs → Editar → Redes Sociais.
+        </p>
+        <label className="fit row" style={{ margin: "0 0 10px" }}>
+          <input className="fit" style={{ width: "auto" }} type="checkbox" checked={form.socialEnabled ?? false} onChange={(e) => setForm({ ...form, socialEnabled: e.target.checked })} />
+          Automação Social ligada (workers de download e publicação)
+        </label>
+        <div className="row">
+          <div>
+            <label>Token Apify {settings.hasApifyToken ? "✓ salvo (preencha p/ trocar)" : ""}</label>
+            <input type="password" value={form.apifyToken ?? ""} onChange={(e) => setForm({ ...form, apifyToken: e.target.value })} placeholder={settings.hasApifyToken ? "••••••••" : "apify_api_…"} />
+          </div>
+          <div>
+            <label>Token Apify reserva {settings.hasApifyTokenBackup ? "✓ salvo" : "(opcional)"}</label>
+            <input type="password" value={form.apifyTokenBackup ?? ""} onChange={(e) => setForm({ ...form, apifyTokenBackup: e.target.value })} placeholder={settings.hasApifyTokenBackup ? "••••••••" : "assume em 402/429/quota"} />
+          </div>
+          <div>
+            <label>Actor TikTok</label>
+            <input value={form.apifyTiktokActor ?? ""} onChange={(e) => setForm({ ...form, apifyTiktokActor: e.target.value })} placeholder="clockworks/tiktok-scraper" />
+          </div>
+          <div>
+            <label>Actor Instagram</label>
+            <input value={form.apifyInstagramActor ?? ""} onChange={(e) => setForm({ ...form, apifyInstagramActor: e.target.value })} placeholder="apify/instagram-scraper" />
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <div>
+            <label>App ID da Meta (mesmo app dos blogs)</label>
+            <input value={form.metaAppId ?? ""} onChange={(e) => setForm({ ...form, metaAppId: e.target.value })} />
+          </div>
+          <div>
+            <label>App Secret da Meta {settings.hasMetaAppSecret ? "✓ salvo (preencha p/ trocar)" : ""}</label>
+            <input type="password" value={form.metaAppSecret ?? ""} onChange={(e) => setForm({ ...form, metaAppSecret: e.target.value })} placeholder={settings.hasMetaAppSecret ? "••••••••" : ""} />
+          </div>
+          <div>
+            <label>API key global do Buffer {settings.hasBufferApiKey ? "✓ salva (preencha p/ trocar)" : ""}</label>
+            <input type="password" value={form.bufferApiKey ?? ""} onChange={(e) => setForm({ ...form, bufferApiKey: e.target.value })} placeholder={settings.hasBufferApiKey ? "••••••••" : "usada quando o blog não tem chave própria"} />
+          </div>
+        </div>
+        {metaApp?.redirectUri && (
+          <p className="muted" style={{ marginTop: 8 }}>
+            Registre esta redirect URI no app da Meta (Facebook Login → Valid OAuth Redirect URIs):{" "}
+            <span className="mono">{metaApp.redirectUri}</span>
+          </p>
+        )}
+        <div className="row" style={{ marginTop: 10 }}>
+          <div>
+            <label>Modelo da legenda (Gemini)</label>
+            <input value={form.captionModel ?? ""} onChange={(e) => setForm({ ...form, captionModel: e.target.value })} placeholder="gemini-2.5-flash" />
+          </div>
+          <div>
+            <label>Retenção dos mp4 (dias após postar)</label>
+            <input type="number" min={0} value={form.socialVideoRetentionDays ?? ""} onChange={(e) => setForm({ ...form, socialVideoRetentionDays: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="7" />
+          </div>
+          <div>
+            <label>Teto de tamanho do vídeo (MB)</label>
+            <input type="number" min={10} value={form.socialMaxVideoMB ?? ""} onChange={(e) => setForm({ ...form, socialMaxVideoMB: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="300" />
+          </div>
+          <div>
+            <label>Teto de publicações por dia (0 = ∞)</label>
+            <input type="number" min={0} value={form.socialDailyPostLimit ?? ""} onChange={(e) => setForm({ ...form, socialDailyPostLimit: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="0" />
+          </div>
+        </div>
+        <label style={{ marginTop: 10 }}>Prompt da legenda customizado (vazio = padrão do sistema)</label>
+        <textarea
+          style={{ minHeight: 100 }}
+          value={form.socialCaptionPromptTemplate ?? ""}
+          onChange={(e) => setForm({ ...form, socialCaptionPromptTemplate: e.target.value })}
+          placeholder={"Use {{LEGENDA}} (legenda original) e {{CREATOR}} (@ do autor)"}
         />
       </div>
 

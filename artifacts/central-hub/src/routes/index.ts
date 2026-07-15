@@ -9,6 +9,7 @@ import deliveriesRouter from "./deliveries.js";
 import usageRouter from "./usage.js";
 import logsRouter from "./logs.js";
 import statsRouter from "./stats.js";
+import socialRouter from "./social.js";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use("/deliveries", deliveriesRouter);
 router.use("/usage", usageRouter);
 router.use("/logs", logsRouter);
 router.use("/stats", statsRouter);
+router.use("/social", socialRouter);
 
 export default router;

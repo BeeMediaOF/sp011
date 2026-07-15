@@ -3,7 +3,7 @@ import { Link, Route, Switch, useLocation } from "wouter";
 import {
   LayoutDashboard, Globe, SlidersHorizontal, Rss, FileText, ClipboardCheck,
   Send, BarChart2, ScrollText, Settings as SettingsIcon, LogOut, Moon, Sun, Radio,
-  PenSquare,
+  PenSquare, Clapperboard,
 } from "lucide-react";
 import { getToken, setToken, api } from "./api";
 import { getStoredUser, clearStoredUser } from "./user";
@@ -14,6 +14,7 @@ import Rules from "./pages/Rules";
 import Sources from "./pages/Sources";
 import News from "./pages/News";
 import NewArticle from "./pages/NewArticle";
+import AutomacaoSocial from "./pages/AutomacaoSocial";
 import Review from "./pages/Review";
 import Deliveries from "./pages/Deliveries";
 import Settings from "./pages/Settings";
@@ -27,6 +28,7 @@ const NAV = [
   { href: "/fontes", label: "Fontes RSS", sub: "Coleta de notícias", icon: Rss },
   { href: "/noticias", label: "Notícias", sub: "Coletadas, reescritas e distribuídas", icon: FileText },
   { href: "/nova-noticia", label: "Nova notícia", sub: "Criar e publicar manualmente em vários blogs", icon: PenSquare },
+  { href: "/automacao-social", label: "Automação Social", sub: "Repostagem de vídeos TikTok/Instagram", icon: Clapperboard },
   { href: "/revisao", label: "Revisão", sub: "Aprovação de entregas", icon: ClipboardCheck },
   { href: "/entregas", label: "Entregas", sub: "Fila de envio para os blogs", icon: Send },
   { href: "/consumo", label: "Consumo IA", sub: "Chamadas, tokens e custo", icon: BarChart2 },
@@ -131,6 +133,7 @@ export default function App() {
             <Route path="/fontes" component={Sources} />
             <Route path="/noticias" component={News} />
             <Route path="/nova-noticia" component={NewArticle} />
+            <Route path="/automacao-social" component={AutomacaoSocial} />
             <Route path="/revisao" component={Review} />
             <Route path="/entregas" component={Deliveries} />
             <Route path="/consumo" component={Usage} />

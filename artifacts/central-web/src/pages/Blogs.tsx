@@ -1,11 +1,12 @@
 import { useState } from "react";
 import {
   Plus, Globe, ExternalLink, Pencil, Trash2, KeyRound, PlugZap, RefreshCw,
-  ShieldCheck, Languages, Gauge, Timer, Radio, Eye,
+  ShieldCheck, Languages, Gauge, Timer, Radio, Eye, Share2,
 } from "lucide-react";
 import { api } from "../api";
 import { nameColor, statusLabel, timeAgo, useLoad } from "../hooks";
 import { fmtNum } from "../charts";
+import BlogSocialTab from "./BlogSocialTab";
 
 export interface BlogCategory { slug: string; hint?: string }
 
@@ -75,8 +76,9 @@ export default function Blogs() {
   const [secret, setSecret] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
+  const [modalTab, setModalTab] = useState<"geral" | "social">("geral");
 
-  const openNew = () => { setForm(EMPTY); setEditing({}); setMsg(""); };
+  const openNew = () => { setForm(EMPTY); setEditing({}); setMsg(""); setModalTab("geral"); };
   const openEdit = (b: Blog) => {
     setForm({
       name: b.name, domain: b.domain ?? "", apiUrl: b.apiUrl,
@@ -89,6 +91,7 @@ export default function Blogs() {
     });
     setEditing(b);
     setMsg("");
+    setModalTab("geral");
   };
 
   const save = async () => {
@@ -277,6 +280,20 @@ export default function Blogs() {
         <div className="modal-back" onClick={() => setEditing(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>{editing.id ? `Editar: ${editing.name}` : "Novo blog"}</h2>
+            {editing.id && (
+              <div className="seg" style={{ marginBottom: 12 }}>
+                <button className={modalTab === "geral" ? "active" : ""} onClick={() => setModalTab("geral")}>
+                  Geral
+                </button>
+                <button className={modalTab === "social" ? "active" : ""} onClick={() => setModalTab("social")}>
+                  <Share2 size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Redes Sociais
+                </button>
+              </div>
+            )}
+            {editing.id && modalTab === "social" ? (
+              <BlogSocialTab blogId={editing.id} />
+            ) : (
+            <>
             {msg && <div className="error-box">{msg}</div>}
             <label>Nome</label>
             <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
@@ -344,6 +361,8 @@ export default function Blogs() {
               </button>
               <button className="secondary" onClick={() => setEditing(null)}>Cancelar</button>
             </div>
+            </>
+            )}
           </div>
         </div>
       )}

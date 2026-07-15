@@ -10,7 +10,10 @@ router.use(authMiddleware);
 
 /** Resposta pública: nunca devolve segredos, só flags/hints. */
 function maskSettings(s: HubSettings) {
-  const { openaiApiKey, openaiApiKeys, geminiApiKeys, perplexityApiKey, perplexityApiKeys, ...rest } = s;
+  const {
+    openaiApiKey, openaiApiKeys, geminiApiKeys, perplexityApiKey, perplexityApiKeys,
+    apifyToken, apifyTokenBackup, metaAppSecret, bufferApiKey, ...rest
+  } = s;
   return {
     ...rest,
     hasOpenaiKey: !!openaiApiKey,
@@ -18,6 +21,10 @@ function maskSettings(s: HubSettings) {
     openaiKeyHints: (openaiApiKeys ?? []).map((k) => `...${k.slice(-4)}`),
     perplexityKeyHints: (perplexityApiKeys ?? []).map((k) => `...${k.slice(-4)}`),
     hasPerplexityKey: !!(perplexityApiKey || process.env["PERPLEXITY_API_KEY"]),
+    hasApifyToken: !!apifyToken,
+    hasApifyTokenBackup: !!apifyTokenBackup,
+    hasMetaAppSecret: !!metaAppSecret,
+    hasBufferApiKey: !!bufferApiKey,
   };
 }
 
@@ -36,6 +43,8 @@ router.put("/", async (req, res) => {
   const body = (req.body ?? {}) as Partial<HubSettings> & {
     hasOpenaiKey?: unknown; geminiKeyHints?: unknown; openaiKeyHints?: unknown;
     perplexityKeyHints?: unknown; hasPerplexityKey?: unknown;
+    hasApifyToken?: unknown; hasApifyTokenBackup?: unknown;
+    hasMetaAppSecret?: unknown; hasBufferApiKey?: unknown;
   };
   // Campos derivados/mascarados nunca entram no merge
   delete body.hasOpenaiKey;
@@ -43,6 +52,10 @@ router.put("/", async (req, res) => {
   delete body.openaiKeyHints;
   delete body.perplexityKeyHints;
   delete body.hasPerplexityKey;
+  delete body.hasApifyToken;
+  delete body.hasApifyTokenBackup;
+  delete body.hasMetaAppSecret;
+  delete body.hasBufferApiKey;
   // Pools de chaves só mudam pelas rotas dedicadas
   for (const pool of Object.values(KEY_POOLS)) {
     delete (body as Record<string, unknown>)[pool.field];
@@ -50,6 +63,10 @@ router.put("/", async (req, res) => {
   // Chaves secretas: só sobrescrevem quando enviadas não-vazias
   if (!body.openaiApiKey) delete body.openaiApiKey;
   if (!body.perplexityApiKey) delete body.perplexityApiKey;
+  if (!body.apifyToken) delete body.apifyToken;
+  if (!body.apifyTokenBackup) delete body.apifyTokenBackup;
+  if (!body.metaAppSecret) delete body.metaAppSecret;
+  if (!body.bufferApiKey) delete body.bufferApiKey;
 
   const updated = await saveSettings(body);
   logEvent({ module: "api", message: "Configurações do hub atualizadas" });

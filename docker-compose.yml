@@ -74,6 +74,8 @@ services:
       OLLAMA_BASE_URL: "http://ollama:11434"
     expose:
       - "8090"          # interno (somente o Caddy acessa)
+    volumes:
+      - central_data:/data   # mp4 da Automação Social (/data/social-videos)
     depends_on:
       - ollama
 
@@ -156,3 +158,4 @@ volumes:
   ollama_models:     # modelos do Ollama (persistem entre deploys/reinícios)
   api_data:          # db-config.enc do assistente de instalação (blog instalável)
   pgblogs_data:      # dados do Postgres dos blogs replicados
+  central_data:      # vídeos da Automação Social do painel central
