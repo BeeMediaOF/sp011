@@ -564,14 +564,14 @@ export default function NewArticle() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64 text-slate-400 gap-3">
+      <div className="tw-page flex items-center justify-center h-64 text-slate-400 gap-3">
         <Loader2 size={20} className="animate-spin" /> Carregando notícia…
       </div>
     );
   }
 
   return (
-    <>
+    <div className="tw-page">
       <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
         {breadcrumb}
         {topbarActions}
@@ -1536,6 +1536,6 @@ export default function NewArticle() {
           </div>
         </div>
       )}
-    </>
+    </div>
   );
 }

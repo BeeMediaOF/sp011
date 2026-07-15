@@ -1,11 +1,72 @@
 /*
- * Tailwind v4 SEM preflight: só theme + utilities. O reset padrão (preflight)
- * zeraria os estilos globais do styles.css das outras páginas do painel —
- * aqui as classes utilitárias servem apenas ao editor "Nova notícia"
- * (réplica do Novo Artigo do admin do blog) e a quem mais quiser usá-las.
+ * Tailwind v4 SEM preflight (o reset global quebraria o styles.css das outras
+ * páginas do painel) e com utilities IMPORTANT: o styles.css tem estilos de
+ * ELEMENTO (button navy, input width:100%, label com margin, .content h3
+ * uppercase, .grid com template auto-fill) que venceriam utilities em @layer —
+ * incidente do layout da "Nova notícia" (2026-07). As utilities só agem onde
+ * há classe, então as demais páginas não mudam.
  */
 @import "tailwindcss/theme.css" layer(theme);
-@import "tailwindcss/utilities.css" layer(utilities);
+@import "tailwindcss/utilities.css" important;
+
+/*
+ * Reset ESCOPADO da página do editor (.tw-page): neutraliza os estilos
+ * globais de elemento do styles.css para os elementos SEM classe utilitária
+ * (checkbox/radio, botões da toolbar do TipTap, títulos de card). Fica fora
+ * de @layer de propósito — precisa vencer o styles.css por ordem/especificidade,
+ * e perde para as utilities porque elas carregam !important.
+ */
+.tw-page button {
+  background: none;
+  color: inherit;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  font: inherit;
+  box-shadow: none;
+  cursor: pointer;
+}
+.tw-page input,
+.tw-page select,
+.tw-page textarea {
+  width: auto;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  min-height: 0;
+  box-shadow: none;
+}
+.tw-page input:focus,
+.tw-page select:focus,
+.tw-page textarea:focus {
+  box-shadow: none;
+}
+.tw-page label {
+  display: block;
+  margin: 0;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
+.tw-page h1, .tw-page h2, .tw-page h3, .tw-page h4 {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  text-transform: none;
+  letter-spacing: normal;
+  color: inherit;
+}
+.tw-page p { margin: 0; }
+.tw-page input[type="checkbox"],
+.tw-page input[type="radio"] {
+  width: 14px;
+  height: 14px;
+  accent-color: #0B2A66;
+  flex-shrink: 0;
+}
 
 /* ── Conteúdo do RichTextEditor (TipTap) — espelho do admin do blog ── */
 .prose-editor .ProseMirror {
