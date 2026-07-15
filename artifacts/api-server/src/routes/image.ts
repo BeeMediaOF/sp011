@@ -67,6 +67,8 @@ const ALLOWED_HOSTS = new Set([
   "upload.wikimedia.org",
   // CDN (CloudFront) de fonte EN do ksports — host exato, distribuição fixa
   "d2me2qg8dfiw8u.cloudfront.net",
+  // Painel central — capas enviadas na "Nova notícia" (/api/news/image/...)
+  "central.midia.run",
 ]);
 
 // CDNs de imagem das fontes internacionais (esportes/EN) — casados por SUFIXO

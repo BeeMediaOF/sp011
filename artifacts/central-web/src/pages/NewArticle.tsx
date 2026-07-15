@@ -1,6 +1,6 @@
-import { useMemo, useState, type ChangeEvent } from "react";
-import { CheckCircle2, Globe, PenSquare, Send } from "lucide-react";
-import { api } from "../api";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { CheckCircle2, Globe, ImagePlus, Loader2, PenSquare, Send, X } from "lucide-react";
+import { api, apiUpload } from "../api";
 import { statusLabel, useLoad } from "../hooks";
 
 interface BlogLite {
@@ -32,11 +32,14 @@ const EMPTY_FORM = {
   subtitle: "",
   content: "",
   imageUrl: "",
+  author: "",
   language: "pt-BR",
   targetCategory: "",
   socialTitle: "",
   socialSummary: "",
 };
+
+const UPLOAD_MAX_MB = 10;
 
 /**
  * Publicação manual multi-blog: escreve a notícia UMA vez e escolhe os blogs
@@ -48,8 +51,34 @@ export default function NewArticle() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ManualResult | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const pickFile = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // permite reescolher o mesmo arquivo
+    if (!file) return;
+    setError(null);
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) {
+      setError("Formato não suportado — use JPEG, PNG, WebP ou GIF.");
+      return;
+    }
+    if (file.size > UPLOAD_MAX_MB * 1024 * 1024) {
+      setError(`Imagem acima de ${UPLOAD_MAX_MB} MB — reduza antes de enviar.`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const res = await apiUpload<{ url: string }>("/news/upload-image", file);
+      setForm((f) => ({ ...f, imageUrl: res.url }));
+    } catch (err) {
+      setError(String(err instanceof Error ? err.message : err));
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const active = useMemo(() => (blogs ?? []).filter((b) => b.isActive), [blogs]);
   const set = (k: keyof typeof EMPTY_FORM) =>
@@ -72,6 +101,7 @@ export default function NewArticle() {
     if (!form.title.trim()) { setError("Informe o título."); return; }
     if (!form.content.trim()) { setError("Escreva o conteúdo da notícia."); return; }
     if (selected.size === 0) { setError("Selecione pelo menos um blog de destino."); return; }
+    if (uploading) { setError("Aguarde o envio da imagem terminar."); return; }
     setSending(true);
     try {
       const res = await api<ManualResult>("/news/manual", {
@@ -81,6 +111,7 @@ export default function NewArticle() {
           subtitle: form.subtitle.trim() || undefined,
           contentHtml: toContentHtml(form.content),
           imageUrl: form.imageUrl.trim() || undefined,
+          author: form.author.trim() || undefined,
           language: form.language,
           targetCategory: form.targetCategory.trim() || undefined,
           socialTitle: form.socialTitle.trim() || undefined,
@@ -139,8 +170,60 @@ export default function NewArticle() {
           rows={12}
           placeholder={"Texto da notícia. Pode colar HTML (<p>, <h3>, <b>…) ou texto puro — parágrafos separados por linha em branco viram <p> automaticamente."}
         />
-        <label>URL da imagem de capa</label>
-        <input value={form.imageUrl} onChange={set("imageUrl")} placeholder="https://… (opcional)" />
+        <label>Imagem de capa</label>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <input
+            style={{ flex: 1, minWidth: 0 }}
+            value={form.imageUrl}
+            onChange={set("imageUrl")}
+            placeholder="https://… (cole uma URL ou envie um arquivo do computador)"
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            style={{ display: "none" }}
+            onChange={(e) => void pickFile(e)}
+          />
+          <button
+            type="button"
+            className="secondary fit"
+            disabled={uploading}
+            onClick={() => fileRef.current?.click()}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            {uploading
+              ? <Loader2 size={14} className="spin-anim" style={{ verticalAlign: "-2px", marginRight: 6 }} />
+              : <ImagePlus size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />}
+            {uploading ? "Enviando…" : "Enviar imagem"}
+          </button>
+        </div>
+        {form.imageUrl.trim() && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 10, margin: "10px 0 4px" }}>
+            <img
+              src={form.imageUrl}
+              alt="Prévia da capa"
+              style={{
+                maxWidth: 280, maxHeight: 158, borderRadius: 8,
+                border: "1px solid var(--border)", objectFit: "cover",
+              }}
+            />
+            <button
+              type="button"
+              className="secondary fit"
+              onClick={() => setForm((f) => ({ ...f, imageUrl: "" }))}
+            >
+              <X size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Remover
+            </button>
+          </div>
+        )}
+        <label>De quem é a notícia (assinatura exibida nos blogs)</label>
+        <input
+          value={form.author}
+          onChange={set("author")}
+          placeholder="ex.: Por BeeSports — vazio = assinatura padrão de cada blog"
+          maxLength={80}
+        />
         <div className="row">
           <div>
             <label>Idioma do texto</label>

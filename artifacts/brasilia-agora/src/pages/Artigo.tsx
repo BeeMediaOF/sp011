@@ -499,6 +499,15 @@ export default function Artigo() {
     ? `https://sbcagora.com.br/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
     : null;
 
+  // Assinatura visível: crédito explícito do artigo (ex.: "Por BeeSports",
+  // vindo da publicação manual do painel central) vence; autor genérico do
+  // pipeline ("Redação"/vazio) cai na assinatura configurada do portal.
+  const GENERIC_AUTHORS = new Set(["", "redacao", "redação", "editorial", "newsroom"]);
+  const explicitAuthor =
+    article?.author && !GENERIC_AUTHORS.has(article.author.trim().toLowerCase())
+      ? article.author.trim()
+      : null;
+
   const newsArticleSchema = article
     ? {
         "@context": "https://schema.org",
@@ -642,7 +651,7 @@ export default function Artigo() {
                       />
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          {settings?.bylineName || settings?.siteName || t("common.newsroom")}
+                          {explicitAuthor || settings?.bylineName || settings?.siteName || t("common.newsroom")}
                         </div>
                         <div className="text-xs text-gray-400">
                           {formatDateTime(article.publishedAt, lang, tz)}

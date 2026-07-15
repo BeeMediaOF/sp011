@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { Router } from "express";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
+import express, { Router } from "express";
 import {
   db,
   blogsTable,
@@ -11,9 +13,74 @@ import { normalizeTitle, plainTextLength } from "@workspace/news-engine";
 import { desc, eq, ilike, and, inArray, type SQL } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth.js";
 import { logEvent } from "../lib/eventLog.js";
+import {
+  ensureImageDir,
+  imageDir,
+  isValidImageFileName,
+  newImageFileName,
+  IMAGE_EXT_BY_MIME,
+} from "../lib/newsImageFiles.js";
+import { centralPublicUrl } from "../lib/social/publicUrl.js";
 
 const router = Router();
+
+// ─── Rota PÚBLICA da imagem (antes do auth) ──────────────────────────────────
+// Blogs (hotlink no artigo) e leitores baixam por URL; nome é não-adivinhável
+// e imutável → cache longo.
+
+router.get("/image/:name", (req, res) => {
+  const name = req.params.name;
+  if (!isValidImageFileName(name)) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.sendFile(name, {
+    root: imageDir(),
+    headers: { "Cache-Control": "public, max-age=31536000, immutable" },
+  }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: "not_found" });
+  });
+});
+
 router.use(authMiddleware);
+
+/**
+ * Upload da imagem de capa da "Nova notícia": corpo cru image/* (sem
+ * multipart/dependência nova), grava no volume central_data e devolve a URL
+ * pública absoluta — é ela que vai no imageUrl da notícia e nos blogs.
+ */
+router.post(
+  "/upload-image",
+  express.raw({ type: "image/*", limit: "10mb" }),
+  async (req, res) => {
+    const mime = (req.headers["content-type"] ?? "").split(";")[0].trim().toLowerCase();
+    if (!IMAGE_EXT_BY_MIME[mime]) {
+      res.status(400).json({
+        error: `Formato não suportado (${mime || "sem Content-Type"}). Use JPEG, PNG, WebP ou GIF.`,
+      });
+      return;
+    }
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      res.status(400).json({ error: "Arquivo vazio — envie a imagem no corpo da requisição." });
+      return;
+    }
+    const base = centralPublicUrl();
+    if (!base) {
+      res.status(500).json({
+        error: "CENTRAL_PUBLIC_URL não configurada no .env.central — necessária para montar a URL pública da imagem.",
+      });
+      return;
+    }
+
+    const fileName = newImageFileName(mime);
+    if (!fileName) {
+      res.status(400).json({ error: "Formato não suportado." });
+      return;
+    }
+    await writeFile(path.join(ensureImageDir(), fileName), req.body);
+    res.status(201).json({ fileName, url: `${base}/api/news/image/${fileName}` });
+  },
+);
 
 /**
  * Publicação manual multi-blog: cria a notícia JÁ PRONTA (sem coleta nem IA)
@@ -47,6 +114,7 @@ router.post("/manual", async (req, res) => {
 
   const subtitle = str(b["subtitle"]);
   const imageUrl = str(b["imageUrl"]);
+  const author = str(b["author"]);
   const category = (str(b["category"]) ?? "geral").toLowerCase();
   const targetCategory = str(b["targetCategory"])?.toLowerCase() ?? null;
   const language = b["language"] === "en" ? "en" : "pt-BR";
@@ -67,6 +135,7 @@ router.post("/manual", async (req, res) => {
     description: subtitle,
     contentRaw: contentHtml,
     imageUrl,
+    author,
     category,
     // Entregas são criadas AQUI — "distributed" impede o distributor de
     // duplicá-las pelas regras automáticas.

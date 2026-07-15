@@ -44,3 +44,24 @@ export async function api<T = unknown>(
   }
   return data as T;
 }
+
+/** Upload de arquivo cru (Content-Type = tipo do arquivo, corpo = bytes). */
+export async function apiUpload<T = unknown>(path: string, file: File): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": file.type };
+  const token = getToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(`/api${path}`, { method: "POST", headers, body: file });
+
+  if (res.status === 401) {
+    setToken(null);
+    if (!location.pathname.startsWith("/login")) location.href = "/login";
+    throw new ApiError(401, "Sessão expirada");
+  }
+
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    throw new ApiError(res.status, (data["error"] as string) ?? `Erro HTTP ${res.status}`);
+  }
+  return data as T;
+}
