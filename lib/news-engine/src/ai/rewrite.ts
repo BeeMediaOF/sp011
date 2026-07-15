@@ -390,8 +390,43 @@ export async function translateRewrite(
   const { text, usage } = await callTextModel(prompt, cfg);
   const parsed = parseRewriteResult(text);
   const rawCategory = extractCategoryField(text);
-  const valid = rawCategory && categories.some((c) => c.slug.toLowerCase() === rawCategory);
-  return { ...parsed, usage, category: valid ? rawCategory : undefined };
+  return { ...parsed, usage, category: matchCategorySlug(rawCategory, categories) ?? undefined };
+}
+
+/** Tokens canônicos p/ casar categoria: minúsculas, sem acentos, sem conectivos. */
+function categoryTokens(s: string): string[] {
+  const STOP = new Set(["e", "de", "da", "do", "das", "dos", "o", "a", "the", "of", "and"]);
+  return s
+    .trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !STOP.has(t));
+}
+
+/**
+ * Casa a resposta do modelo com um slug da taxonomia, tolerando acentos,
+ * rótulo humano ("Fiscal & Tributário" → fiscal-tributario) e texto em volta
+ * ("A categoria é gestao."). Empate/ambiguidade: vence o slug mais específico
+ * (mais tokens). Devolve o slug EXATO da lista ou null — quem valida por
+ * igualdade estrita jogava respostas boas no fallback residual.
+ */
+export function matchCategorySlug(
+  answer: string | null | undefined,
+  categories: Array<{ slug: string }>,
+): string | null {
+  if (!answer) return null;
+  const ans = categoryTokens(answer);
+  if (ans.length === 0) return null;
+  const ansJoined = ` ${ans.join(" ")} `;
+  let best: { slug: string; len: number } | null = null;
+  for (const c of categories) {
+    const toks = categoryTokens(c.slug);
+    if (toks.length === 0) continue;
+    if (!ansJoined.includes(` ${toks.join(" ")} `)) continue;
+    if (!best || toks.length > best.len) best = { slug: c.slug, len: toks.length };
+  }
+  return best?.slug ?? null;
 }
 
 export interface ClassifyInput {
@@ -405,6 +440,8 @@ export interface ClassifyInput {
 export interface ClassifyOutput {
   /** Slug validado contra a lista, ou null quando a IA não decidiu. */
   category: string | null;
+  /** Resposta crua do modelo (p/ diagnóstico quando category = null). */
+  rawAnswer?: string;
   usage?: TokenUsage;
 }
 
@@ -425,7 +462,10 @@ export async function classifyArticle(
   const { text, usage } = await callTextModel(prompt, cfg);
   // JSON {"category": "slug"} ou, em último caso, o slug cru na resposta.
   const fromJson = extractCategoryField(text);
-  const raw = (fromJson ?? text.trim().toLowerCase().replace(/^["']|["']$/g, "")).trim();
-  const match = input.categories.find((c) => c.slug.toLowerCase() === raw);
-  return { category: match ? match.slug : null, usage };
+  const raw = (fromJson ?? text).trim();
+  return {
+    category: matchCategorySlug(raw, input.categories),
+    rawAnswer: raw.slice(0, 200),
+    usage,
+  };
 }

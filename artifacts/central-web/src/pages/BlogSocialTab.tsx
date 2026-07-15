@@ -15,6 +15,9 @@ interface Connection {
   bufferChannelName: string | null;
   hasBufferKey: boolean;
   hasGlobalBufferKey: boolean;
+  metaAppId: string | null;
+  hasMetaAppSecret: boolean;
+  hasGlobalMetaApp: boolean;
 }
 
 interface MetaApp {
@@ -32,7 +35,9 @@ interface OAuthPage {
 
 export default function BlogSocialTab({ blogId }: { blogId: string }) {
   const { data: conn, reload } = useLoad(() => api<Connection>(`/social/connections/${blogId}`), [blogId]);
-  const { data: app } = useLoad(() => api<MetaApp>("/social/meta/app"));
+  const { data: app, reload: reloadApp } = useLoad(
+    () => api<MetaApp>(`/social/meta/app?blogId=${encodeURIComponent(blogId)}`), [blogId],
+  );
 
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -40,12 +45,17 @@ export default function BlogSocialTab({ blogId }: { blogId: string }) {
   const [pages, setPages] = useState<{ sessionId: string; list: OAuthPage[] } | null>(null);
   const [pageId, setPageId] = useState("");
 
+  const [metaAppId, setMetaAppId] = useState("");
+  const [metaAppSecret, setMetaAppSecret] = useState("");
+
   const [bufChannel, setBufChannel] = useState("");
   const [bufName, setBufName] = useState("");
   const [bufKey, setBufKey] = useState("");
 
-  // Preenche o form do Buffer quando a conexão carrega
+  // Preenche os forms quando a conexão carrega
   useEffect(() => {
+    setMetaAppId(conn?.metaAppId ?? "");
+    setMetaAppSecret("");
     setBufChannel(conn?.bufferChannelId ?? "");
     setBufName(conn?.bufferChannelName ?? "");
     setBufKey("");
@@ -126,6 +136,23 @@ export default function BlogSocialTab({ blogId }: { blogId: string }) {
     reload();
   };
 
+  const saveMetaApp = async () => {
+    setBusy(true); setMsg(""); setOk("");
+    try {
+      await api(`/social/connections/${blogId}/meta-app`, {
+        method: "PUT",
+        body: { appId: metaAppId.trim(), appSecret: metaAppSecret.trim() || undefined },
+      });
+      setOk("App Meta do blog salvo.");
+      setMetaAppSecret("");
+      reload(); reloadApp();
+    } catch (err) {
+      setMsg(String((err as Error).message));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const saveBuffer = async () => {
     setBusy(true); setMsg(""); setOk("");
     try {
@@ -164,10 +191,32 @@ export default function BlogSocialTab({ blogId }: { blogId: string }) {
         <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}>
           <Instagram size={16} /> Instagram (Meta — Reels)
         </h3>
+
+        <label>App ID da Meta (deste blog)</label>
+        <input value={metaAppId} onChange={(e) => setMetaAppId(e.target.value)}
+          placeholder={conn?.hasGlobalMetaApp ? "vazio = usa o app global (legado)" : "ID do app no Meta for Developers"} />
+        <label>
+          App Secret da Meta
+          {conn?.hasMetaAppSecret && <span className="muted"> — já salvo (••••), preencha para trocar</span>}
+        </label>
+        <input type="password" value={metaAppSecret} onChange={(e) => setMetaAppSecret(e.target.value)}
+          placeholder={conn?.hasMetaAppSecret ? "••••••••" : "cole o App Secret"} />
+        {app?.redirectUri && (
+          <p className="muted" style={{ fontSize: 12 }}>
+            Registre esta redirect URI no app (Facebook Login → Valid OAuth Redirect URIs):{" "}
+            <code className="mono">{app.redirectUri}</code>
+          </p>
+        )}
+        <div className="row" style={{ margin: "6px 0 14px" }}>
+          <button className="secondary" disabled={busy || !metaAppId.trim()} onClick={() => void saveMetaApp()}>
+            Salvar app
+          </button>
+        </div>
+
         {!appReady && (
           <p className="muted" style={{ marginTop: 0 }}>
-            Configure primeiro o <b>App ID/Secret da Meta</b> em Configurações → Automação Social
-            (e registre a redirect URI no app).
+            Salve o <b>App ID/Secret da Meta</b> acima (e registre a redirect URI no app)
+            para liberar a conexão.
           </p>
         )}
         {conn?.hasMeta ? (

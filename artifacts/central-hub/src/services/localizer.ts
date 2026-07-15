@@ -32,6 +32,7 @@ import {
   bestSocialTitle,
   classifyArticle,
   extractFromRawAI,
+  matchCategorySlug,
   plainTextLength,
   plainTextOf,
   translateRewrite,
@@ -281,7 +282,8 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
     if (needsTranslation(blog.language, rewrite.language)) {
       const result = await ensureTranslatedRewrite(delivery, blog, rewrite, s);
       finalRewrite = result.rewrite;
-      aiCategory = result.aiCategory;
+      // Mesmo matcher tolerante da classificação (acentos/rótulo humano).
+      aiCategory = matchCategorySlug(result.aiCategory ?? null, blog.categories ?? []) ?? undefined;
       if (result.translated) {
         logEvent({
           module: "localizer", refType: "delivery", refId: delivery.id,
@@ -303,6 +305,14 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
           engineConfig(s),
         );
         aiCategory = res.category ?? undefined;
+        if (!res.category) {
+          // Diagnóstico do fallback residual: sem isso, "tudo caiu em outros"
+          // fica invisível (incidente PontoFarma 2026-07).
+          logger.warn(
+            { deliveryId: delivery.id, blog: blog.name, rawAnswer: res.rawAnswer },
+            "Classificação sem categoria válida — fallback residual",
+          );
+        }
         await logUsage(res.usage, "classify", delivery.newsItemId, finalRewrite.id);
       } catch (err) {
         logger.warn({ err, deliveryId: delivery.id }, "Classificação falhou — usando fallback");

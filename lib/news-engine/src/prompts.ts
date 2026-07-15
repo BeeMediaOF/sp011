@@ -175,8 +175,8 @@ Escolha UMA categoria para esta matéria entre as opções abaixo (use o slug ex
 {{CATEGORIAS}}
 
 Regras da escolha de categoria:
-- A categoria deve corresponder ao ESPORTE/TEMA REAL da matéria, não a palavras soltas do texto. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
-- Matéria que NÃO é de esporte (política, economia, cidade, varejo/produtos, entretenimento, celebridades fora do esporte) vai SEMPRE para a categoria residual ("others"/"outros") — NUNCA para uma categoria de esporte.
+- A categoria deve corresponder ao TEMA REAL da matéria, não a palavras soltas do texto; use a DESCRIÇÃO de cada categoria como critério (ex.: futebol/Copa do Mundo/FIFA NUNCA entra em "nfl"/"futebol-americano" nem em "esports"/"e-sports", que é só jogos eletrônicos competitivos).
+- Matéria cujo tema NÃO corresponde a NENHUMA categoria específica da lista vai para a categoria residual ("others"/"outros"), quando existir — NUNCA force o encaixe numa categoria específica.
 - Na dúvida entre uma categoria específica e a categoria residual ("others"/"outros"), escolha SEMPRE a residual.
 
 ## REGRAS DA TRADUÇÃO
@@ -225,8 +225,8 @@ Categorias possíveis (slug — descrição):
 {{CATEGORIAS}}
 
 Regras:
-- A categoria deve corresponder ao ESPORTE/TEMA REAL da notícia, não a palavras soltas. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
-- Notícia que NÃO é de esporte (política, economia, cidade, varejo/produtos, entretenimento, celebridades fora do esporte) vai SEMPRE para a residual ("others"/"outros") — NUNCA para uma categoria de esporte.
+- A categoria deve corresponder ao TEMA REAL da notícia, não a palavras soltas; use a DESCRIÇÃO de cada categoria como critério (ex.: futebol/Copa do Mundo/FIFA NUNCA entra em "nfl"/"futebol-americano" nem em "esports"/"e-sports", que é só jogos eletrônicos competitivos).
+- Notícia cujo tema NÃO corresponde a NENHUMA categoria específica da lista vai para a residual ("others"/"outros"), quando existir — NUNCA force o encaixe numa categoria específica.
 - Na dúvida entre uma categoria específica e a residual ("others"/"outros"), escolha SEMPRE a residual.
 
 Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug"}, usando o slug EXATO de UMA categoria da lista. Sem markdown, sem explicações.`;

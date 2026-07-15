@@ -11,6 +11,10 @@ export const blogSocialAccountsTable = pgTable("blog_social_accounts", {
   id:                 text("id").primaryKey(),
   blogId:             text("blog_id").notNull(),
   // ── Meta (Instagram Reels via Graph API) ──
+  /** App Meta do PRÓPRIO blog (ID público + secret criptografado); ausente →
+   *  fallback no metaAppId/metaAppSecret global das settings. */
+  metaAppId:          text("meta_app_id"),
+  metaAppSecretEnc:   text("meta_app_secret_enc"),
   metaPageId:         text("meta_page_id"),
   metaPageName:       text("meta_page_name"),
   igUserId:           text("ig_user_id"),

@@ -50,6 +50,9 @@ function ZoneSectionHeader({ title, color, href, linkLabel }: {
   title: string; color: string; href?: string; linkLabel?: string;
 }) {
   const { t } = useT();
+  // Bloco sem nome e sem link = seção "sem cabeçalho" (ex.: destaque do hero
+  // dos portais de mock, que não tem título de seção).
+  if (!title && !href) return null;
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2.5 min-w-0">

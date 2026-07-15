@@ -162,10 +162,13 @@ export default function Footer() {
   }
 
   // ── Light ─────────────────────────────────────────────────────────────────
+  // Acento configurável (borda superior, títulos das colunas e botão da
+  // newsletter) — ausente = vermelho original.
   if (style === "light") {
+    const lightAccent = settings?.footerAccentColor || "#c8102e";
     return (
-      <footer className="border-t-4 border-[#c8102e] pt-8 pb-5"
-        style={{ backgroundColor: bgColor ?? "#f9fafb" }}>
+      <footer className="border-t-4 pt-8 pb-5"
+        style={{ backgroundColor: bgColor ?? "#f9fafb", borderTopColor: lightAccent }}>
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
@@ -183,7 +186,7 @@ export default function Footer() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
             {f.columns.map((col) => (
               <div key={col.id}>
-                <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">{col.title}</h3>
+                <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: lightAccent }}>{col.title}</h3>
                 <ul className="flex flex-col gap-1.5 text-xs text-gray-600">
                   {col.links.map((l) => (
                     <li key={l.id}><FooterAnchor href={l.href} className="hover:text-gray-900 transition-colors">{l.label}</FooterAnchor></li>
@@ -194,7 +197,7 @@ export default function Footer() {
 
             {(f.showContact || f.showNewsletter) && (
               <div className="col-span-2">
-                <h3 className="font-bold mb-3 uppercase text-xs tracking-wider text-[#c8102e]">
+                <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: lightAccent }}>
                   {f.showContact && f.showNewsletter ? t("footer.contactNewsletter") : f.showContact ? t("footer.contact") : t("footer.newsletter")}
                 </h3>
                 {f.showContact && (
@@ -206,7 +209,7 @@ export default function Footer() {
                 {f.showNewsletter && (
                   <>
                     <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-600">{f.newsletterTitle}</p>
-                    <NewsletterForm dark={false} accent="#c8102e" />
+                    <NewsletterForm dark={false} accent={lightAccent} />
                   </>
                 )}
               </div>

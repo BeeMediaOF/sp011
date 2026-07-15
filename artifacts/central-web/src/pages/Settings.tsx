@@ -120,8 +120,8 @@ export default function Settings() {
           apifyTokenBackup: form.apifyTokenBackup || undefined,
           apifyTiktokActor: form.apifyTiktokActor ?? "",
           apifyInstagramActor: form.apifyInstagramActor ?? "",
-          metaAppId: form.metaAppId ?? "",
-          metaAppSecret: form.metaAppSecret || undefined,
+          // metaAppId/metaAppSecret saíram desta tela (agora por blog, aba
+          // Redes Sociais) — não enviar evita apagar o fallback global.
           bufferApiKey: form.bufferApiKey || undefined,
           captionModel: form.captionModel ?? "",
           socialCaptionPromptTemplate: form.socialCaptionPromptTemplate ?? "",
@@ -410,15 +410,11 @@ export default function Settings() {
             <input value={form.apifyInstagramActor ?? ""} onChange={(e) => setForm({ ...form, apifyInstagramActor: e.target.value })} placeholder="apify/instagram-scraper" />
           </div>
         </div>
+        <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>
+          O <b>App ID/Secret da Meta</b> agora é configurado <b>por blog</b> em Blogs →
+          Editar → aba Redes Sociais{settings.hasMetaAppSecret ? " (o app global já salvo continua valendo como fallback para blogs sem app próprio)" : ""}.
+        </p>
         <div className="row" style={{ marginTop: 10 }}>
-          <div>
-            <label>App ID da Meta (mesmo app dos blogs)</label>
-            <input value={form.metaAppId ?? ""} onChange={(e) => setForm({ ...form, metaAppId: e.target.value })} />
-          </div>
-          <div>
-            <label>App Secret da Meta {settings.hasMetaAppSecret ? "✓ salvo (preencha p/ trocar)" : ""}</label>
-            <input type="password" value={form.metaAppSecret ?? ""} onChange={(e) => setForm({ ...form, metaAppSecret: e.target.value })} placeholder={settings.hasMetaAppSecret ? "••••••••" : ""} />
-          </div>
           <div>
             <label>API key global do Buffer {settings.hasBufferApiKey ? "✓ salva (preencha p/ trocar)" : ""}</label>
             <input type="password" value={form.bufferApiKey ?? ""} onChange={(e) => setForm({ ...form, bufferApiKey: e.target.value })} placeholder={settings.hasBufferApiKey ? "••••••••" : "usada quando o blog não tem chave própria"} />
@@ -426,7 +422,7 @@ export default function Settings() {
         </div>
         {metaApp?.redirectUri && (
           <p className="muted" style={{ marginTop: 8 }}>
-            Registre esta redirect URI no app da Meta (Facebook Login → Valid OAuth Redirect URIs):{" "}
+            Redirect URI para registrar nos apps da Meta (Facebook Login → Valid OAuth Redirect URIs):{" "}
             <span className="mono">{metaApp.redirectUri}</span>
           </p>
         )}

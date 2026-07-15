@@ -346,9 +346,11 @@ export default function Header() {
   const menuBarStyle: "attached" | "bar" = settings?.menuBarStyle === "bar" ? "bar" : "attached";
   const menuBarBg = settings?.menuBarBgColor || menuActiveColor;
   // Menus com submenu não podem viver num nav com overflow-x-auto (o dropdown
-  // seria cortado); sem submenu, mantém o scroll horizontal original.
+  // seria cortado); nesse caso o nav QUEBRA LINHA quando falta espaço —
+  // overflow-visible puro fazia os itens vazarem por baixo do banner/CTA do
+  // cabeçalho (incidente PontoFarma). Sem submenu, mantém o scroll original.
   const hasDropdowns = navItems.some((it) => visibleChildren(it).length > 0);
-  const navOverflow = hasDropdowns ? "overflow-visible" : "overflow-x-auto no-scrollbar";
+  const navOverflow = hasDropdowns ? "flex-wrap" : "overflow-x-auto no-scrollbar";
   const headerBannerClean = sanitizeArticleHtml(settings?.headerBannerHtml);
   // Link de redirecionamento do banner (painel → Cabeçalho ou aba Propagandas):
   // overlay que cobre o banner inteiro, sem aninhar <a> no HTML do usuário.
@@ -356,8 +358,13 @@ export default function Header() {
   // O banner do cabeçalho é inventário medido como os blocos-propaganda:
   // impressão viewável + clique sob a chave fixa block:header-banner.
   const headerBannerImpRef = useAdImpression(headerBannerClean ? "block:header-banner" : undefined);
+  // No modo "bar" o banner preenche a linha do logo (flex-1); no "attached"
+  // ele divide a linha com o menu — precisa abraçar o conteúdo (shrink-0),
+  // senão disputa metade da largura com o nav e um sobrepõe o outro.
   const headerBanner = headerBannerClean ? (
-    <div ref={headerBannerImpRef} className="hidden lg:flex flex-1 min-w-0 items-center justify-end relative" style={{ minHeight: 48 }}>
+    <div ref={headerBannerImpRef}
+      className={`hidden lg:flex min-w-0 items-center justify-end relative ${menuBarStyle === "bar" ? "flex-1" : "shrink-0 ml-2"}`}
+      style={{ minHeight: 48 }}>
       <div className="w-full min-w-0 flex items-center justify-end"
         dangerouslySetInnerHTML={{ __html: headerBannerClean }} />
       {headerBannerLink && (

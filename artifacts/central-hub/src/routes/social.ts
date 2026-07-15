@@ -17,7 +17,7 @@ import {
   aiUsageEventsTable,
 } from "@workspace/central-db";
 import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
-import { encryptSecret } from "@workspace/news-engine";
+import { decryptSecret, encryptSecret } from "@workspace/news-engine";
 import { authMiddleware } from "../middlewares/auth.js";
 import { getSettings, type HubSettings } from "../lib/store.js";
 import { getGeminiPool } from "../lib/aiPool.js";
@@ -380,6 +380,10 @@ interface ConnectionOut {
   bufferChannelName: string | null;
   hasBufferKey: boolean;
   hasGlobalBufferKey: boolean;
+  /** App Meta do próprio blog (ID é público; secret só como flag). */
+  metaAppId: string | null;
+  hasMetaAppSecret: boolean;
+  hasGlobalMetaApp: boolean;
 }
 
 async function listConnections(s: HubSettings): Promise<ConnectionOut[]> {
@@ -401,8 +405,27 @@ async function listConnections(s: HubSettings): Promise<ConnectionOut[]> {
       bufferChannelName: a?.bufferChannelName ?? null,
       hasBufferKey: !!a?.bufferApiKeyEnc,
       hasGlobalBufferKey: !!s.bufferApiKey,
+      metaAppId: a?.metaAppId ?? null,
+      hasMetaAppSecret: !!a?.metaAppSecretEnc,
+      hasGlobalMetaApp: !!(s.metaAppId && s.metaAppSecret),
     };
   });
+}
+
+/**
+ * App Meta efetivo de um blog: o cadastrado na aba Redes Sociais do próprio
+ * blog vence; sem ele, cai no App ID/Secret global das settings (legado).
+ */
+async function resolveMetaApp(blogId: string, s: HubSettings): Promise<{ appId: string; appSecret: string }> {
+  const [a] = await db
+    .select({ appId: blogSocialAccountsTable.metaAppId, secretEnc: blogSocialAccountsTable.metaAppSecretEnc })
+    .from(blogSocialAccountsTable)
+    .where(eq(blogSocialAccountsTable.blogId, blogId))
+    .limit(1);
+  if (a?.appId && a?.secretEnc) {
+    return { appId: a.appId, appSecret: decryptSecret(a.secretEnc) };
+  }
+  return { appId: s.metaAppId?.trim() ?? "", appSecret: s.metaAppSecret?.trim() ?? "" };
 }
 
 router.get("/connections", async (_req, res) => {
@@ -480,6 +503,33 @@ router.delete("/connections/:blogId/meta", async (req, res) => {
   res.json({ ok: true });
 });
 
+// App Meta do PRÓPRIO blog (aba Redes Sociais). Trim SEMPRE — espaço/quebra
+// colada junto do secret causava "Error validating client secret" (cf67b35).
+router.put("/connections/:blogId/meta-app", async (req, res) => {
+  const blogId = req.params.blogId;
+  const [blog] = await db.select().from(blogsTable).where(eq(blogsTable.id, blogId)).limit(1);
+  if (!blog) { res.status(404).json({ error: "Blog não encontrado." }); return; }
+
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const appId = typeof b["appId"] === "string" ? b["appId"].trim() : "";
+  if (!appId) { res.status(400).json({ error: "App ID da Meta é obrigatório." }); return; }
+
+  const values: Partial<typeof blogSocialAccountsTable.$inferInsert> = { metaAppId: appId };
+  const appSecret = typeof b["appSecret"] === "string" ? b["appSecret"].trim() : "";
+  // Vazio/mascarado mantém o secret já salvo (mesmo padrão da key do Buffer).
+  if (appSecret && !appSecret.includes("•")) values.metaAppSecretEnc = encryptSecret(appSecret);
+
+  await upsertAccount(blogId, values);
+  logEvent({ module: "social", refType: "blog", refId: blogId, message: `App Meta salvo no blog ${blog.name}` });
+  res.json((await listConnections(getSettings())).find((c) => c.blogId === blogId));
+});
+
+router.delete("/connections/:blogId/meta-app", async (req, res) => {
+  await upsertAccount(req.params.blogId, { metaAppId: null, metaAppSecretEnc: null });
+  logEvent({ module: "social", refType: "blog", refId: req.params.blogId, message: "App Meta do blog removido (volta ao global, se houver)" });
+  res.json({ ok: true });
+});
+
 // ─── OAuth Meta (por blog) — adaptado de api-server/routes/social.ts ─────────
 
 const META_GRAPH = "https://graph.facebook.com/v20.0";
@@ -504,22 +554,27 @@ function metaRedirectUri(): string {
   return base ? `${base}/meta-auth-complete.html` : "";
 }
 
-router.get("/meta/app", (_req, res) => {
+router.get("/meta/app", async (req, res) => {
   const s = getSettings();
+  // Com ?blogId= devolve o app EFETIVO do blog (próprio ou fallback global).
+  const blogId = typeof req.query["blogId"] === "string" ? req.query["blogId"].trim() : "";
+  const app = blogId
+    ? await resolveMetaApp(blogId, s)
+    : { appId: s.metaAppId?.trim() ?? "", appSecret: s.metaAppSecret?.trim() ?? "" };
   res.json({
-    appId: s.metaAppId ?? "",
-    hasSecret: !!s.metaAppSecret,
+    appId: app.appId,
+    hasSecret: !!app.appSecret,
     redirectUri: metaRedirectUri(),
     scopes: META_SCOPES,
   });
 });
 
-router.get("/meta/oauth/start", (req, res) => {
+router.get("/meta/oauth/start", async (req, res) => {
   const blogId = typeof req.query["blogId"] === "string" ? req.query["blogId"] : "";
   if (!blogId) { res.status(400).json({ error: "blogId é obrigatório." }); return; }
-  const s = getSettings();
-  if (!s.metaAppId) {
-    res.status(400).json({ error: "Configure o App ID da Meta em Configurações → Automação Social." });
+  const app = await resolveMetaApp(blogId, getSettings());
+  if (!app.appId) {
+    res.status(400).json({ error: "Configure o App ID/Secret da Meta na aba Redes Sociais deste blog." });
     return;
   }
   const redirectUri = metaRedirectUri();
@@ -530,7 +585,7 @@ router.get("/meta/oauth/start", (req, res) => {
   const state = randomUUID();
   metaStates.set(state, { expires: Date.now() + 10 * 60_000, blogId });
   const params = new URLSearchParams({
-    client_id: s.metaAppId,
+    client_id: app.appId,
     redirect_uri: redirectUri,
     state,
     response_type: "code",
@@ -549,9 +604,9 @@ router.post("/meta/oauth/exchange", async (req, res) => {
   }
   metaStates.delete(state);
 
-  const s = getSettings();
-  if (!s.metaAppId || !s.metaAppSecret) {
-    res.status(400).json({ error: "App Meta (ID/Secret) não configurado nas Configurações." });
+  const app = await resolveMetaApp(sess.blogId, getSettings());
+  if (!app.appId || !app.appSecret) {
+    res.status(400).json({ error: "App Meta (ID/Secret) não configurado na aba Redes Sociais deste blog." });
     return;
   }
   const redirectUri = metaRedirectUri();
@@ -559,7 +614,7 @@ router.post("/meta/oauth/exchange", async (req, res) => {
   try {
     // 1. code → token curto
     const shortRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      client_id: s.metaAppId, client_secret: s.metaAppSecret, redirect_uri: redirectUri, code,
+      client_id: app.appId, client_secret: app.appSecret, redirect_uri: redirectUri, code,
     }), { signal: AbortSignal.timeout(15000) });
     const short = (await shortRes.json()) as { access_token?: string; error?: { message: string } };
     if (short.error) throw new Error(short.error.message);
@@ -567,7 +622,7 @@ router.post("/meta/oauth/exchange", async (req, res) => {
 
     // 2. token curto → longa duração (page tokens derivados não expiram)
     const longRes = await fetch(`${META_GRAPH}/oauth/access_token?` + new URLSearchParams({
-      grant_type: "fb_exchange_token", client_id: s.metaAppId, client_secret: s.metaAppSecret, fb_exchange_token: userToken,
+      grant_type: "fb_exchange_token", client_id: app.appId, client_secret: app.appSecret, fb_exchange_token: userToken,
     }), { signal: AbortSignal.timeout(15000) });
     const long = (await longRes.json()) as { access_token?: string };
     if (long.access_token) userToken = long.access_token;

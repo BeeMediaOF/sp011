@@ -265,6 +265,8 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
     query: sql`CREATE TABLE IF NOT EXISTS blog_social_accounts (
       id text PRIMARY KEY,
       blog_id text NOT NULL,
+      meta_app_id text,
+      meta_app_secret_enc text,
       meta_page_id text,
       meta_page_name text,
       ig_user_id text,
@@ -281,6 +283,9 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
     )`,
   },
   { name: "blog_social_accounts_blog_uniq", query: sql`CREATE UNIQUE INDEX IF NOT EXISTS blog_social_accounts_blog_uniq ON blog_social_accounts (blog_id)` },
+  // App Meta por blog (2026-07): cobre instalações onde a tabela já existia
+  { name: "blog_social_accounts_meta_app_id", query: sql`ALTER TABLE blog_social_accounts ADD COLUMN IF NOT EXISTS meta_app_id text` },
+  { name: "blog_social_accounts_meta_app_secret", query: sql`ALTER TABLE blog_social_accounts ADD COLUMN IF NOT EXISTS meta_app_secret_enc text` },
 ];
 
 export async function ensureSchema(): Promise<void> {
