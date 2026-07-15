@@ -86,6 +86,8 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 | `resenhavip` | resenhavip.midia.run | pt-BR, esporte | verde `#1e7a3f`, amarelo `#fdb913`, dark `#0d3b1f` | Kit completo; ⚠️ flag "Páginas enganosas" no Search Console — revisão solicitada (ver §19) |
 | `oleysports` | oleysports.midia.run | pt-BR, esporte (parceria OleyBet) | azul vivo `#2563ff`, royal `#1936c4`, navy `#0a0e27` | Kit completo; go-live pendente; banners viram OleyBet quando chegar a logo branca |
 | `beeesportes` | beeesportes.midia.run | pt-BR, esporte | verde menta `#57c785`, profundo `#18754e`, dark `#0e1412` | Kit completo; go-live pendente |
+| `pontofarma` | pontofarma.com (zona própria; ou .midia.run provisório) | pt-BR, B2B setor farmacêutico | verde `#18a957`/`#0c8b46` + navy `#0e2341`, rodapé `#0c1630`, tagline "conteúdo que gera resultado" | Só template (`deploy/pontofarma/template_final.sql`); blog não provisionado; falta kit (fontes/regras/GO_LIVE) |
+| `creditovc` | credito.vc (zona própria; ou .midia.run provisório) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | Só template (`deploy/creditovc/template_final.sql`); blog não provisionado; falta kit (fontes/regras/GO_LIVE) |
 
 - Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee, todos
   iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
@@ -95,6 +97,14 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   igual mandaria notícia PT ao ksports e dispararia tradução.
 - Categorias reais do sp011 (artigos publicados): politica, mundo, geral,
   economia, cultura, esportes, cidade, saude, tecnologia, seguranca, nfl.
+- Slugs do **pontofarma**: `gestao, fiscal-tributario, legislacao, mercado,
+  vendas, equipe, tecnologia, saude-categorias, outros`. Slugs do
+  **creditovc**: `sair-das-dividas, credito, score, organizar-financas,
+  renda-extra, planejar-o-futuro, investimentos, outros`. Identidades e
+  editorias vêm das propostas Bee Media (PDFs "Proposta_PontoFarma" e
+  "Proposta_Portal_CreditoVC"); mock HTML/JSON de referência em
+  `docs/Guia_Claude_Code_Base.md` (movido de public/ — ali seria servido no
+  site de todos os blogs).
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
   sozinho — ksports mora em ksports.bebee.me).
@@ -445,6 +455,12 @@ montada no servidor.
    gerenciada; PG_POOL_MAX; DISABLE_LOCAL_PIPELINE; mem_limit/healthcheck) e
    provisionador autônomo + tela "Novo blog" na central.
 7. OleyBet: trocar banners "Anuncie aqui" quando o usuário mandar a logo.
+8. **PontoFarma e Crédito.vc** (2026-07-15): templates prontos em
+   `deploy/<id>/template_final.sql`. Falta: kit de go-live (fontes RSS dos
+   PDFs das propostas + taxonomia/regras na central + GO_LIVE.md +
+   social_templates), decisão de domínio (zona própria vs .midia.run) e
+   provisionamento na VPS. Nichos ≠ esporte: NÃO usar sources_pt.sql dos
+   irmãos nem backfill do Esporte Agora.
 
 ## 20. Onde procurar mais (no repo)
 
