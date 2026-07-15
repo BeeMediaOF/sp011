@@ -410,6 +410,12 @@ function categoryTokens(s: string): string[] {
  * ("A categoria é gestao."). Empate/ambiguidade: vence o slug mais específico
  * (mais tokens). Devolve o slug EXATO da lista ou null — quem valida por
  * igualdade estrita jogava respostas boas no fallback residual.
+ *
+ * Segundo passe (só quando o primeiro não decide): match PARCIAL por tokens
+ * compartilhados — modelo respondendo o tema natural ("saúde", "fiscal") em
+ * vez do slug composto ("saude-categorias", "fiscal-tributario") caía no
+ * residual (incidente PontoFarma 2026-07). Só vale sem empate: dois slugs
+ * com a mesma pontuação = ambíguo = null.
  */
 export function matchCategorySlug(
   answer: string | null | undefined,
@@ -426,7 +432,24 @@ export function matchCategorySlug(
     if (!ansJoined.includes(` ${toks.join(" ")} `)) continue;
     if (!best || toks.length > best.len) best = { slug: c.slug, len: toks.length };
   }
-  return best?.slug ?? null;
+  if (best) return best.slug;
+
+  // ── Match parcial não-ambíguo ──
+  const ansSet = new Set(ans);
+  let partial: { slug: string; shared: number } | null = null;
+  let tie = false;
+  for (const c of categories) {
+    const toks = categoryTokens(c.slug);
+    const shared = toks.filter((t) => ansSet.has(t)).length;
+    if (shared === 0) continue;
+    if (!partial || shared > partial.shared) {
+      partial = { slug: c.slug, shared };
+      tie = false;
+    } else if (shared === partial.shared) {
+      tie = true;
+    }
+  }
+  return partial && !tie ? partial.slug : null;
 }
 
 export interface ClassifyInput {
