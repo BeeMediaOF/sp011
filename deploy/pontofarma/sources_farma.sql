@@ -2,9 +2,14 @@
 -- PontoFarma — fontes do setor farmacêutico + taxonomia + regras
 -- =============================================================================
 -- O que faz (idempotente — rodar 2x é seguro):
---   1. Garante as 8 fontes PT do setor da proposta em `central_sources`
---      (upsert por URL), com category='farmacia' — categoria de fonte NOVA
---      na rede, para NÃO casar com as regras "outros" dos blogs de esporte.
+--   1. Garante as 10 fontes da tabela da proposta em `central_sources`
+--      (upsert por URL): 8 do setor com category='farmacia' (categoria de
+--      fonte NOVA na rede, para NÃO casar com as regras "outros" dos blogs
+--      de esporte) + G1 Economia e Agência Brasil (Economia) com
+--      category='financas' (compartilhadas com o Crédito.vc — upsert é
+--      no-op se o sources_financas.sql já rodou). As notícias 'financas' só
+--      chegam ao PontoFarma pela regra de palavra-chave (3b) — sem ela o
+--      blog receberia o noticiário macro inteiro.
 --      ICTQ e Portal Contábeis entram com active=false ("validar endpoint"
 --      na proposta) — teste o feed no navegador e ative no painel central.
 --   2. Blog PontoFarma: language='pt-BR' + taxonomia (categories) — só grava
@@ -12,12 +17,12 @@
 --   3. Regras de distribuição:
 --      a) fonte 'farmacia' → PontoFarma sem targetCategory (IA classifica
 --         cada notícia dentro do menu do blog; pt→pt nunca traduz);
---      b) fonte 'financas' (feeds de economia do Crédito.vc) filtrada por
+--      b) fonte 'financas' (G1 Economia/Agência Brasil e, quando o
+--         creditovc subir, os demais feeds de economia) filtrada por
 --         palavra-chave (farmác/anvisa/medicament/reforma tributária/...) —
 --         é como o PontoFarma pega as pautas de Reforma Tributária/CBS e
---         CMED do noticiário macro, o maior gancho da proposta. Se as
---         fontes 'financas' ainda não existirem (creditovc não subiu), a
---         regra fica dormente sem efeito colateral.
+--         CMED do noticiário macro, o maior gancho da proposta, sem
+--         receber o noticiário econômico inteiro.
 --   4. Acrescenta 'farmacia' ao categories_exclude do catch-all do sp011 —
 --      SEM isso o catch-all (include vazio casa tudo) despejaria notícia
 --      B2B de farmácia no sp011.
@@ -49,9 +54,12 @@ BEGIN
 END $$;
 
 -- -----------------------------------------------------------------------------
--- 1) Fontes PT do setor farmacêutico (da proposta Bee Media; upsert por URL)
+-- 1) Fontes da tabela da proposta (upsert por URL)
 --    ICTQ e Portal Contábeis nascem INATIVAS — a proposta pede validação do
 --    endpoint; confira o feed e ative no painel central (Fontes).
+--    G1 Economia e Agência Brasil (Economia) são as MESMAS do Crédito.vc
+--    (category='financas') — manter nome/URL idênticos aos do
+--    deploy/creditovc/sources_financas.sql para o upsert deduplicar.
 -- -----------------------------------------------------------------------------
 WITH new_sources(name, url, category, active, schedule_hours) AS (
   VALUES
@@ -62,7 +70,9 @@ WITH new_sources(name, url, category, active, schedule_hours) AS (
     ('Medicina S/A',            'https://medicinasa.com.br/feed/',                      'farmacia', true,  2),
     ('Agência Brasil - Saúde',  'https://agenciabrasil.ebc.com.br/rss/saude/feed.xml',  'farmacia', true,  2),
     ('ICTQ (validar endpoint)', 'https://www.ictq.com.br/feed',                         'farmacia', false, 4),
-    ('Portal Contábeis (validar endpoint)', 'https://www.contabeis.com.br/rss/',        'farmacia', false, 4)
+    ('Portal Contábeis (validar endpoint)', 'https://www.contabeis.com.br/rss/',        'farmacia', false, 4),
+    ('G1 Economia',             'https://g1.globo.com/rss/g1/economia/',                'financas', true,  1),
+    ('Agência Brasil - Economia','https://agenciabrasil.ebc.com.br/rss/economia/feed.xml', 'financas', true, 2)
 ),
 ins AS (
   INSERT INTO central_sources
@@ -119,8 +129,9 @@ WHERE (b.name ILIKE '%farma%' OR b.domain ILIKE '%pontofarma%')
   );
 
 -- -----------------------------------------------------------------------------
--- 4) Blinda o catch-all do sp011: exclui a categoria de fonte 'farmacia'
---    (regra com categories_include vazio casa TUDO)
+-- 4) Blinda o catch-all do sp011: exclui as categorias de fonte 'farmacia' E
+--    'financas' (regra com categories_include vazio casa TUDO — e este script
+--    agora também cria fontes 'financas', mesmo sem o creditovc no ar)
 -- -----------------------------------------------------------------------------
 UPDATE distribution_rules r
 SET categories_exclude = COALESCE(r.categories_exclude, '[]'::jsonb) || '["farmacia"]'::jsonb
@@ -129,6 +140,14 @@ WHERE b.id = r.blog_id
   AND (b.name ILIKE '%sp011%' OR b.domain ILIKE '%sp011%')
   AND (r.categories_include IS NULL OR jsonb_array_length(r.categories_include) = 0)
   AND NOT (COALESCE(r.categories_exclude, '[]'::jsonb) ? 'farmacia');
+
+UPDATE distribution_rules r
+SET categories_exclude = COALESCE(r.categories_exclude, '[]'::jsonb) || '["financas"]'::jsonb
+FROM blogs b
+WHERE b.id = r.blog_id
+  AND (b.name ILIKE '%sp011%' OR b.domain ILIKE '%sp011%')
+  AND (r.categories_include IS NULL OR jsonb_array_length(r.categories_include) = 0)
+  AND NOT (COALESCE(r.categories_exclude, '[]'::jsonb) ? 'financas');
 
 COMMIT;
 
@@ -155,8 +174,8 @@ JOIN blogs b ON b.id = r.blog_id
 ORDER BY b.name, r.priority DESC, r.name;
 
 \echo ''
-\echo '=== FONTES DO SETOR FARMACEUTICO ==='
-SELECT name, active, schedule_hours, url
+\echo '=== FONTES DO PONTOFARMA (setor + economia compartilhada) ==='
+SELECT category, name, active, schedule_hours, url
 FROM central_sources
-WHERE category = 'farmacia'
-ORDER BY name;
+WHERE category IN ('farmacia', 'financas')
+ORDER BY category, name;

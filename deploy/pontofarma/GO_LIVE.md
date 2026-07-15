@@ -126,12 +126,15 @@ DBURL=$(grep -m1 '^CENTRAL_DATABASE_URL=' .env.central | cut -d= -f2- | sed -e '
 docker compose exec -T pg-blogs psql "$DBURL" -v ON_ERROR_STOP=1 < deploy/pontofarma/sources_farma.sql
 ```
 
-O script cadastra as 8 fontes do setor (category `farmacia` — categoria de
-fonte NOVA, não cruza com os blogs de esporte), grava idioma/taxonomia do
-blog, cria 2 regras (setor farmacêutico + pautas tributárias por
+O script cadastra as 10 fontes da tabela da proposta: 8 do setor (category
+`farmacia` — categoria de fonte NOVA, não cruza com os blogs de esporte) +
+G1 Economia e Agência Brasil Economia (category `financas`, compartilhadas
+com o Crédito.vc — upsert deduplica). Também grava idioma/taxonomia do
+blog, cria 2 regras (setor farmacêutico com IA + pautas tributárias por
 palavra-chave dos feeds de economia) e **blinda o catch-all do sp011**
-(exclui `farmacia`). ICTQ e Portal Contábeis nascem INATIVAS ("validar
-endpoint" na proposta) — teste os feeds e ative no painel central.
+(exclui `farmacia` e `financas`). ICTQ e Portal Contábeis nascem INATIVAS
+("validar endpoint" na proposta) — teste os feeds e ative no painel
+central.
 
 ## 7) Template + identidade
 
