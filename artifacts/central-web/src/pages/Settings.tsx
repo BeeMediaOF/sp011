@@ -356,8 +356,9 @@ export default function Settings() {
         </p>
         <div className="row">
           <div>
-            <label>Provider da tradução</label>
-            <select value={form.translationProvider ?? "gemini"} onChange={(e) => setForm({ ...form, translationProvider: e.target.value })}>
+            <label>Provider da tradução/classificação</label>
+            <select value={form.translationProvider ?? ""} onChange={(e) => setForm({ ...form, translationProvider: e.target.value })}>
+              <option value="">Mesmo da reescrita (padrão)</option>
               <option value="gemini">Gemini (rodízio de chaves)</option>
               <option value="openai">OpenAI</option>
               <option value="ollama">Ollama (self-hosted)</option>

@@ -75,7 +75,10 @@ function nextOpenaiKey(s: HubSettings): string | undefined {
 }
 
 function engineConfig(s: HubSettings): RewriteEngineConfig {
-  const provider = s.translationProvider ?? "gemini";
+  // Sem escolha explícita, segue o provider principal da reescrita (produção:
+  // Ollama). Default fixo em Gemini estourava a cota das chaves e derrubava a
+  // classificação inteira (incidente PontoFarma 2026-07).
+  const provider = s.translationProvider ?? s.aiProvider ?? "gemini";
   if (provider === "openai") {
     return {
       provider, model: s.translationModel,
@@ -315,6 +318,11 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
         }
         await logUsage(res.usage, "classify", delivery.newsItemId, finalRewrite.id);
       } catch (err) {
+        // Quota/provider fora do ar NÃO pode decidir categoria errada em
+        // definitivo: repassa ao catch externo, que adia a entrega 5 min sem
+        // consumir tentativa (incidente PontoFarma 2026-07: cooldown do
+        // Gemini mandou 49 notícias para "outros").
+        if (isProviderUnavailableError(String(err))) throw err;
         logger.warn({ err, deliveryId: delivery.id }, "Classificação falhou — usando fallback");
       }
     }

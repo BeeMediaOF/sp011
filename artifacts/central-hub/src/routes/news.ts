@@ -356,7 +356,9 @@ let _openaiIdx = 0;
 
 function autofillEngineConfig(): RewriteEngineConfig {
   const s = getSettings();
-  const provider = s.translationProvider ?? "gemini";
+  // Mesmo default do localizer: sem escolha explícita, segue o provider
+  // principal da reescrita (produção: Ollama).
+  const provider = s.translationProvider ?? s.aiProvider ?? "gemini";
   if (provider === "openai") {
     const keys = [...new Set(
       [s.openaiApiKey, ...(s.openaiApiKeys ?? [])].map((k) => k?.trim()).filter((k): k is string => !!k),

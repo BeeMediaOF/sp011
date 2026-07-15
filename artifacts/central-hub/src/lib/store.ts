@@ -67,7 +67,7 @@ export interface HubSettings {
   userAgent?: string;
 
   // ── Tradução & Classificação (localizer — entregas p/ blogs em outro idioma) ─
-  /** Provider da tradução/classificação (default: gemini). */
+  /** Provider da tradução/classificação (vazio = segue o aiProvider). */
   translationProvider?: "gemini" | "openai" | "ollama";
   translationModel?: string;
   /** Template custom do prompt de tradução (vazio = TRANSLATION_PROMPT_TEMPLATE). */
