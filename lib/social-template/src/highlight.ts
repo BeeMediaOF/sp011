@@ -93,12 +93,17 @@ export function hasAiArtifacts(input: string): boolean {
 }
 
 /**
- * Sanitiza um campo de texto puro vindo da IA: remove HTML vazado e, se ainda
- * restarem artefatos de IA (outro idioma, eco de prompt), devolve "" para o
- * chamador usar o fallback em vez de publicar lixo.
+ * Sanitiza um campo de texto puro vindo da IA: remove HTML vazado e os
+ * marcadores de destaque `*` (o modelo copia o padrão do social_title para
+ * título/subtítulo — bug visto em produção: títulos publicados com
+ * *asteriscos* literais). Se ainda restarem artefatos de IA (outro idioma,
+ * eco de prompt), devolve "" para o chamador usar o fallback.
  */
 export function sanitizePlainField(input: string): string {
-  const s = stripInlineHtml(input);
+  const s = stripInlineHtml(input)
+    .replace(/\*+/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
   return hasAiArtifacts(s) ? "" : s;
 }
 

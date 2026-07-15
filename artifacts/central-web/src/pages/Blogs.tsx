@@ -22,6 +22,7 @@ export interface Blog {
   maxPostsPerDay: number | null;
   minMinutesBetweenPosts: number | null;
   language: string;
+  titleCase: string;
   categories: BlogCategory[] | null;
   status: string;
   lastSeenAt: string | null;
@@ -33,7 +34,7 @@ const EMPTY = {
   name: "", domain: "", apiUrl: "", deliveryMode: "publish",
   requireApproval: false, isActive: true,
   maxPostsPerDay: "", minMinutesBetweenPosts: "", notes: "",
-  language: "pt-BR", categoriesText: "",
+  language: "pt-BR", titleCase: "original", categoriesText: "",
 };
 
 // Uma categoria por linha, "slug: dica p/ a IA" (dica opcional).
@@ -87,6 +88,7 @@ export default function Blogs() {
       minMinutesBetweenPosts: b.minMinutesBetweenPosts?.toString() ?? "",
       notes: b.notes ?? "",
       language: b.language === "en" ? "en" : "pt-BR",
+      titleCase: b.titleCase ?? "original",
       categoriesText: categoriesToText(b.categories),
     });
     setEditing(b);
@@ -104,6 +106,7 @@ export default function Blogs() {
         maxPostsPerDay: form.maxPostsPerDay ? Number(form.maxPostsPerDay) : null,
         minMinutesBetweenPosts: form.minMinutesBetweenPosts ? Number(form.minMinutesBetweenPosts) : null,
         language: form.language,
+        titleCase: form.titleCase,
         categories: parseCategories(form.categoriesText),
         notes: form.notes || null,
       };
@@ -314,6 +317,14 @@ export default function Blogs() {
                 <select value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })}>
                   <option value="pt-BR">Português (Brasil)</option>
                   <option value="en">Inglês</option>
+                </select>
+              </div>
+              <div>
+                <label>Título das postagens</label>
+                <select value={form.titleCase} onChange={(e) => setForm({ ...form, titleCase: e.target.value })}>
+                  <option value="original">Como gerado pela IA</option>
+                  <option value="upper">MAIÚSCULAS (caixa alta)</option>
+                  <option value="sentence">Caixa normal (conserta título gritado)</option>
                 </select>
               </div>
               <div>

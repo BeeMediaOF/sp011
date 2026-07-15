@@ -6,6 +6,7 @@ import { desc, eq } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth.js";
 import { testBlogConnection } from "../services/blogClient.js";
 import { logEvent } from "../lib/eventLog.js";
+import { normalizeTitleCaseMode } from "../lib/titleCase.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -70,6 +71,7 @@ router.post("/", async (req, res) => {
       maxPostsPerDay: body.maxPostsPerDay ?? null,
       minMinutesBetweenPosts: body.minMinutesBetweenPosts ?? null,
       language: body.language === "en" ? "en" : "pt-BR",
+      titleCase: normalizeTitleCaseMode(body.titleCase),
       categories: normalizeCategories(body.categories),
       notes: body.notes ?? null,
     })
@@ -91,6 +93,7 @@ router.patch("/:id", async (req, res) => {
   }
   if (body.apiUrl) body.apiUrl = body.apiUrl.trim().replace(/\/+$/, "");
   if (body.language !== undefined) body.language = body.language === "en" ? "en" : "pt-BR";
+  if (body.titleCase !== undefined) body.titleCase = normalizeTitleCaseMode(body.titleCase);
   if (body.categories !== undefined) body.categories = normalizeCategories(body.categories);
 
   const [row] = await db

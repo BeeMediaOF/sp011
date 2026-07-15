@@ -31,6 +31,8 @@ export const blogsTable = pgTable("blogs", {
   minMinutesBetweenPosts: integer("min_minutes_between_posts"),
   /** Idioma do público do blog ("pt-BR" | "en"): difere do idioma da notícia → tradução. */
   language:        text("language").notNull().default("pt-BR"),
+  /** Padrão de caixa do TÍTULO das postagens: 'original' | 'upper' | 'sentence'. */
+  titleCase:       text("title_case").notNull().default("original"),
   /** Taxonomia do blog p/ classificação por IA (null = sem classificação). */
   categories:      jsonb("categories").$type<BlogCategory[]>(),
   status:          text("status").notNull().default("offline"), // 'online' | 'offline' | 'error'

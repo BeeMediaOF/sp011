@@ -135,6 +135,34 @@ async function imageUrlAlive(url: string): Promise<boolean> {
   }
 }
 
+/**
+ * Fallback de imagem: feed sem imagem (ou com imagem morta) → busca o
+ * og:image/twitter:image na página original da matéria. Evita card cinza
+ * "sem imagem" no blog. Melhor esforço: erro/timeout → segue sem imagem.
+ */
+async function fetchOgImage(pageUrl: string, userAgent?: string): Promise<string | null> {
+  try {
+    const res = await fetch(pageUrl, {
+      headers: userAgent ? { "User-Agent": userAgent } : undefined,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) return null;
+    const ct = res.headers.get("content-type") ?? "";
+    if (ct && !ct.includes("html")) return null;
+    // O og:image fica no <head> — 200KB cobrem qualquer página real.
+    const html = (await res.text()).slice(0, 200_000);
+    const m =
+      html.match(/<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i) ??
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i) ??
+      html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i);
+    const found = m?.[1]?.trim();
+    if (!found || !/^https?:\/\//i.test(found)) return null;
+    return found;
+  } catch {
+    return null;
+  }
+}
+
 export async function collectSource(src: CentralSourceRow, maxItems?: number): Promise<number> {
   const s = getSettings();
   const cap = maxItems ?? Number.POSITIVE_INFINITY;
@@ -176,6 +204,17 @@ export async function collectSource(src: CentralSourceRow, maxItems?: number): P
           message: `Imagem inacessível, removida da notícia: ${art.title} (${imageUrl})`,
         });
         imageUrl = null;
+      }
+      // Sem imagem do feed → tenta o og:image da página original
+      if (!imageUrl && art.link) {
+        const og = await fetchOgImage(art.link, s.userAgent);
+        if (og && (await imageUrlAlive(og))) {
+          imageUrl = og;
+          logEvent({
+            module: "collector", refType: "source", refId: src.id,
+            message: `Imagem recuperada via og:image: ${art.title}`,
+          });
+        }
       }
       if (!hasText && !imageUrl) {
         logEvent({

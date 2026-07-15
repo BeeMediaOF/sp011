@@ -21,6 +21,7 @@ import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
 import { sendSigned, INGEST_API_VERSION } from "./blogClient.js";
 import { backoffMsForAttempt, MAX_DELIVERY_ATTEMPTS } from "../lib/backoff.js";
+import { applyTitleCase, normalizeTitleCaseMode } from "../lib/titleCase.js";
 
 const POLL_MS = 15_000;
 const BATCH = 5;
@@ -63,7 +64,8 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
     centralId: news.id,
     mode: blog.deliveryMode === "draft" ? "draft" : "publish",
     article: {
-      title: rewrite.title ?? news.title,
+      // Padrão de caixa do blog (original/MAIÚSCULAS/normal) aplicado no envio
+      title: applyTitleCase(rewrite.title ?? news.title, normalizeTitleCaseMode(blog.titleCase)),
       subtitle: rewrite.subtitle ?? undefined,
       contentHtml: rewrite.contentHtml ?? "",
       category: delivery.targetCategory ?? news.category,

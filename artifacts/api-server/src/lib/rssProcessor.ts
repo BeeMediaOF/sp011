@@ -106,8 +106,11 @@ Conteúdo da fonte:
 ## INSTRUÇÕES
 
 **TÍTULO (title):**
-- Crie um título único de cauda longa com cerca de 150 caracteres.
-- Estilo viral e chamativo, otimizado para Google Discover, mas sem clickbait enganoso: o título precisa entregar o que o texto contém. Nada de CAIXA ALTA (exceto siglas).
+- Crie um título único, direto e objetivo, entre 70 e 110 caracteres, com a informação mais forte logo no início. Nada de rodeios nem enrolação.
+- Estilo estratégico e chamativo, otimizado para Google Discover, mas sem clickbait enganoso: o título precisa entregar o que o texto contém. Nada de CAIXA ALTA (exceto siglas).
+- NUNCA use asteriscos, markdown ou qualquer marcação no título, no subtítulo ou no texto: o destaque com *asteriscos* existe SOMENTE no campo social_title.
+- Use apenas palavras reais do Português do Brasil: NUNCA invente, funda ou corte palavras (nada de termos inexistentes como "garantivaga" ou "esfasteítico"); na dúvida, use a palavra exata da fonte.
+- Siglas sempre na grafia oficial em maiúsculas (NFL, FIFA, CNH) e SEMPRE com a mesma grafia em todos os campos e matérias.
 - Em hipótese alguma inclua nome de veículo/portal/blog (o da fonte ou qualquer outro), programa de TV ou handle de rede social (@usuario) no título: se a pauta vier com sufixo do tipo "- Nome do Veículo" ou "- @usuario", descarte esse sufixo.
 - Inclua a palavra-chave-alvo e as entidades mais importantes da pauta (pessoas, marcas, times, lugares, produtos, instituições).
 - O título deve despertar curiosidade e tocar em interesses reais do público brasileiro.

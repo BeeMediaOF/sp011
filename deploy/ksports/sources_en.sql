@@ -57,8 +57,11 @@ Source content:
 ## INSTRUCTIONS
 
 **TITLE (title):**
-- Write a unique long-tail headline of about 150 characters.
-- Viral, compelling style optimized for Google Discover, but no misleading clickbait: the headline must deliver exactly what the text contains. No ALL CAPS (except acronyms).
+- Write a unique, direct and objective headline between 70 and 110 characters, with the strongest information right at the start. No filler, no rambling.
+- Strategic, compelling style optimized for Google Discover, but no misleading clickbait: the headline must deliver exactly what the text contains. No ALL CAPS (except acronyms).
+- NEVER use asterisks, markdown or any markup in the title, subtitle or body text: the *asterisk* highlight exists ONLY in the social_title field.
+- Use only real English words: NEVER invent, merge or truncate words; when in doubt, use the exact word from the source.
+- Acronyms always in their official uppercase form (NFL, FIFA, UEFA) and ALWAYS spelled the same way across all fields and articles.
 - Include the target keyword and the most important entities of the story (people, clubs, leagues, places, brands, institutions).
 - The headline must spark curiosity and speak to real interests of the sports audience.
 - Under no circumstances repeat the title inside content_html.

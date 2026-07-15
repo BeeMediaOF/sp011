@@ -74,6 +74,16 @@ describe("hasAiArtifacts / sanitizePlainField (guarda de qualidade)", () => {
     assert.equal(sanitizePlainField("Título <b>bom</b> e limpo"), "Título bom e limpo");
   });
 
+  it("sanitizePlainField: asteriscos de destaque vazados no título são removidos (bug real)", () => {
+    // caso do PDF: título publicado com *asteriscos* literais
+    assert.equal(
+      sanitizePlainField("NFL surpreende e libera *nova carga de ingressos* para o *jogo histórico*"),
+      "NFL surpreende e libera nova carga de ingressos para o jogo histórico",
+    );
+    assert.equal(sanitizePlainField("*SANTOS FUTEBOL CLUBE ANUNCIA GRANDE REFORÇO*"), "SANTOS FUTEBOL CLUBE ANUNCIA GRANDE REFORÇO");
+    assert.equal(sanitizePlainField("Texto ** com ruído *"), "Texto com ruído");
+  });
+
   it("sanitizeSocialTitle: lixo de prompt vira vazio; destaque legítimo sobrevive", () => {
     assert.equal(sanitizeSocialTitle("*Bills* se... A,85 caracteres COM DESTAQUE NO TRECHO DE MAIOR IMPACTO"), "");
     assert.equal(sanitizeSocialTitle("Leclerc vence em *Silverstone* e amplia liderança"), "Leclerc vence em *Silverstone* e amplia liderança");

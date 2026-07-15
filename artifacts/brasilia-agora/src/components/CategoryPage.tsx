@@ -20,12 +20,20 @@ export interface Article {
   author?: string;
 }
 
+export interface MostReadItem {
+  id: string;
+  slug?: string;
+  title: string;
+}
+
 interface CategoryPageProps {
   category: string;
   color: string;
   articles: Article[];
   featuredArticle: Article;
   featuredArticle2?: Article;
+  /** Mais lidas REAIS do site (por views). Vazio → cai nas recentes da categoria. */
+  mostRead?: MostReadItem[];
 }
 
 export default function CategoryPage({
@@ -34,6 +42,7 @@ export default function CategoryPage({
   articles,
   featuredArticle,
   featuredArticle2,
+  mostRead,
 }: CategoryPageProps) {
   const { settings } = useSite();
   const { t } = useT();
@@ -129,29 +138,33 @@ export default function CategoryPage({
                 <AdBanner slot="slot_11" />
               </div>
 
-              {/* Mais Lidas */}
-              <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
-                <h3 className="font-bold text-[#1a2448] text-lg mb-4 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-red-600" />
-                  {t("category.mostRead")}
-                </h3>
-                <div className="flex flex-col space-y-4">
-                  {[
-                    { id: "pol-2", title: "Câmara Legislativa aprova projeto que cria o programa Morar DF" },
-                    { id: "df-3",  title: "Obras no Eixão alteram trânsito neste fim de semana em Brasília" },
-                    { id: "sau-1", title: "Hospitais do DF registram queda nos casos de dengue em maio" },
-                    { id: "df-4",  title: "GDF anuncia mais 124 ônibus para reforçar o transporte público" },
-                    { id: "cul-1", title: "Festival de Cinema de Brasília bate recorde de público" },
-                  ].map(({ id, title }, idx) => (
-                    <Link key={id} href={`/artigo/${id}`}>
-                      <div className="flex gap-3 group cursor-pointer">
-                        <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">{idx + 1}</span>
-                        <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#c8102e] transition-colors leading-snug pt-1">{title}</p>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </div>
+              {/* Mais Lidas — SEMPRE artigos reais (views do site; fallback:
+                  recentes da categoria). Nunca as amostras de exemplo: elas
+                  apareciam no site público de blogs novos com links mortos. */}
+              {(() => {
+                const items: MostReadItem[] = (mostRead ?? []).length > 0
+                  ? (mostRead ?? []).slice(0, 5)
+                  : articles.slice(0, 5).map((a) => ({ id: a.id, slug: a.slug, title: a.title }));
+                if (items.length === 0) return null;
+                return (
+                  <div className="bg-gray-50 p-6 rounded-sm border border-gray-100">
+                    <h3 className="font-bold text-[#1a2448] text-lg mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-red-600" />
+                      {t("category.mostRead")}
+                    </h3>
+                    <div className="flex flex-col space-y-4">
+                      {items.map(({ id, slug, title }, idx) => (
+                        <Link key={id} href={`/artigo/${slug || id}`}>
+                          <div className="flex gap-3 group cursor-pointer">
+                            <span className="text-3xl font-black text-gray-200 group-hover:text-gray-300 transition-colors leading-none">{idx + 1}</span>
+                            <p className="text-sm font-bold text-[#1a2448] group-hover:text-[#c8102e] transition-colors leading-snug pt-1">{title}</p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
             </div>
           </div>

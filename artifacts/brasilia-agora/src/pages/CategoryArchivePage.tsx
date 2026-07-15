@@ -3,7 +3,7 @@ import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import CategoryPage from "../components/CategoryPage";
-import type { Article as CategoryArticle } from "../components/CategoryPage";
+import type { Article as CategoryArticle, MostReadItem } from "../components/CategoryPage";
 import type { Article as ApiArticle } from "../lib/adminApi";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useT, relativeTimeOrDate } from "../lib/i18n";
@@ -16,6 +16,7 @@ interface Props {
 
 export default function CategoryArchivePage({ category, slug, color }: Props) {
   const [articles, setArticles] = useState<CategoryArticle[]>([]);
+  const [mostRead, setMostRead] = useState<MostReadItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const { trackCategory } = useAnalytics();
   const { t, lang, tz } = useT();
@@ -51,6 +52,14 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
             author:   a.author,
           }));
         setArticles(filtered);
+        // Mais lidas REAIS do site inteiro (por views), para a sidebar
+        const top = [...(d.articles ?? [])]
+          .sort((a, b) =>
+            ((b as ApiArticle & { views?: number }).views ?? 0) -
+            ((a as ApiArticle & { views?: number }).views ?? 0))
+          .slice(0, 5)
+          .map((a): MostReadItem => ({ id: a.id, slug: a.slug || a.id, title: a.title }));
+        setMostRead(top);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -86,6 +95,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
             color={color}
             articles={rest}
             featuredArticle={featured}
+            mostRead={mostRead}
           />
         )}
       </main>

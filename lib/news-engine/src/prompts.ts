@@ -24,8 +24,11 @@ Conteúdo da fonte:
 ## INSTRUÇÕES
 
 **TÍTULO (title):**
-- Crie um título único de cauda longa com cerca de 150 caracteres.
-- Estilo viral e chamativo, otimizado para Google Discover, mas sem clickbait enganoso: o título precisa entregar o que o texto contém. Nada de CAIXA ALTA (exceto siglas).
+- Crie um título único, direto e objetivo, entre 70 e 110 caracteres, com a informação mais forte logo no início. Nada de rodeios nem enrolação.
+- Estilo estratégico e chamativo, otimizado para Google Discover, mas sem clickbait enganoso: o título precisa entregar o que o texto contém. Nada de CAIXA ALTA (exceto siglas).
+- NUNCA use asteriscos, markdown ou qualquer marcação no título, no subtítulo ou no texto: o destaque com *asteriscos* existe SOMENTE no campo social_title.
+- Use apenas palavras reais do Português do Brasil: NUNCA invente, funda ou corte palavras (nada de termos inexistentes como "garantivaga" ou "esfasteítico"); na dúvida, use a palavra exata da fonte.
+- Siglas sempre na grafia oficial em maiúsculas (NFL, FIFA, CNH) e SEMPRE com a mesma grafia em todos os campos e matérias.
 - Em hipótese alguma inclua nome de veículo/portal/blog (o da fonte ou qualquer outro), programa de TV ou handle de rede social (@usuario) no título: se a pauta vier com sufixo do tipo "- Nome do Veículo" ou "- @usuario", descarte esse sufixo.
 - Inclua a palavra-chave-alvo e as entidades mais importantes da pauta (pessoas, marcas, times, lugares, produtos, instituições).
 - O título deve despertar curiosidade e tocar em interesses reais do público brasileiro.
@@ -173,10 +176,13 @@ Escolha UMA categoria para esta matéria entre as opções abaixo (use o slug ex
 
 Regras da escolha de categoria:
 - A categoria deve corresponder ao ESPORTE/TEMA REAL da matéria, não a palavras soltas do texto. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
+- Matéria que NÃO é de esporte (política, economia, cidade, varejo/produtos, entretenimento, celebridades fora do esporte) vai SEMPRE para a categoria residual ("others"/"outros") — NUNCA para uma categoria de esporte.
 - Na dúvida entre uma categoria específica e a categoria residual ("others"/"outros"), escolha SEMPRE a residual.
 
 ## REGRAS DA TRADUÇÃO
 - Traduza TODO o texto para {{IDIOMA_DESTINO}} com naturalidade de falante nativo; nada de tradução literal palavra a palavra.
+- Use apenas palavras reais de {{IDIOMA_DESTINO}}: NUNCA invente, funda ou corte palavras; se não conhecer o termo equivalente, mantenha o da matéria original.
+- title e subtitle SEM asteriscos/markdown e SEM CAIXA ALTA (exceto siglas, sempre na grafia oficial em maiúsculas).
 - PRESERVE exatamente a estrutura HTML do conteúdo: as mesmas tags (<h2>, <h3>, <p>, <b>, <em>, <ul>, <li>), na mesma ordem e quantidade. Traduza apenas o texto dentro delas.
 - NÃO adicione, remova ou altere fatos, números, datas, valores, nomes próprios ou citações. Nomes de pessoas, clubes e organizações não se traduzem.
 - Títulos de seções fixas também se traduzem (ex.: "Perguntas Frequentes" vira "Frequently Asked Questions" em inglês).
@@ -220,6 +226,7 @@ Categorias possíveis (slug — descrição):
 
 Regras:
 - A categoria deve corresponder ao ESPORTE/TEMA REAL da notícia, não a palavras soltas. Futebol (soccer/Copa do Mundo/FIFA) NUNCA entra em categoria de outro esporte: "nfl"/"futebol-americano" é SÓ futebol americano; "esports"/"e-sports" é SÓ jogos eletrônicos competitivos.
+- Notícia que NÃO é de esporte (política, economia, cidade, varejo/produtos, entretenimento, celebridades fora do esporte) vai SEMPRE para a residual ("others"/"outros") — NUNCA para uma categoria de esporte.
 - Na dúvida entre uma categoria específica e a residual ("others"/"outros"), escolha SEMPRE a residual.
 
 Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug"}, usando o slug EXATO de UMA categoria da lista. Sem markdown, sem explicações.`;
