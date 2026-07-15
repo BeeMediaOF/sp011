@@ -90,6 +90,7 @@ interface IngestArticle {
   tag?: string;
   imageUrl?: string;
   author?: string;
+  imageCredit?: string;
   slug?: string;
   keywords?: string;
   socialTitle?: string;
@@ -166,6 +167,7 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
     // tag derivada dela mesma — nunca o rótulo "GERAL" em blog não-PT.
     tag: article.tag?.trim() || TAG_MAP[category] || category.replace(/-/g, " ").toUpperCase(),
     imageUrl: article.imageUrl?.trim() ?? "",
+    imageCredit: stripInlineHtml(article.imageCredit?.trim() ?? "") || undefined,
     // Crédito explícito do painel central (ex.: "Por BeeSports") vence a
     // assinatura padrão configurável (blog EN não pode nascer com "Redação")
     author: stripInlineHtml(article.author?.trim() ?? "") || store.getSettings().bylineName?.trim() || "Redação",

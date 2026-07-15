@@ -72,6 +72,7 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
       tag: delivery.targetTag ?? undefined,
       imageUrl: news.imageUrl ?? undefined,
       author: news.author ?? undefined,
+      imageCredit: news.imageCredit ?? undefined,
       slug: rewrite.slug ?? undefined,
       keywords: rewrite.keywords ?? undefined,
       socialTitle: rewrite.socialTitle ?? undefined,

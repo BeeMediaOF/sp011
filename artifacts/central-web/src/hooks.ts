@@ -70,6 +70,7 @@ export function statusClass(status: string): string {
 export const STATUS_LABEL: Record<string, string> = {
   collected: "coletada", queued: "na fila", rewriting: "reescrevendo",
   rewritten: "reescrita", distributed: "distribuída", failed: "falhou", discarded: "descartada",
+  manual_draft: "rascunho manual",
   awaiting_localization: "aguardando tradução/categoria", localizing: "traduzindo",
   awaiting_approval: "aguardando aprovação", pending: "pendente", delivering: "enviando",
   delivered: "entregue", duplicate: "duplicada no blog", dead: "esgotou tentativas", cancelled: "cancelada",

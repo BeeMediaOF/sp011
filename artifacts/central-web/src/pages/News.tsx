@@ -28,7 +28,7 @@ interface NewsDetail extends NewsRow {
 
 interface StatsLite { news: Record<string, number> }
 
-const STATUSES = ["", "queued", "rewriting", "rewritten", "distributed", "failed", "discarded", "collected"];
+const STATUSES = ["", "queued", "rewriting", "rewritten", "distributed", "manual_draft", "failed", "discarded", "collected"];
 
 export default function News() {
   const [status, setStatus] = useState("");
@@ -165,6 +165,12 @@ export default function News() {
                           <button className="iconbtn blue" title="Ver conteúdo" aria-label="Ver conteúdo" onClick={() => void open(item.id)}>
                             <Eye size={14} />
                           </button>
+                          {item.sourceName === "Manual" && (
+                            <button className="iconbtn" title="Editar no editor" aria-label="Editar no editor"
+                              onClick={() => { window.location.href = `/nova-noticia?id=${item.id}`; }}>
+                              <PenLine size={14} />
+                            </button>
+                          )}
                           {(item.status === "failed" || item.status === "discarded" || item.status === "collected") && (
                             <button className="iconbtn green" title="Reprocessar (volta p/ fila de reescrita)" aria-label="Reprocessar"
                               disabled={busy === item.id} onClick={() => void requeue(item.id)}>

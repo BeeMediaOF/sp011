@@ -329,6 +329,17 @@ async function callTextModel(
   return cfg.geminiPool.call(cfg.model || "gemini-2.5-flash", prompt);
 }
 
+/**
+ * Chamada de texto genérica pelo provider configurado (Ollama → fallback
+ * Gemini, OpenAI ou Gemini) — para usos fora do pipeline de reescrita
+ * (ex.: autofill de SEO da publicação manual da central).
+ */
+export async function completeText(
+  prompt: string, cfg: RewriteEngineConfig,
+): Promise<{ text: string; usage?: TokenUsage }> {
+  return callTextModel(prompt, cfg);
+}
+
 /** Extrai o campo `category` do JSON bruto da IA (tolerante a JSON malformado). */
 export function extractCategoryField(raw: string): string | undefined {
   const stripped = raw

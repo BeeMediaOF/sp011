@@ -75,6 +75,7 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
       content_raw text,
       image_url text,
       author text,
+      image_credit text,
       category text NOT NULL DEFAULT 'geral',
       tags text,
       published_at_source timestamptz,
@@ -289,6 +290,7 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
   { name: "blog_social_accounts_meta_app_secret", query: sql`ALTER TABLE blog_social_accounts ADD COLUMN IF NOT EXISTS meta_app_secret_enc text` },
   // Assinatura da publicação manual (2026-07): cobre instalações existentes
   { name: "news_items_author", query: sql`ALTER TABLE news_items ADD COLUMN IF NOT EXISTS author text` },
+  { name: "news_items_image_credit", query: sql`ALTER TABLE news_items ADD COLUMN IF NOT EXISTS image_credit text` },
 ];
 
 export async function ensureSchema(): Promise<void> {

@@ -1,0 +1,48 @@
+/*
+ * Tailwind v4 SEM preflight: só theme + utilities. O reset padrão (preflight)
+ * zeraria os estilos globais do styles.css das outras páginas do painel —
+ * aqui as classes utilitárias servem apenas ao editor "Nova notícia"
+ * (réplica do Novo Artigo do admin do blog) e a quem mais quiser usá-las.
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* ── Conteúdo do RichTextEditor (TipTap) — espelho do admin do blog ── */
+.prose-editor .ProseMirror {
+  color: #1e293b;
+  line-height: 1.65;
+}
+.prose-editor .ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+.prose-editor .ProseMirror h1 { font-size: 1.5em; font-weight: 800; color: #0f172a; }
+.prose-editor .ProseMirror h2 { font-size: 1.3em; font-weight: 700; color: #0f172a; }
+.prose-editor .ProseMirror h3 { font-size: 1.15em; font-weight: 700; color: #0f172a; }
+.prose-editor .ProseMirror ul { list-style: disc; padding-left: 1.4em; }
+.prose-editor .ProseMirror ol { list-style: decimal; padding-left: 1.4em; }
+.prose-editor .ProseMirror blockquote {
+  border-left: 4px solid #0B2A66;
+  padding: 8px 14px;
+  background: #EEF2FF;
+  border-radius: 0 8px 8px 0;
+  color: #1e3a8a;
+  font-style: italic;
+}
+.prose-editor .ProseMirror pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.85em;
+  overflow-x: auto;
+}
+.prose-editor .ProseMirror a { color: #2563EB; text-decoration: underline; }
+.prose-editor .ProseMirror img { max-width: 100%; height: auto; border-radius: 8px; }
+.prose-editor .ProseMirror iframe { max-width: 100%; border-radius: 10px; }
+.prose-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: #94a3b8;
+  pointer-events: none;
+  height: 0;
+}

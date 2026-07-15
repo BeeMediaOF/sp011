@@ -21,6 +21,8 @@ export const newsItemsTable = pgTable("news_items", {
   /** Assinatura/crédito da publicação manual (ex.: "Por BeeSports") — vai no
    *  payload do ingest e o blog exibe no lugar da assinatura padrão. */
   author:            text("author"),
+  /** Crédito da foto de capa (publicação manual) — "Foto: …" no blog. */
+  imageCredit:       text("image_credit"),
   category:          text("category").notNull().default("geral"),
   tags:              text("tags"),
   publishedAtSource: timestamp("published_at_source", { withTimezone: true }),

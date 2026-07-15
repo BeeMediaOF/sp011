@@ -289,6 +289,17 @@ centralId; backoff 1m→5m→15m→1h→6h, 5 tentativas → dead).
   de `max_posts_per_day`.
 - **Publicar agora**: `POST /deliveries/:id/publish-now` (pending ou
   awaiting_approval) — também via botão na página Entregas.
+- **Publicação manual** ("Nova notícia", 2026-07): editor réplica do Novo
+  Artigo do blog (TipTap + Tailwind utilities-only no central-web). POST/PUT
+  `/news/manual` — rascunho fica em `news_items.status='manual_draft'` (sem
+  entregas; editar via `/nova-noticia?id=`), publicar cria 1 entrega/blog;
+  agendamento = `deliveries.scheduledAt` futuro (worker só pega vencidas);
+  upload de capa em `/data/news-images` (volume central_data, rota pública
+  `/api/news/image/:name`, host na allowlist do proxy de imagem dos blogs —
+  NUNCA apagar: artigos publicados hotlinkam); `author` ("Por BeeSports") e
+  `imageCredit` atravessam o ingest e o blog exibe (autor não-genérico vence
+  a assinatura padrão); autofill SEO `POST /news/manual/autofill` no provider
+  da central (purpose "autofill").
 - IA da central: provider primário configurável (`aiProvider` nas
   Configurações) — em produção é o **Ollama** self-hosted
   (`qwen2.5:7b-instruct`, serviço `ollama` do compose raiz,
