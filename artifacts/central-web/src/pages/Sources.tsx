@@ -43,8 +43,20 @@ function catLabel(c: string): string {
   return (c || "geral").replace(/-/g, " ").toUpperCase();
 }
 
+interface BlogLite {
+  id: string;
+  name: string;
+}
+
 export default function Sources() {
-  const { data: sources, error, reload } = useLoad(() => api<Source[]>("/sources"));
+  // Filtro por blog: o backend devolve só as fontes que alguma regra ativa
+  // do blog pode casar (categoria/fonte) — "fontes cadastradas nele".
+  const [blogFilter, setBlogFilter] = useState("");
+  const { data: sources, error, reload } = useLoad(
+    () => api<Source[]>(`/sources${blogFilter ? `?blogId=${encodeURIComponent(blogFilter)}` : ""}`),
+    [blogFilter],
+  );
+  const { data: blogs } = useLoad(() => api<BlogLite[]>("/blogs"));
   const [editing, setEditing] = useState<Partial<Source> | null>(null);
   const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState("");
@@ -153,6 +165,11 @@ export default function Sources() {
       <div className="toolbar">
         <input value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar fonte, URL ou categoria…" style={{ maxWidth: 280 }} />
+        <select value={blogFilter} onChange={(e) => setBlogFilter(e.target.value)}
+          style={{ maxWidth: 220 }} title="Mostrar só as fontes que as regras deste blog alcançam">
+          <option value="">Todos os blogs</option>
+          {(blogs ?? []).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
         <div className="grow" />
         <button className="secondary" onClick={runCycle}>Rodar ciclo agora</button>
         <button onClick={openNew}>+ Nova fonte</button>
@@ -163,6 +180,8 @@ export default function Sources() {
 
       <p className="muted" style={{ fontSize: 12, margin: "0 0 10px" }}>
         {grouped.length} marca{grouped.length !== 1 ? "s" : ""} · {filtered.length} fonte{filtered.length !== 1 ? "s" : ""}
+        {blogFilter && (blogs ?? []).find((b) => b.id === blogFilter) &&
+          ` · alcançadas pelas regras de ${(blogs ?? []).find((b) => b.id === blogFilter)!.name}`}
       </p>
 
       {grouped.length === 0 && <div className="card muted">Nenhuma fonte ainda.</div>}

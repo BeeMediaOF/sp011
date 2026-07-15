@@ -11,7 +11,7 @@
  * IGUAL nos dois lados, senão a hidratação descarta o SSR inteiro, #418).
  */
 import React, { useEffect, useRef, useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
 import { ChevronLeft, ChevronRight } from "lucide-react";
@@ -24,6 +24,7 @@ import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
 } from "../../lib/homeBlocks";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
+import { trackSearch } from "../../hooks/useAnalytics";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
 import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
 
@@ -367,7 +368,9 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
   }
 
   return (
-    <section className="py-8" style={{ backgroundColor: color }}>
+    // id = âncora navegável: o bloco de busca (nota "inscreva-se") e o CTA do
+    // cabeçalho apontam para cá via href="#<id do bloco>".
+    <section id={block.id} className="py-8" style={{ backgroundColor: color }}>
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <div className="flex-1">
           <p className="text-lg font-black text-white">{block.name || "Newsletter"}</p>
@@ -390,6 +393,89 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
         )}
         {status === "err" && <p className="text-xs text-white/90 md:ml-2">{lang === "en" ? "Enter a valid email." : "Informe um e-mail válido."}</p>}
       </div>
+    </section>
+  );
+}
+
+// ─── Busca ───────────────────────────────────────────────────────────────────
+/**
+ * Bloco de busca FUNCIONAL: envia para /arquivo?q=… (mesmo destino da busca do
+ * cabeçalho) e registra o termo no analytics. Formatos:
+ *  - "search_bar" (padrão): cabeçalho de seção opcional + campo.
+ *  - "search_card": card claro com conteúdo HTML acima do campo (hero de
+ *    boas-vindas) e nota-link opcional abaixo (linkLabel + linkUrl; destino
+ *    "#<id de bloco>" rola até o bloco na própria home — ex.: newsletter).
+ */
+export function SearchBlock({ block, contained = true }: {
+  block: HomeBlock;
+  /** false = sem o wrapper max-w próprio (uso dentro das zonas da home). */
+  contained?: boolean;
+}) {
+  const { t } = useT();
+  const [, navigate] = useLocation();
+  const [q, setQ] = useState("");
+  const color = block.color ?? "#0B2A66";
+  const isCard = block.format === "search_card";
+  const topHtml = isCard ? sanitizeArticleHtml(block.html) : "";
+  const note = (block.linkLabel ?? "").trim();
+  const noteHref = (block.linkUrl ?? "").trim();
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    const query = q.trim();
+    if (!query) return;
+    trackSearch(query);
+    navigate(`/arquivo?q=${encodeURIComponent(query)}`);
+  }
+
+  function noteClick(e: React.MouseEvent) {
+    // "#id" rola até o bloco alvo na própria página (ex.: newsletter no fim).
+    if (!noteHref.startsWith("#")) return;
+    e.preventDefault();
+    document.getElementById(noteHref.slice(1))?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  const form = (
+    <form onSubmit={submit}
+      className="flex items-center gap-2 border border-gray-200 rounded-2xl bg-white pl-4 pr-1.5 py-1.5">
+      <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
+        placeholder={(block.caption ?? "").trim() || t("search.placeholder")}
+        aria-label={t("search.site")}
+        className="flex-1 min-w-0 text-[14px] text-gray-700 placeholder-gray-400 bg-transparent focus:outline-none py-1.5" />
+      <button type="submit"
+        className="shrink-0 text-white text-[13px] font-bold px-5 py-2 rounded-xl hover:opacity-90 transition-opacity"
+        style={{ backgroundColor: color }}>
+        {t("search.submit")}
+      </button>
+    </form>
+  );
+
+  const noteCls = "block text-[13px] text-gray-500 mt-3";
+  const noteEl = !note ? null
+    : noteHref.startsWith("#")
+      ? <a href={noteHref} onClick={noteClick} className={`${noteCls} hover:underline`}>{note}</a>
+      : safeLinkUrl(noteHref)
+        ? (/^https?:\/\//i.test(noteHref)
+          ? <a href={noteHref} target="_blank" rel="noopener noreferrer" className={`${noteCls} hover:underline`}>{note}</a>
+          : <Link href={noteHref} className={`${noteCls} hover:underline`}>{note}</Link>)
+        : <p className={noteCls}>{note}</p>;
+
+  if (isCard) {
+    return (
+      <section className={`${contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""} h-full`}>
+        <div className="h-full bg-white border border-gray-200 rounded-2xl shadow-[0_8px_28px_rgba(15,23,42,.06)] p-6 sm:p-7 flex flex-col justify-center">
+          {topHtml && <div className="mb-5" dangerouslySetInnerHTML={{ __html: topHtml }} />}
+          {form}
+          {noteEl}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}>
+      {block.name && <SectionHeading title={block.name} color={color} />}
+      <div className="max-w-[640px]">{form}{noteEl}</div>
     </section>
   );
 }

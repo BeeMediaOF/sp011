@@ -22,7 +22,7 @@ import { inferBlockType, segmentBlocks, sampleForPreview, type SegmentEntry } fr
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
-  QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope,
+  QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope, SearchBlock,
 } from "../components/blocks/HomeCustomBlocks";
 import { ZoneBlock } from "../components/blocks/PortalZoneBlocks";
 
@@ -370,6 +370,7 @@ function CustomBlock({ block, getArticles, preview }: {
     case "ticker":      return <TickerBlock block={block} articles={byCategory} preview={preview} />;
     case "advertising": return <AdSlotBlock block={block} preview={preview} />;
     case "newsletter":  return <NewsletterBlock block={block} />;
+    case "search":      return <SearchBlock block={block} />;
     case "categories":  return <CategoriesBlock block={block} />;
     case "social":      return <SocialLinksBlock block={block} preview={preview} />;
     case "quotes":      return <QuotesBlock />;

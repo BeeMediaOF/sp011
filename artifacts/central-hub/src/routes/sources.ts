@@ -1,17 +1,27 @@
 import { randomUUID } from "node:crypto";
 import { Router } from "express";
-import { db, centralSourcesTable, type CentralSourceRow } from "@workspace/central-db";
+import { db, centralSourcesTable, distributionRulesTable, type CentralSourceRow } from "@workspace/central-db";
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth.js";
 import { collectSourceById, runCollectorCycle } from "../services/collector.js";
+import { sourceMatchesAnyRule } from "../lib/rules.js";
 import { logEvent } from "../lib/eventLog.js";
 
 const router = Router();
 router.use(authMiddleware);
 
-router.get("/", async (_req, res) => {
+// ?blogId= filtra pelas regras ativas do blog: só as fontes que ALGUMA regra
+// dele pode casar (categoria/fonte; keywords são por notícia e não excluem).
+router.get("/", async (req, res) => {
   const rows = await db.select().from(centralSourcesTable).orderBy(desc(centralSourcesTable.createdAt));
-  res.json(rows);
+  const blogId = typeof req.query["blogId"] === "string" ? req.query["blogId"].trim() : "";
+  if (!blogId) {
+    res.json(rows);
+    return;
+  }
+  const rules = await db.select().from(distributionRulesTable)
+    .where(eq(distributionRulesTable.blogId, blogId));
+  res.json(rows.filter((s) => sourceMatchesAnyRule(rules, { id: s.id, category: s.category })));
 });
 
 router.post("/", async (req, res) => {

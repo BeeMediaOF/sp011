@@ -12,7 +12,7 @@ import {
   Upload, Minus, ImageIcon, Monitor, Tablet, Smartphone, ExternalLink,
   Undo2, Redo2, FileText, Image, GalleryHorizontal, Play, Megaphone,
   List, Radio, Mail, FolderOpen, CircleDollarSign, Share2,
-  Code, Frame, Map as MapIcon, Settings, Info, RotateCcw, Copy,
+  Code, Frame, Map as MapIcon, Settings, Info, RotateCcw, Copy, Search,
   Newspaper, Users, AlignJustify, Globe, Flame,
   Trophy, Building2, Heart, Cpu, Star, BarChart3,
   Type, Palette, Eye as EyeIcon, FileImage,
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed";
+type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search";
 type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine";
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
@@ -79,6 +79,7 @@ const MAIN_MODULES = [
   { type: "list" as BlockType,        name: "Lista",        desc: "Lista compacta de artigos.",           Icon: List,              iconBg: "#F0FDF4", iconColor: "#22C55E" },
   { type: "ticker" as BlockType,      name: "Ticker",       desc: "Faixa de notícias rolando.",           Icon: Radio,             iconBg: "#EFF6FF", iconColor: "#3B82F6" },
   { type: "newsletter" as BlockType,  name: "Newsletter",   desc: "Captura de e-mails.",                  Icon: Mail,              iconBg: "#F0FDFA", iconColor: "#14B8A6" },
+  { type: "search" as BlockType,      name: "Busca",        desc: "Campo de busca funcional do site.",    Icon: Search,            iconBg: "#EFF6FF", iconColor: "#0EA5E9" },
   { type: "categories" as BlockType,  name: "Categorias",   desc: "Navegação por categorias.",            Icon: FolderOpen,        iconBg: "#FFF7ED", iconColor: "#EA580C" },
   { type: "quotes" as BlockType,      name: "Cotações",     desc: "Moedas e índices.",                    Icon: CircleDollarSign,  iconBg: "#F0FDF4", iconColor: "#16A34A" },
   { type: "social" as BlockType,      name: "Redes Sociais",desc: "Links para redes sociais.",            Icon: Share2,            iconBg: "#EFF6FF", iconColor: "#2563EB" },
@@ -102,6 +103,7 @@ const TYPE_META: Record<string, { tag: string; tagColor: string; tagBg: string; 
   list:        { tag: "LISTA",      tagColor: "#166534", tagBg: "#DCFCE7", Icon: List,              iconBg: "#F0FDF4", iconColor: "#22C55E" },
   ticker:      { tag: "TICKER",     tagColor: "#1e40af", tagBg: "#DBEAFE", Icon: Radio,             iconBg: "#EFF6FF", iconColor: "#3B82F6" },
   newsletter:  { tag: "NEWSLETTER", tagColor: "#115e59", tagBg: "#CCFBF1", Icon: Mail,              iconBg: "#F0FDFA", iconColor: "#14B8A6" },
+  search:      { tag: "BUSCA",      tagColor: "#075985", tagBg: "#E0F2FE", Icon: Search,            iconBg: "#EFF6FF", iconColor: "#0EA5E9" },
   categories:  { tag: "CATEGORIAS", tagColor: "#9a3412", tagBg: "#FFEDD5", Icon: FolderOpen,        iconBg: "#FFF7ED", iconColor: "#EA580C" },
   quotes:      { tag: "COTAÇÕES",   tagColor: "#166534", tagBg: "#DCFCE7", Icon: CircleDollarSign,  iconBg: "#F0FDF4", iconColor: "#16A34A" },
   social:      { tag: "REDES",      tagColor: "#1e40af", tagBg: "#DBEAFE", Icon: Share2,            iconBg: "#EFF6FF", iconColor: "#2563EB" },
@@ -1195,6 +1197,40 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         <PanelSection label="Chamada" icon={Mail}>
           <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
             className={INPUT} placeholder="Receba as principais notícias no seu e-mail." />
+        </PanelSection>
+      )}
+
+      {/* ── Busca ── */}
+      {!isSpecial && form.blockType === "search" && (
+        <PanelSection label="Busca" icon={Search}>
+          <div className="grid grid-cols-2 gap-1 mb-1.5">
+            {([["search_bar", "Barra"], ["search_card", "Card de boas-vindas"]] as const).map(([id, label]) => (
+              <button key={id} type="button" onClick={() => onChange("format", id)}
+                className="p-2 rounded-xl border text-[10px] font-bold uppercase tracking-wide transition-all"
+                style={(form.format || "search_bar") === id
+                  ? { borderColor: form.color, backgroundColor: form.color + "15", color: form.color }
+                  : { borderColor: "#e2e8f0", color: "#94a3b8" }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
+            className={INPUT} placeholder="Texto do campo (ex.: Buscar artigos, guias e temas...)" />
+          {form.format === "search_card" && (
+            <>
+              <textarea value={form.html} onChange={(e) => onChange("html", e.target.value)}
+                rows={5} spellCheck={false}
+                className={`${INPUT} font-mono text-xs resize-y mt-1.5`}
+                placeholder="<div>Conteúdo acima do campo (título, texto…)</div>" />
+              <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+                className={`${INPUT} mt-1.5`} placeholder="Nota abaixo do campo (opcional)" />
+              <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+                className={`${INPUT} mt-1.5`} placeholder="Link da nota: /pagina ou #id-de-bloco (rola até ele)" />
+            </>
+          )}
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            Buscar envia para a página Arquivo (mesmo destino da lupa do cabeçalho) e o termo entra no Analytics.
+          </p>
         </PanelSection>
       )}
 

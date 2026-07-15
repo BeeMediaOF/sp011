@@ -1,6 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { matchBlogRules, ruleMatches, type RuleForMatch } from "../src/lib/rules.ts";
+import {
+  matchBlogRules, ruleMatches, sourceCouldMatchRule, sourceMatchesAnyRule,
+  type RuleForMatch,
+} from "../src/lib/rules.ts";
 
 const NEWS = {
   category: "esportes",
@@ -81,5 +84,39 @@ describe("matchBlogRules", () => {
 
   it("sem regras → não elegível", () => {
     assert.deepEqual(matchBlogRules([], NEWS), { matched: false });
+  });
+});
+
+describe("sourceCouldMatchRule (filtro fontes-por-blog)", () => {
+  const SRC = { id: "fonte-1", category: "farmacia" };
+
+  it("regra por categoria casa a fonte da categoria (case-insensitive)", () => {
+    assert.equal(sourceCouldMatchRule(rule({ categoriesInclude: ["Farmacia"] }), SRC), true);
+    assert.equal(sourceCouldMatchRule(rule({ categoriesInclude: ["financas"] }), SRC), false);
+  });
+
+  it("regra com keywords NAO exclui a fonte (keywords sao por noticia)", () => {
+    assert.equal(
+      sourceCouldMatchRule(rule({ categoriesInclude: ["farmacia"], keywordsInclude: ["anvisa"] }), SRC),
+      true,
+    );
+  });
+
+  it("catch-all (includes vazios) casa qualquer fonte, exceto categoria excluida", () => {
+    assert.equal(sourceCouldMatchRule(rule({}), SRC), true);
+    assert.equal(sourceCouldMatchRule(rule({ categoriesExclude: ["farmacia"] }), SRC), false);
+  });
+
+  it("include/exclude por id de fonte", () => {
+    assert.equal(sourceCouldMatchRule(rule({ sourcesInclude: ["fonte-1"] }), SRC), true);
+    assert.equal(sourceCouldMatchRule(rule({ sourcesInclude: ["fonte-2"] }), SRC), false);
+    assert.equal(sourceCouldMatchRule(rule({ sourcesExclude: ["fonte-1"] }), SRC), false);
+  });
+
+  it("regra inativa nunca casa; sourceMatchesAnyRule = OR das regras", () => {
+    assert.equal(sourceCouldMatchRule(rule({ isActive: false }), SRC), false);
+    assert.equal(sourceMatchesAnyRule([rule({ categoriesInclude: ["financas"] }), rule({ categoriesInclude: ["farmacia"] })], SRC), true);
+    assert.equal(sourceMatchesAnyRule([rule({ categoriesInclude: ["financas"] })], SRC), false);
+    assert.equal(sourceMatchesAnyRule([], SRC), false);
   });
 });

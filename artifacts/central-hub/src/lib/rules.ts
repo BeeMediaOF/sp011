@@ -55,6 +55,33 @@ export function ruleMatches(rule: RuleForMatch, news: NewsForMatch): boolean {
   return true;
 }
 
+export interface SourceForMatch {
+  id: string;
+  category: string;
+}
+
+/**
+ * Uma fonte "pertence" a um blog quando ALGUMA regra ativa dele PODE casar
+ * itens vindos dela. Avalia só as dimensões conhecidas no nível da fonte
+ * (categoria e id da fonte); keywords são por notícia — regra com
+ * keywordsInclude ainda conta, porque parte dos itens da fonte pode casar.
+ * Usado pelo filtro "fontes por blog" da página Fontes.
+ */
+export function sourceCouldMatchRule(rule: RuleForMatch, src: SourceForMatch): boolean {
+  if (!rule.isActive) return false;
+  const category = norm(src.category);
+  if (hasAny(rule.categoriesExclude) && rule.categoriesExclude.some((c) => norm(c) === category)) return false;
+  if (hasAny(rule.sourcesExclude) && rule.sourcesExclude.includes(src.id)) return false;
+  if (hasAny(rule.categoriesInclude) && !rule.categoriesInclude.some((c) => norm(c) === category)) return false;
+  if (hasAny(rule.sourcesInclude) && !rule.sourcesInclude.includes(src.id)) return false;
+  return true;
+}
+
+/** true se alguma regra do blog pode casar itens da fonte. */
+export function sourceMatchesAnyRule(rules: RuleForMatch[], src: SourceForMatch): boolean {
+  return rules.some((r) => sourceCouldMatchRule(r, src));
+}
+
 export interface BlogMatchResult {
   matched: boolean;
   targetCategory?: string;

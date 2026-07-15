@@ -16,7 +16,8 @@ export type HomeBlockLayout =
 export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"
   | "ticker" | "newsletter" | "categories" | "quotes" | "social"
-  | "html" | "embed" | "map" | "sep" | "weather" | "table" | "counter";
+  | "html" | "embed" | "map" | "sep" | "weather" | "table" | "counter"
+  | "search";
 
 export interface HomeBlock {
   id: string;
@@ -125,7 +126,7 @@ export interface HomeTemplate {
 const TYPE_PREFIXES: readonly string[] = [
   "content", "image", "carousel", "video", "advertising", "list", "ticker",
   "newsletter", "categories", "weather", "quotes", "social", "html", "table",
-  "counter", "sep", "map", "embed",
+  "counter", "sep", "map", "embed", "search",
 ];
 
 /**
@@ -147,6 +148,7 @@ export function defaultFormatForType(type: string): string {
     case "video":       return "video_featured";
     case "advertising": return "banner_970x90";
     case "list":        return "list_compact";
+    case "search":      return "search_bar";
     default:            return "grid";
   }
 }
