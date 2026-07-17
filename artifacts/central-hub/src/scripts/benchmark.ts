@@ -107,8 +107,11 @@ async function collect(): Promise<void> {
 
   const json = JSON.stringify(picked, null, 2);
   const out = arg("out");
+  // Sem --out: escrita SÍNCRONA no fd 1 — console.log + process.exit trunca
+  // stdout em 64 KiB (golden.json saía cortado no meio de uma string) e o
+  // pino também loga no stdout, sujando o JSON redirecionado. Prefira --out.
   if (out) { writeFileSync(out, json); console.error(`golden set: ${picked.length} itens → ${out}`); }
-  else console.log(json);
+  else writeFileSync(1, json + "\n");
 }
 
 // ── run: A×B no golden set ────────────────────────────────────────────────────
@@ -226,28 +229,36 @@ async function run(): Promise<void> {
     }
   }
 
-  // Relatório markdown no stdout
+  // Relatório markdown — montado em memória e escrito de forma SÍNCRONA
+  // (--out ou fd 1): console.log + process.exit trunca stdout em 64 KiB e o
+  // pino loga no stdout (o "Store central inicializado" sujava o arquivo).
   const rows = variants.map((v) => summarize(v.label, results.get(v.label)!));
   const keys = Object.keys(rows[0]!);
-  console.log(`# Benchmark de prompt — ${golden.length} itens (${language}), provider ${cfg.provider}\n`);
-  console.log(`| métrica | ${rows.map((r) => r["variante"]).join(" | ")} |`);
-  console.log(`|---|${rows.map(() => "---").join("|")}|`);
+  const md: string[] = [];
+  md.push(`# Benchmark de prompt — ${golden.length} itens (${language}), provider ${cfg.provider}\n`);
+  md.push(`| métrica | ${rows.map((r) => r["variante"]).join(" | ")} |`);
+  md.push(`|---|${rows.map(() => "---").join("|")}|`);
   for (const k of keys.filter((k) => k !== "variante")) {
-    console.log(`| ${k} | ${rows.map((r) => r[k]).join(" | ")} |`);
+    md.push(`| ${k} | ${rows.map((r) => r[k]).join(" | ")} |`);
   }
-  console.log("\n## Piores itens por variante (score)");
+  md.push("\n## Piores itens por variante (score)");
   for (const v of variants) {
     const worst = results.get(v.label)!
       .map((m, i) => ({ m, title: golden[i]!.title }))
       .filter((x) => x.m.ok)
       .sort((a, b2) => (a.m.score ?? 0) - (b2.m.score ?? 0))
       .slice(0, 5);
-    console.log(`\n### ${v.label}`);
-    for (const w of worst) console.log(`- score ${w.m.score}, cobertura ${w.m.coverage}%, nº sem fonte ${w.m.invented}: ${w.title.slice(0, 90)}`);
+    md.push(`\n### ${v.label}`);
+    for (const w of worst) md.push(`- score ${w.m.score}, cobertura ${w.m.coverage}%, nº sem fonte ${w.m.invented}: ${w.title.slice(0, 90)}`);
   }
-  console.log("\n## Critério de aceite (PRD 03)");
-  console.log("Só substitua o prompt se B ≥ A em cobertura e score, ≤ A em números sem fonte,");
-  console.log("falhas/ilegíveis e issues block, com duração/tokens na mesma ordem de grandeza.");
+  md.push("\n## Critério de aceite (PRD 03)");
+  md.push("Só substitua o prompt se B ≥ A em cobertura e score, ≤ A em números sem fonte,");
+  md.push("falhas/ilegíveis e issues block, com duração/tokens na mesma ordem de grandeza.");
+
+  const report = md.join("\n") + "\n";
+  const outPath = arg("out");
+  if (outPath) { writeFileSync(outPath, report); console.error(`relatório → ${outPath}`); }
+  else writeFileSync(1, report);
 }
 
 const cmd = process.argv[2];
