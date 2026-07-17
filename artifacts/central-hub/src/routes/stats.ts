@@ -341,4 +341,92 @@ router.get("/", async (_req, res) => {
   });
 });
 
+/**
+ * GET /stats/quality — dashboard Qualidade IA (F6 dos PRDs 01–05).
+ * Tudo calculado dos dados que a F2/F5 passaram a gravar: fail_reason
+ * agregado, score/cobertura médios, números sem fonte, auditorias, taxa de
+ * erro de IA por provider/propósito e fontes problemáticas (detector de
+ * scrape quebrado). Contrato aditivo: só ganha chaves.
+ */
+router.get("/quality", async (_req, res) => {
+  const failReasons = async (days: number) => db
+    .select({ reason: newsItemsTable.failReason, n: sql<number>`count(*)::int` })
+    .from(newsItemsTable)
+    .where(sql`${newsItemsTable.updatedAt} >= ${spSince(days)} and ${newsItemsTable.status} = 'failed'`)
+    .groupBy(newsItemsTable.failReason)
+    .orderBy(sql`count(*) desc`)
+    .limit(15);
+
+  const [failReasons7d, failReasons30d] = await Promise.all([failReasons(6), failReasons(29)]);
+
+  const [rw] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      avgScore: sql<number | null>`round(avg(${rewritesTable.qualityScore}))::int`,
+      avgCoverage: sql<number | null>`round(avg(${rewritesTable.fidelityCoverage}))::int`,
+      withInvented: sql<number>`count(*) filter (where jsonb_array_length(coalesce(${rewritesTable.inventedNumbers}, '[]'::jsonb)) > 0)::int`,
+      avgDurationMs: sql<number | null>`round(avg(${rewritesTable.durationMs}))::int`,
+    })
+    .from(rewritesTable)
+    .where(sql`${rewritesTable.createdAt} >= ${spSince(6)} and ${rewritesTable.status} = 'ok' and ${rewritesTable.blogId} is null`);
+
+  const scoreBuckets = await db
+    .select({
+      bucket: sql<number>`least(4, floor(coalesce(${rewritesTable.qualityScore}, 0) / 20))::int`,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(rewritesTable)
+    .where(sql`${rewritesTable.createdAt} >= ${spSince(6)} and ${rewritesTable.status} = 'ok' and ${rewritesTable.blogId} is null and ${rewritesTable.qualityScore} is not null`)
+    .groupBy(sql`1`);
+
+  const audits = await db
+    .select({ status: rewritesTable.auditStatus, n: sql<number>`count(*)::int` })
+    .from(rewritesTable)
+    .where(sql`${rewritesTable.createdAt} >= ${spSince(29)} and ${rewritesTable.auditStatus} is not null`)
+    .groupBy(rewritesTable.auditStatus);
+
+  const aiCalls = await db
+    .select({
+      provider: aiUsageEventsTable.provider,
+      purpose: aiUsageEventsTable.purpose,
+      calls: sql<number>`count(*)::int`,
+      errors: sql<number>`count(*) filter (where ${aiUsageEventsTable.ok} = false)::int`,
+      avgDurationMs: sql<number | null>`round(avg(${aiUsageEventsTable.durationMs}))::int`,
+    })
+    .from(aiUsageEventsTable)
+    .where(sql`${aiUsageEventsTable.createdAt} >= ${spSince(6)}`)
+    .groupBy(aiUsageEventsTable.provider, aiUsageEventsTable.purpose)
+    .orderBy(sql`count(*) desc`);
+
+  const problemSources = await db
+    .select({
+      sourceName: newsItemsTable.sourceName,
+      total: sql<number>`count(*)::int`,
+      failed: sql<number>`count(*) filter (where ${newsItemsTable.status} = 'failed')::int`,
+      thinSource: sql<number>`count(*) filter (where ${newsItemsTable.failReason} = 'thin_source')::int`,
+      offTopic: sql<number>`count(*) filter (where ${newsItemsTable.failReason} = 'off_topic_rewrite')::int`,
+      shortContent: sql<number>`count(*) filter (where ${newsItemsTable.failReason} in ('short_content', 'no_content'))::int`,
+    })
+    .from(newsItemsTable)
+    .where(sql`${newsItemsTable.createdAt} >= ${spSince(29)}`)
+    .groupBy(newsItemsTable.sourceName)
+    .having(sql`count(*) filter (where ${newsItemsTable.status} = 'failed') > 0`)
+    .orderBy(sql`count(*) filter (where ${newsItemsTable.status} = 'failed') desc`)
+    .limit(12);
+
+  res.json({
+    failReasons7d,
+    failReasons30d,
+    rewrites7d: rw ?? null,
+    scoreBuckets7d: scoreBuckets,
+    audits30d: audits,
+    aiCalls7d: aiCalls,
+    problemSources30d: problemSources.map((p) => ({
+      ...p,
+      failPct: p.total > 0 ? Math.round((p.failed / p.total) * 100) : 0,
+    })),
+    generatedAt: new Date().toISOString(),
+  });
+});
+
 export default router;

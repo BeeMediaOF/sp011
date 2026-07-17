@@ -3,7 +3,7 @@ import { Link, Route, Switch, useLocation } from "wouter";
 import {
   LayoutDashboard, Globe, SlidersHorizontal, Rss, FileText, ClipboardCheck,
   Send, BarChart2, ScrollText, Settings as SettingsIcon, LogOut, Moon, Sun, Radio,
-  PenSquare, Clapperboard,
+  PenSquare, Clapperboard, ShieldCheck,
 } from "lucide-react";
 import { getToken, setToken, api } from "./api";
 import { getStoredUser, clearStoredUser } from "./user";
@@ -19,6 +19,7 @@ import Review from "./pages/Review";
 import Deliveries from "./pages/Deliveries";
 import Settings from "./pages/Settings";
 import Usage from "./pages/Usage";
+import Quality from "./pages/Quality";
 import Logs from "./pages/Logs";
 
 const NAV = [
@@ -32,6 +33,7 @@ const NAV = [
   { href: "/revisao", label: "Revisão", sub: "Aprovação de entregas", icon: ClipboardCheck },
   { href: "/entregas", label: "Entregas", sub: "Fila de envio para os blogs", icon: Send },
   { href: "/consumo", label: "Consumo IA", sub: "Chamadas, tokens e custo", icon: BarChart2 },
+  { href: "/qualidade", label: "Qualidade IA", sub: "Score, falhas, auditoria e fontes problemáticas", icon: ShieldCheck },
   { href: "/logs", label: "Logs", sub: "Eventos do pipeline", icon: ScrollText },
   { href: "/configuracoes", label: "Configurações", sub: "Ajustes da central", icon: SettingsIcon },
 ];
@@ -137,6 +139,7 @@ export default function App() {
             <Route path="/revisao" component={Review} />
             <Route path="/entregas" component={Deliveries} />
             <Route path="/consumo" component={Usage} />
+            <Route path="/qualidade" component={Quality} />
             <Route path="/logs" component={Logs} />
             <Route path="/configuracoes" component={Settings} />
             <Route>Página não encontrada.</Route>
