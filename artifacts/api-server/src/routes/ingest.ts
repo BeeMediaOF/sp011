@@ -17,6 +17,7 @@ import { db, articlesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { verifyIngestSignature } from "@workspace/news-engine/signing";
 import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
+import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
 import { articleService } from "../lib/articleService.js";
 import { store } from "../lib/store.js";
 import { TAG_MAP } from "../lib/rssProcessor.js";
@@ -161,7 +162,9 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
     socialSummary: stripInlineHtml(article.socialSummary?.trim() ?? "") || undefined,
     socialHashtags: stripInlineHtml(article.socialHashtags?.trim() ?? "") || undefined,
     subtitle: stripInlineHtml(article.subtitle?.trim() ?? ""),
-    content: article.contentHtml.trim(),
+    // Corpo sanitizado NA ENTRADA (F7): script/iframe/handlers/javascript:
+    // nunca chegam ao banco — antes a defesa era só no render (SSR/DOMPurify)
+    content: sanitizeIngestHtml(article.contentHtml.trim()),
     category,
     // Categoria fora do mapa PT (ex.: slugs EN "world-cup"/"formula-1") vira
     // tag derivada dela mesma — nunca o rótulo "GERAL" em blog não-PT.

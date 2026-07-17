@@ -24,6 +24,9 @@ import {
 import { logger } from "./logger.js";
 import { store } from "./store.js";
 import { sanitizePlainField, sanitizeSocialTitle } from "@workspace/social-template";
+// Gates anti-alucinação espelhados da CENTRAL (F7 dos PRDs; incidente "Três
+// Moços"): subpath puro do news-engine — não puxa providers/@google.
+import { bestSocialTitle, plainTextLength, plainTextOf, rewriteMatchesSource } from "@workspace/news-engine/quality";
 
 // ── Content quality guard & JSON recovery ────────────────────────────────────
 
@@ -479,6 +482,18 @@ async function processItem(item: RewriteJobItem, helperProvider?: "gemini" | "pe
       "Rewriting queued article",
     );
 
+    // Fonte rasa (scrape quebrado, feed sem descrição): reescrever a partir
+    // de quase nada é alucinação na certa — exclui SEM gastar IA (espelho do
+    // gate thin_source da central).
+    if (plainTextLength(item.text) < 80) {
+      await articleService.deleteArticle(item.articleId);
+      _failedTotal++;
+      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: "Fonte sem texto utilizável — artigo excluído sem gastar IA (thin_source)" });
+      pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: "thin_source" });
+      logger.warn({ articleId: item.articleId }, "Rewrite queue: thin source — deleted without AI call");
+      return;
+    }
+
     let result: Awaited<ReturnType<typeof rewriteWithAI>>;
     if (helperProvider === "perplexity") {
       const p = await rewriteWithPerplexity(item);
@@ -548,6 +563,26 @@ async function processItem(item: RewriteJobItem, helperProvider?: "gemini" | "pe
       logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: deleted article — content unrenderable after recovery attempt");
       return;
     }
+
+    // Gate anti-alucinação (espelho do off_topic da central): reescrita sem
+    // termos distintivos em comum com a fonte = matéria inventada — excluir.
+    const rewritePlain = `${finalTitle ?? item.title} ${plainTextOf(finalContent)}`;
+    if (!rewriteMatchesSource(rewritePlain, `${item.title} ${item.text}`)) {
+      await articleService.deleteArticle(item.articleId);
+      _failedTotal++;
+      addLog({ type: "error", sourceName: item.sourceName, articleTitle: item.title, message: "Reescrita sem relação com a fonte (alucinação) — artigo excluído" });
+      pushHistory({ articleId: item.articleId, title: item.title, status: "failed", at: Date.now(), error: "off_topic_rewrite" });
+      logger.warn({ articleId: item.articleId, attempt }, "Rewrite queue: deleted article — rewrite does not match source");
+      return;
+    }
+
+    // Manchete social segura (espelho do bestSocialTitle da central): palavra
+    // inventada/colada pelo modelo cai no próprio título ("garantivaga").
+    finalSocialTitle = bestSocialTitle(
+      finalSocialTitle ?? null,
+      finalTitle || item.title,
+      `${finalTitle ?? item.title}\n${finalSubtitle ?? ""}\n${plainTextOf(finalContent)}`,
+    ) ?? undefined;
 
     await articleService.updateArticle(item.articleId, {
       ...(finalTitle          && { title:          finalTitle }),

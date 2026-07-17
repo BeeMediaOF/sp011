@@ -7,7 +7,9 @@
     ".": "./src/index.ts",
     "./signing": "./src/signing.ts",
     "./dedup": "./src/dedup.ts",
-    "./crypto": "./src/crypto.ts"
+    "./crypto": "./src/crypto.ts",
+    "./quality": "./src/quality.ts",
+    "./score": "./src/score.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

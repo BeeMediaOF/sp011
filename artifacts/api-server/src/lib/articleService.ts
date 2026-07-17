@@ -327,7 +327,20 @@ export const articleService = {
     bustCache();
     const now = new Date();
     const id  = randomUUID();
-    const slug = data.slug ?? slugify(data.title);
+    // Slug único (F7 dos PRDs): o índice de slug não é UNIQUE e uma colisão
+    // silenciosa fazia getArticle(slug) resolver sempre o artigo mais antigo
+    // (o novo ficava inacessível). Colisão → sufixo -2, -3, ...
+    const baseSlug = data.slug ?? slugify(data.title);
+    let slug = baseSlug;
+    for (let n = 2; n <= 50; n++) {
+      const [clash] = await db
+        .select({ id: articlesTable.id })
+        .from(articlesTable)
+        .where(eq(articlesTable.slug, slug))
+        .limit(1);
+      if (!clash) break;
+      slug = `${baseSlug}-${n}`;
+    }
 
     const rows = await db
       .insert(articlesTable)
