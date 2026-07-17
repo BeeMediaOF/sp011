@@ -137,6 +137,51 @@ export function socialTitleMatchesSource(socialTitle: string, sourceText: string
   return words.every((w) => hay.includes(w));
 }
 
+/** Palavras comuns (pt/en, 4+ letras, SEM acentos — o texto é normalizado
+ *  antes) que não contam como termo distintivo no gate anti-alucinação. */
+const REWRITE_MATCH_STOPWORDS = new Set([
+  // pt
+  "para", "como", "mais", "menos", "sobre", "entre", "apos", "antes", "contra",
+  "pelo", "pela", "pelos", "pelas", "seus", "suas", "essa", "esse", "esta",
+  "este", "isso", "aquela", "aquele", "ainda", "onde", "quando", "porque",
+  "muito", "muita", "muitos", "muitas", "foram", "sera", "serao", "pode",
+  "podem", "deve", "devem", "anos", "dias", "hoje", "amanha", "ontem",
+  "durante", "tambem", "depois", "nesta", "neste", "dessa", "desse", "desta",
+  "deste", "toda", "todo", "todas", "todos", "outra", "outro", "outras",
+  "outros", "quem", "qual", "quais", "ficou", "ficam", "fazer", "feito",
+  // en
+  "with", "that", "this", "from", "after", "before", "over", "into", "will",
+  "have", "been", "says", "said", "more", "than", "what", "when", "where",
+  "their", "there", "about", "against", "could", "would", "should",
+]);
+
+/**
+ * Gate anti-alucinação (incidente Oley 2026-07-17: scrape quebrado da Trivela
+ * → o modelo INVENTOU uma notícia do zero, "Pontes de Três Moços" no lugar do
+ * acerto do Arsenal): a reescrita precisa compartilhar termos distintivos
+ * (4+ caracteres, sem stopwords) com o material ORIGINAL do feed (título +
+ * descrição). Comparação sem acentos/caixa; exige 2 termos em comum (1 quando
+ * o original só tem 1 termo distintivo). Original sem nenhum termo distintivo
+ * passa — não dá para julgar.
+ */
+export function rewriteMatchesSource(rewriteText: string, sourceText: string): boolean {
+  const tokens = new Set(
+    (normForCompare(sourceText).match(/[a-z0-9]{4,}/g) ?? [])
+      .filter((w) => !REWRITE_MATCH_STOPWORDS.has(w)),
+  );
+  if (tokens.size === 0) return true;
+  const hay = normForCompare(rewriteText);
+  const needed = Math.min(2, tokens.size);
+  let hits = 0;
+  for (const t of tokens) {
+    if (hay.includes(t)) {
+      hits++;
+      if (hits >= needed) return true;
+    }
+  }
+  return false;
+}
+
 /** Título cortado no limite da arte (85), sem cortar palavra no meio. */
 export function socialTitleFromTitle(title: string, max = 85): string {
   const t = title.trim();

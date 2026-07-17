@@ -28,6 +28,7 @@ import {
   plainTextLength,
   plainTextOf,
   resolvePrompt,
+  rewriteMatchesSource,
   rewriteNews,
   rewriteWithPerplexity,
   type RewriteEngineConfig,
@@ -48,6 +49,12 @@ const MAX_ATTEMPTS = 3;
  * do prompt (lead + seções + FAQ) passa disto com folga.
  */
 const MIN_REWRITE_PLAIN_CHARS = 700;
+/**
+ * Fonte com menos texto que isto (scrape quebrado, página "ao vivo", feed sem
+ * descrição) nem vai para a IA: reescrever a partir de quase nada é a receita
+ * da alucinação (incidente "Três Moços"/Oley 2026-07-17) — failed thin_source.
+ */
+const MIN_SOURCE_PLAIN_CHARS = 80;
 const MAX_CONCURRENCY = 6;
 /** Quantos artigos o reforço processa em paralelo (além da lane principal). */
 const HELPER_CONCURRENCY = 2;
@@ -230,10 +237,16 @@ async function saveRewrite(
   via?: string,
   /** Idioma do texto reescrito = idioma da fonte (o prompt não traduz). */
   language = "pt-BR",
-): Promise<"ok" | "unrenderable" | "too_short"> {
+): Promise<"ok" | "unrenderable" | "too_short" | "off_topic"> {
   const extracted = extractFromRawAI(out.content);
   if (!extracted) return "unrenderable";
   if (plainTextLength(extracted.content) < MIN_REWRITE_PLAIN_CHARS) return "too_short";
+  // Gate anti-alucinação: reescrita sem NENHUM termo distintivo do item do
+  // feed = matéria inventada pelo modelo — nunca gravar/publicar.
+  if (!rewriteMatchesSource(
+    `${out.title || extracted.title || ""} ${plainTextOf(extracted.content)}`,
+    `${item.title} ${item.description ?? ""}`,
+  )) return "off_topic";
 
   // Manchete da arte: guarda contra palavra inventada/colada pelo modelo
   // ("garantivaga") — se não bater com o material, cai no próprio título.
@@ -310,6 +323,23 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
     .returning({ id: newsItemsTable.id });
   if (claimed.length === 0) return;
 
+  // Fonte rasa (scrape quebrado, página "ao vivo", feed sem descrição): falha
+  // imediata SEM gastar IA — reescrever a partir de quase nada é alucinação
+  // na certa (o modelo inventa a matéria inteira).
+  const sourcePlain = plainTextLength(item.contentRaw ?? item.description ?? "");
+  if (sourcePlain < MIN_SOURCE_PLAIN_CHARS) {
+    await db
+      .update(newsItemsTable)
+      .set({ status: "failed", failReason: "thin_source", updatedAt: new Date() })
+      .where(eq(newsItemsTable.id, item.id));
+    _attempts.delete(item.id);
+    logEvent({
+      module: "rewriter", level: "warn", refType: "news_item", refId: item.id,
+      message: `Fonte sem texto utilizável (${sourcePlain} chars) — descartada sem IA: ${item.title}`,
+    });
+    return;
+  }
+
   const isHelper = !!helperProvider;
   if (isHelper) _activeHelpers++;
   const s = getSettings();
@@ -371,29 +401,34 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
       return;
     }
 
-    if (saved === "too_short") {
+    if (saved === "too_short" || saved === "off_topic") {
+      const motivo = saved === "off_topic" ? "sem relação com o original (alucinação)" : "curta demais";
       if (isHelper) {
         await requeue(item);
-        logger.warn({ newsItemId: item.id, helperProvider }, "Reforço: reescrita curta demais — item devolvido à lane principal");
+        logger.warn({ newsItemId: item.id, helperProvider, saved }, `Reforço: reescrita ${motivo} — item devolvido à lane principal`);
         return;
       }
-      // Toco na lane principal: retenta (outra chamada pode render matéria
-      // inteira); persistindo, marca failed para não publicar incompleta.
+      // Reprovada na lane principal: retenta (outra chamada pode sair fiel e
+      // inteira); persistindo, marca failed para não publicar lixo.
       const attempts = (_attempts.get(item.id) ?? 0) + 1;
       _attempts.set(item.id, attempts);
       if (attempts >= MAX_ATTEMPTS) {
         await db
           .update(newsItemsTable)
-          .set({ status: "failed", failReason: "short_rewrite", updatedAt: new Date() })
+          .set({
+            status: "failed",
+            failReason: saved === "off_topic" ? "off_topic_rewrite" : "short_rewrite",
+            updatedAt: new Date(),
+          })
           .where(eq(newsItemsTable.id, item.id));
         _attempts.delete(item.id);
         logEvent({
           module: "rewriter", level: "warn", refType: "news_item", refId: item.id,
-          message: `Reescrita saiu curta demais ${MAX_ATTEMPTS}x — descartada: ${item.title}`,
+          message: `Reescrita ${motivo} ${MAX_ATTEMPTS}x — descartada: ${item.title}`,
         });
       } else {
         await requeue(item);
-        logger.warn({ newsItemId: item.id, attempts }, "Reescrita curta demais — retentará");
+        logger.warn({ newsItemId: item.id, attempts, saved }, `Reescrita ${motivo} — retentará`);
       }
       return;
     }

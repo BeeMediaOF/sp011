@@ -5,6 +5,7 @@ import {
   extractFromRawAI,
   isContentRenderable,
   plainTextLength,
+  rewriteMatchesSource,
   socialTitleFromTitle,
   socialTitleMatchesSource,
 } from "../src/quality.ts";
@@ -103,5 +104,47 @@ describe("socialTitleFromTitle / bestSocialTitle", () => {
     assert.equal(bestSocialTitle("ESPANHA GARANTE VAGA", title, source), "ESPANHA GARANTE VAGA");
     assert.equal(bestSocialTitle(null, title, source), title);
     assert.equal(bestSocialTitle("", "", ""), null);
+  });
+});
+
+describe("rewriteMatchesSource (gate anti-alucinação)", () => {
+  const FONTE_ARSENAL = "Arsenal encaminha acerto com Tzolis para repor saída de Gabriel Martinelli";
+
+  it("reescrita inventada do zero (incidente Três Moços) → reprovada", () => {
+    const alucinada = "NOVA LINHA NA HISTÓRIA: PONTES DE TRÊS MOÇOS ABRIRÁ " +
+      "Prefeitura anuncia investimento recorde para melhorar acesso do município a Curitiba; " +
+      "obra vai impactar 12 mil moradores e gerar 300 empregos diretos.";
+    assert.equal(rewriteMatchesSource(alucinada, FONTE_ARSENAL), false);
+  });
+
+  it("reescrita fiel (mantém entidades do original) → aprovada", () => {
+    const fiel = "Arsenal avança por Tzolis: grego é o alvo para o lugar de Martinelli. " +
+      "O clube inglês encaminhou as bases salariais com o atacante.";
+    assert.equal(rewriteMatchesSource(fiel, FONTE_ARSENAL), true);
+  });
+
+  it("comparação ignora acentos e caixa", () => {
+    assert.equal(rewriteMatchesSource(
+      "SAO PAULO ANUNCIA NOVA LINHA DE METRO com estações na zona leste",
+      "São Paulo anuncia nova linha de metrô",
+    ), true);
+  });
+
+  it("stopwords em comum não contam como relação", () => {
+    // "sobre", "depois", "ainda" aparecem nos dois, mas nenhum termo distintivo
+    assert.equal(rewriteMatchesSource(
+      "Governo fala sobre impostos e ainda avalia mudanças depois do feriado",
+      "Flamengo vence sobre o Palmeiras e ainda sonha com o título depois da rodada",
+    ), false);
+  });
+
+  it("original com 1 termo distintivo exige só esse termo", () => {
+    assert.equal(rewriteMatchesSource("O Corinthians venceu de virada", "Corinthians hoje"), true);
+    assert.equal(rewriteMatchesSource("O Flamengo venceu de virada", "Corinthians hoje"), false);
+  });
+
+  it("original sem termo distintivo (não dá para julgar) → passa", () => {
+    assert.equal(rewriteMatchesSource("Qualquer texto reescrito", ""), true);
+    assert.equal(rewriteMatchesSource("Qualquer texto reescrito", "de o a e"), true);
   });
 });
