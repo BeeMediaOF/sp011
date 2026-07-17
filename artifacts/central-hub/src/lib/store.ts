@@ -75,6 +75,32 @@ export interface HubSettings {
   /** Teto diário de traduções (0/ausente = sem teto) — guarda de quota. */
   translationMaxPerDay?: number;
 
+  // ── Qualidade & Validação (PRDs 01–05, 2026-07) ────────────────────────────
+  /**
+   * Política das validações de reescrita (validate/score do news-engine):
+   * "off" = nem calcula; "log" = calcula, persiste e loga SEM bloquear
+   * (default — fase de calibração); "enforce" = issues block/coverage abaixo
+   * do piso entram no fluxo de retry→failed. Rollback instantâneo: voltar
+   * para "log" (sem deploy).
+   */
+  validationMode?: "off" | "log" | "enforce";
+  /** Fonte com menos texto visível que isto nem vai à IA (default 80). */
+  minSourcePlainChars?: number;
+  /** Reescrita com menos texto visível que isto é um toco (default 700). */
+  minRewritePlainChars?: number;
+  /** Piso de cobertura (%) do gate off_topic em enforce (default 0 = só o
+   *  critério clássico de 2 termos; calibrar com dados do modo log). */
+  fidelityMinCoverage?: number;
+  /** Teto (%) da banda borderline que dispara a IA Auditora (default 60). */
+  fidelityAuditBand?: number;
+  /** Confiança mínima (0-100) da categoria do classificador (default 70). */
+  categoryConfidenceMin?: number;
+  /** IA Auditora (F5): só roda em casos borderline. Default false. */
+  auditEnabled?: boolean;
+  /** Provider da auditoria (default "gemini" — juiz melhor que o 7B local). */
+  auditProvider?: "gemini" | "openai" | "ollama";
+  auditModel?: string;
+
   // ── Automação Social (repostagem de vídeos TikTok/Instagram) ───────────────
   /** Liga os workers de download/publicação de vídeos (default false). */
   socialEnabled?: boolean;
@@ -111,6 +137,7 @@ const DEFAULT_SETTINGS: HubSettings = {
   maxPendingRewrites: 30,
   rewriteEnabled: true,
   deliveryEnabled: true,
+  validationMode: "log",
 };
 
 /** Campos secretos do blob hub_settings (criptografados at-rest). */

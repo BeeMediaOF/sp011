@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, jsonb, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 /**
@@ -25,6 +25,22 @@ export const rewritesTable = pgTable("rewrites", {
   attempts:       integer("attempts").notNull().default(0),
   status:         text("status").notNull().default("ok"), // 'ok' | 'failed'
   errorMessage:   text("error_message"),
+  // ── Qualidade IA (PRDs 01–05, 2026-07) — tudo nullable/aditivo ────────────
+  /** Versão do prompt de reescrita usado (PROMPT_VERSION do news-engine). */
+  promptVersion:  text("prompt_version"),
+  /** Nota 0–100 calculada em código (qualityScore — fidelidade dominante). */
+  qualityScore:   integer("quality_score"),
+  /** % dos termos distintivos do feed cobertos pela reescrita (0–100). */
+  fidelityCoverage: integer("fidelity_coverage"),
+  /** Números da reescrita ausentes do material da fonte (string[]). */
+  inventedNumbers: jsonb("invented_numbers"),
+  /** Issues da validação estrutural (ValidationIssue[] do news-engine). */
+  validationIssues: jsonb("validation_issues"),
+  /** null (sem auditoria) | 'passed' | 'flagged' (→ revisão) | 'rejected'. */
+  auditStatus:    text("audit_status"),
+  auditNotes:     text("audit_notes"),
+  /** Duração da chamada de IA que gerou esta reescrita (ms). */
+  durationMs:     integer("duration_ms"),
   createdAt:      timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   // No máximo UMA reescrita compartilhada por notícia

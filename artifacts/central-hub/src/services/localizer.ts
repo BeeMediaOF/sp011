@@ -41,6 +41,7 @@ import {
 } from "@workspace/news-engine";
 import { and, asc, count, eq, gte, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { getSettings, type HubSettings } from "../lib/store.js";
+import { logAiCallError } from "../lib/aiUsage.js";
 import { getGeminiPool } from "../lib/aiPool.js";
 import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
@@ -119,6 +120,7 @@ async function translationsToday(): Promise<number> {
 async function logUsage(
   usage: TokenUsage | undefined, purpose: "translate" | "classify",
   newsItemId: string, rewriteId: string | null,
+  durationMs?: number,
 ): Promise<void> {
   if (!usage) return;
   await db.insert(aiUsageEventsTable).values({
@@ -131,6 +133,7 @@ async function logUsage(
     outputTokens: usage.outputTokens ?? null,
     totalTokens: usage.totalTokens ?? null,
     purpose,
+    durationMs: durationMs ?? null,
   });
 }
 
@@ -174,6 +177,7 @@ async function ensureTranslatedRewrite(
   }
 
   // 3. Tradução (com a taxonomia do blog no MESMO prompt)
+  const t0 = Date.now();
   const out = await translateRewrite(
     {
       title: shared.title ?? "",
@@ -240,7 +244,7 @@ async function ensureTranslatedRewrite(
     })
     .returning();
 
-  await logUsage(out.usage, "translate", delivery.newsItemId, inserted[0]?.id ?? null);
+  await logUsage(out.usage, "translate", delivery.newsItemId, inserted[0]?.id ?? null, Date.now() - t0);
 
   if (inserted.length > 0) {
     return { rewrite: inserted[0]!, aiCategory: out.category, translated: true };
@@ -299,6 +303,7 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
     // reuso/only-classify), chamada barata com título+resumo. NUNCA bloqueia.
     if (needsClassification(blog.categories, delivery.targetCategory) && !aiCategory) {
       try {
+        const tClassify = Date.now();
         const res = await classifyArticle(
           {
             title: finalRewrite.title ?? "",
@@ -316,7 +321,7 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
             "Classificação sem categoria válida — fallback residual",
           );
         }
-        await logUsage(res.usage, "classify", delivery.newsItemId, finalRewrite.id);
+        await logUsage(res.usage, "classify", delivery.newsItemId, finalRewrite.id, Date.now() - tClassify);
       } catch (err) {
         // Quota/provider fora do ar NÃO pode decidir categoria errada em
         // definitivo: repassa ao catch externo, que adia a entrega 5 min sem
@@ -349,6 +354,10 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
     _attempts.delete(delivery.id);
   } catch (err) {
     const msg = String(err);
+    void logAiCallError({
+      newsItemId: delivery.newsItemId, provider: s.translationProvider ?? s.aiProvider ?? "gemini",
+      purpose: "translate", errorMessage: msg,
+    });
 
     // Provider indisponível/quota: não consome tentativa, re-tenta em 5 min
     if (isProviderUnavailableError(msg)) {

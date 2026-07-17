@@ -5,6 +5,14 @@
  */
 import type { PromptsBlob } from "./types.ts";
 
+/**
+ * Versão do prompt de reescrita padrão — carimbada em `rewrites.prompt_version`
+ * para correlacionar qualidade com versão (PRD 05). Histórico:
+ * - 1.0.0 (2026-07-17): baseline — o prompt aprovado em produção, sem mudanças
+ *   (o versionamento começou aqui; ver docs/IA_PIPELINE.md §6 para a análise).
+ */
+export const PROMPT_VERSION = "1.0.0";
+
 // ─── SEO / AIO journalist prompt ──────────────────────────────────────────────
 
 export const DEFAULT_PROMPT_TEMPLATE = `## PAPEL

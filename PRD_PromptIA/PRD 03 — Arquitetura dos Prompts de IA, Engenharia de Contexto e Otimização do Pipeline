@@ -1,0 +1,496 @@
+# PRD 03 — Arquitetura dos Prompts de IA, Engenharia de Contexto e Otimização do Pipeline
+
+> Documento técnico para implementação no Claude Code.
+
+---
+
+# Objetivo
+
+Este documento define como toda a arquitetura de prompts do sistema deverá evoluir.
+
+O objetivo **não é substituir os prompts atuais**.
+
+O objetivo é transformar os prompts existentes em prompts extremamente robustos, previsíveis, fáceis de manter e resistentes a alucinações.
+
+O padrão atual de escrita foi aprovado e deve continuar sendo preservado.
+
+Todo o trabalho consiste em fortalecer esse padrão.
+
+---
+
+# Princípio mais importante
+
+Nunca trate um prompt apenas como um texto.
+
+Cada prompt é uma regra de negócio.
+
+Ele deve ser:
+
+- previsível;
+- determinístico;
+- modular;
+- reutilizável;
+- facilmente evolutivo.
+
+Evite criar prompts gigantes contendo centenas de instruções sem organização.
+
+A organização influencia diretamente na qualidade das respostas.
+
+---
+
+# Objetivos
+
+Os novos prompts devem:
+
+- reduzir ambiguidades;
+- reduzir criatividade desnecessária;
+- reduzir alucinações;
+- aumentar consistência;
+- aumentar previsibilidade;
+- aumentar fidelidade factual;
+- melhorar SEO;
+- melhorar Google Discover;
+- melhorar classificação.
+
+Sempre priorizar precisão.
+
+---
+
+# Primeira etapa
+
+Antes de modificar qualquer prompt:
+
+Analisar completamente:
+
+- prompt de reescrita;
+- prompt de título;
+- prompt de categoria;
+- prompt de SEO;
+- prompt de resumo;
+- prompt de tags.
+
+Documentar:
+
+- pontos fortes;
+- pontos fracos;
+- ambiguidades;
+- regras conflitantes;
+- instruções redundantes.
+
+Nenhum prompt deve ser alterado antes dessa análise.
+
+---
+
+# Preservação do padrão atual
+
+A maior regra deste projeto é:
+
+Não alterar o estilo editorial.
+
+O padrão atual de escrita deve continuar existindo.
+
+A missão é:
+
+melhorar a arquitetura.
+
+Não mudar a identidade do texto.
+
+---
+
+# Estrutura recomendada dos prompts
+
+Todos os prompts devem seguir uma estrutura organizada.
+
+Exemplo:
+
+## Papel
+
+Quem a IA é.
+
+Exemplo:
+
+Você é um jornalista profissional especializado em reescrever notícias mantendo absoluta fidelidade aos fatos.
+
+---
+
+## Objetivo
+
+Explicar claramente o resultado esperado.
+
+Nunca utilizar objetivos vagos.
+
+---
+
+## Entrada
+
+Descrever exatamente quais dados serão recebidos.
+
+---
+
+## Restrições
+
+Criar uma lista explícita.
+
+Exemplo:
+
+Nunca invente informações.
+
+Nunca utilize conhecimento externo.
+
+Nunca altere números.
+
+Nunca altere datas.
+
+Nunca altere nomes.
+
+Nunca altere estatísticas.
+
+Nunca altere placares.
+
+Nunca conclua algo que o texto não afirma.
+
+---
+
+## Processo interno
+
+Descrever como a IA deve raciocinar.
+
+Exemplo:
+
+1. Ler completamente a notícia.
+
+2. Identificar fatos.
+
+3. Identificar contexto.
+
+4. Identificar entidades.
+
+5. Identificar tema principal.
+
+6. Somente depois iniciar a reescrita.
+
+---
+
+## Formato da saída
+
+Nunca depender de texto livre.
+
+Sempre retornar JSON estruturado.
+
+---
+
+# Engenharia do Prompt de Reescrita
+
+O prompt atual deve ser mantido.
+
+Adicionar melhorias como:
+
+- regras anti-alucinação;
+- validação interna;
+- preservação de fatos;
+- preservação de contexto;
+- preservação cronológica.
+
+A IA nunca deve:
+
+- adicionar contexto;
+- remover fatos importantes;
+- criar estatísticas;
+- criar declarações;
+- criar citações.
+
+---
+
+# Engenharia do Prompt do Título
+
+O título deve ser tratado como um problema independente.
+
+Criar regras como:
+
+priorizar:
+
+- assunto principal;
+- entidade principal;
+- ação principal.
+
+Evitar:
+
+- exageros;
+- clickbait enganoso;
+- promessas falsas.
+
+---
+
+# Engenharia do Prompt de Categoria
+
+Transformar completamente o prompt atual.
+
+Ele não deve gerar texto.
+
+Ele deve funcionar como um classificador.
+
+Etapas:
+
+1.
+
+Identificar tema.
+
+2.
+
+Identificar assunto predominante.
+
+3.
+
+Identificar entidades.
+
+4.
+
+Comparar todas as categorias.
+
+5.
+
+Escolher apenas uma.
+
+6.
+
+Calcular confiança.
+
+Nunca utilizar apenas palavras isoladas.
+
+Sempre utilizar contexto.
+
+---
+
+# Engenharia do Prompt de SEO
+
+Gerar:
+
+- meta description;
+- slug;
+- palavras-chave;
+- tags.
+
+Tudo baseado exclusivamente na notícia.
+
+Nunca criar palavras-chave irrelevantes apenas por SEO.
+
+---
+
+# Engenharia de Contexto
+
+Todos os prompts devem receber apenas o contexto necessário.
+
+Evitar enviar informações desnecessárias.
+
+Quanto menor o contexto útil, maior tende a ser a precisão.
+
+---
+
+# Estratégia de Few-shot
+
+Quando fizer sentido, utilizar exemplos.
+
+Mas:
+
+Os exemplos devem representar exatamente o padrão aprovado pelo projeto.
+
+Nunca utilizar exemplos genéricos.
+
+Criar poucos exemplos de alta qualidade.
+
+---
+
+# Cadeia de raciocínio
+
+Não solicitar que a IA exponha seu raciocínio.
+
+Em vez disso:
+
+Definir claramente o processo que ela deve seguir.
+
+Exemplo:
+
+- identificar fatos;
+- identificar contexto;
+- validar coerência;
+- produzir resultado.
+
+---
+
+# JSON Padronizado
+
+Todos os prompts devem retornar estruturas padronizadas.
+
+Nunca respostas imprevisíveis.
+
+Exemplo de campos:
+
+titulo
+
+conteudo
+
+resumo
+
+slug
+
+categoria
+
+confianca_categoria
+
+meta_description
+
+tags
+
+score
+
+alertas
+
+observacoes
+
+A estrutura deve permanecer compatível entre versões.
+
+---
+
+# Compatibilidade
+
+Mudanças futuras nos prompts não devem quebrar o backend.
+
+Caso novos campos sejam adicionados:
+
+eles devem ser opcionais.
+
+---
+
+# Versionamento
+
+Todos os prompts devem possuir:
+
+- versão;
+- data;
+- histórico de alterações.
+
+Exemplo:
+
+Prompt:
+
+rewrite_news
+
+Versão:
+
+2.3.0
+
+---
+
+# Configuração centralizada
+
+Evitar prompts espalhados pelo código.
+
+Criar uma arquitetura onde todos os prompts estejam centralizados.
+
+Objetivos:
+
+- facilitar manutenção;
+- facilitar auditoria;
+- facilitar testes.
+
+---
+
+# Testes
+
+Criar uma suíte de testes para prompts.
+
+Utilizar dezenas de notícias reais.
+
+Testar:
+
+- política;
+- esportes;
+- tecnologia;
+- economia;
+- entretenimento;
+- internacional.
+
+Comparar:
+
+- qualidade;
+- fidelidade;
+- SEO;
+- categoria;
+- títulos.
+
+---
+
+# Benchmarks
+
+Antes de substituir qualquer prompt:
+
+Executar benchmark.
+
+Comparar:
+
+Prompt atual
+
+×
+
+Prompt novo.
+
+Métricas:
+
+- qualidade;
+- tempo;
+- consumo de tokens;
+- fidelidade;
+- categoria.
+
+Somente substituir quando houver melhoria comprovada.
+
+---
+
+# Critérios de aceite
+
+O trabalho somente será considerado concluído quando:
+
+- o padrão editorial atual permanecer intacto;
+- os prompts ficarem mais organizados;
+- a arquitetura estiver modular;
+- houver redução mensurável de erros;
+- houver redução de ambiguidades;
+- os prompts forem mais fáceis de evoluir.
+
+---
+
+# Ordem de implementação
+
+1. Inventariar todos os prompts existentes.
+
+2. Documentar suas responsabilidades.
+
+3. Identificar redundâncias.
+
+4. Padronizar a estrutura.
+
+5. Melhorar cada prompt individualmente.
+
+6. Executar testes comparativos.
+
+7. Medir consumo de tokens.
+
+8. Medir qualidade.
+
+9. Apresentar relatório.
+
+10. Somente depois substituir os prompts antigos.
+
+---
+
+# Importante
+
+Nunca assumir que um prompt está correto apenas porque funciona.
+
+Toda alteração deve ser baseada em:
+
+- testes;
+- métricas;
+- comparação com o comportamento atual.
+
+O objetivo final é construir uma arquitetura de prompts profissional, modular, previsível e preparada para evoluir continuamente, preservando o padrão editorial já aprovado e reduzindo drasticamente erros de classificação, SEO e reescrita.

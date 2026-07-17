@@ -4,6 +4,8 @@ export * from "./prompts.ts";
 export * from "./scrape.ts";
 export * from "./rss.ts";
 export * from "./quality.ts";
+export * from "./score.ts";
+export * from "./validate.ts";
 export * from "./dedup.ts";
 export * from "./crypto.ts";
 export * from "./signing.ts";

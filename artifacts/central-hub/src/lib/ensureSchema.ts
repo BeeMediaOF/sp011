@@ -291,6 +291,18 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
   // Assinatura da publicação manual (2026-07): cobre instalações existentes
   { name: "news_items_author", query: sql`ALTER TABLE news_items ADD COLUMN IF NOT EXISTS author text` },
   { name: "news_items_image_credit", query: sql`ALTER TABLE news_items ADD COLUMN IF NOT EXISTS image_credit text` },
+  // ── Qualidade IA (PRDs 01–05, 2026-07): score/validação/auditoria ──────────
+  { name: "rewrites_prompt_version", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS prompt_version text` },
+  { name: "rewrites_quality_score", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS quality_score integer` },
+  { name: "rewrites_fidelity_coverage", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS fidelity_coverage integer` },
+  { name: "rewrites_invented_numbers", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS invented_numbers jsonb` },
+  { name: "rewrites_validation_issues", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS validation_issues jsonb` },
+  { name: "rewrites_audit_status", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS audit_status text` },
+  { name: "rewrites_audit_notes", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS audit_notes text` },
+  { name: "rewrites_duration_ms", query: sql`ALTER TABLE rewrites ADD COLUMN IF NOT EXISTS duration_ms integer` },
+  { name: "ai_usage_duration_ms", query: sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS duration_ms integer` },
+  { name: "ai_usage_ok", query: sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS ok boolean NOT NULL DEFAULT true` },
+  { name: "ai_usage_error_kind", query: sql`ALTER TABLE ai_usage_events ADD COLUMN IF NOT EXISTS error_kind text` },
 ];
 
 export async function ensureSchema(): Promise<void> {

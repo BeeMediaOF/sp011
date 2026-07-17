@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, boolean, timestamp, index } from "drizzle-orm/pg-core";
 
 /**
  * Consumo de tokens por chamada de IA (capturado do usageMetadata/usage).
@@ -16,6 +16,12 @@ export const aiUsageEventsTable = pgTable("ai_usage_events", {
   outputTokens: integer("output_tokens"),
   totalTokens:  integer("total_tokens"),
   purpose:      text("purpose").notNull().default("rewrite"),
+  /** Duração da chamada em ms (F2 dos PRDs — antes só a entrega HTTP media). */
+  durationMs:   integer("duration_ms"),
+  /** false = chamada falhou (antes só sucesso era registrado). */
+  ok:           boolean("ok").notNull().default(true),
+  /** Classe do erro quando ok=false (quota | auth | timeout | parse | other). */
+  errorKind:    text("error_kind"),
   createdAt:    timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [
   index("ai_usage_created_at_idx").on(t.createdAt),

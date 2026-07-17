@@ -1,0 +1,469 @@
+# PRD 04 — Plano de Implementação, Refatoração, Testes e Critérios de Aceite
+
+> Documento técnico para implementação no Claude Code.
+
+---
+
+# Objetivo
+
+Este documento define a estratégia de implementação de todas as melhorias propostas nos PRDs anteriores.
+
+O objetivo é garantir que a evolução do sistema aconteça de forma incremental, segura e totalmente reversível, evitando regressões e preservando o funcionamento do ambiente de produção.
+
+Nenhuma implementação deve ser feita diretamente sem antes seguir as fases descritas neste documento.
+
+---
+
+# Regra Principal
+
+**Não alterar o comportamento do sistema diretamente em produção.**
+
+Toda melhoria deve seguir um fluxo de implementação controlado.
+
+Cada etapa deve ser validada antes da próxima.
+
+Caso qualquer etapa apresente regressão, ela deverá ser revertida imediatamente.
+
+---
+
+# Objetivos da implementação
+
+A implementação deve buscar:
+
+- manter compatibilidade com o sistema atual;
+- preservar o padrão editorial;
+- reduzir alucinações;
+- reduzir erros de categoria;
+- melhorar SEO;
+- melhorar qualidade dos títulos;
+- reduzir consumo de tokens;
+- facilitar futuras evoluções.
+
+---
+
+# Levantamento inicial
+
+Antes de escrever qualquer linha de código, realizar um levantamento completo do sistema atual.
+
+Documentar:
+
+- arquitetura atual;
+- fluxo de publicação;
+- prompts existentes;
+- funções responsáveis pela IA;
+- funções responsáveis pelo RSS;
+- funções responsáveis pela publicação;
+- funções responsáveis pelo SEO;
+- funções responsáveis pelas categorias;
+- funções responsáveis pela comunicação com o Painel Central.
+
+Não modificar nada nesta etapa.
+
+O objetivo é compreender completamente a arquitetura existente.
+
+---
+
+# Inventário
+
+Criar um inventário contendo:
+
+## Prompts
+
+- nome;
+- localização;
+- responsabilidade;
+- entrada;
+- saída;
+- dependências.
+
+---
+
+## Serviços
+
+Documentar:
+
+- serviço de coleta;
+- serviço de IA;
+- serviço de publicação;
+- serviço de imagens;
+- serviço de SEO;
+- serviço de distribuição.
+
+---
+
+## Banco de Dados
+
+Documentar:
+
+- tabelas utilizadas;
+- campos utilizados;
+- relacionamentos;
+- índices.
+
+---
+
+# Mapeamento das dependências
+
+Antes de alterar qualquer função:
+
+Identificar:
+
+- quem chama essa função;
+- quem depende dessa função;
+- quais módulos utilizam essa saída;
+- possíveis impactos.
+
+Evitar alterações que quebrem compatibilidade.
+
+---
+
+# Estratégia de implementação
+
+A implementação deve acontecer por fases.
+
+Nunca alterar múltiplos módulos críticos simultaneamente.
+
+---
+
+# Fase 1
+
+## Auditoria
+
+Objetivos:
+
+- compreender arquitetura;
+- documentar fluxo;
+- identificar gargalos;
+- identificar redundâncias;
+- identificar código morto.
+
+Nenhuma alteração.
+
+---
+
+# Fase 2
+
+## Refatoração dos Prompts
+
+Executar:
+
+- melhoria dos prompts;
+- padronização;
+- modularização;
+- melhoria do JSON.
+
+Não alterar lógica de publicação.
+
+---
+
+# Fase 3
+
+## Validações
+
+Implementar:
+
+- validações estruturais;
+- validações semânticas;
+- score;
+- confiança;
+- logging.
+
+Ainda sem alterar a publicação.
+
+As validações apenas gerarão logs.
+
+---
+
+# Fase 4
+
+## Modo Shadow
+
+Criar um modo onde:
+
+o sistema atual continua publicando normalmente.
+
+O novo sistema executa em paralelo.
+
+Comparar:
+
+- categoria;
+- título;
+- SEO;
+- score;
+- qualidade.
+
+Nenhuma decisão do novo sistema deve afetar a produção.
+
+---
+
+# Fase 5
+
+## Comparação
+
+Comparar centenas de notícias reais.
+
+Registrar:
+
+- diferenças;
+- erros;
+- melhorias;
+- consumo de tokens;
+- tempo de processamento.
+
+Gerar relatório.
+
+---
+
+# Fase 6
+
+## Ativação Parcial
+
+Ativar inicialmente apenas:
+
+- validações;
+- logging;
+- score.
+
+Ainda manter o fluxo atual de publicação.
+
+---
+
+# Fase 7
+
+## Ativação Controlada
+
+Habilitar:
+
+- novo sistema de categorias;
+- novo sistema de SEO;
+- novo sistema de títulos.
+
+Sempre monitorando métricas.
+
+---
+
+# Fase 8
+
+## Ativação Completa
+
+Somente após todas as fases anteriores serem aprovadas.
+
+---
+
+# Estratégia de Testes
+
+Criar testes automatizados.
+
+Utilizar notícias reais.
+
+Categorias mínimas:
+
+- Futebol
+- Basquete
+- Fórmula 1
+- MMA
+- Tecnologia
+- Economia
+- Política
+- Internacional
+- Entretenimento
+- Ciência
+
+---
+
+# Casos de teste
+
+Testar:
+
+- notícias muito curtas;
+- notícias muito longas;
+- RSS incompleto;
+- HTML quebrado;
+- sem imagem;
+- múltiplas categorias;
+- títulos ambíguos;
+- datas conflitantes;
+- conteúdo duplicado;
+- idioma diferente.
+
+---
+
+# Benchmarks
+
+Executar benchmark entre:
+
+Sistema Atual
+
+×
+
+Sistema Novo
+
+Comparar:
+
+- tempo;
+- tokens;
+- categoria;
+- SEO;
+- fidelidade;
+- score.
+
+---
+
+# Métricas
+
+Criar indicadores como:
+
+## IA
+
+- chamadas;
+- tokens;
+- custo estimado;
+- tempo médio.
+
+---
+
+## Categorias
+
+- taxa de acerto;
+- categorias corrigidas;
+- categorias rejeitadas.
+
+---
+
+## Publicação
+
+- taxa de aprovação;
+- taxa de rejeição;
+- notícias auditadas;
+- duplicidades detectadas.
+
+---
+
+## SEO
+
+- tamanho médio dos títulos;
+- tamanho das meta descriptions;
+- densidade de palavras-chave.
+
+---
+
+# Logging
+
+Todo processo deve gerar logs.
+
+Registrar:
+
+- horário;
+- duração;
+- prompts utilizados;
+- versão dos prompts;
+- score;
+- confiança;
+- categoria;
+- decisão final.
+
+---
+
+# Rollback
+
+Toda alteração deve possuir rollback simples.
+
+Caso qualquer problema seja detectado:
+
+deve ser possível retornar ao comportamento anterior imediatamente.
+
+Nenhuma atualização deve impedir esse retorno.
+
+---
+
+# Compatibilidade
+
+Manter compatibilidade com:
+
+- Painel Central;
+- blogs conectados;
+- sistema de publicação;
+- banco de dados;
+- APIs existentes.
+
+Evitar breaking changes.
+
+Caso sejam necessárias mudanças estruturais:
+
+utilizar versionamento.
+
+---
+
+# Performance
+
+As melhorias não podem aumentar significativamente:
+
+- consumo de memória;
+- uso de CPU;
+- tempo médio de processamento;
+- consumo de tokens.
+
+Sempre medir antes e depois.
+
+---
+
+# Critérios de Aceite
+
+O projeto somente será considerado concluído quando:
+
+✓ O padrão editorial atual permanecer preservado.
+
+✓ O consumo de tokens permanecer igual ou menor.
+
+✓ A taxa de erros de categoria diminuir.
+
+✓ As alucinações forem reduzidas.
+
+✓ As validações bloquearem publicações incorretas.
+
+✓ O sistema continuar compatível com o Painel Central.
+
+✓ O sistema permanecer modular.
+
+✓ Todas as alterações forem documentadas.
+
+✓ Todos os testes forem aprovados.
+
+✓ O rollback estiver funcional.
+
+---
+
+# Entregáveis Esperados
+
+Ao final da implementação, o Claude Code deverá entregar:
+
+- documentação da arquitetura atual;
+- documentação da arquitetura nova;
+- relatório comparativo;
+- prompts revisados;
+- pipeline atualizado;
+- sistema de validação;
+- sistema de score;
+- sistema de auditoria;
+- testes automatizados;
+- métricas de desempenho;
+- plano de rollback;
+- documentação técnica completa.
+
+---
+
+# Instrução Final
+
+Não implemente imediatamente.
+
+Primeiro:
+
+1. Analise toda a base de código.
+2. Identifique todos os pontos impactados.
+3. Elabore um plano detalhado de implementação.
+4. Liste riscos e dependências.
+5. Apresente esse plano para aprovação.
+
+Somente após a aprovação, implemente as mudanças seguindo rigorosamente as fases definidas neste documento.
+
+O foco deste projeto não é apenas melhorar os prompts, mas construir uma arquitetura de IA escalável, auditável, modular e confiável, preparada para suportar múltiplos blogs, crescimento do sistema e futuras evoluções sem comprometer a estabilidade da plataforma.

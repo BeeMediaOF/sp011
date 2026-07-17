@@ -24,18 +24,23 @@ import {
 import {
   bestSocialTitle,
   extractFromRawAI,
+  fidelityReport,
   isKeyAuthError,
   plainTextLength,
   plainTextOf,
+  PROMPT_VERSION,
+  qualityScore,
   resolvePrompt,
-  rewriteMatchesSource,
   rewriteNews,
   rewriteWithPerplexity,
+  validateRewrite,
   type RewriteEngineConfig,
   type TokenUsage,
+  type ValidationIssue,
 } from "@workspace/news-engine";
 import { and, asc, count, eq, notInArray } from "drizzle-orm";
 import { getPrompts, getSettings, type HubSettings } from "../lib/store.js";
+import { logAiCallError } from "../lib/aiUsage.js";
 import { getGeminiPool } from "../lib/aiPool.js";
 import { dailyQuotaFilledReason } from "../lib/dailyQuota.js";
 import { logger } from "../lib/logger.js";
@@ -56,6 +61,17 @@ const MIN_REWRITE_PLAIN_CHARS = 700;
  */
 const MIN_SOURCE_PLAIN_CHARS = 80;
 const MAX_CONCURRENCY = 6;
+
+// Thresholds configuráveis (PRD 05 — defaults = comportamento clássico acima)
+function minSourceChars(s: HubSettings): number {
+  return Math.max(0, Math.floor(s.minSourcePlainChars ?? MIN_SOURCE_PLAIN_CHARS));
+}
+function minRewriteChars(s: HubSettings): number {
+  return Math.max(0, Math.floor(s.minRewritePlainChars ?? MIN_REWRITE_PLAIN_CHARS));
+}
+function validationMode(s: HubSettings): "off" | "log" | "enforce" {
+  return s.validationMode ?? "log";
+}
 /** Quantos artigos o reforço processa em paralelo (além da lane principal). */
 const HELPER_CONCURRENCY = 2;
 
@@ -226,9 +242,12 @@ async function runPerplexity(item: NewsItemRow, src: SourceCtx, s: HubSettings):
 
 /**
  * Valida (quality gate), grava a reescrita + consumo e marca o item como
- * rewritten. Devolve "unrenderable" quando o conteúdo é irrecuperável e
- * "too_short" quando saiu um toco — cada lane decide o que fazer (principal:
- * failed/retry; apoio/fallback: volta à fila).
+ * rewritten. Devolve "unrenderable" quando o conteúdo é irrecuperável,
+ * "too_short" quando saiu um toco e "off_topic" quando não bate com a fonte —
+ * cada lane decide o que fazer (principal: failed/retry; apoio/fallback:
+ * volta à fila). Desde a F2 dos PRDs também calcula validação estrutural +
+ * score de fidelidade em código e persiste tudo na reescrita; em
+ * `validationMode: "log"` (default) nada disso bloqueia — só registra.
  */
 async function saveRewrite(
   item: NewsItemRow,
@@ -237,16 +256,51 @@ async function saveRewrite(
   via?: string,
   /** Idioma do texto reescrito = idioma da fonte (o prompt não traduz). */
   language = "pt-BR",
-): Promise<"ok" | "unrenderable" | "too_short" | "off_topic"> {
+  /** Duração da chamada de IA (ms), medida pelo chamador. */
+  durationMs?: number,
+): Promise<"ok" | "unrenderable" | "too_short" | "off_topic" | "blocked"> {
   const extracted = extractFromRawAI(out.content);
   if (!extracted) return "unrenderable";
-  if (plainTextLength(extracted.content) < MIN_REWRITE_PLAIN_CHARS) return "too_short";
-  // Gate anti-alucinação: reescrita sem NENHUM termo distintivo do item do
-  // feed = matéria inventada pelo modelo — nunca gravar/publicar.
-  if (!rewriteMatchesSource(
-    `${out.title || extracted.title || ""} ${plainTextOf(extracted.content)}`,
-    `${item.title} ${item.description ?? ""}`,
-  )) return "off_topic";
+  if (plainTextLength(extracted.content) < minRewriteChars(s)) return "too_short";
+
+  const mode = validationMode(s);
+  const rewriteText = `${out.title || extracted.title || ""} ${plainTextOf(extracted.content)}`;
+  const feedText = `${item.title} ${item.description ?? ""}`;
+  // Baseline dos números inventados: TUDO que a IA recebeu (feed + scrape)
+  const fullSourceText = `${feedText} ${plainTextOf(item.contentRaw ?? "")}`;
+  const report = fidelityReport(rewriteText, feedText, fullSourceText);
+
+  // Gate anti-alucinação clássico: reescrita sem termos distintivos do item do
+  // feed = matéria inventada pelo modelo — nunca gravar/publicar. Em enforce,
+  // o piso contínuo de cobertura (calibrado no modo log) também derruba.
+  const matchesSource = report.totalTokens === 0
+    || report.matchedTokens >= Math.min(2, report.totalTokens);
+  const belowFloor = mode === "enforce"
+    && report.coverage < Math.max(0, s.fidelityMinCoverage ?? 0);
+  if (!matchesSource || belowFloor) return "off_topic";
+
+  // Validação estrutural + score em código (PRD 02) — em "off" nem calcula
+  let issues: ValidationIssue[] = [];
+  let score: number | null = null;
+  if (mode !== "off") {
+    issues = validateRewrite(extracted, fullSourceText, { minBodyChars: minRewriteChars(s) });
+    score = qualityScore({ coverage: report.coverage, inventedNumbers: report.inventedNumbers, issues });
+    const blocks = issues.filter((i) => i.severity === "block");
+    if (blocks.length > 0 || report.inventedNumbers.length > 0) {
+      logEvent({
+        module: "rewriter", level: "warn", refType: "news_item", refId: item.id,
+        message: `Validação (${mode}): score ${score}, cobertura ${report.coverage}%` +
+          (report.inventedNumbers.length ? `, números sem fonte: ${report.inventedNumbers.slice(0, 5).join(", ")}` : "") +
+          (blocks.length ? `, issues block: ${blocks.map((i) => i.code).join(", ")}` : ""),
+        meta: { score, coverage: report.coverage, issues, inventedNumbers: report.inventedNumbers },
+      });
+    }
+    // Enforce: defeito bloqueante (ex.: HTML perigoso) segue o fluxo do
+    // too_short — retenta e, persistindo, failed (nunca publica).
+    if (mode === "enforce" && blocks.some((i) => i.code === "html_dangerous")) {
+      return "blocked";
+    }
+  }
 
   // Manchete da arte: guarda contra palavra inventada/colada pelo modelo
   // ("garantivaga") — se não bater com o material, cai no próprio título.
@@ -276,6 +330,13 @@ async function saveRewrite(
     model: out.usage?.model ?? s.aiModel ?? null,
     attempts: (_attempts.get(item.id) ?? 0) + 1,
     status: "ok",
+    // Qualidade IA (F2): auditoria completa por publicação (PRD 05)
+    promptVersion: PROMPT_VERSION,
+    qualityScore: score,
+    fidelityCoverage: mode !== "off" ? report.coverage : null,
+    inventedNumbers: mode !== "off" ? report.inventedNumbers : null,
+    validationIssues: mode !== "off" ? issues : null,
+    durationMs: durationMs ?? null,
   });
 
   if (out.usage) {
@@ -289,6 +350,7 @@ async function saveRewrite(
       outputTokens: out.usage.outputTokens ?? null,
       totalTokens: out.usage.totalTokens ?? null,
       purpose: "rewrite",
+      durationMs: durationMs ?? null,
     });
   }
 
@@ -323,11 +385,13 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
     .returning({ id: newsItemsTable.id });
   if (claimed.length === 0) return;
 
+  const s = getSettings();
+
   // Fonte rasa (scrape quebrado, página "ao vivo", feed sem descrição): falha
   // imediata SEM gastar IA — reescrever a partir de quase nada é alucinação
   // na certa (o modelo inventa a matéria inteira).
   const sourcePlain = plainTextLength(item.contentRaw ?? item.description ?? "");
-  if (sourcePlain < MIN_SOURCE_PLAIN_CHARS) {
+  if (sourcePlain < minSourceChars(s)) {
     await db
       .update(newsItemsTable)
       .set({ status: "failed", failReason: "thin_source", updatedAt: new Date() })
@@ -342,7 +406,7 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
 
   const isHelper = !!helperProvider;
   if (isHelper) _activeHelpers++;
-  const s = getSettings();
+  const startedAt = Date.now();
 
   try {
     // Prompt: fonte > categoria > global > default (mesma hierarquia do blog)
@@ -380,7 +444,12 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
       );
     }
 
-    const saved = await saveRewrite(item, out, s, isHelper ? `apoio: ${helperProvider}` : undefined, src.language);
+    const saved = await saveRewrite(
+      item, out, s,
+      isHelper ? `apoio: ${helperProvider}` : undefined,
+      src.language,
+      Date.now() - startedAt,
+    );
     if (saved === "unrenderable") {
       if (isHelper) {
         // Falha da IA de apoio não pune o artigo: volta à fila para a lane principal
@@ -401,8 +470,10 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
       return;
     }
 
-    if (saved === "too_short" || saved === "off_topic") {
-      const motivo = saved === "off_topic" ? "sem relação com o original (alucinação)" : "curta demais";
+    if (saved === "too_short" || saved === "off_topic" || saved === "blocked") {
+      const motivo = saved === "off_topic" ? "sem relação com o original (alucinação)"
+        : saved === "blocked" ? "reprovada na validação (defeito bloqueante)"
+        : "curta demais";
       if (isHelper) {
         await requeue(item);
         logger.warn({ newsItemId: item.id, helperProvider, saved }, `Reforço: reescrita ${motivo} — item devolvido à lane principal`);
@@ -417,7 +488,8 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
           .update(newsItemsTable)
           .set({
             status: "failed",
-            failReason: saved === "off_topic" ? "off_topic_rewrite" : "short_rewrite",
+            failReason: saved === "off_topic" ? "off_topic_rewrite"
+              : saved === "blocked" ? "validation_blocked" : "short_rewrite",
             updatedAt: new Date(),
           })
           .where(eq(newsItemsTable.id, item.id));
@@ -436,6 +508,10 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
     if (isHelper) { refreshBoostDay(); _boostUsedToday++; }
   } catch (err) {
     const msg = String(err);
+    void logAiCallError({
+      newsItemId: item.id, provider: helperProvider ?? s.aiProvider,
+      purpose: "rewrite", errorMessage: msg, durationMs: Date.now() - startedAt,
+    });
 
     if (isHelper) {
       // Falha na IA de apoio não pode punir o artigo: volta à fila sem consumir
@@ -455,8 +531,9 @@ async function processItem(item: NewsItemRow, helperProvider?: HelperProvider): 
       if ((s.fallbackPerplexityEnabled ?? true) && perplexityKeys(s).length > 0) {
         try {
           const src = await loadSourceCtx(item);
+          const t0 = Date.now();
           const out = await runPerplexity(item, src, s);
-          const saved = await saveRewrite(item, out, s, "fallback: perplexity", src.language);
+          const saved = await saveRewrite(item, out, s, "fallback: perplexity", src.language, Date.now() - t0);
           if (saved === "ok") return;
         } catch (pErr) {
           logger.warn({ err: pErr, newsItemId: item.id }, "Fallback Perplexity falhou — item volta à fila");

@@ -1,0 +1,473 @@
+# PRD 05 — Governança da IA, Monitoramento Contínuo e Evolução da Plataforma
+
+> Documento técnico para implementação no Claude Code.
+
+---
+
+# Objetivo
+
+Este documento define as diretrizes de longo prazo para garantir que a arquitetura de Inteligência Artificial permaneça consistente, escalável, auditável e fácil de evoluir.
+
+O objetivo não é apenas construir um bom sistema hoje.
+
+O objetivo é impedir que futuras alterações degradem a qualidade do sistema.
+
+Todo novo recurso relacionado à IA deverá seguir estas regras.
+
+---
+
+# Filosofia
+
+O sistema deve evoluir continuamente.
+
+Cada melhoria deve ser baseada em dados reais.
+
+Nunca alterar prompts ou algoritmos apenas por intuição.
+
+Toda mudança deve possuir:
+
+- justificativa;
+- testes;
+- métricas;
+- comparação com a versão anterior.
+
+---
+
+# Princípios Fundamentais
+
+Toda decisão da IA deve obedecer aos seguintes princípios.
+
+## Precisão
+
+A precisão sempre possui prioridade máxima.
+
+Nunca sacrificar precisão para ganhar velocidade.
+
+---
+
+## Fidelidade
+
+A IA nunca poderá alterar fatos.
+
+Ela deve reorganizar informações.
+
+Nunca inventá-las.
+
+---
+
+## Consistência
+
+Duas notícias semelhantes devem produzir resultados semelhantes.
+
+Mudanças aleatórias de comportamento devem ser evitadas.
+
+---
+
+## Modularidade
+
+Cada componente deve possuir apenas uma responsabilidade.
+
+Exemplo:
+
+Reescrita
+
+↓
+
+Título
+
+↓
+
+SEO
+
+↓
+
+Categoria
+
+↓
+
+Validação
+
+↓
+
+Publicação
+
+Nunca criar funções responsáveis por múltiplas responsabilidades não relacionadas.
+
+---
+
+# Arquitetura Evolutiva
+
+Toda melhoria futura deve respeitar esta arquitetura.
+
+Novos módulos deverão ser adicionados sem alterar módulos já estáveis.
+
+Sempre preferir expansão em vez de reescrita.
+
+---
+
+# Versionamento
+
+Todos os prompts deverão possuir:
+
+Nome
+
+Versão
+
+Autor
+
+Data
+
+Descrição
+
+Histórico de alterações
+
+Exemplo
+
+```
+rewrite_news
+
+v2.4.1
+
+Criado:
+2026-07-17
+
+Mudanças:
+
+- melhoria SEO
+- melhoria categoria
+- redução de alucinação
+```
+
+Nunca substituir um prompt sem manter histórico.
+
+---
+
+# Versionamento dos Modelos
+
+Caso futuramente seja utilizada outra IA:
+
+GPT
+
+Claude
+
+Gemini
+
+Llama
+
+Mistral
+
+Cada modelo deverá possuir seu próprio histórico de desempenho.
+
+Nunca assumir que um modelo melhor em benchmarks será automaticamente melhor para este projeto.
+
+---
+
+# Benchmark Contínuo
+
+Criar uma base permanente de testes.
+
+Essa base deve conter centenas de notícias reais.
+
+Sempre que um prompt for alterado:
+
+Executar benchmark.
+
+Comparar:
+
+- qualidade;
+- fidelidade;
+- SEO;
+- categoria;
+- tempo;
+- tokens.
+
+Nenhuma alteração deve entrar em produção sem benchmark.
+
+---
+
+# Base Permanente de Testes
+
+Criar um conjunto fixo de notícias.
+
+Exemplo
+
+- Futebol
+- Basquete
+- Fórmula 1
+- Tênis
+- MMA
+- Economia
+- Política
+- Tecnologia
+- Internacional
+- Entretenimento
+
+Essas notícias nunca devem mudar.
+
+Assim será possível comparar diferentes versões da IA.
+
+---
+
+# Métricas Obrigatórias
+
+Monitorar continuamente.
+
+## IA
+
+- chamadas;
+- tokens;
+- custo;
+- tempo.
+
+---
+
+## Categorias
+
+- acertos;
+- erros;
+- revisões;
+- auditorias.
+
+---
+
+## SEO
+
+- CTR (quando disponível);
+- tamanho médio dos títulos;
+- qualidade das meta descriptions.
+
+---
+
+## Publicações
+
+- publicações por hora;
+- publicações rejeitadas;
+- duplicidades;
+- erros.
+
+---
+
+## Qualidade
+
+- score médio;
+- confiança média;
+- auditorias executadas.
+
+---
+
+# Dashboard de IA
+
+Criar um dashboard exclusivo para monitoramento da IA.
+
+Exibir:
+
+- score médio;
+- confiança média;
+- custo diário;
+- tokens;
+- categorias mais problemáticas;
+- notícias rejeitadas;
+- auditorias executadas;
+- erros detectados.
+
+Esse dashboard será utilizado para decisões futuras.
+
+---
+
+# Aprendizado Contínuo
+
+O sistema deve permitir identificar padrões.
+
+Exemplos:
+
+Categorias frequentemente corrigidas.
+
+RSS que gera mais erros.
+
+Fontes que produzem notícias incompletas.
+
+Blogs que apresentam mais rejeições.
+
+Esses dados deverão orientar futuras melhorias.
+
+---
+
+# Gestão dos Prompts
+
+Todos os prompts deverão estar centralizados.
+
+Evitar prompts espalhados em:
+
+- controllers;
+- services;
+- rotas;
+- componentes.
+
+Criar uma estrutura organizada.
+
+Exemplo
+
+```
+prompts/
+
+rewrite/
+
+title/
+
+seo/
+
+category/
+
+audit/
+
+shared/
+```
+
+---
+
+# Componentes Compartilhados
+
+Evitar repetir regras.
+
+Exemplo.
+
+As regras anti-alucinação devem existir em um componente compartilhado.
+
+Não copiar o mesmo texto em todos os prompts.
+
+Sempre reutilizar.
+
+---
+
+# Configurações
+
+Todas as configurações devem ser parametrizáveis.
+
+Exemplos.
+
+Confiança mínima.
+
+Score mínimo.
+
+Quantidade mínima de palavras.
+
+Categorias permitidas.
+
+Idioma.
+
+Temperatura.
+
+Modelo utilizado.
+
+Nunca deixar esses valores fixos no código.
+
+---
+
+# Auditoria Completa
+
+Toda publicação deve permitir responder futuramente.
+
+Qual prompt foi utilizado?
+
+Qual versão?
+
+Qual modelo?
+
+Qual score?
+
+Qual confiança?
+
+Quanto custou?
+
+Quanto tempo levou?
+
+Quais validações passaram?
+
+Por que foi publicada?
+
+Essas informações devem permanecer registradas.
+
+---
+
+# Segurança
+
+Nunca permitir que entradas externas modifiquem diretamente os prompts.
+
+Sanitizar todos os dados vindos do RSS.
+
+Proteger contra:
+
+- Prompt Injection;
+- HTML malicioso;
+- JavaScript;
+- URLs perigosas;
+- conteúdo oculto.
+
+---
+
+# Preparação para Escalabilidade
+
+A arquitetura deve suportar naturalmente:
+
+- dezenas de blogs;
+- centenas de blogs;
+- milhares de notícias por dia;
+- múltiplos idiomas;
+- múltiplos modelos de IA;
+- novos módulos futuros.
+
+Evitar qualquer implementação que dificulte essa expansão.
+
+---
+
+# Critérios de Evolução
+
+Uma melhoria somente poderá substituir a versão atual quando:
+
+✓ possuir benchmark melhor;
+
+✓ manter o padrão editorial;
+
+✓ reduzir ou manter o consumo de tokens;
+
+✓ reduzir erros;
+
+✓ manter compatibilidade;
+
+✓ possuir testes automatizados aprovados.
+
+---
+
+# Roadmap Futuro
+
+A arquitetura deverá estar preparada para futuras funcionalidades, como:
+
+- classificação multi-rótulo (quando aplicável);
+- sugestões automáticas de imagens;
+- extração de entidades;
+- análise de sentimento;
+- geração de conteúdo para redes sociais;
+- geração de newsletters;
+- tradução para múltiplos idiomas;
+- adaptação do conteúdo para cada blog;
+- otimização baseada em desempenho histórico.
+
+Essas funcionalidades não devem ser implementadas agora, mas a arquitetura deve permitir sua adição sem grandes refatorações.
+
+---
+
+# Instrução Final
+
+Antes de iniciar qualquer implementação:
+
+1. Leia integralmente os cinco PRDs.
+2. Analise a arquitetura atual do projeto.
+3. Identifique divergências entre a implementação existente e os PRDs.
+4. Elabore um plano consolidado de execução.
+5. Classifique as tarefas por prioridade e risco.
+6. Apresente um cronograma técnico.
+7. Aguarde aprovação antes de alterar o código.
+
+A implementação deve preservar totalmente o comportamento já validado pelo projeto, evoluindo a arquitetura de forma incremental, segura e orientada por métricas.
+
+O objetivo final é construir uma plataforma de publicação automática de notícias que seja escalável, confiável, auditável e preparada para crescer por muitos anos sem perda de qualidade.

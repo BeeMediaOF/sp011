@@ -3,6 +3,7 @@
  * `api-server/src/lib/rewriteQueue.ts` (funções puras).
  */
 import { sanitizePlainField, sanitizeSocialTitle } from "./highlight.ts";
+import { fidelityReport, normForCompare } from "./score.ts";
 
 export interface ExtractedAI {
   content: string;
@@ -119,11 +120,6 @@ export function plainTextLength(html: string): number {
   return plainTextOf(html).length;
 }
 
-/** Normalização p/ comparação: minúsculas e sem acentos (NFD - combining). */
-function normForCompare(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-}
-
 /**
  * Guarda contra manchete social com palavra inventada/colada pelo modelo
  * (incidente sp011 2026-07: arte publicada com "garantivaga" em vez de
@@ -137,24 +133,6 @@ export function socialTitleMatchesSource(socialTitle: string, sourceText: string
   return words.every((w) => hay.includes(w));
 }
 
-/** Palavras comuns (pt/en, 4+ letras, SEM acentos — o texto é normalizado
- *  antes) que não contam como termo distintivo no gate anti-alucinação. */
-const REWRITE_MATCH_STOPWORDS = new Set([
-  // pt
-  "para", "como", "mais", "menos", "sobre", "entre", "apos", "antes", "contra",
-  "pelo", "pela", "pelos", "pelas", "seus", "suas", "essa", "esse", "esta",
-  "este", "isso", "aquela", "aquele", "ainda", "onde", "quando", "porque",
-  "muito", "muita", "muitos", "muitas", "foram", "sera", "serao", "pode",
-  "podem", "deve", "devem", "anos", "dias", "hoje", "amanha", "ontem",
-  "durante", "tambem", "depois", "nesta", "neste", "dessa", "desse", "desta",
-  "deste", "toda", "todo", "todas", "todos", "outra", "outro", "outras",
-  "outros", "quem", "qual", "quais", "ficou", "ficam", "fazer", "feito",
-  // en
-  "with", "that", "this", "from", "after", "before", "over", "into", "will",
-  "have", "been", "says", "said", "more", "than", "what", "when", "where",
-  "their", "there", "about", "against", "could", "would", "should",
-]);
-
 /**
  * Gate anti-alucinação (incidente Oley 2026-07-17: scrape quebrado da Trivela
  * → o modelo INVENTOU uma notícia do zero, "Pontes de Três Moços" no lugar do
@@ -162,24 +140,13 @@ const REWRITE_MATCH_STOPWORDS = new Set([
  * (4+ caracteres, sem stopwords) com o material ORIGINAL do feed (título +
  * descrição). Comparação sem acentos/caixa; exige 2 termos em comum (1 quando
  * o original só tem 1 termo distintivo). Original sem nenhum termo distintivo
- * passa — não dá para julgar.
+ * passa — não dá para julgar. Implementação: wrapper de `fidelityReport`
+ * (score.ts), que expõe a versão contínua (cobertura %) do mesmo critério.
  */
 export function rewriteMatchesSource(rewriteText: string, sourceText: string): boolean {
-  const tokens = new Set(
-    (normForCompare(sourceText).match(/[a-z0-9]{4,}/g) ?? [])
-      .filter((w) => !REWRITE_MATCH_STOPWORDS.has(w)),
-  );
-  if (tokens.size === 0) return true;
-  const hay = normForCompare(rewriteText);
-  const needed = Math.min(2, tokens.size);
-  let hits = 0;
-  for (const t of tokens) {
-    if (hay.includes(t)) {
-      hits++;
-      if (hits >= needed) return true;
-    }
-  }
-  return false;
+  const r = fidelityReport(rewriteText, sourceText);
+  if (r.totalTokens === 0) return true;
+  return r.matchedTokens >= Math.min(2, r.totalTokens);
 }
 
 /** Título cortado no limite da arte (85), sem cortar palavra no meio. */

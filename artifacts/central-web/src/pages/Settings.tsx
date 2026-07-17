@@ -36,6 +36,15 @@ interface MaskedSettings {
   translationModel?: string;
   translationPromptTemplate?: string;
   translationMaxPerDay?: number;
+  validationMode?: string;
+  minSourcePlainChars?: number;
+  minRewritePlainChars?: number;
+  fidelityMinCoverage?: number;
+  fidelityAuditBand?: number;
+  categoryConfidenceMin?: number;
+  auditEnabled?: boolean;
+  auditProvider?: string;
+  auditModel?: string;
   socialEnabled?: boolean;
   apifyTiktokActor?: string;
   apifyInstagramActor?: string;
@@ -115,6 +124,15 @@ export default function Settings() {
           translationModel: form.translationModel || undefined,
           translationPromptTemplate: form.translationPromptTemplate || undefined,
           translationMaxPerDay: num(form.translationMaxPerDay),
+          validationMode: form.validationMode || undefined,
+          minSourcePlainChars: num(form.minSourcePlainChars),
+          minRewritePlainChars: num(form.minRewritePlainChars),
+          fidelityMinCoverage: num(form.fidelityMinCoverage),
+          fidelityAuditBand: num(form.fidelityAuditBand),
+          categoryConfidenceMin: num(form.categoryConfidenceMin),
+          auditEnabled: form.auditEnabled,
+          auditProvider: form.auditProvider || undefined,
+          auditModel: form.auditModel || undefined,
           socialEnabled: form.socialEnabled,
           apifyToken: form.apifyToken || undefined,
           apifyTokenBackup: form.apifyTokenBackup || undefined,
@@ -380,6 +398,64 @@ export default function Settings() {
           onChange={(e) => setForm({ ...form, translationPromptTemplate: e.target.value })}
           placeholder="Use {{IDIOMA_DESTINO}}, {{TITULO}}, {{SUBTITULO}}, {{CONTEUDO}}, {{CATEGORIAS}}…"
         />
+      </div>
+
+      <div className="card">
+        <h3>Qualidade &amp; Validação (IA)</h3>
+        <p className="muted">
+          Toda reescrita ganha score de fidelidade calculado em código (cobertura dos termos da
+          fonte + números sem fonte) e validação estrutural. Em "Só registrar" nada bloqueia —
+          use alguns dias assim para calibrar antes de ativar "Bloquear". A IA Auditora (2ª
+          opinião) só roda em casos suspeitos e nunca reescreve.
+        </p>
+        <div className="row">
+          <div>
+            <label>Modo das validações</label>
+            <select value={form.validationMode ?? "log"} onChange={(e) => setForm({ ...form, validationMode: e.target.value })}>
+              <option value="off">Desligado (nem calcula)</option>
+              <option value="log">Só registrar (padrão — calibração)</option>
+              <option value="enforce">Bloquear (reprova defeito grave)</option>
+            </select>
+          </div>
+          <div>
+            <label>Mín. chars da fonte (sem IA abaixo disso)</label>
+            <input type="number" min={0} value={form.minSourcePlainChars ?? 80} onChange={(e) => setForm({ ...form, minSourcePlainChars: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label>Mín. chars da reescrita</label>
+            <input type="number" min={0} value={form.minRewritePlainChars ?? 700} onChange={(e) => setForm({ ...form, minRewritePlainChars: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label>Piso de cobertura % (só no modo Bloquear)</label>
+            <input type="number" min={0} max={100} value={form.fidelityMinCoverage ?? 0} onChange={(e) => setForm({ ...form, fidelityMinCoverage: Number(e.target.value) })} />
+          </div>
+        </div>
+        <div className="row" style={{ marginTop: 10 }}>
+          <div>
+            <label>Banda de auditoria (cobertura ≤ %)</label>
+            <input type="number" min={0} max={100} value={form.fidelityAuditBand ?? 60} onChange={(e) => setForm({ ...form, fidelityAuditBand: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label>Confiança mínima da categoria %</label>
+            <input type="number" min={0} max={100} value={form.categoryConfidenceMin ?? 70} onChange={(e) => setForm({ ...form, categoryConfidenceMin: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label>Provider da auditoria</label>
+            <select value={form.auditProvider ?? "gemini"} onChange={(e) => setForm({ ...form, auditProvider: e.target.value })}>
+              <option value="gemini">Gemini (recomendado)</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama (self-hosted)</option>
+            </select>
+          </div>
+          <div>
+            <label>Modelo da auditoria (vazio = padrão)</label>
+            <input value={form.auditModel ?? ""} onChange={(e) => setForm({ ...form, auditModel: e.target.value })} placeholder="gemini-2.5-flash" />
+          </div>
+        </div>
+        <label className="fit row" style={{ margin: "10px 0 0" }}>
+          <input className="fit" style={{ width: "auto" }} type="checkbox" checked={form.auditEnabled ?? false} onChange={(e) => setForm({ ...form, auditEnabled: e.target.checked })} />
+          IA Auditora ligada (2ª opinião nos casos suspeitos; suspeita vai para Revisão)
+        </label>
       </div>
 
       <div className="card">
