@@ -635,3 +635,32 @@ html.dark .chip { background: rgba(15, 23, 42, 0.5); }
   .switch .track, .switch .track::after { transition: none; }
   .kpi-delta, .legend-item, .tl-item, .iconbtn, .pg-btn, .nav-item { transition: none; }
 }
+
+/* ── Seletor de chips (Automação Social: destinos e blogs) ──────────────────
+   NUNCA usar .row nesses chips: .row > * { flex:1; min-width:140px } estica
+   os badges em pílulas gigantes e o nome (min-width:0) colapsa até sumir —
+   era o bug visual da tela de Automação Social. */
+.chipsel {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer; background: var(--panel); user-select: none;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s;
+}
+html.dark .chipsel { background: var(--panel-2); }
+.chipsel:hover { border-color: var(--faint); }
+.chipsel.on { border-color: var(--info); background: var(--primary-soft); box-shadow: 0 0 0 1px var(--info) inset; }
+html.dark .chipsel.on { background: rgba(59, 130, 246, 0.12); }
+.chipsel input { width: auto; margin: 0; flex: 0 0 auto; accent-color: var(--info); }
+.chipsel .name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 13px; font-weight: 600; color: var(--text-2);
+}
+.chipsel.on .name { color: var(--primary-on); }
+html.dark .chipsel.on .name { color: var(--text); }
+.chipsel .badge { flex: 0 0 auto; }
+.chipsel-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 8px; margin-top: 6px;
+}
+.chipsel-inline { display: flex; gap: 8px; flex-wrap: wrap; }
+.chipsel-inline .chipsel { flex: 0 0 auto; }

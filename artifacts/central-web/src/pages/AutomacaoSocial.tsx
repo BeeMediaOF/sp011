@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import {
-  Calendar, Clapperboard, ExternalLink, History, Instagram, Loader2, Music2,
-  Pencil, Plus, RefreshCw, Sparkles, Trash2, Video, Zap,
+  AlertTriangle, Calendar, CheckCircle2, Clapperboard, Clock, ExternalLink,
+  History, Instagram, Loader2, Music2, Pencil, Plus, RefreshCw, Sparkles,
+  Trash2, Video, Zap,
 } from "lucide-react";
 import { api } from "../api";
 import { fmtDate, nameColor, statusClass, statusLabel, timeAgo, useLoad } from "../hooks";
+import { Kpi } from "../ui";
 
 interface SocialConnection {
   blogId: string;
@@ -251,8 +253,21 @@ export default function AutomacaoSocial() {
 
   const list = videos ?? [];
 
+  // KPIs do topo (mesma linguagem visual do Dashboard)
+  const kProcessing = list.filter((v) => ACTIVE_STATUSES.includes(v.status)).length;
+  const kScheduled = list.filter((v) => v.status === "scheduled").length;
+  const kPublished = list.filter((v) => !!v.sentAt).length;
+  const kErrors = list.filter((v) => v.status === "error").length;
+
   return (
     <>
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <Kpi icon={Loader2} tone="c-blue" value={kProcessing} label="Na fila / processando" />
+        <Kpi icon={Clock} tone="c-amber" value={kScheduled} label="Agendados" />
+        <Kpi icon={CheckCircle2} tone="c-green" value={kPublished} label="Publicados" />
+        <Kpi icon={AlertTriangle} tone="c-red" value={kErrors} label="Com erro" />
+      </div>
+
       <div className="seg" style={{ marginBottom: 16 }}>
         <button className={tab === "postagem" ? "active" : ""} onClick={() => setTab("postagem")}>
           <Video size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Postagem
@@ -267,10 +282,15 @@ export default function AutomacaoSocial() {
       {connError && <div className="error-box">{connError}</div>}
 
       {tab === "postagem" && (
-        <div className="card">
-          <h3 style={{ marginTop: 0, display: "flex", alignItems: "center", gap: 8 }}>
-            <Clapperboard size={17} /> Repostar vídeo do TikTok/Instagram
-          </h3>
+        <div className="panel">
+          <div className="panel-head">
+            <div>
+              <p className="panel-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Clapperboard size={17} /> Repostar vídeo do TikTok/Instagram
+              </p>
+              <p className="panel-sub">cole o link, escolha os destinos e os blogs; a legenda sai por IA se você não personalizar</p>
+            </div>
+          </div>
 
           <label>Link do vídeo *</label>
           <input
@@ -279,17 +299,20 @@ export default function AutomacaoSocial() {
             placeholder="https://www.tiktok.com/@usuario/video/… ou https://www.instagram.com/reel/…"
           />
 
-          <div className="row" style={{ marginTop: 10 }}>
+          <div className="row" style={{ marginTop: 12 }}>
             <div>
               <label>Destinos</label>
-              <div className="row" style={{ margin: 0 }}>
-                {TARGETS.map((t) => (
-                  <label className="fit row" style={{ margin: 0 }} key={t.id}>
-                    <input className="fit" style={{ width: "auto" }} type="checkbox"
-                      checked={targets.has(t.id)} onChange={() => toggleTarget(t.id)} />
-                    {t.label}
-                  </label>
-                ))}
+              <div className="chipsel-inline">
+                {TARGETS.map((t) => {
+                  const Icon = t.id === "instagram" ? Instagram : Music2;
+                  return (
+                    <label className={`chipsel ${targets.has(t.id) ? "on" : ""}`} key={t.id}>
+                      <input type="checkbox" checked={targets.has(t.id)} onChange={() => toggleTarget(t.id)} />
+                      <Icon size={14} style={{ flex: "0 0 auto", color: "var(--muted)" }} />
+                      <span className="name">{t.label}</span>
+                    </label>
+                  );
+                })}
               </div>
             </div>
             <div>
@@ -298,26 +321,22 @@ export default function AutomacaoSocial() {
             </div>
           </div>
 
-          <label style={{ marginTop: 10 }}>Blogs de destino (só aparecem os com canal conectado)</label>
+          <label style={{ marginTop: 12 }}>Blogs de destino (só aparecem os com canal conectado)</label>
           {availableBlogs.length === 0 ? (
             <p className="muted" style={{ margin: "4px 0 0" }}>
               Nenhum blog tem canal compatível com os destinos marcados. Conecte Meta/Buffer no
               cadastro do blog (Blogs → Editar → Redes Sociais).
             </p>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 8 }}>
+            <div className="chipsel-grid">
               {availableBlogs.map((c) => {
                 const igOk = supportsTarget(c, "instagram");
                 const ttOk = supportsTarget(c, "tiktok");
                 const missing = [...targets].filter((t) => !supportsTarget(c, t));
                 return (
-                  <label key={c.blogId} className="row"
-                    style={{ margin: 0, padding: "8px 10px", cursor: "pointer", border: "1px solid var(--border)", borderRadius: 8, flexWrap: "nowrap" }}>
-                    <input className="fit" style={{ width: "auto" }} type="checkbox"
-                      checked={blogIds.has(c.blogId)} onChange={() => toggleBlog(c.blogId)} />
-                    <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {c.blogName}
-                    </span>
+                  <label key={c.blogId} className={`chipsel ${blogIds.has(c.blogId) ? "on" : ""}`}>
+                    <input type="checkbox" checked={blogIds.has(c.blogId)} onChange={() => toggleBlog(c.blogId)} />
+                    <span className="name" title={c.blogName}>{c.blogName}</span>
                     {igOk && <span className="badge info" title={c.igUsername ? `@${c.igUsername}` : "Instagram conectado"}>IG</span>}
                     {ttOk && <span className="badge info">TikTok</span>}
                     {missing.length > 0 && (

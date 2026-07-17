@@ -1,4 +1,5 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { fmtNum } from "./charts";
 
 export const PAGE_SIZE = 12;
@@ -37,6 +38,25 @@ export function Pager({ page, totalPages, total, onPage, noun }: {
         <button className="pg-btn" disabled={page === totalPages} onClick={() => onPage(Math.min(totalPages, page + 1))} aria-label="Próxima página">
           <ChevronRight size={15} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Stat tile no padrão do Dashboard (ícone tonalizado + valor + rótulo) —
+ *  reuso nas abas Blogs e Automação Social; o Dashboard mantém o dele (tem
+ *  o Delta hoje×ontem acoplado). Tones: c-blue/c-purple/c-green/c-amber/
+ *  c-red/c-cyan/c-navy/c-orange (styles.css). */
+export function Kpi({ icon: Icon, tone, value, label, children }: {
+  icon: LucideIcon; tone: string; value: ReactNode; label: string; children?: ReactNode;
+}) {
+  return (
+    <div className="kpi">
+      <div className={`kpi-icon ${tone}`}><Icon size={19} /></div>
+      <div className="kpi-body">
+        <div className="kpi-value">{value}</div>
+        <div className="kpi-label">{label}</div>
+        {children}
       </div>
     </div>
   );

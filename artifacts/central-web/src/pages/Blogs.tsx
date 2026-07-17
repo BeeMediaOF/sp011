@@ -1,11 +1,12 @@
 import { useState } from "react";
 import {
   Plus, Globe, ExternalLink, Pencil, Trash2, KeyRound, PlugZap, RefreshCw,
-  ShieldCheck, Languages, Gauge, Timer, Radio, Eye, Share2,
+  ShieldCheck, Languages, Gauge, Timer, Radio, Eye, Share2, AlertTriangle, Power,
 } from "lucide-react";
 import { api } from "../api";
 import { nameColor, statusLabel, timeAgo, useLoad } from "../hooks";
 import { fmtNum } from "../charts";
+import { Kpi } from "../ui";
 import BlogSocialTab from "./BlogSocialTab";
 
 export interface BlogCategory { slug: string; hint?: string }
@@ -152,6 +153,8 @@ export default function Blogs() {
 
   const list = blogs ?? [];
   const online = list.filter((b) => b.status === "online").length;
+  const withProblem = list.filter((b) => b.isActive && b.status !== "online").length;
+  const inactive = list.filter((b) => !b.isActive).length;
 
   return (
     <>
@@ -159,7 +162,7 @@ export default function Blogs() {
         <span className="muted" style={{ fontSize: 13 }}>
           {loading && list.length === 0
             ? "Carregando…"
-            : `${fmtNum(list.length)} blog(s) · ${fmtNum(online)} online`}
+            : `${fmtNum(list.length)} blog(s) conectado(s) à central`}
         </span>
         <div className="grow" />
         <button className="iconbtn" title="Atualizar" aria-label="Atualizar lista" onClick={reload}>
@@ -167,6 +170,15 @@ export default function Blogs() {
         </button>
         <button onClick={openNew}><Plus size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Novo blog</button>
       </div>
+
+      {list.length > 0 && (
+        <div className="kpi-grid" style={{ marginBottom: 16 }}>
+          <Kpi icon={Globe} tone="c-blue" value={fmtNum(list.length)} label="Blogs na rede" />
+          <Kpi icon={Radio} tone="c-green" value={fmtNum(online)} label="Online agora" />
+          <Kpi icon={AlertTriangle} tone={withProblem > 0 ? "c-red" : "c-amber"} value={fmtNum(withProblem)} label="Offline / com erro" />
+          <Kpi icon={Power} tone="c-navy" value={fmtNum(inactive)} label="Inativos (pausados)" />
+        </div>
+      )}
 
       {error && <div className="error-box">{error}</div>}
       {msg && <div className="card" role="status">{msg}</div>}
@@ -197,7 +209,8 @@ export default function Blogs() {
           const color = nameColor(b.name);
           const cats = b.categories ?? [];
           return (
-            <div className="blog-card" key={b.id}>
+            <div className="blog-card" key={b.id}
+              style={{ borderTop: `3px solid ${b.isActive ? color : "var(--border)"}` }}>
               <div className="bc-head">
                 <div className="bc-avatar" style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}>
                   {initials(b.name)}
