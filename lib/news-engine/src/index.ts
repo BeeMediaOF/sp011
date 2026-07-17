@@ -12,3 +12,4 @@ export * from "./signing.ts";
 export * from "./ai/geminiPool.ts";
 export * from "./ai/rewrite.ts";
 export * from "./ai/perplexity.ts";
+export * from "./ai/audit.ts";

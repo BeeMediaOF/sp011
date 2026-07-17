@@ -70,6 +70,7 @@ export async function runDistributorCycle(): Promise<number> {
       news: newsItemsTable,
       rewriteId: rewritesTable.id,
       rewriteLanguage: rewritesTable.language,
+      auditStatus: rewritesTable.auditStatus,
     })
     .from(newsItemsTable)
     .innerJoin(
@@ -106,9 +107,17 @@ export async function runDistributorCycle(): Promise<number> {
 
   let created = 0;
 
-  for (const { news, rewriteId, rewriteLanguage } of items) {
+  for (const { news, rewriteId, rewriteLanguage, auditStatus } of items) {
+    // IA Auditora (F5): reescrita suspeita fica SEGURA até o veredito (o
+    // worker de auditoria resolve para passed/flagged/rejected). Com a
+    // auditora desligada o pending é ignorado — nada fica preso.
+    if ((s.auditEnabled ?? false) && auditStatus === "pending") continue;
+
     const searchText = `${news.title} ${news.description ?? ""}`;
     const sourceLang = rewriteLanguage ?? "pt-BR"; // null = legado pt-BR
+    // flagged → toda entrega nasce aguardando aprovação humana (Revisão),
+    // independente do requireApproval do blog.
+    const auditFlagged = auditStatus === "flagged";
 
     for (const blog of blogs) {
       const rules = rulesByBlog.get(blog.id) ?? [];
@@ -147,7 +156,7 @@ export async function runDistributorCycle(): Promise<number> {
         (blog.categories?.length ?? 0) > 0 && !match.targetCategory;
       const status = needsTranslation || needsClassification
         ? "awaiting_localization"
-        : (blog.requireApproval ? "awaiting_approval" : "pending");
+        : (blog.requireApproval || auditFlagged ? "awaiting_approval" : "pending");
 
       try {
         const inserted = await db

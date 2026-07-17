@@ -302,6 +302,22 @@ async function saveRewrite(
     }
   }
 
+  // IA Auditora (F5): reescrita suspeita ganha 2ª opinião ANTES de distribuir
+  // (o distributor segura itens com auditoria pendente; o worker de auditoria
+  // resolve para passed/flagged/rejected). Só marca; nunca bloqueia aqui.
+  let auditStatus: string | null = null;
+  if (mode !== "off" && (s.auditEnabled ?? false)) {
+    const band = Math.max(0, Math.min(100, s.fidelityAuditBand ?? 60));
+    const warns = issues.filter((i) => i.severity === "warn").length;
+    const suspicious =
+      report.coverage <= band ||
+      report.inventedNumbers.length > 0 ||
+      issues.some((i) => i.severity === "block" || i.code === "promo_content" || i.code === "live_updating") ||
+      plainTextLength(item.contentRaw ?? item.description ?? "") < 400 ||
+      warns >= 3;
+    if (suspicious) auditStatus = "pending";
+  }
+
   // Manchete da arte: guarda contra palavra inventada/colada pelo modelo
   // ("garantivaga") — se não bater com o material, cai no próprio título.
   const finalTitle = out.title || extracted.title || item.title;
@@ -336,6 +352,7 @@ async function saveRewrite(
     fidelityCoverage: mode !== "off" ? report.coverage : null,
     inventedNumbers: mode !== "off" ? report.inventedNumbers : null,
     validationIssues: mode !== "off" ? issues : null,
+    auditStatus,
     durationMs: durationMs ?? null,
   });
 

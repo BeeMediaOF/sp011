@@ -6,6 +6,7 @@ import { seedCentralAdmin } from "./lib/seed.js";
 import { startCollector } from "./services/collector.js";
 import { startRewriteWorker } from "./services/rewriter.js";
 import { startDistributor } from "./services/distributor.js";
+import { startAuditor } from "./services/audit.js";
 import { startLocalizer } from "./services/localizer.js";
 import { startDeliveryWorker } from "./services/deliveryWorker.js";
 import { startVideoDownloader } from "./services/videoDownloader.js";
@@ -35,6 +36,7 @@ app.listen(port, async (err?: Error) => {
   startCollector();
   startRewriteWorker();
   startDistributor();
+  startAuditor(); // IA Auditora (F5) — só trabalha com auditEnabled ligado
   startLocalizer();
   startDeliveryWorker();
   // Automação Social (vídeos) — só trabalham com socialEnabled ligado

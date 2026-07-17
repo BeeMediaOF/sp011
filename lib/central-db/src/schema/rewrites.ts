@@ -36,7 +36,8 @@ export const rewritesTable = pgTable("rewrites", {
   inventedNumbers: jsonb("invented_numbers"),
   /** Issues da validação estrutural (ValidationIssue[] do news-engine). */
   validationIssues: jsonb("validation_issues"),
-  /** null (sem auditoria) | 'passed' | 'flagged' (→ revisão) | 'rejected'. */
+  /** null (sem auditoria) | 'pending' (aguardando IA Auditora — distributor
+   *  segura) | 'passed' | 'flagged' (→ revisão humana) | 'rejected'. */
   auditStatus:    text("audit_status"),
   auditNotes:     text("audit_notes"),
   /** Duração da chamada de IA que gerou esta reescrita (ms). */

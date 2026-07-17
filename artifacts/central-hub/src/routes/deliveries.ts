@@ -57,6 +57,10 @@ router.get("/review", async (_req, res) => {
       rewriteTitle: rewritesTable.title,
       rewriteSubtitle: rewritesTable.subtitle,
       contentHtml: rewritesTable.contentHtml,
+      auditStatus: rewritesTable.auditStatus,
+      auditNotes: rewritesTable.auditNotes,
+      qualityScore: rewritesTable.qualityScore,
+      fidelityCoverage: rewritesTable.fidelityCoverage,
       blogName: blogsTable.name,
     })
     .from(deliveriesTable)
@@ -75,6 +79,10 @@ router.get("/review", async (_req, res) => {
     sourceName: r.sourceName,
     imageUrl: r.imageUrl,
     blogName: r.blogName,
+    auditStatus: r.auditStatus,
+    auditNotes: r.auditNotes,
+    qualityScore: r.qualityScore,
+    fidelityCoverage: r.fidelityCoverage,
   })));
 });
 

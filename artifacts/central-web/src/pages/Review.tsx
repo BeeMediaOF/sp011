@@ -11,6 +11,10 @@ interface ReviewItem {
   imageUrl: string | null;
   blogName: string | null;
   createdAt: string;
+  auditStatus: string | null;
+  auditNotes: string | null;
+  qualityScore: number | null;
+  fidelityCoverage: number | null;
 }
 
 export default function Review() {
@@ -49,7 +53,15 @@ export default function Review() {
               <tr key={item.id}>
                 <td>
                   <a href="#preview" onClick={(e) => { e.preventDefault(); setPreview(item); }}>{item.title}</a>
-                  <div className="muted">{item.sourceName}</div>
+                  <div className="muted">
+                    {item.sourceName}
+                    {item.qualityScore != null && ` · score ${item.qualityScore}`}
+                  </div>
+                  {item.auditStatus === "flagged" && (
+                    <div className="error-box" style={{ marginTop: 4, padding: "4px 8px", fontSize: 12 }}>
+                      ⚠ IA Auditora: {item.auditNotes ?? "sinalizada para revisão"}
+                    </div>
+                  )}
                 </td>
                 <td>{item.blogName}</td>
                 <td>{fmtDate(item.createdAt)}</td>
@@ -69,6 +81,12 @@ export default function Review() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h2>{preview.title}</h2>
             {preview.subtitle && <p className="muted">{preview.subtitle}</p>}
+            {preview.auditStatus === "flagged" && (
+              <div className="error-box" style={{ marginBottom: 8 }}>
+                ⚠ IA Auditora: {preview.auditNotes ?? "sinalizada para revisão"}
+                {preview.fidelityCoverage != null && ` (cobertura da fonte: ${preview.fidelityCoverage}%)`}
+              </div>
+            )}
             {preview.imageUrl && <img src={preview.imageUrl} alt="" style={{ maxWidth: "100%", borderRadius: 8 }} />}
             <div className="card" style={{ maxHeight: 320, overflow: "auto" }}
               dangerouslySetInnerHTML={{ __html: preview.contentHtml ?? "" }} />

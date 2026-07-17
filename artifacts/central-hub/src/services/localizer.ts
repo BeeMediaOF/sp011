@@ -362,7 +362,9 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
     await db
       .update(deliveriesTable)
       .set({
-        status: postLocalizationStatus(blog.requireApproval),
+        // Reescrita flagged pela IA Auditora força revisão humana também no
+        // caminho da localização (o distributor só cobre o caminho direto).
+        status: postLocalizationStatus(blog.requireApproval || rewrite.auditStatus === "flagged"),
         rewriteId: finalRewrite.id,
         targetCategory,
         nextRetryAt: null,
