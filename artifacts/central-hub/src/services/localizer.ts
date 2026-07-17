@@ -157,7 +157,7 @@ async function deferDelivery(delivery: DeliveryRow, delayMs: number, error?: str
  */
 async function ensureTranslatedRewrite(
   delivery: DeliveryRow, blog: BlogRow, shared: RewriteRow, s: HubSettings,
-): Promise<{ rewrite: RewriteRow; aiCategory?: string; translated: boolean }> {
+): Promise<{ rewrite: RewriteRow; aiCategory?: string; aiConfidence?: number; translated: boolean }> {
   // 1. Reuso: já existe tradução ok desta notícia neste idioma?
   const [existing] = await db
     .select()
@@ -247,7 +247,7 @@ async function ensureTranslatedRewrite(
   await logUsage(out.usage, "translate", delivery.newsItemId, inserted[0]?.id ?? null, Date.now() - t0);
 
   if (inserted.length > 0) {
-    return { rewrite: inserted[0]!, aiCategory: out.category, translated: true };
+    return { rewrite: inserted[0]!, aiCategory: out.category, aiConfidence: out.categoryConfidence, translated: true };
   }
   const [winner] = await db
     .select()
@@ -258,7 +258,7 @@ async function ensureTranslatedRewrite(
     ))
     .limit(1);
   if (!winner) throw new Error("conflito ao gravar tradução e variação não encontrada");
-  return { rewrite: winner, aiCategory: out.category, translated: true };
+  return { rewrite: winner, aiCategory: out.category, aiConfidence: out.categoryConfidence, translated: true };
 }
 
 async function processDelivery(delivery: DeliveryRow): Promise<void> {
@@ -285,12 +285,14 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
   try {
     let finalRewrite = rewrite;
     let aiCategory: string | undefined;
+    let aiConfidence: number | undefined;
 
     if (needsTranslation(blog.language, rewrite.language)) {
       const result = await ensureTranslatedRewrite(delivery, blog, rewrite, s);
       finalRewrite = result.rewrite;
       // Mesmo matcher tolerante da classificação (acentos/rótulo humano).
       aiCategory = matchCategorySlug(result.aiCategory ?? null, blog.categories ?? []) ?? undefined;
+      aiConfidence = result.aiConfidence;
       if (result.translated) {
         logEvent({
           module: "localizer", refType: "delivery", refId: delivery.id,
@@ -313,6 +315,7 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
           engineConfig(s),
         );
         aiCategory = res.category ?? undefined;
+        aiConfidence = res.confidence;
         if (!res.category) {
           // Diagnóstico do fallback residual: sem isso, "tudo caiu em outros"
           // fica invisível (incidente PontoFarma 2026-07).
@@ -330,6 +333,22 @@ async function processDelivery(delivery: DeliveryRow): Promise<void> {
         if (isProviderUnavailableError(String(err))) throw err;
         logger.warn({ err, deliveryId: delivery.id }, "Classificação falhou — usando fallback");
       }
+    }
+
+    // Confiança mínima da categoria (F4 dos PRDs): abaixo do limite, em
+    // "enforce" a escolha da IA é descartada (cai no fallback residual — na
+    // dúvida, "outros" e não uma editoria errada); em "log" só registra.
+    // Campo é opcional: modelo que não informa confiança passa direto.
+    const minConf = Math.max(0, Math.min(100, s.categoryConfidenceMin ?? 70));
+    if (aiCategory && aiConfidence !== undefined && aiConfidence < minConf) {
+      const enforce = (s.validationMode ?? "log") === "enforce";
+      logEvent({
+        module: "localizer", level: "warn", refType: "delivery", refId: delivery.id,
+        message: `Categoria "${aiCategory}" com confiança baixa (${aiConfidence}% < ${minConf}%)` +
+          (enforce ? " — descartada, cai no fallback residual" : " — mantida (modo log)"),
+        meta: { aiCategory, aiConfidence, minConf, blog: blog.name },
+      });
+      if (enforce) aiCategory = undefined;
     }
 
     const targetCategory = needsClassification(blog.categories, delivery.targetCategory)

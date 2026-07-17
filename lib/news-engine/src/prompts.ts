@@ -203,6 +203,7 @@ Regras da escolha de categoria:
 ## REGRAS ABSOLUTAS
 - Retorne EXCLUSIVAMENTE JSON válido, sem markdown, sem \`\`\`json, sem explicações antes ou depois.
 - "category" deve ser EXATAMENTE um dos slugs listados acima (ou "" quando a lista estiver vazia).
+- "category_confidence" é um número inteiro de 0 a 100 com a sua certeza de que a categoria corresponde ao TEMA REAL da matéria (use menos de 70 quando estiver na dúvida ou forçando o encaixe).
 
 ## RESPOSTA (apenas JSON, direto, sem delimitadores de código):
 {
@@ -214,7 +215,8 @@ Regras da escolha de categoria:
   "content_html": "<h2>...</h2><p>...</p>",
   "slug": "new-slug-in-target-language",
   "keywords": "kw1, kw2, kw3, kw4, kw5, kw6, kw7, kw8",
-  "category": "slug-escolhido"
+  "category": "slug-escolhido",
+  "category_confidence": 90
 }`;
 
 /**
@@ -237,7 +239,11 @@ Regras:
 - Notícia cujo tema NÃO corresponde a NENHUMA categoria específica da lista vai para a residual ("others"/"outros"), quando existir — NUNCA force o encaixe numa categoria específica.
 - Na dúvida entre uma categoria específica e a residual ("others"/"outros"), escolha SEMPRE a residual.
 
-Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug"}, usando o slug EXATO de UMA categoria da lista. Sem markdown, sem explicações.`;
+Responda EXCLUSIVAMENTE com JSON válido no formato {"category": "slug", "confidence": 90, "reason": "uma frase curta"}, onde:
+- "category" é o slug EXATO de UMA categoria da lista;
+- "confidence" é um número inteiro de 0 a 100 com a sua certeza de que a categoria corresponde ao TEMA REAL da notícia (use menos de 70 quando estiver na dúvida ou forçando o encaixe);
+- "reason" é a justificativa resumida da escolha, em uma frase.
+Sem markdown, sem explicações fora do JSON.`;
 
 /**
  * Resolve o melhor prompt para uma fonte seguindo a hierarquia:

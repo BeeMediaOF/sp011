@@ -356,6 +356,25 @@ export function extractCategoryField(raw: string): string | undefined {
   return m?.[1]?.trim().toLowerCase() || undefined;
 }
 
+/**
+ * Extrai a confiança (0–100) da classificação do JSON bruto — campos
+ * `confidence` (classificador) ou `category_confidence` (tradução). Campo
+ * OPCIONAL (PRD 03: novos campos nunca quebram o parse): ausente/inválido →
+ * undefined e o chamador trata como "sem informação de confiança".
+ */
+export function extractCategoryConfidence(raw: string): number | undefined {
+  const m = raw.match(/"(?:category_)?confidence"\s*:\s*"?(\d{1,3})"?/);
+  if (!m) return undefined;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : undefined;
+}
+
+/** Extrai a justificativa curta (`reason`) da classificação, quando houver. */
+export function extractCategoryReason(raw: string): string | undefined {
+  const m = raw.match(/"reason"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  return m?.[1]?.replace(/\\"/g, '"').trim().slice(0, 200) || undefined;
+}
+
 export interface TranslateInput {
   title: string;
   subtitle?: string;
@@ -376,6 +395,8 @@ export interface TranslateOutput extends RewriteResult {
   usage?: TokenUsage;
   /** Slug de categoria escolhido pela IA (já validado contra a lista) ou undefined. */
   category?: string;
+  /** Confiança (0–100) declarada pela IA na categoria; undefined = não informou. */
+  categoryConfidence?: number;
 }
 
 /**
@@ -401,7 +422,12 @@ export async function translateRewrite(
   const { text, usage } = await callTextModel(prompt, cfg);
   const parsed = parseRewriteResult(text);
   const rawCategory = extractCategoryField(text);
-  return { ...parsed, usage, category: matchCategorySlug(rawCategory, categories) ?? undefined };
+  return {
+    ...parsed,
+    usage,
+    category: matchCategorySlug(rawCategory, categories) ?? undefined,
+    categoryConfidence: extractCategoryConfidence(text),
+  };
 }
 
 /** Tokens canônicos p/ casar categoria: minúsculas, sem acentos, sem conectivos. */
@@ -474,6 +500,10 @@ export interface ClassifyInput {
 export interface ClassifyOutput {
   /** Slug validado contra a lista, ou null quando a IA não decidiu. */
   category: string | null;
+  /** Confiança (0–100) declarada pela IA; undefined = modelo não informou. */
+  confidence?: number;
+  /** Justificativa resumida da escolha (quando o modelo informou). */
+  reason?: string;
   /** Resposta crua do modelo (p/ diagnóstico quando category = null). */
   rawAnswer?: string;
   usage?: TokenUsage;
@@ -494,11 +524,13 @@ export async function classifyArticle(
     .replace(/\{\{CATEGORIAS\}\}/g, formatCategoriesForPrompt(input.categories));
 
   const { text, usage } = await callTextModel(prompt, cfg);
-  // JSON {"category": "slug"} ou, em último caso, o slug cru na resposta.
+  // JSON {"category": "slug", ...} ou, em último caso, o slug cru na resposta.
   const fromJson = extractCategoryField(text);
   const raw = (fromJson ?? text).trim();
   return {
     category: matchCategorySlug(raw, input.categories),
+    confidence: extractCategoryConfidence(text),
+    reason: extractCategoryReason(text),
     rawAnswer: raw.slice(0, 200),
     usage,
   };
