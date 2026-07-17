@@ -1,4 +1,11 @@
-# Prompt v2 — candidato (NÃO está em produção)
+# Prompt v2 — candidato REPROVADO no benchmark (2026-07-17)
+
+> **Status: REPROVADO — NÃO aplicar.** No benchmark A×B de 2026-07-17
+> (20 itens, Ollama dedicado) o candidato perdeu em cobertura (18.4 vs 38.1),
+> score (11.9 vs 25.4), números sem fonte (13 vs 8) e issues block (21 vs 17).
+> Ganhou só em disciplina de formato (0 ilegíveis vs 3) — vale reaproveitar
+> isso num futuro candidato MÍNIMO (uma mudança por vez). Relatório completo:
+> `docs/BENCHMARK_PROMPT_V2_2026-07-17.md`. Produção segue no v1.0.0.
 
 `candidate_pt.txt` é o prompt de reescrita fortalecido (F4 dos PRDs 01–05),
 gerado a partir do template atual com 3 mudanças cirúrgicas — o estilo
