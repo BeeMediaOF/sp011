@@ -1,7 +1,19 @@
 # Benchmark A×B — prompt v1.0.0 (produção) × candidato v2 — 2026-07-17
 
-**Veredito: REPROVADO. O prompt de produção continua o v1.0.0.**
-O candidato (`deploy/prompt-v2/candidate_pt.txt`) NÃO deve ser aplicado.
+> **ADENDO (mesma data, horas depois): RODADA INVALIDADA.** O incidente FGTS
+> revelou que o servidor Ollama rodava com a janela de contexto DEFAULT
+> (2048–4096 tokens) — menor que prompt (+resposta) da reescrita (~3,4k + até
+> 8k). O Ollama truncava o prompt/contexto silenciosamente e o modelo perdia a
+> fonte, EM PRODUÇÃO e NESTE benchmark. Isso explica a cobertura média baixa
+> do próprio A (38%), os itens com cobertura ~0% nas duas variantes e pune
+> DESPROPORCIONALMENTE o B (template maior = mais truncamento). Conserto:
+> `OLLAMA_CONTEXT_LENGTH=16384` no compose (mesmo commit deste adendo).
+> **Re-rodar o A×B com a janela corrigida antes de qualquer veredito.** Os
+> números abaixo ficam como registro da rodada contaminada.
+
+**Veredito original (SUPERADO pelo adendo): REPROVADO.**
+O candidato (`deploy/prompt-v2/candidate_pt.txt`) segue fora de produção
+até o re-teste.
 
 ## Método
 

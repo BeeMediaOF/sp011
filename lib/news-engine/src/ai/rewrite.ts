@@ -229,6 +229,12 @@ export interface RewriteInput {
 
 export async function rewriteNews(input: RewriteInput, cfg: RewriteEngineConfig): Promise<RewriteOutput> {
   const logger = cfg.logger ?? consoleLogger;
+  // Teto do texto-fonte: applyPromptTemplate corta {{TEXTO}} em 7.000 chars —
+  // prompt final ≈ 3,4k tokens. A janela do servidor Ollama PRECISA comportar
+  // prompt + resposta (OLLAMA_CONTEXT_LENGTH=16384 no compose; o endpoint
+  // OpenAI-compat ignora num_ctx por chamada). Com a janela default (2048–
+  // 4096) o Ollama truncava o prompt e o modelo inventava a notícia inteira
+  // (incidente FGTS 2026-07-17).
   const prompt = applyPromptTemplate(
     input.promptTemplate ?? DEFAULT_PROMPT_TEMPLATE,
     input.title, input.text, input.sourceName, input.giveCredit,

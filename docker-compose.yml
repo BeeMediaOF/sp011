@@ -120,6 +120,14 @@ services:
       # processo de longa vida acumular memória (visto 12,9 GiB p/ modelo de 5,1).
       OLLAMA_KEEP_ALIVE: "30m"
       OLLAMA_NUM_PARALLEL: "1"   # 1 geração por vez (CPU não paraleliza bem; a central também manda 1 por vez)
+      # Janela de contexto do servidor. O default (2048–4096 conforme a versão)
+      # truncava o prompt da reescrita (~3,4k tokens: template + fonte cortada
+      # em 7k chars) ou derrubava o início do contexto durante a geração — o
+      # modelo perdia a fonte e INVENTAVA a notícia inteira (incidente FGTS
+      # 2026-07-17). O endpoint OpenAI-compat ignora num_ctx por chamada,
+      # então o teto real é ESTE env. 16k comporta prompt + resposta (até
+      # max_tokens 8192) com folga; custo ~+1 GiB de RAM no KV cache.
+      OLLAMA_CONTEXT_LENGTH: "16384"
     volumes:
       - ollama_models:/root/.ollama
 
