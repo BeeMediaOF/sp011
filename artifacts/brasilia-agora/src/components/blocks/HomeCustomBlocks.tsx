@@ -358,6 +358,8 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
   const caption = block.caption
     || (lang === "en" ? "Get the top stories in your inbox." : "Receba as principais notícias no seu e-mail.");
   const note = (block.linkLabel ?? "").trim();
+  // Rótulo do botão configurável por bloco (mock Crédito.vc: "Quero receber").
+  const btnLabel = (block.buttonLabel ?? "").trim() || t("newsletter.subscribe");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -408,13 +410,13 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
                     <button type="submit" disabled={status === "sending"}
                       className="text-white text-sm font-bold px-5 py-2.5 rounded-r-xl hover:opacity-90 disabled:opacity-60 transition-opacity"
                       style={{ backgroundColor: accent }}>
-                      {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
+                      {status === "sending" ? t("newsletter.sending") : btnLabel}
                     </button>
                   ) : (
                     <button type="submit" disabled={status === "sending"}
                       className="bg-white text-sm font-bold px-5 py-2.5 rounded-r-xl hover:bg-white/90 disabled:opacity-60 transition-colors border-l border-gray-200"
                       style={{ color }}>
-                      {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
+                      {status === "sending" ? t("newsletter.sending") : btnLabel}
                     </button>
                   )}
                 </form>
@@ -447,7 +449,7 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
             <button type="submit" disabled={status === "sending"}
               className="bg-white text-sm font-bold px-5 py-2.5 rounded-r-lg hover:bg-white/90 disabled:opacity-60 transition-colors"
               style={{ color }}>
-              {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
+              {status === "sending" ? t("newsletter.sending") : btnLabel}
             </button>
           </form>
         )}

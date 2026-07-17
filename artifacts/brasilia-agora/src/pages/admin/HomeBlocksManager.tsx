@@ -751,6 +751,7 @@ interface BlockForm {
   area: "" | "main" | "sidebar";
   width: "" | "full" | "half" | "quarter";
   linkLabel: string;
+  buttonLabel: string;
   sectionStyle: "" | "revista";
   isAd: boolean;
   fontFamily: string;
@@ -764,6 +765,7 @@ const EMPTY_FORM: BlockForm = {
   imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
   adSlot: "slot_05", adId: "",
   area: "", width: "", linkLabel: "",
+  buttonLabel: "",
   sectionStyle: "",
   isAd: false,
   fontFamily: "",
@@ -794,6 +796,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     area:          block.area ?? "",
     width:         block.width ?? "",
     linkLabel:     block.linkLabel ?? "",
+    buttonLabel:   block.buttonLabel ?? "",
     sectionStyle:  block.sectionStyle ?? "",
     isAd:          block.isAd ?? false,
     fontFamily:    block.fontFamily ?? "",
@@ -828,6 +831,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     area:       f.area || undefined,
     width:      f.width || undefined,
     linkLabel:  f.linkLabel.trim() || undefined,
+    buttonLabel: f.blockType === "newsletter" ? (f.buttonLabel.trim() || undefined) : undefined,
     sectionStyle: isContent && f.sectionStyle ? "revista" : undefined,
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
     fontFamily: f.fontFamily || undefined,
@@ -1203,6 +1207,10 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         <PanelSection label="Chamada" icon={Mail}>
           <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
             className={INPUT} placeholder="Receba as principais notícias no seu e-mail." />
+          <input value={form.buttonLabel} onChange={(e) => onChange("buttonLabel", e.target.value)}
+            className={`${INPUT} mt-1.5`} placeholder='Texto do botão (padrão: "Assinar")' />
+          <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+            className={`${INPUT} mt-1.5`} placeholder='Nota sob o formulário (ex.: "Sem spam…") — só no formato cartão' />
         </PanelSection>
       )}
 
@@ -1317,6 +1325,25 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
           <select value={form.source} onChange={(e) => onChange("source", e.target.value as SourceType)} className={INPUT}>
             {SOURCES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
+        </PanelSection>
+      )}
+
+      {/* Cards Revista: 1º item em destaque (mock "Escolha do Editor" do Crédito.vc) */}
+      {!isSpecial && form.blockType === "content" && form.layout === "mini" && (
+        <PanelSection label="Primeiro item em destaque" icon={Layers}>
+          <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
+            <div className="flex items-center gap-2">
+              <Layers size={12} className="text-slate-400" />
+              <span className="text-[12px] font-medium text-slate-700">Card grande à esquerda + mini cards ao lado</span>
+            </div>
+            <Toggle checked={form.format === "destaque"}
+              onChange={() => onChange("format", form.format === "destaque" ? "mini" : "destaque")}
+              accent={form.color} />
+          </div>
+          <p className="text-[10px] mt-1.5 text-slate-400 leading-relaxed">
+            O 1º artigo vira um card grande com título sobre a foto; os demais seguem
+            como mini cards. Reescolher o layout acima desliga o destaque.
+          </p>
         </PanelSection>
       )}
 

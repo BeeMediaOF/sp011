@@ -112,6 +112,8 @@ export interface HomeBlock {
   area?: "main" | "sidebar"; width?: "full" | "half";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona. */
   linkLabel?: string;
+  /** Rótulo do botão do bloco de newsletter (padrão: i18n "Assinar"). */
+  buttonLabel?: string;
   /** Cabeçalho de seção estilo "revista" (título grande + link colorido, sem
    *  barra/uppercase). Os layouts "mini" e "hero" já usam revista por padrão. */
   sectionStyle?: "revista";

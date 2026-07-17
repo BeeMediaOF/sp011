@@ -343,27 +343,42 @@ function SectionBlockMagazine({ title, color, href, articles }: { title: string;
 /** Faixa de mini cards em largura total (título grande + "Ver todos" colorido).
  *  Recebe o bloco inteiro (≠ dos SectionBlock* clássicos): usa itemsLimit,
  *  linkLabel e linkUrl. Fontes latest/most_read não têm página de categoria —
- *  o "Ver todos" vem de linkUrl (ex.: /arquivo). */
+ *  o "Ver todos" vem de linkUrl (ex.: /arquivo). format "destaque" (mock
+ *  "Escolha do Editor" do Crédito.vc): 1º item vira card grande com título
+ *  sobre a foto e os demais seguem como mini cards ao lado. */
 function SectionBlockMini({ block, color, articles }: {
   block: HomeBlock; color: string; articles: SectionArticle[];
 }) {
+  const { t } = useT();
   const href = block.source !== "latest" && block.source !== "most_read" && block.category
     ? `/${block.category}` : safeLinkUrl(block.linkUrl) ?? undefined;
   const items = articles.slice(0, block.itemsLimit ?? 5);
   if (items.length === 0) return null;
+  const destaque = block.format === "destaque" && items.length >= 2;
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
       <ZoneSectionHeader variant="revista" title={block.name} color={color}
         href={href} linkLabel={block.linkLabel} />
-      <MiniCardsGrid items={items} color={color}
-        cols={Math.min(5, Math.max(3, block.itemsLimit ?? 4)) as 3 | 4 | 5} />
+      {destaque ? (
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] gap-5 items-stretch">
+          <HeroOverlayCard a={items[0]} color={color} big eager={false}
+            minRead={t("common.minRead")}
+            className="aspect-[16/10] lg:aspect-auto lg:h-full lg:min-h-[320px]" />
+          <MiniCardsGrid items={items.slice(1)} color={color}
+            cols={Math.min(5, Math.max(3, items.length - 1)) as 3 | 4 | 5} />
+        </div>
+      ) : (
+        <MiniCardsGrid items={items} color={color}
+          cols={Math.min(5, Math.max(3, block.itemsLimit ?? 4)) as 3 | 4 | 5} />
+      )}
     </section>
   );
 }
 
-/** Card com título sobre a foto do hero revista (destaque grande e laterais). */
-function HeroOverlayCard({ a, color, big = false, minRead, className = "" }: {
-  a: SectionArticle; color: string; big?: boolean; minRead: string; className?: string;
+/** Card com título sobre a foto do hero revista (destaque grande e laterais).
+ *  eager=false para uso abaixo da dobra (ex.: destaque da Escolha do Editor). */
+function HeroOverlayCard({ a, color, big = false, minRead, className = "", eager = true }: {
+  a: SectionArticle; color: string; big?: boolean; minRead: string; className?: string; eager?: boolean;
 }) {
   const meta = [
     a.readingMinutes ? `${a.readingMinutes} ${minRead}` : "",
@@ -375,7 +390,7 @@ function HeroOverlayCard({ a, color, big = false, minRead, className = "" }: {
       {a.image && (
         <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
           sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 100vw, 300px"}
-          alt={a.title} width={640} height={400} loading="eager" decoding="async"
+          alt={a.title} width={640} height={400} loading={eager ? "eager" : "lazy"} decoding="async"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
