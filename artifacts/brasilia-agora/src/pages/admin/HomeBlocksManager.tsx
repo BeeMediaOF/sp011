@@ -21,7 +21,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search";
-type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine";
+type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine" | "mini" | "hero";
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
@@ -191,6 +191,8 @@ const LAYOUTS: { id: LayoutId; label: string; desc: string; mini: React.ReactNod
   { id: "timeline", label: "Timeline",  desc: "Lista com linha", mini: <div className="flex flex-col gap-0.5 w-full pl-1 border-l border-current opacity-60">{[0,1,2,3].map(i=><div key={i} className="flex gap-0.5 items-center"><div className="w-1.5 h-1.5 rounded-full bg-current opacity-60 shrink-0"/><div className="flex-1 h-1 bg-current rounded opacity-25"/></div>)}</div> },
   { id: "overlay",  label: "Overlay",   desc: "Título sobre a foto", mini: <div className="flex gap-0.5 w-full">{[0,1,2,3].map(i=><div key={i} className="flex-1 h-4 bg-current rounded-sm opacity-40 flex flex-col justify-end p-0.5"><div className="h-1 bg-current rounded-sm opacity-60"/></div>)}</div> },
   { id: "magazine", label: "Magazine",  desc: "1 capa + 4 cards", mini: <div className="flex flex-col gap-0.5 w-full"><div className="w-full h-2.5 bg-current rounded-sm opacity-40"/><div className="flex gap-0.5">{[0,1,2,3].map(i=><div key={i} className="flex-1 h-1.5 bg-current rounded-sm opacity-25"/>)}</div></div> },
+  { id: "mini",     label: "Cards Revista", desc: "Fileira de mini cards", mini: <div className="flex gap-0.5 w-full">{[0,1,2,3,4].map(i=><div key={i} className="flex-1 flex flex-col gap-0.5"><div className="h-2 bg-current rounded-sm opacity-40"/><div className="h-1 w-2/3 bg-current rounded-full opacity-50"/><div className="h-1 bg-current rounded opacity-25"/></div>)}</div> },
+  { id: "hero",     label: "Hero Revista",  desc: "Boas-vindas + busca + destaques", mini: <div className="flex gap-0.5 w-full"><div className="flex-1 flex flex-col gap-0.5 justify-center"><div className="h-1 w-2/3 bg-current rounded opacity-40"/><div className="h-1 bg-current rounded opacity-25"/><div className="h-1.5 bg-current rounded-full opacity-40"/></div><div className="flex-[2] h-4 bg-current rounded-sm opacity-40"/><div className="flex-1 flex flex-col gap-0.5">{[0,1].map(i=><div key={i} className="flex-1 bg-current rounded-sm opacity-25"/>)}</div></div> },
 ];
 
 // ─── Block defaults ───────────────────────────────────────────────────────────
@@ -749,6 +751,7 @@ interface BlockForm {
   area: "" | "main" | "sidebar";
   width: "" | "full" | "half" | "quarter";
   linkLabel: string;
+  sectionStyle: "" | "revista";
   isAd: boolean;
   fontFamily: string;
 }
@@ -761,6 +764,7 @@ const EMPTY_FORM: BlockForm = {
   imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
   adSlot: "slot_05", adId: "",
   area: "", width: "", linkLabel: "",
+  sectionStyle: "",
   isAd: false,
   fontFamily: "",
 };
@@ -790,6 +794,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     area:          block.area ?? "",
     width:         block.width ?? "",
     linkLabel:     block.linkLabel ?? "",
+    sectionStyle:  block.sectionStyle ?? "",
     isAd:          block.isAd ?? false,
     fontFamily:    block.fontFamily ?? "",
   };
@@ -823,6 +828,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     area:       f.area || undefined,
     width:      f.width || undefined,
     linkLabel:  f.linkLabel.trim() || undefined,
+    sectionStyle: isContent && f.sectionStyle ? "revista" : undefined,
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
     fontFamily: f.fontFamily || undefined,
   };
@@ -1314,8 +1320,27 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         </PanelSection>
       )}
 
-      {/* Quantidade (layouts de Conteúdo definem as próprias contagens) */}
-      {!isSpecial && isArticleType && form.blockType !== "content" && (
+      {/* Cabeçalho estilo revista (título grande + link colorido, sem barra) */}
+      {!isSpecial && form.blockType === "content" && form.layout !== "mini" && form.layout !== "hero" && (
+        <PanelSection label="Cabeçalho da seção" icon={Type}>
+          <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
+            <div className="flex items-center gap-2">
+              <Type size={12} className="text-slate-400" />
+              <span className="text-[12px] font-medium text-slate-700">Estilo revista (título grande + link colorido)</span>
+            </div>
+            <Toggle checked={form.sectionStyle === "revista"}
+              onChange={() => onChange("sectionStyle", form.sectionStyle === "revista" ? "" : "revista")}
+              accent={form.color} />
+          </div>
+          <p className="text-[10px] mt-1.5 text-slate-400 leading-relaxed">
+            Os layouts Cards Revista e Hero Revista já usam este cabeçalho.
+          </p>
+        </PanelSection>
+      )}
+
+      {/* Quantidade (layouts de Conteúdo definem as próprias contagens; os
+          layouts revista "mini"/"hero" respeitam a quantidade escolhida) */}
+      {!isSpecial && isArticleType && (form.blockType !== "content" || form.layout === "mini" || form.layout === "hero") && (
         <PanelSection label="Quantidade de itens">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => onChange("itemsLimit", Math.max(1, form.itemsLimit - 1))}
@@ -1355,11 +1380,42 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         </p>
       </PanelSection>
 
-      {/* Texto do link do cabeçalho de seção (renderizadores de zona) */}
-      {!isSpecial && isArticleType && (form.area !== "" || form.width === "half") && (
+      {/* Texto do link do cabeçalho de seção (zonas + layouts revista no fluxo) */}
+      {!isSpecial && isArticleType && (form.area !== "" || form.width === "half" || form.layout === "mini") && (
         <PanelSection label="Texto do link da seção">
           <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
             className={INPUT} placeholder='Padrão: "Ver mais"' />
+          {form.layout === "mini" && (
+            <>
+              <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+                className={`${INPUT} mt-1.5`} placeholder="Destino do link (ex.: /arquivo)" />
+              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                Fontes "mais recentes"/"mais lidas" não têm página própria de categoria —
+                o destino acima vale nesses casos (ex.: /arquivo).
+              </p>
+            </>
+          )}
+        </PanelSection>
+      )}
+
+      {/* ── Hero Revista: boas-vindas + busca (campos próprios do layout) ── */}
+      {!isSpecial && form.blockType === "content" && form.layout === "hero" && (
+        <PanelSection label="Hero Revista" icon={Type}>
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Boas-vindas (HTML)</label>
+          <textarea value={form.html} onChange={(e) => onChange("html", e.target.value)}
+            rows={5} spellCheck={false}
+            className={`${INPUT} font-mono text-xs resize-y`} placeholder="<p>BEM-VINDO…</p><h1>Título</h1><p>Texto…</p>" />
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mt-2 mb-1">Placeholder da busca</label>
+          <input value={form.caption} onChange={(e) => onChange("caption", e.target.value)}
+            className={INPUT} placeholder="Buscar artigos, guias e temas..." />
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mt-2 mb-1">Nota sob a busca</label>
+          <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+            className={INPUT} placeholder="Receba conteúdos exclusivos… Quero me inscrever →" />
+          <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+            className={`${INPUT} mt-1.5`} placeholder='Destino da nota ("#id-do-bloco" rola até ele)' />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            O destaque grande e os 2 cards laterais vêm da fonte de artigos acima (3 itens).
+          </p>
         </PanelSection>
       )}
 
@@ -1497,6 +1553,7 @@ export default function HomeBlocksManager() {
   const [menuBarStyle, setMenuBarStyle]           = useState<"attached" | "bar">("attached");
   const [menuBarBgColor, setMenuBarBgColor]       = useState("");
   const [footerAccentColor, setFooterAccentColor] = useState("");
+  const [pageBgColor, setPageBgColor]             = useState("");
   // Idioma/fuso do site público — entram no snapshot para o Desfazer restaurar
   // quando um template EN (KSports) os altera.
   const [siteLanguage, setSiteLanguage] = useState<"pt-BR" | "en">("pt-BR");
@@ -1536,6 +1593,7 @@ export default function HomeBlocksManager() {
     headerBannerLinkUrl?: string;
     menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
     footerAccentColor?: string;
+    pageBgColor?: string;
     /** Idioma/fuso do site público (aplicados/restaurados só quando definidos). */
     siteLanguage?: "pt-BR" | "en"; siteTimezone?: string;
   };
@@ -1616,6 +1674,7 @@ export default function HomeBlocksManager() {
         setMenuBarStyle(r.settings.menuBarStyle === "bar" ? "bar" : "attached");
         setMenuBarBgColor(r.settings.menuBarBgColor ?? "");
         setFooterAccentColor(r.settings.footerAccentColor ?? "");
+        setPageBgColor(r.settings.pageBgColor ?? "");
         setSiteLanguage(r.settings.siteLanguage === "en" ? "en" : "pt-BR");
         setSiteTimezone(r.settings.siteTimezone ?? "");
         if (r.settings.logoBase64) setLogoBase64(r.settings.logoBase64);
@@ -1728,7 +1787,7 @@ export default function HomeBlocksManager() {
       menuTextColor, menuActiveColor, menuFontSize, menuFontWeight,
       headerPaddingX, headerMarginTop, showTickerBar, showHeroStrip,
       showTopBar, topBarBgColor, headerBannerHtml, headerBannerLinkUrl, menuBarStyle, menuBarBgColor,
-      footerAccentColor,
+      footerAccentColor, pageBgColor,
       siteLanguage, siteTimezone,
       ...(menuItems ? { menuItems: menuItems.map((m) => ({ ...m, children: m.children?.map((c) => ({ ...c })) })) } : {}),
       ...(footerConfig !== undefined ? { footerConfig: JSON.parse(JSON.stringify(footerConfig)) as FooterConfig } : {}),
@@ -1759,6 +1818,7 @@ export default function HomeBlocksManager() {
       ...(snap.menuBarStyle      !== undefined ? { menuBarStyle:      snap.menuBarStyle }      : {}),
       ...(snap.menuBarBgColor    !== undefined ? { menuBarBgColor:    snap.menuBarBgColor }    : {}),
       ...(snap.footerAccentColor !== undefined ? { footerAccentColor: snap.footerAccentColor } : {}),
+      ...(snap.pageBgColor       !== undefined ? { pageBgColor:       snap.pageBgColor }       : {}),
       ...(snap.footerConfig      !== undefined ? { footerConfig:      snap.footerConfig }      : {}),
       ...(snap.siteLanguage      !== undefined ? { siteLanguage:      snap.siteLanguage }      : {}),
       ...(snap.siteTimezone      !== undefined ? { siteTimezone:      snap.siteTimezone }      : {}),
@@ -1785,6 +1845,7 @@ export default function HomeBlocksManager() {
     if (snap.menuBarStyle      !== undefined) setMenuBarStyle(snap.menuBarStyle);
     if (snap.menuBarBgColor    !== undefined) setMenuBarBgColor(snap.menuBarBgColor);
     if (snap.footerAccentColor !== undefined) setFooterAccentColor(snap.footerAccentColor);
+    if (snap.pageBgColor       !== undefined) setPageBgColor(snap.pageBgColor);
     if (snap.footerConfig      !== undefined) setFooterConfig(snap.footerConfig);
     if (snap.siteLanguage      !== undefined) setSiteLanguage(snap.siteLanguage);
     if (snap.siteTimezone      !== undefined) setSiteTimezone(snap.siteTimezone);
@@ -1811,7 +1872,7 @@ export default function HomeBlocksManager() {
   // define — um look antigo restaura o visual clássico em vez de herdar sobras
   // do KSports. ("" = não configurado; o site trata vazio como default.)
   function portalFieldsOf(src: Partial<HomeSnapshot>): Pick<HomeSnapshot,
-    "showTopBar" | "topBarBgColor" | "headerBannerHtml" | "headerBannerLinkUrl" | "menuBarStyle" | "menuBarBgColor" | "footerAccentColor"> {
+    "showTopBar" | "topBarBgColor" | "headerBannerHtml" | "headerBannerLinkUrl" | "menuBarStyle" | "menuBarBgColor" | "footerAccentColor" | "pageBgColor"> {
     return {
       showTopBar:        src.showTopBar        ?? false,
       topBarBgColor:     src.topBarBgColor     ?? "",
@@ -1820,6 +1881,7 @@ export default function HomeBlocksManager() {
       menuBarStyle:      src.menuBarStyle      ?? "attached",
       menuBarBgColor:    src.menuBarBgColor    ?? "",
       footerAccentColor: src.footerAccentColor ?? "",
+      pageBgColor:       src.pageBgColor       ?? "",
     };
   }
 

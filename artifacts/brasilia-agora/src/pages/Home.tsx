@@ -11,20 +11,21 @@ import SectionBlockLista from "../components/SectionBlockLista";
 import SectionBlockManchete from "../components/SectionBlockManchete";
 import DestaquesListaBadge from "../components/DestaquesListaBadge";
 import Footer from "../components/Footer";
-import AdBanner from "../components/ads/AdBanner";
+import AdSlotBand from "../components/ads/AdSlotBand";
 import { useArticles } from "../hooks/useArticles";
 
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { useT, formatDayMonth } from "../lib/i18n";
 import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
-import { inferBlockType, segmentBlocks, sampleForPreview, type SegmentEntry } from "../lib/homeBlocks";
+import { inferBlockType, segmentBlocks, sampleForPreview, safeLinkUrl, type SegmentEntry } from "../lib/homeBlocks";
+import { sanitizeArticleHtml, safeTitleHtml } from "../lib/sanitize";
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
-  QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope, SearchBlock,
+  QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope, SearchBlock, SearchForm,
 } from "../components/blocks/HomeCustomBlocks";
-import { ZoneBlock } from "../components/blocks/PortalZoneBlocks";
+import { ZoneBlock, ZoneSectionHeader, MiniCardsGrid } from "../components/blocks/PortalZoneBlocks";
 
 /* Lazy: ColumnistsSection não é crítico para LCP — carregado sob demanda */
 const ColumnistsSection = lazy(() => import("../components/ColumnistsSection"));
@@ -67,6 +68,8 @@ type SectionArticle = {
   id: string; slug?: string; title: string; summary: string;
   image: string; chapeu: string; author: string; time: string;
   views?: number;
+  /** Tempo de leitura em minutos (api novo; ausente em payload antigo). */
+  readingMinutes?: number;
 };
 
 /** Ordena por leituras reais (blocos "Mais lidas"); empate mantém a ordem original. */
@@ -88,6 +91,7 @@ function useArticlesByCategory(category: string): SectionArticle[] {
       chapeu: a.tag || category.toUpperCase(),
       author: a.author,
       time: formatDayMonth(a.publishedAt, lang, tz),
+      readingMinutes: a.readingMinutes,
     }));
 }
 
@@ -335,6 +339,135 @@ function SectionBlockMagazine({ title, color, href, articles }: { title: string;
   );
 }
 
+// ─── Layouts "revista" (mock dos portais B2B: PontoFarma/Crédito.vc) ─────────
+/** Faixa de mini cards em largura total (título grande + "Ver todos" colorido).
+ *  Recebe o bloco inteiro (≠ dos SectionBlock* clássicos): usa itemsLimit,
+ *  linkLabel e linkUrl. Fontes latest/most_read não têm página de categoria —
+ *  o "Ver todos" vem de linkUrl (ex.: /arquivo). */
+function SectionBlockMini({ block, color, articles }: {
+  block: HomeBlock; color: string; articles: SectionArticle[];
+}) {
+  const href = block.source !== "latest" && block.source !== "most_read" && block.category
+    ? `/${block.category}` : safeLinkUrl(block.linkUrl) ?? undefined;
+  const items = articles.slice(0, block.itemsLimit ?? 5);
+  if (items.length === 0) return null;
+  return (
+    <section className="max-w-[1280px] mx-auto px-4 py-6">
+      <ZoneSectionHeader variant="revista" title={block.name} color={color}
+        href={href} linkLabel={block.linkLabel} />
+      <MiniCardsGrid items={items} color={color}
+        cols={Math.min(5, Math.max(3, block.itemsLimit ?? 4)) as 3 | 4 | 5} />
+    </section>
+  );
+}
+
+/** Card com título sobre a foto do hero revista (destaque grande e laterais). */
+function HeroOverlayCard({ a, color, big = false, minRead, className = "" }: {
+  a: SectionArticle; color: string; big?: boolean; minRead: string; className?: string;
+}) {
+  const meta = [
+    a.readingMinutes ? `${a.readingMinutes} ${minRead}` : "",
+    a.time,
+  ].filter(Boolean).join(" · ");
+  return (
+    <Link href={`/artigo/${a.slug ?? a.id}`}
+      className={`group relative block overflow-hidden rounded-2xl bg-gray-200 ${className}`}>
+      {a.image && (
+        <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+          sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 100vw, 300px"}
+          alt={a.title} width={640} height={400} loading="eager" decoding="async"
+          className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+      <div className={`absolute bottom-0 left-0 right-0 ${big ? "p-5" : "p-4"}`}>
+        <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded-full mb-1.5"
+          style={{ backgroundColor: color }}>{a.chapeu}</span>
+        <p className={`${big ? "text-[22px] md:text-[24px] leading-tight line-clamp-3" : "text-[14px] leading-snug line-clamp-2"} font-black text-white`}
+          dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }} />
+        {big && a.summary && (
+          <p className="text-[13px] text-white/80 leading-snug line-clamp-2 mt-1.5">{a.summary}</p>
+        )}
+        {meta && <p className={`${big ? "text-[12px]" : "text-[11px]"} text-white/70 mt-1.5`}>{meta}</p>}
+      </div>
+    </Link>
+  );
+}
+
+/** Hero "revista" de 3 colunas (mock): boas-vindas (html do bloco) + busca à
+ *  esquerda, destaque grande no centro e 2 cards menores à direita. linkLabel/
+ *  linkUrl viram a nota sob a busca (âncora "#<id>" rola até o bloco — ex.:
+ *  newsletter no fim da home). */
+function SectionBlockHero({ block, color, articles }: {
+  block: HomeBlock; color: string; articles: SectionArticle[];
+}) {
+  const { t } = useT();
+  const { settings } = useSite();
+  const [main, ...side] = articles.slice(0, block.itemsLimit ?? 3);
+  const html = sanitizeArticleHtml(block.html);
+  const note = (block.linkLabel ?? "").trim();
+  const noteHref = (block.linkUrl ?? "").trim();
+  const minRead = t("common.minRead");
+
+  function noteClick(e: React.MouseEvent) {
+    if (!noteHref.startsWith("#")) return;
+    e.preventDefault();
+    document.getElementById(noteHref.slice(1))?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  if (!main) return null;
+  const mainMeta = [
+    settings?.siteName ?? "",
+    main.readingMinutes ? `${main.readingMinutes} ${minRead}` : "",
+    main.time,
+  ].filter(Boolean).join(" · ");
+
+  return (
+    <section className="max-w-[1280px] mx-auto px-4 py-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[340px_minmax(0,1fr)_300px] gap-5 items-stretch">
+        <div className="flex flex-col justify-center min-w-0 lg:pr-2">
+          {html && <div className="mb-5" dangerouslySetInnerHTML={{ __html: html }} />}
+          <SearchForm placeholder={(block.caption ?? "").trim() || undefined} color={color} />
+          {note && (
+            noteHref.startsWith("#")
+              ? <a href={noteHref} onClick={noteClick} className="block text-[13px] text-gray-500 mt-3 hover:underline">{note}</a>
+              : <p className="text-[13px] text-gray-500 mt-3">{note}</p>
+          )}
+        </div>
+        <div className="min-w-0">
+          <Link href={`/artigo/${main.slug ?? main.id}`}
+            className="group relative block overflow-hidden rounded-2xl bg-gray-200 aspect-[16/10] lg:aspect-auto lg:h-full lg:min-h-[400px]">
+            {main.image && (
+              <img src={main.image} srcSet={buildSrcSet(main.image, CARD_WIDTHS) || undefined}
+                sizes="(max-width: 1024px) 100vw, 640px" alt={main.title}
+                width={640} height={400} loading="eager" fetchPriority="high" decoding="sync"
+                className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 p-5">
+              <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-white px-2 py-0.5 rounded-full mb-1.5"
+                style={{ backgroundColor: color }}>{main.chapeu}</span>
+              <p className="text-[22px] md:text-[24px] font-black text-white leading-tight line-clamp-3"
+                dangerouslySetInnerHTML={{ __html: safeTitleHtml(main.title) }} />
+              {main.summary && (
+                <p className="text-[13px] text-white/80 leading-snug line-clamp-2 mt-1.5">{main.summary}</p>
+              )}
+              {mainMeta && <p className="text-[12px] text-white/70 mt-1.5">{mainMeta}</p>}
+            </div>
+          </Link>
+        </div>
+        {side.length > 0 && (
+          <div className="flex flex-row lg:flex-col gap-5 min-w-0">
+            {side.slice(0, 2).map((a) => (
+              <HeroOverlayCard key={a.id} a={a} color={color} minRead={minRead}
+                className="flex-1 aspect-[16/10] lg:aspect-auto lg:min-h-0" />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ─── Custom block renderer ────────────────────────────────────────────────────
 function CustomBlock({ block, getArticles, preview }: {
   block: HomeBlock;
@@ -358,7 +491,8 @@ function CustomBlock({ block, getArticles, preview }: {
   if (preview && byCategory.length === 0) {
     byCategory = sampleForPreview(getArticles(""), block.id, 8);
   }
-  // itemsLimit só vale para lista/carrossel/ticker — layouts editoriais
+  // itemsLimit só vale para lista/carrossel/ticker (e para os layouts revista
+  // "mini"/"hero", que fatiam por conta própria) — os demais layouts editoriais
   // (featured, duplo, mosaico…) definem as próprias contagens.
   const limited = block.itemsLimit ? byCategory.slice(0, block.itemsLimit) : byCategory;
 
@@ -423,6 +557,10 @@ function CustomBlock({ block, getArticles, preview }: {
       return <SectionBlockBigStory title={block.name} color={color} href={href} articles={articles} />;
     case "timeline":
       return <SectionBlockTimeline title={block.name} color={color} href={href} articles={articles} />;
+    case "mini":
+      return <SectionBlockMini block={block} color={color} articles={articles} />;
+    case "hero":
+      return <SectionBlockHero block={block} color={color} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={block.name} color={color} href={href} articles={articles} pageSize={4} />;
@@ -492,6 +630,10 @@ function ConfigurableBlock({ block, getArticles, preview }: {
       return <SectionBlockBigStory title={title} color={color} href={href} articles={articles} />;
     case "timeline":
       return <SectionBlockTimeline title={title} color={color} href={href} articles={articles} />;
+    case "mini":
+      return <SectionBlockMini block={block} color={color} articles={articles} />;
+    case "hero":
+      return <SectionBlockHero block={block} color={color} articles={articles} />;
     case "grid":
     default:
       return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} />;
@@ -673,6 +815,7 @@ export default function Home() {
         author: a.author,
         time: formatDayMonth(a.publishedAt, lang, tz),
         views: a.views,
+        readingMinutes: a.readingMinutes,
       }));
   }
 
@@ -716,11 +859,11 @@ export default function Home() {
   function renderFlowBlock(block: HomeBlock, idx: number): React.ReactNode {
     const content = (
       <>
-        {idx === 0 && <div className="max-w-[1280px] mx-auto px-4 pt-4 pb-2"><AdBanner slot="slot_08" priority /></div>}
-        {idx === 1 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_01" /></div>}
-        {idx === 2 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_02" /></div>}
-        {idx === 4 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_03" /></div>}
-        {idx === 7 && <div className="max-w-[1280px] mx-auto px-4 py-4"><AdBanner slot="slot_04" /></div>}
+        {idx === 0 && <AdSlotBand slot="slot_08" priority className="max-w-[1280px] mx-auto px-4 pt-4 pb-2" />}
+        {idx === 1 && <AdSlotBand slot="slot_01" className="max-w-[1280px] mx-auto px-4 py-4" />}
+        {idx === 2 && <AdSlotBand slot="slot_02" className="max-w-[1280px] mx-auto px-4 py-4" />}
+        {idx === 4 && <AdSlotBand slot="slot_03" className="max-w-[1280px] mx-auto px-4 py-4" />}
+        {idx === 7 && <AdSlotBand slot="slot_04" className="max-w-[1280px] mx-auto px-4 py-4" />}
         <BlockFontScope fontId={block.fontFamily}>
           {block.custom
             ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
@@ -792,7 +935,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-white flex flex-col overflow-x-hidden">
+    // Fundo da home configurável (mock dos portais B2B usa #f7f9fb); demais
+    // páginas seguem brancas — o campo só afeta a home.
+    <div className="min-h-screen w-full flex flex-col overflow-x-hidden"
+      style={{ backgroundColor: settings?.pageBgColor || "#ffffff" }}>
       <TopBar />
       <Header />
 
@@ -852,10 +998,8 @@ export default function Home() {
           );
         })}
 
-        {/* slot_09 — Rodapé da Home */}
-        <div className="max-w-[1280px] mx-auto px-4 py-6">
-          <AdBanner slot="slot_09" />
-        </div>
+        {/* slot_09 — Rodapé da Home (sem anúncio = sem faixa reservada) */}
+        <AdSlotBand slot="slot_09" className="max-w-[1280px] mx-auto px-4 py-6" />
       </main>
 
       <Footer />

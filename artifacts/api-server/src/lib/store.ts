@@ -98,7 +98,7 @@ export interface MenuItem {
 export interface HomeBlock {
   id: string; name: string; visible: boolean; order: number;
   category?: string;
-  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine";
+  layout?: "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine" | "mini" | "hero";
   color?: string; custom?: boolean; reverse?: boolean;
   /** Tipo do bloco (image, carousel, video, html…). Ausente = content. */
   blockType?: string;
@@ -112,6 +112,9 @@ export interface HomeBlock {
   area?: "main" | "sidebar"; width?: "full" | "half";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona. */
   linkLabel?: string;
+  /** Cabeçalho de seção estilo "revista" (título grande + link colorido, sem
+   *  barra/uppercase). Os layouts "mini" e "hero" já usam revista por padrão. */
+  sectionStyle?: "revista";
   /** Fonte do texto do bloco (id do registro de fontes do frontend). */
   fontFamily?: string;
 }
@@ -141,6 +144,8 @@ export interface HomeTemplate {
   headerBannerLinkUrl?: string;
   menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
   footerAccentColor?: string;
+  /** Fundo da página da home (vazio = branco). */
+  pageBgColor?: string;
 }
 
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */
@@ -202,6 +207,8 @@ export interface SiteSettings {
   menuBarStyle?: "attached" | "bar"; menuBarBgColor?: string;
   /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */
   footerAccentColor?: string;
+  /** Fundo da página da home (vazio/ausente = branco). */
+  pageBgColor?: string;
   seoDescription?: string; seoKeywords?: string;
   facebookPixelId?: string; gtmId?: string; ga4MeasurementId?: string;
   customHeadCode?: string; customBodyCode?: string;

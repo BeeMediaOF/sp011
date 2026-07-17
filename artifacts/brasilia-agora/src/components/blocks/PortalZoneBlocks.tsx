@@ -34,6 +34,8 @@ export interface ZoneArticle {
   author: string;
   time: string;
   views?: number;
+  /** Tempo de leitura em minutos (api novo; ausente em payload antigo). */
+  readingMinutes?: number;
 }
 
 /** Ordena por leituras reais ("Most Read"); empate mantém a ordem original. */
@@ -43,16 +45,36 @@ function sortByViews(list: ZoneArticle[]): ZoneArticle[] {
 
 const stripTags = (s: string) => s.replace(/<[^>]*>/g, "");
 
+/** Meta dos cards estilo "revista": "6 min · 16 de mai." (sem tempo → só a data). */
+const metaLine = (a: ZoneArticle) =>
+  a.readingMinutes ? `${a.readingMinutes} min · ${a.time}` : a.time;
+
 type Zone = "main" | "sidebar" | "half";
 
 // ─── Cabeçalho de seção das zonas (barra de cor + título + link opcional) ─────
-function ZoneSectionHeader({ title, color, href, linkLabel }: {
+// variant "revista" = título grande sem barra/uppercase + link na cor do bloco
+// (mock dos portais B2B). Exportado: os blocos de FLUXO mini/hero da Home usam.
+export function ZoneSectionHeader({ title, color, href, linkLabel, variant = "classic" }: {
   title: string; color: string; href?: string; linkLabel?: string;
+  variant?: "classic" | "revista";
 }) {
   const { t } = useT();
   // Bloco sem nome e sem link = seção "sem cabeçalho" (ex.: destaque do hero
   // dos portais de mock, que não tem título de seção).
   if (!title && !href) return null;
+  if (variant === "revista") {
+    return (
+      <div className="flex items-baseline justify-between mb-5">
+        <h2 className="text-[22px] font-extrabold text-[#1a1a1a] leading-tight truncate">{title}</h2>
+        {href && (
+          <Link href={href}
+            className="text-[14px] font-bold hover:underline shrink-0 ml-3" style={{ color }}>
+            {linkLabel ?? t("common.seeMore")}
+          </Link>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -124,8 +146,8 @@ function OverlayCard({ a, color, big = false, className = "" }: {
 }
 
 /** Linha com título à esquerda e thumb à direita (listas laterais). */
-function ThumbRow({ a, color, chapeu = false, small = false }: {
-  a: ZoneArticle; color?: string; chapeu?: boolean; small?: boolean;
+function ThumbRow({ a, color, chapeu = false, small = false, revista = false }: {
+  a: ZoneArticle; color?: string; chapeu?: boolean; small?: boolean; revista?: boolean;
 }) {
   return (
     <Link href={`/artigo/${a.slug ?? a.id}`}
@@ -136,7 +158,7 @@ function ThumbRow({ a, color, chapeu = false, small = false }: {
         )}
         <p className="text-[13px] font-semibold text-[#1a1a1a] leading-snug line-clamp-2 group-hover:underline"
           dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }} />
-        <p className="text-[11px] text-gray-400 mt-1">{a.time}</p>
+        <p className="text-[11px] text-gray-400 mt-1">{revista ? metaLine(a) : a.time}</p>
       </div>
       {a.image && (
         <img src={a.image} srcSet={buildSrcSet(a.image, THUMB_WIDTHS) || undefined} sizes={small ? "64px" : "80px"}
@@ -164,6 +186,52 @@ function CardsGrid({ items, color, cols, narrow = false }: {
           summary={cols !== 3}
           sizes={cols === 2 ? "(max-width: 1024px) 100vw, 300px" : "(max-width: 1024px) 50vw, 230px"} />
       ))}
+    </div>
+  );
+}
+
+/** Card "revista" fiel ao mock dos portais B2B: caixa branca com sombra,
+ *  imagem 4/3 no topo, selo-pílula da categoria ABAIXO da imagem (fundo tintado
+ *  na cor do bloco) e meta "X min · data". */
+function MiniCard({ a, color, sizes = "(max-width: 640px) 50vw, (max-width: 1280px) 33vw, 240px" }: {
+  a: ZoneArticle; color: string; sizes?: string;
+}) {
+  return (
+    <Link href={`/artigo/${a.slug ?? a.id}`}
+      className="group flex flex-col min-w-0 bg-white border border-gray-200 rounded-2xl shadow-[0_8px_28px_rgba(15,23,42,.06)] overflow-hidden">
+      <div className="relative w-full aspect-[4/3] overflow-hidden bg-gray-100">
+        {a.image && (
+          <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+            sizes={sizes} alt={stripTags(a.title)}
+            width={460} height={345} loading="lazy" decoding="async"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        )}
+      </div>
+      <div className="p-3.5 flex flex-col">
+        {a.chapeu && (
+          // "1f" = alpha ~12% em hex de 8 dígitos (cores de bloco são sempre hex).
+          <span className="self-start text-[10px] font-extrabold uppercase tracking-wide px-2.5 py-1 rounded-full mb-2"
+            style={{ backgroundColor: `${color}1f`, color }}>{a.chapeu}</span>
+        )}
+        <p className="text-[15px] font-bold text-[#1a1a1a] leading-snug line-clamp-3 group-hover:underline"
+          dangerouslySetInnerHTML={{ __html: safeTitleHtml(a.title) }} />
+        <p className="text-[12px] text-gray-400 mt-2">{metaLine(a)}</p>
+      </div>
+    </Link>
+  );
+}
+
+/** Grade de mini cards "revista" (ex.: "Mais Recentes" dos portais B2B).
+ *  Exportada: os blocos de FLUXO com layout "mini" da Home usam direto. */
+export function MiniCardsGrid({ items, color, cols }: {
+  items: ZoneArticle[]; color: string; cols: 3 | 4 | 5;
+}) {
+  const colsCls = cols === 5 ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5"
+    : cols === 4 ? "grid-cols-2 lg:grid-cols-4"
+    : "grid-cols-2 sm:grid-cols-3";
+  return (
+    <div className={`grid ${colsCls} gap-4`}>
+      {items.map((a) => <MiniCard key={a.id} a={a} color={color} />)}
     </div>
   );
 }
@@ -258,8 +326,8 @@ function BigStoryZone({ items, color }: { items: ZoneArticle[]; color: string })
  * Foto + lista lateral (o visual das seções Football/Basketball do exemplo).
  * Pill do destaque usa a legenda do bloco quando preenchida.
  */
-function FotoListaBody({ block, articles, color }: {
-  block: HomeBlock; articles: ZoneArticle[]; color: string;
+function FotoListaBody({ block, articles, color, revista = false }: {
+  block: HomeBlock; articles: ZoneArticle[]; color: string; revista?: boolean;
 }) {
   const [main, ...rest] = articles;
   const pill = (block.caption ?? "").trim() || main.chapeu;
@@ -279,11 +347,11 @@ function FotoListaBody({ block, articles, color }: {
         <h3 className="text-[16px] font-black text-[#1a1a1a] leading-snug line-clamp-2 group-hover:underline"
           dangerouslySetInnerHTML={{ __html: safeTitleHtml(main.title) }} />
         {main.summary && <p className="text-[12.5px] text-gray-500 leading-snug line-clamp-2 mt-1">{stripTags(main.summary)}</p>}
-        <p className="text-[11px] text-gray-400 mt-1.5">{main.time}</p>
+        <p className="text-[11px] text-gray-400 mt-1.5">{revista ? metaLine(main) : main.time}</p>
       </Link>
       {rest.length > 0 && (
         <div className="flex flex-col min-w-0">
-          {rest.slice(0, 3).map((a) => <ThumbRow key={a.id} a={a} />)}
+          {rest.slice(0, 3).map((a) => <ThumbRow key={a.id} a={a} revista={revista} />)}
         </div>
       )}
     </div>
@@ -428,6 +496,8 @@ function ZoneContent({ block, articles, color, href, zone, preview }: {
   const narrow = zone === "half";
   const limit = block.itemsLimit;
   const layout = block.layout ?? (narrow ? "bigstory" : "grid");
+  // Cabeçalho "revista" opt-in por bloco; o layout mini já nasce revista.
+  const revista = block.sectionStyle === "revista" || layout === "mini";
 
   let body: React.ReactNode;
   switch (layout) {
@@ -440,7 +510,7 @@ function ZoneContent({ block, articles, color, href, zone, preview }: {
       body = <DuploZone items={articles.slice(0, narrow ? 4 : 6)} color={color} narrow={narrow} />;
       break;
     case "cultura":
-      body = <FotoListaBody block={block} articles={articles.slice(0, 4)} color={color} />;
+      body = <FotoListaBody block={block} articles={articles.slice(0, 4)} color={color} revista={revista} />;
       break;
     case "lista":
       body = <NumListZone items={articles.slice(0, limit ?? (narrow ? 5 : 6))} color={color} cols={narrow ? 1 : 2} />;
@@ -471,6 +541,11 @@ function ZoneContent({ block, articles, color, href, zone, preview }: {
     case "magazine":
       body = <MagazineZone items={articles.slice(0, narrow ? 3 : 5)} color={color} narrow={narrow} />;
       break;
+    case "mini":
+      // half = 3 cards em 3 colunas; main = nº de colunas segue o itemsLimit (3–5).
+      body = <MiniCardsGrid items={articles.slice(0, limit ?? (narrow ? 3 : 4))} color={color}
+        cols={narrow ? 3 : (Math.min(5, Math.max(3, limit ?? 4)) as 3 | 4 | 5)} />;
+      break;
     case "grid":
     default:
       body = <CardsGrid items={articles.slice(0, limit ?? 4)} color={color} cols={narrow ? 2 : 4} />;
@@ -479,7 +554,8 @@ function ZoneContent({ block, articles, color, href, zone, preview }: {
 
   return (
     <section className="min-w-0">
-      <ZoneSectionHeader title={block.name} color={color} href={href} linkLabel={block.linkLabel} />
+      <ZoneSectionHeader title={block.name} color={color} href={href} linkLabel={block.linkLabel}
+        variant={revista ? "revista" : "classic"} />
       {body}
     </section>
   );
@@ -619,6 +695,8 @@ function SidebarContent({ block, articles, color, preview }: {
     case "grid":
     case "trio":
     case "duplo":
+    case "mini":   // mini/hero não cabem em 320px — caem nos cards empilhados
+    case "hero":
       return <SidebarCards block={block} articles={articles} color={color} preview={preview} />;
     case "overlay":
       return <SidebarCards block={block} articles={articles} color={color} preview={preview} overlay />;

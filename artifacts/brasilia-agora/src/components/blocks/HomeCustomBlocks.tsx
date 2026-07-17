@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
 import AdBanner from "../ads/AdBanner";
 import CotacaoWidget from "../CotacaoWidget";
 import { useSite } from "../../hooks/useSite";
@@ -347,9 +347,17 @@ function getSessionId(): string {
 
 export function NewsletterBlock({ block }: { block: HomeBlock }) {
   const { t, lang } = useT();
+  const { settings } = useSite();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "err">("idle");
   const color = block.color ?? "#0B2A66";
+  // Variante "card" (mock dos portais B2B): cartão arredondado contido, com
+  // ícone de envelope no acento do site e nota curta (linkLabel) sob o form.
+  const isCard = block.format === "card";
+  const accent = settings?.menuActiveColor || settings?.footerAccentColor || "";
+  const caption = block.caption
+    || (lang === "en" ? "Get the top stories in your inbox." : "Receba as principais notícias no seu e-mail.");
+  const note = (block.linkLabel ?? "").trim();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -367,6 +375,59 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
     } catch { setStatus("err"); }
   }
 
+  const errMsg = status === "err" && (
+    <p className="text-xs text-white/90 mt-2">{lang === "en" ? "Enter a valid email." : "Informe um e-mail válido."}</p>
+  );
+
+  if (isCard) {
+    return (
+      // id = âncora navegável (busca do hero/CTA do cabeçalho → "#<id do bloco>").
+      <section id={block.id} className="max-w-[1280px] mx-auto px-4 py-6">
+        <div className="rounded-3xl px-6 py-7 md:px-10 md:py-8 shadow-[0_8px_28px_rgba(15,23,42,.08)] flex flex-col md:flex-row md:items-center gap-5 md:gap-8"
+          style={{ backgroundColor: color }}>
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0"
+              style={{ backgroundColor: accent || "rgba(255,255,255,.15)" }}>
+              <Mail size={26} className="text-white" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-lg md:text-xl font-black text-white leading-snug">{block.name || "Newsletter"}</p>
+              <p className="text-sm text-white/75 mt-1">{caption}</p>
+            </div>
+          </div>
+          <div className="w-full md:w-auto">
+            {status === "ok" ? (
+              <p className="text-sm font-bold text-white bg-white/15 rounded-xl px-4 py-3">{t("newsletter.thanks")}</p>
+            ) : (
+              <>
+                <form onSubmit={submit} className="flex w-full md:w-auto md:min-w-[380px]">
+                  <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (status === "err") setStatus("idle"); }}
+                    placeholder={t("newsletter.email")} aria-label={t("newsletter.emailAria")} required
+                    className="flex-1 min-w-0 bg-white text-gray-800 placeholder-gray-400 px-4 py-2.5 text-sm rounded-l-xl focus:outline-none" />
+                  {accent ? (
+                    <button type="submit" disabled={status === "sending"}
+                      className="text-white text-sm font-bold px-5 py-2.5 rounded-r-xl hover:opacity-90 disabled:opacity-60 transition-opacity"
+                      style={{ backgroundColor: accent }}>
+                      {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
+                    </button>
+                  ) : (
+                    <button type="submit" disabled={status === "sending"}
+                      className="bg-white text-sm font-bold px-5 py-2.5 rounded-r-xl hover:bg-white/90 disabled:opacity-60 transition-colors border-l border-gray-200"
+                      style={{ color }}>
+                      {status === "sending" ? t("newsletter.sending") : t("newsletter.subscribe")}
+                    </button>
+                  )}
+                </form>
+                {note && <p className="text-[11px] text-white/60 mt-2">{note}</p>}
+                {errMsg}
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     // id = âncora navegável: o bloco de busca (nota "inscreva-se") e o CTA do
     // cabeçalho apontam para cá via href="#<id do bloco>".
@@ -374,8 +435,7 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
         <div className="flex-1">
           <p className="text-lg font-black text-white">{block.name || "Newsletter"}</p>
-          <p className="text-sm text-white/80 mt-1">{block.caption
-            || (lang === "en" ? "Get the top stories in your inbox." : "Receba as principais notícias no seu e-mail.")}</p>
+          <p className="text-sm text-white/80 mt-1">{caption}</p>
         </div>
         {status === "ok" ? (
           <p className="text-sm font-bold text-white bg-white/15 rounded-lg px-4 py-3">{t("newsletter.thanks")}</p>
@@ -406,19 +466,12 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
  *    boas-vindas) e nota-link opcional abaixo (linkLabel + linkUrl; destino
  *    "#<id de bloco>" rola até o bloco na própria home — ex.: newsletter).
  */
-export function SearchBlock({ block, contained = true }: {
-  block: HomeBlock;
-  /** false = sem o wrapper max-w próprio (uso dentro das zonas da home). */
-  contained?: boolean;
-}) {
+/** Campo de busca reutilizável (SearchBlock e hero "revista"): envia para
+ *  /arquivo?q=… — mesmo destino da busca do cabeçalho — e registra o termo. */
+export function SearchForm({ placeholder, color }: { placeholder?: string; color: string }) {
   const { t } = useT();
   const [, navigate] = useLocation();
   const [q, setQ] = useState("");
-  const color = block.color ?? "#0B2A66";
-  const isCard = block.format === "search_card";
-  const topHtml = isCard ? sanitizeArticleHtml(block.html) : "";
-  const note = (block.linkLabel ?? "").trim();
-  const noteHref = (block.linkUrl ?? "").trim();
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -428,18 +481,11 @@ export function SearchBlock({ block, contained = true }: {
     navigate(`/arquivo?q=${encodeURIComponent(query)}`);
   }
 
-  function noteClick(e: React.MouseEvent) {
-    // "#id" rola até o bloco alvo na própria página (ex.: newsletter no fim).
-    if (!noteHref.startsWith("#")) return;
-    e.preventDefault();
-    document.getElementById(noteHref.slice(1))?.scrollIntoView({ behavior: "smooth", block: "center" });
-  }
-
-  const form = (
+  return (
     <form onSubmit={submit}
       className="flex items-center gap-2 border border-gray-200 rounded-2xl bg-white pl-4 pr-1.5 py-1.5">
       <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
-        placeholder={(block.caption ?? "").trim() || t("search.placeholder")}
+        placeholder={placeholder || t("search.placeholder")}
         aria-label={t("search.site")}
         className="flex-1 min-w-0 text-[14px] text-gray-700 placeholder-gray-400 bg-transparent focus:outline-none py-1.5" />
       <button type="submit"
@@ -449,6 +495,27 @@ export function SearchBlock({ block, contained = true }: {
       </button>
     </form>
   );
+}
+
+export function SearchBlock({ block, contained = true }: {
+  block: HomeBlock;
+  /** false = sem o wrapper max-w próprio (uso dentro das zonas da home). */
+  contained?: boolean;
+}) {
+  const color = block.color ?? "#0B2A66";
+  const isCard = block.format === "search_card";
+  const topHtml = isCard ? sanitizeArticleHtml(block.html) : "";
+  const note = (block.linkLabel ?? "").trim();
+  const noteHref = (block.linkUrl ?? "").trim();
+
+  function noteClick(e: React.MouseEvent) {
+    // "#id" rola até o bloco alvo na própria página (ex.: newsletter no fim).
+    if (!noteHref.startsWith("#")) return;
+    e.preventDefault();
+    document.getElementById(noteHref.slice(1))?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  const form = <SearchForm placeholder={(block.caption ?? "").trim() || undefined} color={color} />;
 
   const noteCls = "block text-[13px] text-gray-500 mt-3";
   const noteEl = !note ? null

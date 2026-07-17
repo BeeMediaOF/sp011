@@ -105,10 +105,15 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   "Proposta_Portal_CreditoVC"); mock HTML/JSON de referência em
   `docs/Guia_Claude_Code_Base.md` (movido de public/ — ali seria servido no
   site de todos os blogs). ⚠️ O template desses dois é LAYOUT PRÓPRIO do
-  mock (header/rodapé claros, hero de boas-vindas, zona main+sidebar,
-  bloco newsletter) — NÃO é a família KSports-Final; os template_final.sql
-  deles também fazem bootstrap do site_settings com os defaults do app
-  (espelho do store.ts) quando a linha não existe (blog recém-instalado).
+  mock, COLUNA ÚNICA fiel desde 2026-07-16: layouts de app `hero` (3 colunas:
+  boas-vindas+busca | destaque | 2 cards) e `mini` (cards revista c/ tempo de
+  leitura), `sectionStyle:"revista"`, newsletter `format:"card"`, fundo
+  `pageBgColor:#f7f9fb`, rodapé claro 3 colunas + social — exige imagem
+  blog-api/web com esses layouts (aplicar template SÓ depois do rollout).
+  "Mais Lidas"/"Últimas Notícias" fora da home; `colunistas` oculto até
+  existirem colunistas reais. NÃO é a família KSports-Final; os
+  template_final.sql deles também fazem bootstrap do site_settings com os
+  defaults do app (espelho do store.ts) quando a linha não existe.
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
   sozinho — ksports mora em ksports.bebee.me).

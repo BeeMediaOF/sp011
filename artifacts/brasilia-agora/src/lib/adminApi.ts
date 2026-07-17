@@ -391,6 +391,8 @@ export interface SiteSettings {
   menuBarBgColor?: string;
   /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */
   footerAccentColor?: string;
+  /** Fundo da página da home (vazio/ausente = branco). */
+  pageBgColor?: string;
   siteUrl?: string;
   // Retenção automática de artigos (limpeza do banco)
   articleRetentionEnabled?: boolean;

@@ -73,6 +73,7 @@ router.get("/", async (_req, res) => {
       author: a.author,
       publishedAt: a.publishedAt,
       keywords: a.keywords,
+      readingMinutes: a.readingMinutes,
       views: views[a.id]?.views ?? 0,
     }));
   res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30, stale-while-revalidate=300");

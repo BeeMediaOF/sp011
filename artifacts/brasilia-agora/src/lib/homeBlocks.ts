@@ -11,7 +11,7 @@ import type { FooterConfig } from "./footerConfig";
 export type HomeBlockLayout =
   | "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
   | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal"
-  | "overlay" | "magazine";
+  | "overlay" | "magazine" | "mini" | "hero";
 
 export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"
@@ -61,6 +61,9 @@ export interface HomeBlock {
   width?: "full" | "half" | "quarter";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona (padrão "Ver mais"). */
   linkLabel?: string;
+  /** Cabeçalho de seção estilo "revista" (título grande + link colorido, sem
+   *  barra/uppercase). Os layouts "mini" e "hero" já usam revista por padrão. */
+  sectionStyle?: "revista";
   /** Bloco de imagem/HTML marcado como propaganda — listado na aba Propagandas do admin. */
   isAd?: boolean;
   /** Fonte do texto do bloco: id do registro em lib/fonts.ts. Ausente = padrão do site. */
@@ -116,6 +119,8 @@ export interface HomeTemplate {
   menuBarStyle?: "attached" | "bar";
   menuBarBgColor?: string;
   footerAccentColor?: string;
+  /** Fundo da página da home (vazio = branco). Campo "portal": reset neutro. */
+  pageBgColor?: string;
   /** Idioma/fuso do site público aplicados junto (ausente = settings intocadas).
    *  Permite que um starter EN (ex.: KSports) já configure o site em inglês. */
   siteLanguage?: "pt-BR" | "en";

@@ -91,6 +91,8 @@ export interface SiteSettings {
   menuBarBgColor?: string;
   /** Cor de acento do rodapé dark (borda superior, títulos e newsletter). */
   footerAccentColor?: string;
+  /** Fundo da página da home (vazio/ausente = branco). */
+  pageBgColor?: string;
   /** Estilo do menu principal (cor do texto, cor do item ativo, tamanho e peso da fonte). */
   menuTextColor?: string;
   menuActiveColor?: string;

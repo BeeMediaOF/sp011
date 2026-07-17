@@ -26,6 +26,9 @@ export interface Article {
   showImageCredit?: boolean | null;
   /** Leituras registradas pelo analytics — ordena os blocos "Mais lidas". */
   views?: number;
+  /** Tempo de leitura estimado em minutos (calculado no api-server; ausente em
+   *  payload de imagem antiga — exibição sempre condicional). */
+  readingMinutes?: number;
 }
 
 // ─── Singleton module-level cache (2 min TTL) ─────────────────────────────────

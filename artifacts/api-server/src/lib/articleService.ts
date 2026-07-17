@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { eq, or, and, isNull, desc, sql, inArray, type SQL } from "drizzle-orm";
 import { db, articlesTable, articleViewsTable, type ArticleRow } from "@workspace/db";
+import { readingMinutes } from "./readingTime.js";
 
 /** Quais artigos a limpeza automática pode remover. */
 export type RetentionScope = "all" | "published" | "draft";
@@ -139,6 +140,8 @@ export interface Article {
   imageCredit?: string;
   /** Exibição do crédito da foto: true/false força; null/ausente segue o padrão do site. */
   showImageCredit?: boolean | null;
+  /** Tempo de leitura estimado em minutos (derivado do content; não persiste). */
+  readingMinutes: number;
 }
 
 function rowToArticle(row: ArticleRow): Article {
@@ -170,6 +173,7 @@ function rowToArticle(row: ArticleRow): Article {
     showSourceCredit: row.showSourceCredit,
     imageCredit:   row.imageCredit ?? undefined,
     showImageCredit: row.showImageCredit,
+    readingMinutes: readingMinutes(row.content),
   };
 }
 
@@ -317,7 +321,8 @@ export const articleService = {
   },
 
   async createArticle(
-    data: Omit<Article, "id" | "createdAt" | "updatedAt">,
+    // readingMinutes é derivado do content na leitura — nunca entra no insert.
+    data: Omit<Article, "id" | "createdAt" | "updatedAt" | "readingMinutes">,
   ): Promise<Article> {
     bustCache();
     const now = new Date();
@@ -362,7 +367,7 @@ export const articleService = {
 
   async updateArticle(
     id: string,
-    data: Partial<Omit<Article, "id" | "createdAt">>,
+    data: Partial<Omit<Article, "id" | "createdAt" | "readingMinutes">>,
   ): Promise<Article | null> {
     bustCache();
     const rows = await db
