@@ -15,7 +15,12 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    entryPoints: [
+      path.resolve(artifactDir, "src/index.ts"),
+      // CLI de benchmark de prompt (F3 dos PRDs) — vira dist/scripts/benchmark.mjs
+      path.resolve(artifactDir, "src/scripts/benchmark.ts"),
+    ],
+    outbase: path.resolve(artifactDir, "src"),
     platform: "node",
     bundle: true,
     format: "esm",
