@@ -15,7 +15,7 @@ import {
   newsItemsTable,
   rewritesTable,
 } from "@workspace/central-db";
-import { and, eq, gte, inArray, isNull, max, count } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, max, ne, or, count } from "drizzle-orm";
 import { getSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
@@ -64,7 +64,22 @@ export async function runDistributorCycle(): Promise<number> {
   const s = getSettings();
   if (!s.deliveryEnabled) return 0;
 
-  // Notícias reescritas com reescrita compartilhada pronta
+  // Notícias reescritas com reescrita compartilhada pronta. Com a IA Auditora
+  // ligada, itens com auditoria 'pending' ficam FORA do lote: o veredito é do
+  // worker de auditoria — se entrassem aqui, 20 pendentes na cabeça da fila
+  // travavam o distribuidor inteiro (head-of-line; apagão de entregas de
+  // 18–20/07/2026 com 1.094 pendentes acumulados).
+  const joinConds = [
+    eq(rewritesTable.newsItemId, newsItemsTable.id),
+    isNull(rewritesTable.blogId),
+    eq(rewritesTable.status, "ok"),
+  ];
+  if (s.auditEnabled ?? false) {
+    joinConds.push(or(
+      isNull(rewritesTable.auditStatus),
+      ne(rewritesTable.auditStatus, "pending"),
+    )!);
+  }
   const items = await db
     .select({
       news: newsItemsTable,
@@ -73,14 +88,7 @@ export async function runDistributorCycle(): Promise<number> {
       auditStatus: rewritesTable.auditStatus,
     })
     .from(newsItemsTable)
-    .innerJoin(
-      rewritesTable,
-      and(
-        eq(rewritesTable.newsItemId, newsItemsTable.id),
-        isNull(rewritesTable.blogId),
-        eq(rewritesTable.status, "ok"),
-      ),
-    )
+    .innerJoin(rewritesTable, and(...joinConds))
     .where(eq(newsItemsTable.status, "rewritten"))
     .limit(BATCH);
   if (items.length === 0) return 0;
