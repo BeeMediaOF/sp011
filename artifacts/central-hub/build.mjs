@@ -19,6 +19,8 @@ async function buildAll() {
       path.resolve(artifactDir, "src/index.ts"),
       // CLI de benchmark de prompt (F3 dos PRDs) — vira dist/scripts/benchmark.mjs
       path.resolve(artifactDir, "src/scripts/benchmark.ts"),
+      // Backfill retroativo de cobertura/score p/ reescritas pré-métricas
+      path.resolve(artifactDir, "src/scripts/backfillScores.ts"),
     ],
     outbase: path.resolve(artifactDir, "src"),
     platform: "node",
