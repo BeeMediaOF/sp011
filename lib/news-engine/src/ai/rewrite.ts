@@ -36,7 +36,17 @@ export interface RewriteOutput extends RewriteResult {
 
 /** Reduz o slug a no máximo 5 palavras significativas e 55 chars, cortando em hífen. */
 export function trimSlug(raw: string): string {
-  const s = raw.trim().toLowerCase();
+  // Sanitização real (o prompt pede kebab-case sem acento, mas o qwen2.5
+  // desobedece — "elétricos" chegava intacto à URL): NFD + remoção de
+  // diacríticos (faixa SEMPRE escapada \uXXXX — regra do repo) + só
+  // [a-z0-9-], espaços viram hífen.
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 
   const STOP = new Set(["o", "a", "os", "as", "de", "da", "do", "dos", "das", "para", "com", "em", "e", "ou", "um", "uma", "no", "na", "nos", "nas", "ao", "aos", "pela", "pelo", "por", "que"]);
   const words = s.split("-").filter((w) => w.length > 0);

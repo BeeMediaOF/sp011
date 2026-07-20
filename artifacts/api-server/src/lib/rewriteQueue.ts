@@ -455,7 +455,9 @@ async function sweepPendingDrafts(): Promise<void> {
         text:        article.content || article.subtitle || article.title,
         sourceName:  article.tag || "RSS",
         giveCredit:  false,
-        finalStatus: "published",
+        // Rascunho sem capa fica rascunho depois da reescrita — o "published"
+        // fixo daqui contornava o guard anti-publicação-fantasma do processor.
+        finalStatus: article.imageUrl?.trim() ? "published" : "draft",
       });
       added++;
     }

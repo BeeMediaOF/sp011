@@ -330,7 +330,11 @@ export const articleService = {
     // Slug único (F7 dos PRDs): o índice de slug não é UNIQUE e uma colisão
     // silenciosa fazia getArticle(slug) resolver sempre o artigo mais antigo
     // (o novo ficava inacessível). Colisão → sufixo -2, -3, ...
-    const baseSlug = data.slug ?? slugify(data.title);
+    // Slug FORNECIDO também passa pelo slugify: a IA manda acento/maiúscula
+    // (URL /artigo/novos-veiculos-elétricos-... em produção) e nenhuma origem
+    // sanitizava; slugify é idempotente em slug já limpo e, se o slug virar
+    // vazio (ex.: só símbolos), cai para o título.
+    const baseSlug = (data.slug ? slugify(data.slug) : "") || slugify(data.title);
     let slug = baseSlug;
     for (let n = 2; n <= 50; n++) {
       const [clash] = await db
@@ -403,7 +407,7 @@ export const articleService = {
         ...(data.rssSourceName !== undefined && { rssSourceName: data.rssSourceName }),
         ...(data.rssSourceUrl  !== undefined && { rssSourceUrl:  data.rssSourceUrl }),
         ...(data.aiRewritten   !== undefined && { aiRewritten:   data.aiRewritten }),
-        ...(data.slug          !== undefined && { slug:          data.slug }),
+        ...(data.slug          !== undefined && { slug:          slugify(data.slug) || data.slug }),
         ...(data.keywords      !== undefined && { keywords:      data.keywords }),
         ...(data.draftReason   !== undefined && { draftReason:   data.draftReason }),
         ...(data.canonicalUrl  !== undefined && { canonicalUrl:  data.canonicalUrl }),

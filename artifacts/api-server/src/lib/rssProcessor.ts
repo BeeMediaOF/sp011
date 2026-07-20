@@ -282,8 +282,17 @@ export interface RewriteResult {
 
 /** Trim slug to at most 5 meaningful words and 55 chars, cutting at a word boundary */
 function trimSlug(raw: string): string {
-  // Normalise: lowercase, remove accents, replace spaces with hyphens
-  const s = raw.trim().toLowerCase();
+  // Sanitização real (espelho do trimSlug do news-engine — o comentário
+  // antigo prometia "remove accents" mas o código não removia): NFD +
+  // remoção de diacríticos (faixa SEMPRE escapada \uXXXX — regra do repo)
+  // + só [a-z0-9-], espaços viram hífen.
+  const s = raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 
   // Split on hyphens, filter out single-char stop-words
   const STOP = new Set(["o","a","os","as","de","da","do","dos","das","para","com","em","e","ou","um","uma","no","na","nos","nas","ao","aos","pela","pelo","por","que"]);
@@ -1197,7 +1206,9 @@ export async function autoProcessArticle(
         addLog({ type: "skip", sourceName, articleTitle: art.title, message: "Ignorado: sem conteúdo para reescrever" });
         return;
       }
-      const finalStatus = autoMode === "rewrite_publish" ? "published" : "draft";
+      // Sem imagem NUNCA auto-publica (o comentário do guard prometia isso,
+      // mas o finalStatus não era rebaixado — publicava card cinza).
+      const finalStatus = autoMode === "rewrite_publish" && hasImage ? "published" : "draft";
       const prompts = store.getRssPrompts();
       const chosenPrompt = resolvePrompt(src, prompts);
       const draftReason = !hasImage ? "no_image" : undefined;

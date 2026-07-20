@@ -97,10 +97,10 @@ export default function Archive() {
       a.title.toLowerCase().includes(filter.toLowerCase()) ||
       a.category.toLowerCase().includes(filter.toLowerCase());
     const matchDate = !dateFilter || a.publishedAt.startsWith(dateFilter);
+    // Igualdade EXATA de slug: includes() fazia "futebol" casar
+    // "futebol-americano" (e o termo com toUpperCase era um no-op).
     const matchCat = !activeCategory ||
-      a.category.toLowerCase() === activeCategory ||
-      a.category.toLowerCase().includes(activeCategory) ||
-      a.tag.toLowerCase().includes(activeCategory.toUpperCase());
+      a.category.trim().toLowerCase() === activeCategory;
     return matchText && matchDate && matchCat;
   });
 
@@ -110,11 +110,7 @@ export default function Archive() {
     label: cat.label,
     color: categoryColor(cat.value),
     articles: filtered
-      .filter((a) =>
-        a.category.toLowerCase() === cat.value ||
-        a.category.toLowerCase().includes(cat.value) ||
-        a.tag.toLowerCase().includes(cat.value)
-      )
+      .filter((a) => a.category.trim().toLowerCase() === cat.value)
       .slice(0, 5),
   })).filter((m) => m.articles.length > 0);
 
@@ -292,9 +288,7 @@ export default function Archive() {
                     {categories.map((cat) => {
                       const color = categoryColor(cat.value);
                       const count = articles.filter((a) =>
-                        a.category.toLowerCase() === cat.value ||
-                        a.category.toLowerCase().includes(cat.value) ||
-                        a.tag.toLowerCase().includes(cat.value)
+                        a.category.trim().toLowerCase() === cat.value
                       ).length;
                       return (
                         <button

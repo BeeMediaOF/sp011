@@ -80,8 +80,11 @@ function sortByViews(list: SectionArticle[]): SectionArticle[] {
 function useArticlesByCategory(category: string): SectionArticle[] {
   const { articles } = useArticles();
   const { lang, tz } = useT();
+  // Igualdade EXATA de slug ("" = curinga): includes() fazia "futebol" casar
+  // "futebol-americano" e vazava artigo para a seção errada.
+  const want = category.trim().toLowerCase();
   return articles
-    .filter((a) => a.category.toLowerCase().includes(category.toLowerCase()))
+    .filter((a) => want === "" || (a.category ?? "").trim().toLowerCase() === want)
     .map((a) => ({
       id: a.id,
       slug: a.slug || a.id,
@@ -818,8 +821,12 @@ export default function Home() {
   const visibleBlocks = isAdminPreview ? previewBlocks : baseBlocks.filter((b) => b.visible);
 
   function getArticles(cat: string): SectionArticle[] {
+    // Igualdade EXATA de slug ("" = curinga p/ latest/most_read): includes()
+    // fazia "futebol" casar "futebol-americano" — artigo na seção errada em
+    // TODOS os blocos da home (CSR e SSR).
+    const want = cat.trim().toLowerCase();
     return articles
-      .filter((a) => a.category.toLowerCase().includes(cat.toLowerCase()))
+      .filter((a) => want === "" || (a.category ?? "").trim().toLowerCase() === want)
       .map((a) => ({
         id: a.id,
         slug: a.slug || a.id,
@@ -965,8 +972,12 @@ export default function Home() {
       )}
 
       <main className="flex-1">
-        <h1 className="sr-only">{lang === "en" && settings?.siteName
-          ? `${settings.siteName} — ${t("home.h1")}`
+        {/* H1 das settings em AMBOS os idiomas: o literal do dicionário fala de
+            Brasília/DF e a imagem é compartilhada — todo blog replicado servia
+            esse H1 aos buscadores (invariante §13: nada hardcoded por blog).
+            Sem settings carregadas, mantém o literal antigo byte-idêntico. */}
+        <h1 className="sr-only">{settings?.siteName
+          ? `${settings.siteName} — ${settings.tagline || t("home.h1")}`
           : t("home.h1")}</h1>
 
         {segmentBlocks(visibleBlocks).map((seg) => {

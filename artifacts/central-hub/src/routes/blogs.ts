@@ -29,7 +29,7 @@ function normalizeCategories(input: unknown): BlogCategory[] | null {
     if (!item || typeof item !== "object") continue;
     const slug = String((item as { slug?: unknown }).slug ?? "")
       .trim().toLowerCase()
-      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
       .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-")
       .replace(/^-+|-+$/g, "").slice(0, 60);
     if (!slug || out.some((c) => c.slug === slug)) continue;

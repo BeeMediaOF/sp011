@@ -33,9 +33,11 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
       .then((d: { articles: ApiArticle[] }) => {
         const filtered = (d.articles ?? [])
           .filter((a) => {
-            const cat = (a.category ?? "").toLowerCase();
-            const tag = (a.tag ?? "").toLowerCase();
-            return cat === slug || cat.includes(slug) || tag.includes(slug);
+            // Igualdade EXATA: includes() fazia /futebol listar futebol-americano.
+            // Fallback por tag (artigos legados sem category) compara slugificado.
+            const cat = (a.category ?? "").trim().toLowerCase();
+            const tag = (a.tag ?? "").trim().toLowerCase().replace(/\s+/g, "-");
+            return cat === slug || (cat === "" && tag === slug);
           })
           .sort((a, b) =>
             new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()

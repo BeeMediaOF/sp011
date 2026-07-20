@@ -85,6 +85,12 @@ const ALLOWED_HOST_SUFFIXES = [
   ".dailymail.com", ".dailymail.co.uk", ".independent.co.uk",
   ".mirror.co.uk", ".foxsports.com", ".minutemediacdn.com",
   ".offtheblockblog.com", ".esportsinsider.com",
+  // Fontes PT de esporte (2026-07-20): o CDN do ge.globo é *.glbimg.com e
+  // estava FORA da allowlist — toda capa do ge virava hotlink direto de URL
+  // assinada que expira (card cinza). Atenção: URLs glbimg ainda expiram;
+  // o conserto definitivo é o rehost, isto reduz o dano no curto prazo.
+  ".glbimg.com", ".gazetaesportiva.com", ".trivela.com.br",
+  ".tenisnews.com.br", ".theplayoffs.news",
 ];
 
 export function isAllowedImageHost(hostname: string): boolean {

@@ -8,6 +8,8 @@
  * no banco central — nada de artigos/blogs neste estágio.
  */
 import { randomUUID } from "node:crypto";
+import { writeFile } from "node:fs/promises";
+import path from "node:path";
 import {
   db,
   centralSourcesTable,
@@ -21,6 +23,8 @@ import { logger } from "../lib/logger.js";
 import { logEvent } from "../lib/eventLog.js";
 import { isDuplicateNews, makeNewsDedupChecker } from "../lib/newsDedup.js";
 import { dailyQuotaFilledReason } from "../lib/dailyQuota.js";
+import { ensureImageDir, newImageFileName } from "../lib/newsImageFiles.js";
+import { centralPublicUrl } from "../lib/social/publicUrl.js";
 
 const TICK_MS = 60_000;
 
@@ -135,6 +139,36 @@ async function imageUrlAlive(url: string): Promise<boolean> {
   }
 }
 
+/** Teto do download de capa no rehost (evita baixar vídeo/artefato gigante). */
+const MAX_COVER_BYTES = 8 * 1024 * 1024;
+
+/**
+ * REHOST da capa: baixa a imagem da fonte para /data/news-images (mesma
+ * infra da "Nova notícia") e devolve a URL pública da central
+ * (`${CENTRAL_PUBLIC_URL}/api/news/image/<nome>`, host já allowlisted nos
+ * blogs). Motivo: hotlink morre — o CDN do ge (*.glbimg.com) usa URL
+ * ASSINADA que expira dias depois, e vários hosts bloqueiam hotlink por
+ * Referer → card cinza no blog. Falha em qualquer etapa → null (o chamador
+ * mantém a URL remota, comportamento antigo).
+ */
+async function rehostImage(remoteUrl: string): Promise<string | null> {
+  const base = centralPublicUrl();
+  if (!base) return null; // sem CENTRAL_PUBLIC_URL não há URL pública p/ servir
+  try {
+    const res = await fetch(remoteUrl, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return null;
+    const mime = (res.headers.get("content-type") || "").split(";")[0]!.trim();
+    const fileName = newImageFileName(mime);
+    if (!fileName) return null; // formato fora do catálogo (svg, avif…) → hotlink
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length === 0 || buf.length > MAX_COVER_BYTES) return null;
+    await writeFile(path.join(ensureImageDir(), fileName), buf);
+    return `${base}/api/news/image/${fileName}`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fallback de imagem: feed sem imagem (ou com imagem morta) → busca o
  * og:image/twitter:image na página original da matéria. Evita card cinza
@@ -215,6 +249,12 @@ export async function collectSource(src: CentralSourceRow, maxItems?: number): P
             message: `Imagem recuperada via og:image: ${art.title}`,
           });
         }
+      }
+      // Rehost: a partir daqui a capa vive na central (URL estável), não na
+      // fonte. Falha no download → mantém a URL remota (comportamento antigo).
+      if (imageUrl) {
+        const hosted = await rehostImage(imageUrl);
+        if (hosted) imageUrl = hosted;
       }
       if (!hasText && !imageUrl) {
         logEvent({

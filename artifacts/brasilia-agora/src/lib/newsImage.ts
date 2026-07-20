@@ -56,6 +56,9 @@ const PROXY_HOST_SUFFIXES = [
   ".dailymail.com", ".dailymail.co.uk", ".independent.co.uk",
   ".mirror.co.uk", ".foxsports.com", ".minutemediacdn.com",
   ".offtheblockblog.com", ".esportsinsider.com",
+  // Fontes PT de esporte (2026-07-20) — espelho do image.ts (mudar nos DOIS)
+  ".glbimg.com", ".gazetaesportiva.com", ".trivela.com.br",
+  ".tenisnews.com.br", ".theplayoffs.news",
 ];
 
 function isProxyableHost(hostname: string): boolean {

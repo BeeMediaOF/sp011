@@ -33,6 +33,7 @@ import {
   resolvePrompt,
   rewriteNews,
   rewriteWithPerplexity,
+  trimSlug,
   validateRewrite,
   type RewriteEngineConfig,
   type TokenUsage,
@@ -340,7 +341,9 @@ async function saveRewrite(
     socialSummary: out.socialSummary ?? extracted.socialSummary ?? null,
     socialHashtags: out.socialHashtags ?? extracted.socialHashtags ?? null,
     contentHtml: extracted.content,
-    slug: out.slug || extracted.slug || null,
+    // trimSlug de novo: out.slug já vem limpo do parse, mas o fallback
+    // extracted.slug (recovery de JSON cru) chega sem sanitização.
+    slug: trimSlug(out.slug || extracted.slug || "") || null,
     keywords: out.keywords || extracted.keywords || null,
     provider: out.usage?.provider ?? s.aiProvider,
     model: out.usage?.model ?? s.aiModel ?? null,

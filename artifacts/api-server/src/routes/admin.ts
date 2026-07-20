@@ -826,13 +826,21 @@ router.post("/articles/migrate-json-content", requireAdmin, async (req, res) => 
 router.post("/bulk-publish", requirePermission("articles.publish"), async (_req, res) => {
   const articles = await articleService.getArticles();
   let count = 0;
+  let skippedNoImage = 0;
   for (const a of articles) {
     if (a.status === "draft") {
+      // Rascunho segurado pelo ingest por falta de capa NÃO entra no bulk —
+      // publicá-lo em massa criava card cinza na home (o guard do ingest
+      // existia só na entrada e este endpoint o contornava).
+      if (!a.imageUrl?.trim()) {
+        skippedNoImage++;
+        continue;
+      }
       await articleService.updateArticle(a.id, { status: "published", publishedAt: new Date().toISOString() });
       count++;
     }
   }
-  res.json({ message: `${count} article(s) published`, count });
+  res.json({ message: `${count} article(s) published`, count, skippedNoImage });
 });
 
 // ─── Menu ────────────────────────────────────────────────────────────────────
