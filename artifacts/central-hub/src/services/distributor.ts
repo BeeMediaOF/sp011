@@ -118,8 +118,10 @@ export async function runDistributorCycle(): Promise<number> {
   for (const { news, rewriteId, rewriteLanguage, auditStatus } of items) {
     // IA Auditora (F5): reescrita suspeita fica SEGURA até o veredito (o
     // worker de auditoria resolve para passed/flagged/rejected). Com a
-    // auditora desligada o pending é ignorado — nada fica preso.
-    if ((s.auditEnabled ?? false) && auditStatus === "pending") continue;
+    // auditora desligada o pending é ignorado — nada fica preso. 'rejected'
+    // também é pulado por defesa: a news vira 'failed' logo em seguida, mas
+    // há uma janela de ms entre os dois updates do worker de auditoria.
+    if ((s.auditEnabled ?? false) && (auditStatus === "pending" || auditStatus === "rejected")) continue;
 
     const searchText = `${news.title} ${news.description ?? ""}`;
     const sourceLang = rewriteLanguage ?? "pt-BR"; // null = legado pt-BR

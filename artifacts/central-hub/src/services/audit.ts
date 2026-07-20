@@ -117,11 +117,15 @@ async function processRewrite(rewrite: RewriteRow, s: HubSettings): Promise<void
     }
 
     if (out.invented) {
-      await setAudit(rewrite, "rejected", out.notes ?? "auditoria: informação inventada");
+      // news 'failed' ANTES do audit_status: na ordem inversa havia janela de
+      // ms em que a rewrite 'rejected' passava no filtro do distribuidor (que
+      // segura só 'pending') com a news ainda 'rewritten' — risco de entrega
+      // de conteúdo reprovado por invenção.
       await db
         .update(newsItemsTable)
         .set({ status: "failed", failReason: "audit_rejected", updatedAt: new Date() })
         .where(eq(newsItemsTable.id, news.id));
+      await setAudit(rewrite, "rejected", out.notes ?? "auditoria: informação inventada");
       logEvent({
         module: "rewriter", level: "warn", refType: "news_item", refId: news.id,
         message: `IA Auditora REPROVOU (invenção): ${news.title}`,
