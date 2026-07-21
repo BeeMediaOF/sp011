@@ -576,6 +576,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^2.11.5
         version: 2.27.2
+      dompurify:
+        specifier: ^3.2.4
+        version: 3.4.11
       lucide-react:
         specifier: 'catalog:'
         version: 0.545.0(react@19.1.0)

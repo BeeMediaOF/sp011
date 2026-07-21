@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api";
+import { sanitizeHtml } from "../lib/sanitize";
 import { fmtDate, useLoad } from "../hooks";
 
 interface ReviewItem {
@@ -89,7 +90,7 @@ export default function Review() {
             )}
             {preview.imageUrl && <img src={preview.imageUrl} alt="" style={{ maxWidth: "100%", borderRadius: 8 }} />}
             <div className="card" style={{ maxHeight: 320, overflow: "auto" }}
-              dangerouslySetInnerHTML={{ __html: preview.contentHtml ?? "" }} />
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(preview.contentHtml) }} />
             <div className="row">
               <button onClick={() => act(preview, "approve")}>Aprovar e enviar p/ {preview.blogName}</button>
               <button className="danger" onClick={() => act(preview, "reject")}>Rejeitar</button>

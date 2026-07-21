@@ -4,6 +4,7 @@ import {
   Clock, PenLine, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { api } from "../api";
+import { sanitizeHtml } from "../lib/sanitize";
 import { fmtDate, nameColor, statusClass, statusLabel, useLoad } from "../hooks";
 import { fmtNum } from "../charts";
 import { Pager, PAGE_SIZE } from "../ui";
@@ -217,7 +218,7 @@ export default function News() {
               <>
                 <h3 style={{ margin: "14px 0 8px" }}>Reescrita ({detail.rewrites[0]!.provider}/{detail.rewrites[0]!.model})</h3>
                 <div className="card" style={{ maxHeight: 320, overflow: "auto" }}
-                  dangerouslySetInnerHTML={{ __html: detail.rewrites[0]!.contentHtml ?? "" }} />
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(detail.rewrites[0]!.contentHtml) }} />
               </>
             ) : (
               <>

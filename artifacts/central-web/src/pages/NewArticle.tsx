@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import RichTextEditor from "../components/RichTextEditor";
 import { api, apiUpload } from "../api";
+import { sanitizeHtml } from "../lib/sanitize";
 import { statusLabel, useLoad } from "../hooks";
 
 /**
@@ -1525,7 +1526,7 @@ export default function NewArticle() {
               </p>
               <div
                 className="prose-editor text-[15px] leading-relaxed text-slate-800 [&_p]:mb-3 [&_h2]:font-bold [&_h2]:text-lg [&_h2]:mt-5 [&_h2]:mb-2 [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_img]:rounded-xl [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
-                dangerouslySetInnerHTML={{ __html: content || "<p>(sem conteúdo)</p>" }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) || "<p>(sem conteúdo)</p>" }}
               />
             </div>
             <div className="flex items-center justify-end px-6 py-4 border-t border-slate-100">
