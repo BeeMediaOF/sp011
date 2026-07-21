@@ -23,7 +23,7 @@ import { store } from "../lib/store.js";
 import { TAG_MAP } from "../lib/rssProcessor.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { sendPushToAll } from "./push.js";
-import { logAudit, getClientIp } from "../lib/audit.js";
+import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { dbNonceStore, cleanupNonces } from "../lib/ingestNonce.js";
 
 declare global {
@@ -61,7 +61,13 @@ async function centralIngestAuth(req: Request, res: Response, next: NextFunction
     typeof signature === "string" ? signature : undefined,
   );
   if (!result.ok) {
-    res.status(401).json({ ok: false, error: result.reason === "timestamp_skew" ? "timestamp_skew" : "invalid_signature" });
+    const reason = result.reason === "timestamp_skew" ? "timestamp_skew" : "invalid_signature";
+    // PRD-13: sinal de segurança para o alerting (tentativa de forjar publicação).
+    void logSecurity({
+      eventType: "ingest_signature_invalid", severity: "high",
+      description: `Ingest 401: ${reason}`, route: "/api/ingest", ipAddress: getClientIp(req),
+    });
+    res.status(401).json({ ok: false, error: reason });
     return;
   }
   // PRD-14: nonce anti-replay — a MESMA assinatura só vale UMA vez (a janela de

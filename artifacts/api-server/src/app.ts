@@ -7,6 +7,7 @@ import setupRouter from "./routes/setup";
 import { logger } from "./lib/logger";
 import { isDbReady } from "./lib/setupState";
 import { isStoreHydrated } from "./lib/store";
+import { errorResponseBody } from "./lib/errorResponse";
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -187,6 +188,16 @@ app.use("/api", (_req, res, next) => {
 });
 
 app.use("/api", router);
+
+// Handler de erro global (PRD-13/CWE-209): resposta JSON padronizada, SEM
+// err.message/stack em produção; o detalhe completo fica só no log interno.
+const errorHandler: express.ErrorRequestHandler = (err, req, res, next) => {
+  logger.error({ err, reqId: (req as { id?: string }).id }, "unhandled route error");
+  if (res.headersSent) { next(err); return; }
+  const { status, body } = errorResponseBody(err, isProd, (req as { id?: string }).id);
+  res.status(status).json(body);
+};
+app.use(errorHandler);
 
 // startScheduler() saiu do import: roda no index.ts, após o banco inicializar.
 

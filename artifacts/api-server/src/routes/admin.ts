@@ -385,7 +385,8 @@ router.post("/articles/:id/rewrite", requirePermission("articles.edit"), async (
     res.json({ article: updated });
   } catch (err: unknown) {
     req.log.error({ err }, "AI rewrite failed");
-    res.status(500).json({ error: err instanceof Error ? err.message : "AI rewrite failed" });
+    req.log.error({ err }, "AI rewrite (admin) failed");
+    res.status(500).json({ error: "AI rewrite failed" });
   }
 });
 
@@ -479,7 +480,8 @@ Regras:
     });
   } catch (err: unknown) {
     req.log.error({ err }, "autofill failed");
-    res.status(500).json({ error: err instanceof Error ? err.message : "autofill failed" });
+    req.log.error({ err }, "autofill (admin) failed");
+    res.status(500).json({ error: "autofill failed" });
   }
 });
 
@@ -1365,7 +1367,7 @@ router.post("/article-from-url",
     });
   } catch (err: unknown) {
     req.log.error({ err }, "article-from-url failed");
-    res.status(500).json({ error: err instanceof Error ? err.message : "Erro ao gerar artigo" });
+    res.status(500).json({ error: "Erro ao gerar artigo" });
   }
 });
 

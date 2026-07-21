@@ -1,5 +1,6 @@
 import { db, auditLogsTable, securityLogsTable } from "@workspace/db";
 import { logger } from "./logger.js";
+import { dispatchAlert } from "./securityAlert.js";
 
 export interface AuditParams {
   userId?: number;
@@ -54,6 +55,9 @@ export async function logSecurity(params: SecurityParams): Promise<void> {
       route: params.route ?? null,
       payloadSummary: params.payloadSummary ?? null,
     });
+    // PRD-13: alerta best-effort (fire-and-forget, fail-open) — o insert acima
+    // é a fonte da verdade; o alerting nunca derruba o request.
+    void dispatchAlert(params).catch(() => undefined);
   } catch (err) {
     logger.error({ err }, "Failed to write security log");
   }
