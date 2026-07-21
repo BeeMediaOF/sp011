@@ -263,7 +263,7 @@ function Router() {
           <RequirePermission perm="home_blocks.view"><HomeBlocksManager /></RequirePermission>
         </Route>
         <Route path="/admin/categorias">
-          <RequirePermission perm="home_blocks.view"><CategoriesManager /></RequirePermission>
+          <RequirePermission perm="categories.view"><CategoriesManager /></RequirePermission>
         </Route>
         <Route path="/admin/colunistas">
           <RequirePermission perm="columnists.view"><ColumnistsManager /></RequirePermission>
