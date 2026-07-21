@@ -720,9 +720,9 @@ export default function Artigo() {
                           decoding="sync"
                         />
                       </div>
-                      {/* Crédito da foto — padrão do painel (global) com override por
-                          notícia; crédito manual > nome da fonte importada. */}
-                      {(article.showImageCredit ?? settings?.showImageCredit) === true
+                      {/* Crédito da foto — padrão do painel (global, ausente = exibir)
+                          com override por notícia; crédito manual > nome da fonte. */}
+                      {(article.showImageCredit ?? settings?.showImageCredit ?? true) === true
                         && (article.imageCredit?.trim() || article.rssSourceName) && (
                         <figcaption className="text-[11px] text-gray-400 mt-1.5 text-right">
                           {t("article.photoLabel")}{" "}{article.imageCredit?.trim() || article.rssSourceName}

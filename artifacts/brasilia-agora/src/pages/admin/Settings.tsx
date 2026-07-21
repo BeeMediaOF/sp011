@@ -787,9 +787,9 @@ export default function Settings() {
                   </button>
                   {/* Crédito das fotos — legenda "Foto: …" sob a imagem principal */}
                   <button
-                    onClick={() => setField("showImageCredit", !(settings.showImageCredit ?? false))}
+                    onClick={() => setField("showImageCredit", !(settings.showImageCredit ?? true))}
                     className={`mt-3 flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all w-full ${
-                      (settings.showImageCredit ?? false)
+                      (settings.showImageCredit ?? true)
                         ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
                         : "border-[#E2E8F0] text-[#94A3B8] hover:border-[#CBD5E1]"
                     }`}>
@@ -798,8 +798,8 @@ export default function Settings() {
                       <p className="text-[13px] font-semibold">{t("cfg.imageCreditsToggle")}</p>
                       <p className="text-[11px] opacity-70">{t("cfg.imageCreditsHint")}</p>
                     </div>
-                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showImageCredit ?? false) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
-                      {(settings.showImageCredit ?? false) ? t("cfg.enabledM") : t("cfg.disabledM")}
+                    <span className={`text-xs px-2.5 py-1 rounded-full font-semibold ${(settings.showImageCredit ?? true) ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                      {(settings.showImageCredit ?? true) ? t("cfg.enabledM") : t("cfg.disabledM")}
                     </span>
                   </button>
                 </div>

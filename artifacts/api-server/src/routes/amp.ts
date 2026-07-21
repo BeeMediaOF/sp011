@@ -157,7 +157,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     ${article.subtitle ? `<p class="subtitle">${escHtml(stripHtml(article.subtitle))}</p>` : ""}
     <div class="meta">${authorName}${dateStr ? ` · ${dateStr}` : ""}</div>
     ${imageUrl ? `<amp-img src="${escHtml(imageUrl)}" alt="${title}" width="800" height="450" layout="responsive"></amp-img>` : ""}
-    ${imageUrl && (article.showImageCredit ?? siteCfg.showImageCredit) === true && (article.imageCredit?.trim() || article.rssSourceName) ? `<p class="photo-credit">${en ? "Photo" : "Foto"}: ${escHtml(article.imageCredit?.trim() || article.rssSourceName || "")}</p>` : ""}
+    ${imageUrl && (article.showImageCredit ?? siteCfg.showImageCredit ?? true) === true && (article.imageCredit?.trim() || article.rssSourceName) ? `<p class="photo-credit">${en ? "Photo" : "Foto"}: ${escHtml(article.imageCredit?.trim() || article.rssSourceName || "")}</p>` : ""}
     <div>${bodyHtml}</div>
     ${(article.showSourceCredit ?? siteCfg.showSourceCredit) === true && article.rssSourceName ? `<p class="source">${en ? "Source" : "Fonte"}: ${escHtml(article.rssSourceName)}</p>` : ""}
     <a class="back" href="${escHtml(canonicalUrl)}">${en ? "← View full version" : "← Ver versão completa"}</a>

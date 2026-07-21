@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
+import RewriteQueueCard from "../../components/admin/RewriteQueueCard";
 import {
   Plus, Trash2, RefreshCw, Wand2, Send, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
@@ -1181,6 +1182,20 @@ export default function RSSManager() {
             </div>
           ))}
         </div>
+
+        {/* ══ REESCRITA COM IA ════════════════════════════════════════════════ */}
+        {/* Só quando o pipeline interno está em uso: coleta ativada E ≥1 fonte
+            ativa. No padrão da rede (central-push, coleta local desligada) o
+            card some — a reescrita acontece no painel central. */}
+        {colCfg?.enabled && sources.some((s) => s.active) && (
+          <div className="mb-6">
+            <RewriteQueueCard
+              totalRewritten={rssStats.rewritten}
+              totalArticles={rssStats.total}
+              onArticlesChanged={() => { void loadRssStats(); }}
+            />
+          </div>
+        )}
 
         {/* ══ 2-COLUMN GRID ═══════════════════════════════════════════════════ */}
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-5 items-start">
