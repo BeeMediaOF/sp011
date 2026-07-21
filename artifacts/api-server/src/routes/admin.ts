@@ -11,6 +11,7 @@ import {
 import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, generateURI as otpGenerateURI } from "otplib";
 import QRCode from "qrcode";
 import { requirePermission } from "../middlewares/permissions.js";
+import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
@@ -1222,7 +1223,9 @@ async function scrapeYouTube(url: string): Promise<{ title: string; text: string
 }
 
 /** POST /api/admin/article-from-url — generate article from a URL */
-router.post("/article-from-url", requirePermission("articles.create"), async (req, res) => {
+router.post("/article-from-url",
+  endpointRateLimit("/api/admin/article-from-url", { limit: 20, windowMs: 60_000, blockMs: 15 * 60_000 }),
+  requirePermission("articles.create"), async (req, res) => {
   const { url, category, giveCredit } = req.body as {
     url?: string; category?: string; giveCredit?: boolean;
   };

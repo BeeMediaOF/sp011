@@ -23,6 +23,7 @@
 
 import { Router } from "express";
 import multer from "multer";
+import sharp from "sharp";
 import { randomUUID } from "crypto";
 import { extname, join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -30,6 +31,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { Readable } from "stream";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
+import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { logger } from "../lib/logger.js";
 import {
   cacheKey,
@@ -38,8 +40,31 @@ import {
   DEFAULT_Q,
   MAX_WIDTH,
   MAX_Q,
+  MAX_INPUT_PIXELS,
   type ImageFormat,
 } from "../lib/imageTransform.js";
+
+/** Rate limit de upload (PRD-11): 60/min por IP nas rotas de POST. */
+const uploadRateLimit = endpointRateLimit("/api/uploads", { limit: 60, windowMs: 60_000 });
+
+/**
+ * Rejeita bomba de decompressão (PRD-11): decodifica só o cabeçalho e verifica
+ * as dimensões ANTES de gravar. Retorna true se pode prosseguir; se não, já
+ * respondeu o erro. Vídeos NÃO passam por aqui.
+ */
+async function imageDimensionsOk(buffer: Buffer, res: import("express").Response): Promise<boolean> {
+  try {
+    const meta = await sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+    if ((meta.width ?? 0) * (meta.height ?? 0) > MAX_INPUT_PIXELS) {
+      res.status(413).json({ error: "Imagem excede o limite de dimensões permitido." });
+      return false;
+    }
+    return true;
+  } catch {
+    res.status(422).json({ error: "Imagem inválida ou corrompida." });
+    return false;
+  }
+}
 
 const isProd = process.env["NODE_ENV"] === "production";
 
@@ -177,7 +202,7 @@ const router = Router();
  * Multipart upload — field name: "image"
  * Optional field: "title" — generates a SEO-friendly filename
  */
-router.post("/image", authMiddleware, requirePermission("upload.images"), upload.single("image"), async (req, res) => {
+router.post("/image", uploadRateLimit, authMiddleware, requirePermission("upload.images"), upload.single("image"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado. Campo esperado: 'image'." });
     return;
@@ -186,6 +211,7 @@ router.post("/image", authMiddleware, requirePermission("upload.images"), upload
     res.status(413).json({ error: `Imagem muito grande. Máximo: ${IMAGE_MAX / 1024 / 1024} MB.` });
     return;
   }
+  if (!(await imageDimensionsOk(req.file.buffer, res))) return;
 
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 
@@ -207,7 +233,7 @@ router.post("/image", authMiddleware, requirePermission("upload.images"), upload
  * Multipart upload — field name: "media"
  * Accepts images and videos. Optional field: "title".
  */
-router.post("/media", authMiddleware, requirePermission("upload.images"), upload.single("media"), async (req, res) => {
+router.post("/media", uploadRateLimit, authMiddleware, requirePermission("upload.images"), upload.single("media"), async (req, res) => {
   if (!req.file) {
     res.status(400).json({ error: "Nenhum arquivo enviado. Campo esperado: 'media'." });
     return;
@@ -218,6 +244,7 @@ router.post("/media", authMiddleware, requirePermission("upload.images"), upload
     res.status(413).json({ error: `Imagem muito grande. Máximo: ${IMAGE_MAX / 1024 / 1024} MB.` });
     return;
   }
+  if (mediaType === "image" && !(await imageDimensionsOk(req.file.buffer, res))) return;
 
   const filename = buildFilename(req.file.originalname, req.body["title"]);
 

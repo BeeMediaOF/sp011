@@ -80,13 +80,26 @@ async function diskWrite(key: string, buf: Buffer): Promise<void> {
  * effort: 1 (vs padrão 4) → ~3-4× mais rápido na codificação WebP/AVIF, com
  * diferença de tamanho < 5%. Ideal para um proxy onde latência > compressão.
  */
+/**
+ * Teto de pixels de ENTRADA do sharp (PRD-11, anti-bomba de decompressão):
+ * 50 MP — muito acima de qualquer imagem editorial real (MAX_WIDTH=1600), bem
+ * abaixo do default ~268 MP. Fonte ÚNICA do cap (uploads.ts importa daqui).
+ */
+export const MAX_INPUT_PIXELS = 50_000_000;
+const SHARP_TIMEOUT_S = 15;
+
 export async function transformImage(
   raw: Buffer,
   w: number,
   q: number,
   fmt: ImageFormat,
 ): Promise<Buffer> {
-  const pipeline = sharp(raw).resize({ width: w, withoutEnlargement: true });
+  // limitInputPixels + timeout: um input acima do cap (ou que trava a decodificação)
+  // faz o sharp LANÇAR — tratado a montante (proxy → placeholder; upload GET →
+  // streaming cru), sem derrubar o processo.
+  const pipeline = sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
+    .resize({ width: w, withoutEnlargement: true })
+    .timeout({ seconds: SHARP_TIMEOUT_S });
   if (fmt === "avif") {
     return pipeline.avif({ quality: q, effort: 1 }).toBuffer();
   }

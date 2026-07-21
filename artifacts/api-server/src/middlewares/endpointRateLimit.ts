@@ -12,10 +12,18 @@ const WINDOW_MS     = 60_000;        // 1 minute
 const BLOCK_MS      = 60 * 60_000;  // 1 hour
 
 /**
- * Returns middleware that rate-limits an endpoint.
- * After LIMIT failures per minute per IP, blocks for 1 hour.
+ * Returns middleware that rate-limits an endpoint (PRD-11: parametrizável).
+ * Defaults preservam o comportamento antigo (10/min por IP, bloqueio de 1h) —
+ * ingest/publish seguem idênticos. O reset da janela no conflito é sempre de
+ * 1 minuto no SQL; todos os usos deste PRD mantêm windowMs=60_000.
  */
-export function endpointRateLimit(endpointName: string) {
+export function endpointRateLimit(
+  endpointName: string,
+  opts?: { limit?: number; windowMs?: number; blockMs?: number },
+) {
+  const limit    = opts?.limit ?? LIMIT;
+  const windowMs = opts?.windowMs ?? WINDOW_MS;
+  const blockMs  = opts?.blockMs ?? BLOCK_MS;
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const ip = getClientIp(req);
     const ua = req.headers["user-agent"] ?? "";
@@ -29,7 +37,7 @@ export function endpointRateLimit(endpointName: string) {
           ip,
           endpoint:  endpointName,
           count:     1,
-          resetAt:   new Date(Date.now() + WINDOW_MS),
+          resetAt:   new Date(Date.now() + windowMs),
           updatedAt: now,
         })
         .onConflictDoUpdate({
@@ -67,8 +75,8 @@ export function endpointRateLimit(endpointName: string) {
       }
 
       // Block if over limit
-      if (row.count > LIMIT) {
-        const blockedUntil = new Date(Date.now() + BLOCK_MS);
+      if (row.count > limit) {
+        const blockedUntil = new Date(Date.now() + blockMs);
         await db
           .update(endpointRateLimitsTable)
           .set({ blockedUntil, updatedAt: now })

@@ -19,11 +19,19 @@ import {
   type TemplateElement,
 } from "@workspace/social-template";
 import { logger } from "../logger.js";
+import {
+  runWithTimeout, acquireRenderSlot, releaseRenderSlot, activeRenderCount,
+  RENDER_TIMEOUT_MS, RENDERS_BEFORE_RECYCLE,
+} from "./renderGuards.js";
 
 export type { ArticleData, SocialTemplate, TemplateElement };
 
 let _browser: Browser | null = null;
 let _launching: Promise<Browser> | null = null;
+
+// Guards de recurso (timeout/semáforo/recycle) vivem em ./renderGuards.ts
+// (módulo puro, testável). Aqui só o contador de recycle.
+let _renderCount = 0;
 
 async function getBrowser(): Promise<Browser> {
   if (_browser && _browser.isConnected()) return _browser;
@@ -72,14 +80,21 @@ export async function renderArt(
   opts: RenderOptions = {},
 ): Promise<Buffer> {
   const html = buildTemplateHtml(template, article, { baseHref: opts.baseHref });
-  const browser = await getBrowser();
-  const context = await browser.newContext({
-    viewport: { width: template.width, height: template.height },
-    deviceScaleFactor: 1,
-  });
-  const page = await context.newPage();
+  // PRD-11: adquire um slot de concorrência (bloqueia acima de MAX_CONCURRENT_RENDERS
+  // para não abrir N contextos Chromium numa rajada e estourar a RAM da VPS).
+  await acquireRenderSlot();
   try {
-    await page.setContent(html, { waitUntil: "load", timeout: 30_000 });
+    const browser = await getBrowser();
+    const context = await browser.newContext({
+      viewport: { width: template.width, height: template.height },
+      deviceScaleFactor: 1,
+    });
+    const page = await context.newPage();
+    try {
+      // PRD-11: timeout GLOBAL do render (setContent+evaluate+screenshot) — sem
+      // ele um page.evaluate/screenshot pendurado travaria o worker.
+      const buf = await runWithTimeout(async () => {
+    await page.setContent(html, { waitUntil: "load", timeout: 15_000 });
     // Espera fontes carregarem e imagens decodificarem antes do screenshot,
     // senão o print pode sair com fonte fallback ou imagem em branco.
     // (Callback roda no contexto do browser; usamos `any` pois o tsconfig do
@@ -108,15 +123,26 @@ export async function renderArt(
           el.style.fontSize = size + "px";
         }
       }
-    });
-    const buf = await page.screenshot({
-      type: "jpeg",
-      quality: 90,
-      clip: { x: 0, y: 0, width: template.width, height: template.height },
-    });
-    return buf;
+        });
+        return page.screenshot({
+          type: "jpeg",
+          quality: 90,
+          clip: { x: 0, y: 0, width: template.width, height: template.height },
+        });
+      }, RENDER_TIMEOUT_MS);
+      _renderCount++;
+      return buf;
+    } finally {
+      await context.close().catch(() => undefined);
+    }
   } finally {
-    await context.close().catch(() => undefined);
+    releaseRenderSlot();
+    // Recycle do browser quente (cap na deriva de memória) — só quando NÃO há
+    // render concorrente, para não derrubar outro render em andamento.
+    if (_renderCount >= RENDERS_BEFORE_RECYCLE && activeRenderCount() === 0) {
+      _renderCount = 0;
+      await closeRenderBrowser().catch(() => undefined);
+    }
   }
 }
 

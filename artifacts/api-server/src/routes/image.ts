@@ -39,8 +39,14 @@ import {
   type ImageFormat,
 } from "../lib/imageTransform.js";
 import { safeFetch } from "../lib/safeFetch.js";
+import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 
 const router = Router();
+
+// Rate limit do proxy público (PRD-11, CANÁRIO): limite ALTO porque um pageview
+// legítimo dispara dezenas de /api/image em rajada. Observar 429 e aumentar se
+// atingir tráfego real (o alvo é o path de miss/fetch, não os cache hits).
+const imageRateLimit = endpointRateLimit("/api/image", { limit: 240, windowMs: 60_000 });
 
 // ── Allowlist de domínios permitidos ────────────────────────────────────────
 const ALLOWED_HOSTS = new Set([
@@ -205,7 +211,7 @@ export async function warmImageCache(
 }
 
 // ── Rota ──────────────────────────────────────────────────────────────────────
-router.get("/image", async (req, res) => {
+router.get("/image", imageRateLimit, async (req, res) => {
   const rawUrl = req.query["url"];
   const rawW   = req.query["w"];
   const rawQ   = req.query["q"];

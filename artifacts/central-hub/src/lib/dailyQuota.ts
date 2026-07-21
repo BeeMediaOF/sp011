@@ -25,6 +25,11 @@ import {
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { logger } from "./logger.js";
 import { logEvent } from "./eventLog.js";
+import { isDailyQuotaFilled, resolveDefaultCap, DEFAULT_MAX_POSTS_PER_DAY } from "./dailyQuotaCore.js";
+
+// Núcleo puro (testável sem DB) em ./dailyQuotaCore.ts; re-exportado para os
+// consumidores que já importavam DEFAULT_MAX_POSTS_PER_DAY daqui.
+export { isDailyQuotaFilled, DEFAULT_MAX_POSTS_PER_DAY } from "./dailyQuotaCore.js";
 
 const MEMO_MS = 60_000;
 let _memo: { at: number; reason: string | null } | null = null;
@@ -88,9 +93,9 @@ async function compute(): Promise<string | null> {
   const candidates = blogs.filter((b) => withRules.has(b.id));
   if (candidates.length === 0) return null;
 
-  // Blog sem teto diário = demanda ilimitada → não há o que saturar.
-  if (candidates.some((b) => !b.maxPostsPerDay)) return null;
-
+  // PRD-11/F13: NÃO curto-circuitar para "ilimitado" quando falta teto — blog
+  // sem maxPostsPerDay usa o DEFAULT_MAX_POSTS_PER_DAY (via isDailyQuotaFilled),
+  // então o portão de economia sempre pode fechar.
   const counts = await db
     .select({
       blogId: deliveriesTable.blogId,
@@ -100,12 +105,8 @@ async function compute(): Promise<string | null> {
     .from(deliveriesTable)
     .where(inArray(deliveriesTable.blogId, candidates.map((b) => b.id)))
     .groupBy(deliveriesTable.blogId);
-  const byBlog = new Map(counts.map((c) => [c.blogId, c]));
-
-  for (const b of candidates) {
-    const c = byBlog.get(b.id);
-    const occupied = Number(c?.waiting ?? 0) + Number(c?.deliveredToday ?? 0);
-    if (occupied < (b.maxPostsPerDay ?? 0)) return null; // este blog ainda tem vaga hoje
-  }
-  return "fila diária cheia em todos os blogs (entregues hoje + em espera ≥ teto)";
+  const occupiedByBlog = new Map<string, number>(
+    counts.map((c) => [c.blogId, Number(c.waiting ?? 0) + Number(c.deliveredToday ?? 0)]),
+  );
+  return isDailyQuotaFilled(candidates, occupiedByBlog, resolveDefaultCap());
 }
