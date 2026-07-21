@@ -165,8 +165,14 @@ router.get("/amp/artigos/:slug", async (req, res) => {
 </body>
 </html>`;
 
-    // AMP requires no CSP restriction on script-src for the AMP runtime
-    res.removeHeader("Content-Security-Policy");
+    // CSP de backstop apropriada ao AMP (PRD-08): em vez de remover a CSP e
+    // deixar a página sem nenhuma, permite o runtime de cdn.ampproject.org, os
+    // estilos inline do AMP boilerplate/custom e o JSON-LD inline — mantendo
+    // object-src/base-uri/frame-ancestors travados.
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src https://cdn.ampproject.org 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://cdn.ampproject.org; object-src 'none'; base-uri 'self'; frame-ancestors 'none'",
+    );
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.send(html);
   } catch (err) {

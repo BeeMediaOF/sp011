@@ -1,0 +1,14 @@
+# Override APENAS para teste local no Docker Desktop (PRD-08).
+# NÃO é auto-mesclado: o nome != docker-compose.override.yml DE PROPÓSITO, para
+# que `docker compose up -d` (sem -f) em produção NÃO publique web:3000 no host
+# sem TLS/headers do Caddy (achado F10). Para usá-lo no teste local, passe os
+# DOIS arquivos explicitamente:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up --build api web
+#
+# Produção (com Caddy/HTTPS) usa SOMENTE o base, sem publicar 3000 no host:
+#   docker compose up -d          (ou: docker compose -f docker-compose.yml up -d)
+services:
+  web:
+    ports:
+      - "3000:3000"   # publica a porta do vite preview no host
