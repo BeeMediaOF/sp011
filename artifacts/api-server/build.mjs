@@ -15,7 +15,12 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/index.ts")],
+    entryPoints: [
+      path.resolve(artifactDir, "src/index.ts"),
+      // PRD-12: script de expurgo/anonimização de retenção (manual, dry-run) —
+      // gera dist/scripts/retentionSweep.mjs; o entry principal segue index.ts.
+      path.resolve(artifactDir, "src/scripts/retentionSweep.ts"),
+    ],
     platform: "node",
     bundle: true,
     format: "esm",
