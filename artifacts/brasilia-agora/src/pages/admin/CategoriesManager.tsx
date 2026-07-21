@@ -55,7 +55,7 @@ const EMPTY_FORM = { name: "", slug: "", color: "#0B2A66", visible: true };
 
 export default function CategoriesManager() {
   const { can } = useCan();
-  const canManage = can("home_blocks.manage");
+  const canManage = can("categories.manage");
   const [cats, setCats] = useState<SiteCategory[]>([]);
   const [persisted, setPersisted] = useState(false); // settings.categories já existe?
   const [loading, setLoading] = useState(true);
@@ -98,7 +98,7 @@ export default function CategoriesManager() {
   useEffect(() => { void load(); }, []);
 
   async function persist(next: SiteCategory[]) {
-    if (!canManage) return; // somente-leitura sem home_blocks.manage
+    if (!canManage) return; // somente-leitura sem categories.manage
     setSaving(true);
     try {
       await adminApi.updateSettings({ categories: next });
@@ -265,7 +265,7 @@ export default function CategoriesManager() {
             )}
           </div>
 
-          {/* Formulário — só para quem pode gerenciar (home_blocks.manage) */}
+          {/* Formulário — só para quem pode gerenciar (categories.manage) */}
           {canManage && (
           <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
             <div>

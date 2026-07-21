@@ -30,6 +30,8 @@ export const ALL_PERMISSIONS: PermissionDef[] = [
   { key: "ads.manage",           label: "Alterar propagandas",      group: "Plataforma",     description: "Criar e editar propagandas" },
   { key: "home_blocks.view",     label: "Blocos Home",              group: "Plataforma",     description: "Acessar os blocos da página inicial" },
   { key: "home_blocks.manage",   label: "Alterar blocos home",      group: "Plataforma",     description: "Criar e editar blocos da home" },
+  { key: "categories.view",      label: "Ver categorias",           group: "Plataforma",     description: "Acessar o gerenciador de categorias" },
+  { key: "categories.manage",    label: "Alterar categorias",       group: "Plataforma",     description: "Criar, editar e excluir categorias" },
   // Automações
   { key: "rss.view",             label: "Ver fontes RSS",           group: "Automações",     description: "Acessar fontes RSS cadastradas" },
   { key: "rss.manage",           label: "Gerenciar RSS",            group: "Automações",     description: "Adicionar e configurar fontes RSS" },

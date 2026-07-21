@@ -27,7 +27,7 @@ const NAV_MAIN = [
   { tk: "nav.articles",   icon: FileText,         path: "/admin/artigos",      permKey: "articles.view" },
   { tk: "nav.menu",       icon: Menu,             path: "/admin/menu",         permKey: "menu.view" },
   { tk: "nav.homeBlocks", icon: LayoutGrid,       path: "/admin/home-blocos",  permKey: "home_blocks.view" },
-  { tk: "nav.categories", icon: FolderOpen,       path: "/admin/categorias",   permKey: "home_blocks.view" },
+  { tk: "nav.categories", icon: FolderOpen,       path: "/admin/categorias",   permKey: "categories.view" },
   { tk: "nav.ads",        icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
   { tk: "nav.columnists", icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
   { tk: "nav.rss",        icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
