@@ -45,6 +45,13 @@ router.get("/image/:name", (req, res) => {
     res.status(404).json({ error: "not_found" });
     return;
   }
+  // Capa servida para BLOGS (hotlink cross-origin no <img> do artigo) e leitores:
+  // o helmet global (app.ts) carimba Cross-Origin-Resource-Policy: same-origin, que
+  // faz o navegador bloquear a imagem quando embutida em outra origem
+  // (ERR_BLOCKED_BY_RESPONSE.NotSameOrigin). Esta rota é pública e projetada para
+  // hotlink → libera o embed cross-origin. setHeader roda depois do middleware e
+  // sobrescreve o header. A API autenticada segue com o same-origin do helmet.
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
   res.sendFile(name, {
     root: imageDir(),
     headers: { "Cache-Control": "public, max-age=31536000, immutable" },
