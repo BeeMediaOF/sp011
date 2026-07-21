@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, type TemplateMenuItem } from "../../lib/homeBlocks";
 import { FONT_OPTIONS, FONT_GROUP_LABELS, fontCss, ensureFontLoaded, type FontOption } from "../../lib/fonts";
@@ -717,6 +718,8 @@ function TemplateCard({ tpl, isPreviewing, busy, onPreview, onConfirm, onCancel,
   onPreview: () => void; onConfirm: () => void; onCancel: () => void;
   onDelete?: () => void;
 }) {
+  const { can } = useCan();
+  const canManage = can("home_blocks.manage");
   const accent = tpl.accentColor ?? "#0B2A66";
   const visibleBlocks = tpl.blocks.filter((b) => b.visible);
   return (
@@ -761,7 +764,7 @@ function TemplateCard({ tpl, isPreviewing, busy, onPreview, onConfirm, onCancel,
               <span className="text-[9px] font-semibold px-1.5 py-0.5 bg-[#F1F5F9] text-[#475569] rounded-md">Rodapé {FOOTER_STYLE_LABEL[tpl.footerStyle ?? "dark"]}</span>
             </div>
           </div>
-          {isPreviewing ? (
+          {!canManage ? null : isPreviewing ? (
             <div className="flex gap-1.5 mt-2">
               <button onClick={onCancel} disabled={busy}
                 className="flex-1 flex items-center justify-center gap-1 py-1.5 text-[11px] font-bold border border-slate-200 text-slate-500 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
@@ -1302,6 +1305,8 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function HomeBlocksManager() {
+  const { can } = useCan();
+  const canManage = can("home_blocks.manage");
   const [blocks, setBlocks]             = useState<HomeBlock[]>([]);
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState(false);
@@ -1581,6 +1586,9 @@ export default function HomeBlocksManager() {
 
   // ── Auto-save (debounced) ───────────────────────────────────────────────────
   const debounceSave = useCallback((newBlocks: HomeBlock[], delay = 400) => {
+    // Sem `home_blocks.manage` a tela é somente-leitura: nunca persistir (o
+    // auto-save contorna o botão Salvar, então a guarda mora aqui).
+    if (!canManage) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       setSaving(true);
@@ -1596,7 +1604,7 @@ export default function HomeBlocksManager() {
         setTimeout(() => setSaveError(false), 4000);
       } finally { setSaving(false); }
     }, delay);
-  }, []);
+  }, [canManage]);
 
   /** Snapshot do estado atual da home (tudo que presets/templates podem alterar). */
   function captureSnapshot(): HomeSnapshot {
@@ -1615,6 +1623,7 @@ export default function HomeBlocksManager() {
 
   /** Persiste um snapshot e sincroniza estado local + prévia (campos ausentes ficam como estão). */
   async function pushSnapshot(snap: HomeSnapshot) {
+    if (!canManage) return;
     const ordered = snap.blocks.map((b, i) => ({ ...b, order: i }));
     await adminApi.updateSettings({
       homeBlocks:    ordered,
@@ -1788,6 +1797,7 @@ export default function HomeBlocksManager() {
 
   // ── Templates: salvar/excluir snapshots da home ─────────────────────────────
   async function saveCurrentAsTemplate() {
+    if (!canManage) return;
     const name = templateName.trim();
     if (!name || templateSaving) return;
     setTemplateSaving(true); setTemplateStatus("idle");
@@ -1809,6 +1819,7 @@ export default function HomeBlocksManager() {
   }
 
   async function deleteTemplate(id: string) {
+    if (!canManage) return;
     if (!confirm("Excluir este template? Esta ação não pode ser desfeita.")) return;
     const next = templates.filter((t) => t.id !== id);
     try {
@@ -1821,6 +1832,7 @@ export default function HomeBlocksManager() {
   }
 
   async function saveAll() {
+    if (!canManage) return;
     setSaving(true);
     const ordered = blocks.map((b, i) => ({ ...b, order: i }));
     try {
@@ -1840,6 +1852,7 @@ export default function HomeBlocksManager() {
   // preview (iframe) para rebuscar /api/site — o Header/Hero remontam in-place,
   // sem recarregar o iframe inteiro.
   async function saveSettingsPatch(patch: Parameters<typeof adminApi.updateSettings>[0]) {
+    if (!canManage) return;
     setSaving(true);
     try {
       await adminApi.updateSettings(patch);
@@ -1854,6 +1867,7 @@ export default function HomeBlocksManager() {
   }
 
   async function saveHeaderFooter(hs: HeaderStyle, fs: FooterStyle, hBg?: string, fBg?: string) {
+    if (!canManage) return;
     setSaving(true);
     try {
       await adminApi.updateSettings({
@@ -1868,6 +1882,7 @@ export default function HomeBlocksManager() {
   }
 
   async function saveLogo() {
+    if (!canManage) return;
     setLogoSaving(true); setLogoStatus("idle");
     try {
       if (logoPreview) { await adminApi.uploadLogo(logoPreview); setLogoBase64(logoPreview); setLogoPreview(null); }
@@ -2076,19 +2091,23 @@ export default function HomeBlocksManager() {
                 Erro ao salvar — tente novamente
               </span>
             )}
-            <button onClick={undo} disabled={!canUndo}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#0F172A] border border-[#E2E8F0] bg-white rounded-xl hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              <Undo2 size={14} /> Desfazer
-            </button>
-            <button onClick={redo} disabled={!canRedo}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#0F172A] border border-[#E2E8F0] bg-white rounded-xl hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-              <Redo2 size={14} /> Refazer
-            </button>
-            <button onClick={saveAll} disabled={saving || loading}
-              className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold text-white bg-[#E71D36] rounded-xl hover:bg-[#c0112a] disabled:opacity-50 shadow-sm transition-colors">
-              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-              {saving ? "Salvando…" : "Salvar alterações"}
-            </button>
+            {canManage && (
+              <>
+                <button onClick={undo} disabled={!canUndo}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#0F172A] border border-[#E2E8F0] bg-white rounded-xl hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  <Undo2 size={14} /> Desfazer
+                </button>
+                <button onClick={redo} disabled={!canRedo}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium text-[#0F172A] border border-[#E2E8F0] bg-white rounded-xl hover:bg-[#F8FAFC] disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                  <Redo2 size={14} /> Refazer
+                </button>
+                <button onClick={saveAll} disabled={saving || loading}
+                  className="flex items-center gap-2 px-4 py-1.5 text-[13px] font-semibold text-white bg-[#E71D36] rounded-xl hover:bg-[#c0112a] disabled:opacity-50 shadow-sm transition-colors">
+                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                  {saving ? "Salvando…" : "Salvar alterações"}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -2123,24 +2142,26 @@ export default function HomeBlocksManager() {
 
                 <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
                   {/* ── Salvar home atual ── */}
-                  <div className="rounded-2xl border border-[#E2E8F0] bg-white p-3 space-y-2">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Salvar home atual</p>
-                    <input
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCurrentAsTemplate(); } }}
-                      placeholder="Nome do template (ex.: Home esportes)"
-                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors placeholder:text-slate-400"
-                    />
-                    <button onClick={() => void saveCurrentAsTemplate()} disabled={templateSaving || !templateName.trim()}
-                      className="w-full flex items-center justify-center gap-2 py-2 bg-[#0B2A66] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                      {templateSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-                      {templateSaving ? "Salvando…" : "Salvar como template"}
-                    </button>
-                    {templateStatus === "ok"  && <p className="flex items-center gap-1.5 text-[11px] text-green-700"><CheckCircle size={11} /> Template salvo!</p>}
-                    {templateStatus === "err" && <p className="text-[11px] text-red-600">Erro ao salvar — tente novamente.</p>}
-                    <p className="text-[10px] text-slate-400 leading-relaxed">Guarda blocos, cabeçalho, rodapé e estilo do menu como estão agora.</p>
-                  </div>
+                  {canManage && (
+                    <div className="rounded-2xl border border-[#E2E8F0] bg-white p-3 space-y-2">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Salvar home atual</p>
+                      <input
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void saveCurrentAsTemplate(); } }}
+                        placeholder="Nome do template (ex.: Home esportes)"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66] transition-colors placeholder:text-slate-400"
+                      />
+                      <button onClick={() => void saveCurrentAsTemplate()} disabled={templateSaving || !templateName.trim()}
+                        className="w-full flex items-center justify-center gap-2 py-2 bg-[#0B2A66] text-white text-[13px] font-semibold rounded-xl hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                        {templateSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                        {templateSaving ? "Salvando…" : "Salvar como template"}
+                      </button>
+                      {templateStatus === "ok"  && <p className="flex items-center gap-1.5 text-[11px] text-green-700"><CheckCircle size={11} /> Template salvo!</p>}
+                      {templateStatus === "err" && <p className="text-[11px] text-red-600">Erro ao salvar — tente novamente.</p>}
+                      <p className="text-[10px] text-slate-400 leading-relaxed">Guarda blocos, cabeçalho, rodapé e estilo do menu como estão agora.</p>
+                    </div>
+                  )}
 
                   {/* ── Meus templates ── */}
                   <div>
@@ -2228,7 +2249,7 @@ export default function HomeBlocksManager() {
                     return (
                       <React.Fragment key={block.id}>
                         {/* ── Insert-here separator (between blocks) ── */}
-                        {bIdx > 0 && (
+                        {bIdx > 0 && canManage && (
                           <div className="group/ins flex items-center gap-1 my-0.5 px-1 h-5">
                             <div className="flex-1 h-px bg-[#E2E8F0] group-hover/ins:bg-[#0B2A66]/20 transition-colors" />
                             <button
@@ -2243,7 +2264,7 @@ export default function HomeBlocksManager() {
 
                         <div
                           ref={(el) => { blockRefs.current[block.id] = el; }}
-                          draggable={!isEditing}
+                          draggable={canManage && !isEditing}
                           onDragStart={() => handleDragStart(realIdx)}
                           onDragOver={(e) => handleDragOver(e, realIdx)}
                           onDragEnd={handleDragEnd}
@@ -2254,10 +2275,12 @@ export default function HomeBlocksManager() {
                           `}
                           style={{ boxShadow: isDragging ? "0 8px 24px rgba(15,23,42,0.10)" : isEditing ? "0 0 0 2px rgba(11,42,102,0.12)" : undefined }}
                         >
-                          <div className="flex items-center gap-2 px-3 py-2.5 cursor-pointer" onClick={() => openEdit(block)}>
-                            <span className="text-[#CBD5E1] hover:text-[#94A3B8] cursor-grab shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <GripVertical size={15} />
-                            </span>
+                          <div className={`flex items-center gap-2 px-3 py-2.5 ${canManage ? "cursor-pointer" : ""}`} onClick={() => { if (canManage) openEdit(block); }}>
+                            {canManage && (
+                              <span className="text-[#CBD5E1] hover:text-[#94A3B8] cursor-grab shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <GripVertical size={15} />
+                              </span>
+                            )}
                             <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: meta.iconBg }}>
                               <meta.Icon size={14} style={{ color: meta.iconColor }} />
                             </span>
@@ -2270,35 +2293,41 @@ export default function HomeBlocksManager() {
                             </div>
 
                             {/* ── Inline quick-actions (visible on hover) ── */}
-                            <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                title="Mover para cima"
-                                disabled={realIdx === 0}
-                                onClick={() => moveBlockUp(realIdx)}
-                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                                <ChevronUp size={13} />
-                              </button>
-                              <button
-                                title="Mover para baixo"
-                                disabled={realIdx === blocks.length - 1}
-                                onClick={() => moveBlockDown(realIdx)}
-                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-                                <ChevronDown size={13} />
-                              </button>
-                              <button
-                                title="Duplicar bloco"
-                                onClick={() => duplicateBlock(block.id)}
-                                className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition-colors">
-                                <Copy size={12} />
-                              </button>
-                            </div>
+                            {canManage && (
+                              <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/block:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  title="Mover para cima"
+                                  disabled={realIdx === 0}
+                                  onClick={() => moveBlockUp(realIdx)}
+                                  className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                  <ChevronUp size={13} />
+                                </button>
+                                <button
+                                  title="Mover para baixo"
+                                  disabled={realIdx === blocks.length - 1}
+                                  onClick={() => moveBlockDown(realIdx)}
+                                  className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#0B2A66] hover:bg-[#EFF6FF] disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
+                                  <ChevronDown size={13} />
+                                </button>
+                                <button
+                                  title="Duplicar bloco"
+                                  onClick={() => duplicateBlock(block.id)}
+                                  className="w-6 h-6 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-[#7C3AED] hover:bg-[#EDE9FE] transition-colors">
+                                  <Copy size={12} />
+                                </button>
+                              </div>
+                            )}
 
-                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <Toggle checked={block.visible} onChange={() => toggleVisible(realIdx)} />
-                            </div>
-                            <span className={`text-[#CBD5E1] transition-transform ${isEditing ? "rotate-180" : ""}`}>
-                              <ChevronDown size={14} />
-                            </span>
+                            {canManage && (
+                              <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                <Toggle checked={block.visible} onChange={() => toggleVisible(realIdx)} />
+                              </div>
+                            )}
+                            {canManage && (
+                              <span className={`text-[#CBD5E1] transition-transform ${isEditing ? "rotate-180" : ""}`}>
+                                <ChevronDown size={14} />
+                              </span>
+                            )}
                           </div>
 
                           {isEditing && (
@@ -2318,19 +2347,21 @@ export default function HomeBlocksManager() {
                   })}
                 </div>
 
-                <div className="shrink-0 px-3 py-3 border-t border-[#E2E8F0] space-y-2">
-                  <button onClick={() => setShowAdd(true)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#E71D36] text-white text-[13px] font-semibold rounded-xl hover:bg-[#c0112a] transition-colors shadow-sm">
-                    <Plus size={15} /> Adicionar bloco
-                  </button>
-                  <button onClick={() => {
-                    if (!confirm("Restaurar blocos padrão? Isso removerá blocos personalizados.")) return;
-                    setBlocks(DEFAULT_BLOCKS); pushHistory(DEFAULT_BLOCKS); debounceSave(DEFAULT_BLOCKS);
-                  }}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 text-[12px] font-medium text-[#64748B] hover:text-[#0B2A66] hover:bg-[#F8FAFC] rounded-xl transition-colors">
-                    <RotateCcw size={12} /> Restaurar padrões
-                  </button>
-                </div>
+                {canManage && (
+                  <div className="shrink-0 px-3 py-3 border-t border-[#E2E8F0] space-y-2">
+                    <button onClick={() => setShowAdd(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#E71D36] text-white text-[13px] font-semibold rounded-xl hover:bg-[#c0112a] transition-colors shadow-sm">
+                      <Plus size={15} /> Adicionar bloco
+                    </button>
+                    <button onClick={() => {
+                      if (!confirm("Restaurar blocos padrão? Isso removerá blocos personalizados.")) return;
+                      setBlocks(DEFAULT_BLOCKS); pushHistory(DEFAULT_BLOCKS); debounceSave(DEFAULT_BLOCKS);
+                    }}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 text-[12px] font-medium text-[#64748B] hover:text-[#0B2A66] hover:bg-[#F8FAFC] rounded-xl transition-colors">
+                      <RotateCcw size={12} /> Restaurar padrões
+                    </button>
+                  </div>
+                )}
               </>
             )}
 
@@ -2399,11 +2430,13 @@ export default function HomeBlocksManager() {
                     </div>
                     {logoStatus === "ok"  && <div className="flex items-center gap-1.5 text-green-700 text-xs bg-green-50 border border-green-200 rounded-xl px-3 py-2"><CheckCircle size={12}/> Logo atualizada!</div>}
                     {logoStatus === "err" && <div className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-xl px-3 py-2">Erro ao salvar logo</div>}
-                    <button onClick={saveLogo} disabled={logoSaving}
-                      className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                      {logoSaving ? <RefreshCw size={13} className="animate-spin"/> : <Save size={13}/>}
-                      {logoSaving ? "Salvando…" : "Salvar logo"}
-                    </button>
+                    {canManage && (
+                      <button onClick={saveLogo} disabled={logoSaving}
+                        className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                        {logoSaving ? <RefreshCw size={13} className="animate-spin"/> : <Save size={13}/>}
+                        {logoSaving ? "Salvando…" : "Salvar logo"}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -2461,10 +2494,12 @@ export default function HomeBlocksManager() {
                     <span style={{ color: menuTextColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}>ECONOMIA</span>
                   </div>
 
-                  <button onClick={() => saveSettingsPatch({ menuTextColor, menuActiveColor, menuFontSize, menuFontWeight })} disabled={saving}
-                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                    <Save size={13} /> Salvar estilo do menu
-                  </button>
+                  {canManage && (
+                    <button onClick={() => saveSettingsPatch({ menuTextColor, menuActiveColor, menuFontSize, menuFontWeight })} disabled={saving}
+                      className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                      <Save size={13} /> Salvar estilo do menu
+                    </button>
+                  )}
                 </div>
 
                 {/* ── Margem do cabeçalho ── */}
@@ -2493,10 +2528,12 @@ export default function HomeBlocksManager() {
                       onTouchEnd={() => saveSettingsPatch({ headerMarginTop })}
                       className="w-full accent-[#0B2A66]" />
                   </div>
-                  <button onClick={() => saveSettingsPatch({ headerPaddingX, headerMarginTop })} disabled={saving}
-                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                    <Save size={13} /> Salvar margem
-                  </button>
+                  {canManage && (
+                    <button onClick={() => saveSettingsPatch({ headerPaddingX, headerMarginTop })} disabled={saving}
+                      className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                      <Save size={13} /> Salvar margem
+                    </button>
+                  )}
                 </div>
 
                 {/* ── Barra de cotação e strip de destaques ── */}
@@ -2580,10 +2617,12 @@ export default function HomeBlocksManager() {
                       placeholder="Link de redirecionamento ao clicar (opcional)"
                       className="w-full mt-1.5 border border-[#E2E8F0] rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20" />
                     <p className="text-[10px] text-[#94A3B8] mt-1 leading-relaxed">HTML sanitizado (scripts são removidos); exibido só no desktop, à direita do logo. O upload gera a tag da imagem pronta; com o link preenchido, o banner inteiro vira clicável (abre em nova aba).</p>
-                    <button onClick={() => saveSettingsPatch({ headerBannerHtml, headerBannerLinkUrl })} disabled={saving}
-                      className="w-full mt-1.5 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                      <Save size={13} /> Salvar banner
-                    </button>
+                    {canManage && (
+                      <button onClick={() => saveSettingsPatch({ headerBannerHtml, headerBannerLinkUrl })} disabled={saving}
+                        className="w-full mt-1.5 py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                        <Save size={13} /> Salvar banner
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2821,10 +2860,12 @@ export default function HomeBlocksManager() {
                       Lateral da notícia salva — abra uma notícia para conferir.
                     </p>
                   )}
-                  <button type="button" onClick={() => void saveArticleSidebar()} disabled={saving}
-                    className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                    <Save size={13} /> Salvar lateral da notícia
-                  </button>
+                  {canManage && (
+                    <button type="button" onClick={() => void saveArticleSidebar()} disabled={saving}
+                      className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
+                      <Save size={13} /> Salvar lateral da notícia
+                    </button>
+                  )}
                 </div>
               </div>
             )}

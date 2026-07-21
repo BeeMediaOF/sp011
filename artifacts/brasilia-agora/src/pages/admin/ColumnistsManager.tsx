@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Columnist, type ColumnistSpecialty } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import {
   Plus, Trash2, Pencil, Search, UserCheck, UserX,
   Users, FileText, Upload, X, ChevronLeft, ChevronRight,
@@ -87,6 +88,8 @@ function emptyForm() {
 
 // ─── Main ──────────────────────────────────────────────────────────────────────
 export default function ColumnistsManager() {
+  const { can } = useCan();
+  const canManage = can("columnists.manage");
   const [columnists, setColumnists] = useState<Columnist[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
@@ -144,6 +147,7 @@ export default function ColumnistsManager() {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
   async function toggleActive(c: Columnist) {
+    if (!canManage) return;
     try {
       const res = await adminApi.updateColumnist(c.id, { active: !c.active });
       setColumnists((prev) => prev.map((x) => x.id === c.id ? res.columnist : x));
@@ -151,6 +155,7 @@ export default function ColumnistsManager() {
   }
 
   async function handleDelete(id: string) {
+    if (!canManage) return;
     if (!confirm("Remover este colunista?")) return;
     try {
       await adminApi.deleteColumnist(id);
@@ -177,6 +182,7 @@ export default function ColumnistsManager() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManage) return;
     if (!form.name.trim()) return;
     setSaving(true);
     try {
@@ -301,14 +307,16 @@ export default function ColumnistsManager() {
                   <option value="inativo">Inativo</option>
                 </select>
               </div>
-              <button
-                onClick={resetForm}
-                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-                style={{ backgroundColor: "#E71D36" }}
-              >
-                <Plus size={16} />
-                Novo colunista
-              </button>
+              {canManage && (
+                <button
+                  onClick={resetForm}
+                  className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#E71D36" }}
+                >
+                  <Plus size={16} />
+                  Novo colunista
+                </button>
+              )}
             </div>
 
             {/* Table */}
@@ -379,28 +387,34 @@ export default function ColumnistsManager() {
                             {/* Ações */}
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  onClick={() => startEdit(c)}
-                                  title="Editar"
-                                  className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
-                                    editingId === c.id
-                                      ? "border-[#0B2A66] bg-[#0B2A66] text-white"
-                                      : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66]"
-                                  }`}
-                                >
-                                  <Pencil size={13} />
-                                </button>
-                                <ToggleSwitch
-                                  checked={c.active}
-                                  onChange={() => { void toggleActive(c); }}
-                                />
-                                <button
-                                  onClick={() => { void handleDelete(c.id); }}
-                                  title="Excluir"
-                                  className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                                {canManage ? (
+                                  <>
+                                    <button
+                                      onClick={() => startEdit(c)}
+                                      title="Editar"
+                                      className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
+                                        editingId === c.id
+                                          ? "border-[#0B2A66] bg-[#0B2A66] text-white"
+                                          : "border-gray-200 text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66]"
+                                      }`}
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                    <ToggleSwitch
+                                      checked={c.active}
+                                      onChange={() => { void toggleActive(c); }}
+                                    />
+                                    <button
+                                      onClick={() => { void handleDelete(c.id); }}
+                                      title="Excluir"
+                                      className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -469,7 +483,8 @@ export default function ColumnistsManager() {
             )}
           </div>
 
-          {/* ── RIGHT: form panel ──────────────────────────────────────────── */}
+          {/* ── RIGHT: form panel — só quem pode gerenciar (columnists.manage) ── */}
+          {canManage && (
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
             <div className="mb-4">
               <h3 className="font-semibold text-[#0F172A]">
@@ -625,6 +640,7 @@ export default function ColumnistsManager() {
               </div>
             </form>
           </div>
+          )}
 
         </div>
       </div>

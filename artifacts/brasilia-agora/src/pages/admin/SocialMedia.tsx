@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { useAdminT, type AdminTKey } from "../../lib/adminI18n";
+import { useCan } from "../../lib/permissionsCache";
 import {
   type TemplateElement,
   type ArticleData,
@@ -761,6 +762,8 @@ function ConnectionCard({
   onDelete: (id: string) => void;
 }) {
   const { t } = useAdminT();
+  const { can } = useCan();
+  const canManage = can("social.manage");
   return (
     <div className="bg-white rounded-2xl p-5 flex flex-col gap-4" style={{ boxShadow: CARD_SHADOW }}>
       <div className="flex items-start gap-3">
@@ -786,37 +789,41 @@ function ConnectionCard({
               <p className={testStatus[conn.id]?.ok ? "text-green-600" : "text-red-500"}>{testStatus[conn.id]?.msg}</p>
             )}
           </div>
-          <div className="flex items-center gap-1.5 mt-auto pt-1">
-            <button onClick={() => onTest(conn.id)} disabled={testingId === conn.id} title={t("soc.testNow")}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 transition-colors">
-              {testingId === conn.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />} {t("soc.test")}
-            </button>
-            <button onClick={() => onToggleAuto(conn)} title={t("soc.autoPublish")}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 transition-colors">
-              {conn.autoPublish ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
-            </button>
-            {docUrl && (
-              <a href={docUrl} target="_blank" rel="noreferrer" title={t("soc.openDocs")}
-                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-50 transition-colors">
-                <ExternalLink size={13} />
-              </a>
-            )}
-            <button onClick={() => onConfigure(conn)} title={t("soc.configure")}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors ml-auto">
-              <Settings size={14} />
-            </button>
-            <button onClick={() => onDelete(conn.id)} title={t("soc.disconnect")}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-              <Trash2 size={13} />
-            </button>
-          </div>
+          {canManage && (
+            <div className="flex items-center gap-1.5 mt-auto pt-1">
+              <button onClick={() => onTest(conn.id)} disabled={testingId === conn.id} title={t("soc.testNow")}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 disabled:opacity-50 transition-colors">
+                {testingId === conn.id ? <Loader2 size={12} className="animate-spin" /> : <TestTube2 size={12} />} {t("soc.test")}
+              </button>
+              <button onClick={() => onToggleAuto(conn)} title={t("soc.autoPublish")}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 transition-colors">
+                {conn.autoPublish ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
+              </button>
+              {docUrl && (
+                <a href={docUrl} target="_blank" rel="noreferrer" title={t("soc.openDocs")}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-50 transition-colors">
+                  <ExternalLink size={13} />
+                </a>
+              )}
+              <button onClick={() => onConfigure(conn)} title={t("soc.configure")}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors ml-auto">
+                <Settings size={14} />
+              </button>
+              <button onClick={() => onDelete(conn.id)} title={t("soc.disconnect")}
+                className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
         </>
-      ) : (
+      ) : canManage ? (
         <button onClick={() => onConfigure(null)}
           className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
           style={{ background: PRIMARY }}>
           <Plus size={15} /> {t("soc.connect")}
         </button>
+      ) : (
+        <p className="mt-auto text-xs text-slate-400 italic">Não conectado</p>
       )}
     </div>
   );
@@ -830,6 +837,8 @@ function MetaConnectionCard({
   onConfigure: () => void;
 }) {
   const { t } = useAdminT();
+  const { can } = useCan();
+  const canManage = can("social.manage");
   const connected = accounts.length;
   const status: "online" | "offline" = connected > 0 && metaApp.hasSecret ? "online" : "offline";
   return (
@@ -857,11 +866,13 @@ function MetaConnectionCard({
             ))}
         {connected > 3 && <p className="text-slate-400">+{connected - 3} {t("soc.others")}</p>}
       </div>
-      <button onClick={onConfigure}
-        className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
-        style={{ background: PRIMARY }}>
-        <Settings size={15} /> {connected > 0 ? t("soc.manage") : t("soc.connect")}
-      </button>
+      {canManage && (
+        <button onClick={onConfigure}
+          className="mt-auto flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white"
+          style={{ background: PRIMARY }}>
+          <Settings size={15} /> {connected > 0 ? t("soc.manage") : t("soc.connect")}
+        </button>
+      )}
     </div>
   );
 }
@@ -1126,6 +1137,8 @@ function MetaModal({
 
 export default function SocialMedia() {
   const { t, lang } = useAdminT();
+  const { can } = useCan();
+  const canManage = can("social.manage");
   const nloc = lang === "en" ? "en-US" : "pt-BR";
   const [tab, setTab] = useState<"connections" | "templates" | "queue" | "automation">("connections");
 
@@ -1725,6 +1738,7 @@ export default function SocialMedia() {
   }
 
   async function saveTemplate() {
+    if (!canManage) return;
     if (!currentTemplate) return;
     setTemplateSaving(true);
     try {
@@ -1742,6 +1756,7 @@ export default function SocialMedia() {
   }
 
   async function deleteTemplate(id: string) {
+    if (!canManage) return;
     if (!window.confirm(t("soc.confirmRemoveTemplate"))) return;
     await apiFetch(`/templates/${id}`, { method: "DELETE" });
     if (currentTemplate?.id === id) setCurrentTemplate(null);
@@ -1911,22 +1926,26 @@ export default function SocialMedia() {
   }
 
   async function submitQueueForm() {
+    if (!canManage) return;
     if (!queueForm.articleId || !queueForm.accountIds.length) return;
     await apiFetch("/queue", { method: "POST", body: JSON.stringify(queueForm) });
     setShowQueueModal(false); await fetchQueue();
   }
 
   async function removeFromQueue(id: string) {
+    if (!canManage) return;
     await apiFetch(`/queue/${id}`, { method: "DELETE" });
     setQueue((q) => q.filter((i) => i.id !== id));
   }
 
   async function retryQueueItem(id: string) {
+    if (!canManage) return;
     await apiFetch(`/queue/${id}/retry`, { method: "POST" });
     await fetchQueue();
   }
 
   async function processQueue() {
+    if (!canManage) return;
     setProcessing(true);
     try { await apiFetch("/process", { method: "POST" }); await fetchQueue(); }
     finally { setProcessing(false); }
@@ -1963,6 +1982,7 @@ export default function SocialMedia() {
   }
 
   async function saveAutomation() {
+    if (!canManage) return;
     setAutoSaving(true);
     try {
       // Legenda (captionTemplate) vive em social_config → salva junto.
@@ -1974,6 +1994,7 @@ export default function SocialMedia() {
   }
 
   async function runAutomationNow() {
+    if (!canManage) return;
     setAutoRunning(true); setAutoRunResult(null);
     try {
       const body = autoBackfill ? { backfillHours: 24 } : {};
@@ -2080,6 +2101,7 @@ export default function SocialMedia() {
   }
 
   async function publishManual() {
+    if (!canManage) return;
     if (!manualArticleId || !manualAccountId) return;
     setManualPublishing(true); setManualResult(null);
     try {
@@ -2256,14 +2278,18 @@ export default function SocialMedia() {
               <option value="">{t("soc.selectTemplate")}</option>
               {templates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.type === "story" ? "Story" : isStoryCapable(t) ? "Feed + Story" : "Feed"})</option>)}
             </select>
-            <button onClick={() => newTemplate("feed")}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: PRIMARY }}>
-              <Plus size={13} /> Feed
-            </button>
-            <button onClick={() => newTemplate("story")}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: "#9333EA" }}>
-              <Plus size={13} /> Story
-            </button>
+            {canManage && (
+              <>
+                <button onClick={() => newTemplate("feed")}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: PRIMARY }}>
+                  <Plus size={13} /> Feed
+                </button>
+                <button onClick={() => newTemplate("story")}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl text-white" style={{ background: "#9333EA" }}>
+                  <Plus size={13} /> Story
+                </button>
+              </>
+            )}
             <select
               value=""
               onChange={(e) => { if (e.target.value) applyPreset(e.target.value as PresetKind); e.target.value = ""; }}
@@ -2311,22 +2337,26 @@ export default function SocialMedia() {
                     <X size={14} />
                   </button>
                 )}
-                <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title={t("soc.duplicateTemplate")}
-                  className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors disabled:opacity-50">
-                  <Copy size={14} />
-                </button>
-                {currentTemplate.id && (
-                  <button onClick={() => { void deleteTemplate(currentTemplate.id); }}
-                    className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                    <Trash2 size={14} />
-                  </button>
+                {canManage && (
+                  <>
+                    <button onClick={() => { void duplicateTemplate(); }} disabled={templateSaving} title={t("soc.duplicateTemplate")}
+                      className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors disabled:opacity-50">
+                      <Copy size={14} />
+                    </button>
+                    {currentTemplate.id && (
+                      <button onClick={() => { void deleteTemplate(currentTemplate.id); }}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    <button onClick={() => { void saveTemplate(); }} disabled={templateSaving}
+                      className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-60 ${templateSaved ? "!bg-green-500" : ""}`}
+                      style={!templateSaved ? { background: ACCENT } : {}}>
+                      {templateSaving ? <Loader2 size={13} className="animate-spin" /> : templateSaved ? <CheckCircle size={13} /> : <Save size={13} />}
+                      {templateSaving ? t("soc.saving") : templateSaved ? t("soc.saved") : t("soc.save")}
+                    </button>
+                  </>
                 )}
-                <button onClick={() => { void saveTemplate(); }} disabled={templateSaving}
-                  className={`flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl text-white disabled:opacity-60 ${templateSaved ? "!bg-green-500" : ""}`}
-                  style={!templateSaved ? { background: ACCENT } : {}}>
-                  {templateSaving ? <Loader2 size={13} className="animate-spin" /> : templateSaved ? <CheckCircle size={13} /> : <Save size={13} />}
-                  {templateSaving ? t("soc.saving") : templateSaved ? t("soc.saved") : t("soc.save")}
-                </button>
               </div>
             )}
           </div>
@@ -2884,21 +2914,25 @@ export default function SocialMedia() {
               <option value="published">{t("soc.stPublished")}</option>
               <option value="failed">{t("soc.stFailed")}</option>
             </select>
-            <button onClick={() => { void processQueue(); }} disabled={processing}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
-              style={{ background: "#16A34A" }}>
-              {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-              {processing ? t("soc.processing") : t("soc.processNow")}
-            </button>
+            {canManage && (
+              <button onClick={() => { void processQueue(); }} disabled={processing}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-white disabled:opacity-50"
+                style={{ background: "#16A34A" }}>
+                {processing ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                {processing ? t("soc.processing") : t("soc.processNow")}
+              </button>
+            )}
             <button onClick={() => { void fetchQueue(); }} title={t("soc.refresh")}
               className="w-9 h-9 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
               <RefreshCw size={14} />
             </button>
-            <button onClick={() => { void openQueueModal(); }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-              style={{ background: PRIMARY }}>
-              <Plus size={15} /> {t("soc.addToQueue")}
-            </button>
+            {canManage && (
+              <button onClick={() => { void openQueueModal(); }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                style={{ background: PRIMARY }}>
+                <Plus size={15} /> {t("soc.addToQueue")}
+              </button>
+            )}
           </div>
 
           {queueLoading ? (
@@ -2948,7 +2982,7 @@ export default function SocialMedia() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {item.status === "failed" && (
+                            {canManage && item.status === "failed" && (
                               <button onClick={() => { void retryQueueItem(item.id); }} title={t("soc.retry")}
                                 className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors">
                                 <RefreshCw size={12} />
@@ -2960,10 +2994,12 @@ export default function SocialMedia() {
                                 <Link2 size={12} />
                               </a>
                             )}
-                            <button onClick={() => { void removeFromQueue(item.id); }} title={t("soc.remove")}
-                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                              <Trash2 size={12} />
-                            </button>
+                            {canManage && (
+                              <button onClick={() => { void removeFromQueue(item.id); }} title={t("soc.remove")}
+                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                <Trash2 size={12} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -3207,12 +3243,14 @@ export default function SocialMedia() {
             </div>
 
             <div className="flex items-center gap-3 pt-1">
-              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: PRIMARY }}>
-                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? t("soc.saving") : t("soc.saveConfig")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: PRIMARY }}>
+                  {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {autoSaving ? t("soc.saving") : t("soc.saveConfig")}
+                </button>
+              )}
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
@@ -3302,12 +3340,14 @@ export default function SocialMedia() {
             )}
 
             <div className="flex items-center gap-3 pt-1">
-              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: PRIMARY }}>
-                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? t("soc.saving") : t("soc.saveFormats")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: PRIMARY }}>
+                  {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {autoSaving ? t("soc.saving") : t("soc.saveFormats")}
+                </button>
+              )}
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
@@ -3368,12 +3408,14 @@ export default function SocialMedia() {
             )}
 
             <div className="flex items-center gap-3 pt-1">
-              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: PRIMARY }}>
-                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? t("soc.saving") : t("soc.saveHours")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: PRIMARY }}>
+                  {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {autoSaving ? t("soc.saving") : t("soc.saveHours")}
+                </button>
+              )}
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
@@ -3485,12 +3527,14 @@ export default function SocialMedia() {
             </div>
 
             <div className="flex items-center gap-3 pt-1">
-              <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: PRIMARY }}>
-                {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                {autoSaving ? t("soc.saving") : t("soc.savePriority")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void saveAutomation(); }} disabled={autoSaving}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: PRIMARY }}>
+                  {autoSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  {autoSaving ? t("soc.saving") : t("soc.savePriority")}
+                </button>
+              )}
               {autoSaved && <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle size={13} /> {t("soc.savedShort")}</span>}
             </div>
           </div>
@@ -3504,12 +3548,14 @@ export default function SocialMedia() {
                 <input type="checkbox" checked={autoBackfill} onChange={(e) => setAutoBackfill(e.target.checked)} />
                 {t("soc.backfill24")}
               </label>
-              <button onClick={() => { void runAutomationNow(); }} disabled={autoRunning}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: "#16A34A" }}>
-                {autoRunning ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {autoRunning ? t("soc.running") : t("soc.runNow")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void runAutomationNow(); }} disabled={autoRunning}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: "#16A34A" }}>
+                  {autoRunning ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                  {autoRunning ? t("soc.running") : t("soc.runNow")}
+                </button>
+              )}
             </div>
             {autoRunResult && (
               <div className="mt-3 space-y-2">
@@ -3580,12 +3626,14 @@ export default function SocialMedia() {
                 className="mt-1 w-full text-sm border border-slate-200 rounded-xl px-3 py-2 outline-none focus:border-[#0B2A66] bg-white" />
             </label>
             <div className="flex items-center gap-3">
-              <button onClick={() => { void publishManual(); }} disabled={manualPublishing || !manualArticleId || !manualAccountId}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: ACCENT }}>
-                {manualPublishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                {manualPublishing ? t("soc.publishing") : t("soc.publishNow")}
-              </button>
+              {canManage && (
+                <button onClick={() => { void publishManual(); }} disabled={manualPublishing || !manualArticleId || !manualAccountId}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+                  style={{ background: ACCENT }}>
+                  {manualPublishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                  {manualPublishing ? t("soc.publishing") : t("soc.publishNow")}
+                </button>
+              )}
               {manualResult && (
                 <span className={`text-xs flex items-center gap-1 ${manualResult.ok ? "text-green-600" : "text-red-500"}`}>
                   {manualResult.ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />} {manualResult.msg}

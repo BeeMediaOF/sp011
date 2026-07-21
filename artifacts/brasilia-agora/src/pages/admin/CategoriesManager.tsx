@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type SiteCategory } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   Plus, Trash2, Pencil, Search, RefreshCw, Save, FolderOpen, Eye, EyeOff, Info,
@@ -53,6 +54,8 @@ function kebab(s: string): string {
 const EMPTY_FORM = { name: "", slug: "", color: "#0B2A66", visible: true };
 
 export default function CategoriesManager() {
+  const { can } = useCan();
+  const canManage = can("home_blocks.manage");
   const [cats, setCats] = useState<SiteCategory[]>([]);
   const [persisted, setPersisted] = useState(false); // settings.categories já existe?
   const [loading, setLoading] = useState(true);
@@ -95,6 +98,7 @@ export default function CategoriesManager() {
   useEffect(() => { void load(); }, []);
 
   async function persist(next: SiteCategory[]) {
+    if (!canManage) return; // somente-leitura sem home_blocks.manage
     setSaving(true);
     try {
       await adminApi.updateSettings({ categories: next });
@@ -175,11 +179,13 @@ export default function CategoriesManager() {
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#64748B] border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
               <RefreshCw size={12} /> Atualizar
             </button>
-            <button onClick={resetForm}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#0B2A66" }}>
-              <Plus size={13} /> Nova categoria
-            </button>
+            {canManage && (
+              <button onClick={resetForm}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white rounded-xl hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: "#0B2A66" }}>
+                <Plus size={13} /> Nova categoria
+              </button>
+            )}
           </div>
         </div>
 
@@ -237,25 +243,30 @@ export default function CategoriesManager() {
                     {c.visible === false && (
                       <span className="text-[10px] font-semibold px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full shrink-0">Oculta</span>
                     )}
-                    <button onClick={() => void toggleVisible(c)} title={c.visible === false ? "Mostrar" : "Ocultar"} disabled={saving}
-                      className="p-1.5 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
-                      {c.visible === false ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                    <button onClick={() => openEdit(c)} title="Editar"
-                      className="p-1.5 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
-                      <Pencil size={14} />
-                    </button>
-                    <button onClick={() => void remove(c)} title="Excluir" disabled={saving}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
-                      <Trash2 size={14} />
-                    </button>
+                    {canManage && (
+                      <>
+                        <button onClick={() => void toggleVisible(c)} title={c.visible === false ? "Mostrar" : "Ocultar"} disabled={saving}
+                          className="p-1.5 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
+                          {c.visible === false ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                        <button onClick={() => openEdit(c)} title="Editar"
+                          className="p-1.5 text-gray-400 hover:text-[#0B2A66] hover:bg-blue-50 rounded-lg transition-colors shrink-0">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => void remove(c)} title="Excluir" disabled={saving}
+                          className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors shrink-0">
+                          <Trash2 size={14} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Formulário */}
+          {/* Formulário — só para quem pode gerenciar (home_blocks.manage) */}
+          {canManage && (
           <div className="bg-white rounded-2xl p-5 space-y-4" style={{ boxShadow: CARD_SHADOW }}>
             <div>
               <p className="text-xs font-bold text-[#0F172A]">{editingId ? "Editar categoria" : "Nova categoria"}</p>
@@ -316,6 +327,7 @@ export default function CategoriesManager() {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </AdminLayout>

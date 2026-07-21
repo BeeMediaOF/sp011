@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type MenuItem, type SiteSettings } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { useCategories, categoryColor } from "../../hooks/useCategories";
 import {
@@ -48,6 +49,8 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 
 export default function MenuManager() {
   const { t } = useAdminT();
+  const { can } = useCan();
+  const canEdit = can("menu.edit");
   const [items, setItems]       = useState<MenuItem[]>([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -257,22 +260,26 @@ export default function MenuManager() {
                 {t("menu.errSave")}
               </span>
             )}
-            <button
-              onClick={() => addItem(t("menu.defNewItem"), "/")}
-              className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-slate-300 transition-colors"
-              style={{ boxShadow: CARD_SHADOW }}
-            >
-              <PlusCircle size={15} /> {t("menu.createNew")}
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white transition-colors disabled:opacity-60"
-              style={{ background: saved ? "#16A34A" : "#E71D36" }}
-            >
-              {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <Check size={15} /> : <Save size={15} />}
-              {saved ? t("menu.savedBang") : saving ? t("menu.saving") : t("menu.saveChanges")}
-            </button>
+            {canEdit && (
+              <>
+                <button
+                  onClick={() => addItem(t("menu.defNewItem"), "/")}
+                  className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:border-slate-300 transition-colors"
+                  style={{ boxShadow: CARD_SHADOW }}
+                >
+                  <PlusCircle size={15} /> {t("menu.createNew")}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl text-white transition-colors disabled:opacity-60"
+                  style={{ background: saved ? "#16A34A" : "#E71D36" }}
+                >
+                  {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <Check size={15} /> : <Save size={15} />}
+                  {saved ? t("menu.savedBang") : saving ? t("menu.saving") : t("menu.saveChanges")}
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -391,12 +398,14 @@ export default function MenuManager() {
                       <p className="text-xs font-medium text-slate-700 truncate">{t(page.tk)}</p>
                       <p className="text-[10px] text-slate-400 font-mono">{page.path}</p>
                     </div>
-                    <button
-                      onClick={() => addItem(t(page.tk), page.path)}
-                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                    >
-                      <Plus size={11} />
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => addItem(t(page.tk), page.path)}
+                        className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                      >
+                        <Plus size={11} />
+                      </button>
+                    )}
                   </div>
                 ))}
                 {pagesTab === "categorias" && (
@@ -412,12 +421,14 @@ export default function MenuManager() {
                           <p className="text-xs font-medium text-slate-700 truncate">{cat.label}</p>
                           <p className="text-[10px] text-slate-400 font-mono">/{cat.value}</p>
                         </div>
-                        <button
-                          onClick={() => addItem(cat.label, `/${cat.value}`)}
-                          className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
-                        >
-                          <Plus size={11} />
-                        </button>
+                        {canEdit && (
+                          <button
+                            onClick={() => addItem(cat.label, `/${cat.value}`)}
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-[#0B2A66] hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0 opacity-0 group-hover:opacity-100"
+                          >
+                            <Plus size={11} />
+                          </button>
+                        )}
                       </div>
                     ))
                   )
@@ -425,12 +436,14 @@ export default function MenuManager() {
                 {pagesTab === "links" && (
                   <div className="pt-1">
                     <p className="text-xs text-slate-400 mb-3">{t("menu.addExternalDesc")}</p>
-                    <button
-                      onClick={() => addItem(t("menu.defExternalLink"), "https://")}
-                      className="flex items-center gap-2 text-xs font-medium text-[#2563EB] hover:underline"
-                    >
-                      <Link2 size={12} /> {t("menu.addCustomLink")}
-                    </button>
+                    {canEdit && (
+                      <button
+                        onClick={() => addItem(t("menu.defExternalLink"), "https://")}
+                        className="flex items-center gap-2 text-xs font-medium text-[#2563EB] hover:underline"
+                      >
+                        <Link2 size={12} /> {t("menu.addCustomLink")}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -452,12 +465,14 @@ export default function MenuManager() {
                 <h3 className="text-sm font-semibold text-[#0B2A66]">{t("menu.structure")}</h3>
                 <p className="text-xs text-slate-400 mt-0.5">{t("menu.structureDesc")}</p>
               </div>
-              <button
-                onClick={() => addItem(t("menu.defNewItem"), "/")}
-                className="flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors shrink-0"
-              >
-                <Plus size={12} /> {t("menu.addItem")}
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => addItem(t("menu.defNewItem"), "/")}
+                  className="flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 px-3 py-1.5 rounded-xl hover:border-slate-300 hover:bg-slate-50 transition-colors shrink-0"
+                >
+                  <Plus size={12} /> {t("menu.addItem")}
+                </button>
+              )}
             </div>
 
             <div className="p-4">
@@ -522,29 +537,31 @@ export default function MenuManager() {
                           </span>
 
                           {/* Row actions */}
-                          <div className="flex items-center gap-0.5 shrink-0">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); selectItem(item); }}
-                              className="p-1 rounded text-slate-300 hover:text-[#0B2A66] hover:bg-blue-50 transition-colors"
-                            >
-                              <Pencil size={11} />
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, visible: !it.visible } : it));
-                              }}
-                              className={`p-1 rounded transition-colors ${item.visible ? "text-slate-300 hover:text-slate-600" : "text-amber-400 hover:text-amber-600"}`}
-                            >
-                              {item.visible ? <Eye size={11} /> : <EyeOff size={11} />}
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                              className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                            >
-                              <Trash2 size={11} />
-                            </button>
-                          </div>
+                          {canEdit && (
+                            <div className="flex items-center gap-0.5 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); selectItem(item); }}
+                                className="p-1 rounded text-slate-300 hover:text-[#0B2A66] hover:bg-blue-50 transition-colors"
+                              >
+                                <Pencil size={11} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setItems((prev) => prev.map((it) => it.id === item.id ? { ...it, visible: !it.visible } : it));
+                                }}
+                                className={`p-1 rounded transition-colors ${item.visible ? "text-slate-300 hover:text-slate-600" : "text-amber-400 hover:text-amber-600"}`}
+                              >
+                                {item.visible ? <Eye size={11} /> : <EyeOff size={11} />}
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                              >
+                                <Trash2 size={11} />
+                              </button>
+                            </div>
+                          )}
                         </div>
 
                         {/* Subitens (1 nível) */}
@@ -567,31 +584,35 @@ export default function MenuManager() {
                                   </p>
                                   <p className="text-[10px] text-slate-400 truncate">{child.path}</p>
                                 </div>
-                                <div className="flex items-center gap-0.5 shrink-0">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setItems((prev) => patchItemIn(prev, child.id, { visible: !child.visible }));
-                                    }}
-                                    className={`p-1 rounded transition-colors ${child.visible ? "text-slate-300 hover:text-slate-600" : "text-amber-400 hover:text-amber-600"}`}
-                                  >
-                                    {child.visible ? <Eye size={11} /> : <EyeOff size={11} />}
-                                  </button>
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); removeItem(child.id); }}
-                                    className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                  >
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
+                                {canEdit && (
+                                  <div className="flex items-center gap-0.5 shrink-0">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setItems((prev) => patchItemIn(prev, child.id, { visible: !child.visible }));
+                                      }}
+                                      className={`p-1 rounded transition-colors ${child.visible ? "text-slate-300 hover:text-slate-600" : "text-amber-400 hover:text-amber-600"}`}
+                                    >
+                                      {child.visible ? <Eye size={11} /> : <EyeOff size={11} />}
+                                    </button>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); removeItem(child.id); }}
+                                      className="p-1 rounded text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                    >
+                                      <Trash2 size={11} />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             ))}
-                            <div
-                              onClick={() => addChild(item)}
-                              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 hover:border-[#0B2A66] hover:text-[#0B2A66] cursor-pointer transition-colors text-xs"
-                            >
-                              <Plus size={10} /> {t("menu.addSubitem")}
-                            </div>
+                            {canEdit && (
+                              <div
+                                onClick={() => addChild(item)}
+                                className="flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-slate-200 text-slate-400 hover:border-[#0B2A66] hover:text-[#0B2A66] cursor-pointer transition-colors text-xs"
+                              >
+                                <Plus size={10} /> {t("menu.addSubitem")}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -611,7 +632,7 @@ export default function MenuManager() {
               </p>
             </div>
 
-            {selectedItem ? (
+            {selectedItem && canEdit ? (
               <div className="p-5 space-y-4">
                 {/* Texto do menu */}
                 <div>

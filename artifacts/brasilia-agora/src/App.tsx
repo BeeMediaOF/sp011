@@ -251,10 +251,10 @@ function Router() {
         <Route path="/admin/setup" component={Setup} />
 
         <Route path="/admin/artigos/novo">
-          <RequirePermission perm="articles.view"><ArticleEdit /></RequirePermission>
+          <RequirePermission perm="articles.create"><ArticleEdit /></RequirePermission>
         </Route>
         <Route path="/admin/artigos/:id">
-          <RequirePermission perm="articles.view"><ArticleEdit /></RequirePermission>
+          <RequirePermission perm="articles.edit"><ArticleEdit /></RequirePermission>
         </Route>
         <Route path="/admin/artigos">
           <RequirePermission perm="articles.view"><Articles /></RequirePermission>

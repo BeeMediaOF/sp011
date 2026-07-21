@@ -421,7 +421,7 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
     });
   }
 
-  const { permSet, loaded } = useEditorPermissions(role);
+  const { permSet } = useEditorPermissions(role);
   const { t, lang } = useAdminT();
 
   function canSee(permKey: string | null): boolean {
@@ -474,16 +474,6 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
           <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 tracking-wide">{t("nav.tagline")}</p>
         </div>
-
-        {/* Papel do usuário */}
-        {role === "editor" && (
-          <div className="mx-3 mt-3 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50">
-            <p className="text-[11px] font-semibold text-amber-700 dark:text-amber-400">{t("shell.editorAccess")}</p>
-            <p className="text-[10px] text-amber-600 dark:text-amber-500 mt-0.5">
-              {loaded ? `${permSet.size} ${t("shell.permsActive")}` : t("shell.loadingPerms")}
-            </p>
-          </div>
-        )}
 
         {/* Nav */}
         <nav className="flex-1 py-4 space-y-0.5 pr-2 overflow-y-auto min-h-0">

@@ -4,6 +4,7 @@ import { useCategories } from "../../hooks/useCategories";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import { invalidateArticlesCache } from "../../hooks/useArticles";
 import {
   Save, Send, Eye, ChevronDown, ChevronRight,
@@ -44,6 +45,7 @@ function wordCount(s: string) {
 }
 
 export default function ArticleEdit() {
+  const { can } = useCan();
   const [, navigate]                = useLocation();
   const [matchEdit, paramsEdit]     = useRoute("/admin/artigos/:id");
   const isNew     = !matchEdit || paramsEdit?.id === "novo";
@@ -418,6 +420,9 @@ export default function ArticleEdit() {
   }
 
   const isPublished = form.status === "published";
+  // Enviar arquivo exige `upload.images`; a entrada por URL fica sempre disponível.
+  // Inerte para admin e para editor com a permissão (can() já devolve true).
+  const canUpload = can("upload.images");
 
   async function handleSave(intent: "draft" | "publish" | "update") {
     setError(""); setSuccess("");
@@ -508,14 +513,16 @@ export default function ArticleEdit() {
           {error || success}
         </span>
       )}
-      <button
-        onClick={() => { void handleSave("draft"); }}
-        disabled={saving}
-        className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
-        style={{ boxShadow: CARD_SHADOW }}
-      >
-        <Save size={14} /> Salvar rascunho
-      </button>
+      {can(isNew ? "articles.create" : "articles.edit") && (
+        <button
+          onClick={() => { void handleSave("draft"); }}
+          disabled={saving}
+          className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          style={{ boxShadow: CARD_SHADOW }}
+        >
+          <Save size={14} /> Salvar rascunho
+        </button>
+      )}
       <a
         href={form.slug ? `/artigo/${form.slug}` : "#"}
         target="_blank"
@@ -525,20 +532,22 @@ export default function ArticleEdit() {
       >
         <Eye size={14} /> Pré-visualizar
       </a>
-      <div className="flex rounded-xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
-        <button
-          onClick={() => { void handleSave(isPublished ? "update" : "publish"); }}
-          disabled={saving}
-          className="flex items-center gap-2 text-sm font-semibold px-4 py-2 text-white transition-colors disabled:opacity-60"
-          style={{ background: "#E71D36" }}
-        >
-          {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          {saving ? "Salvando…" : isPublished ? "Atualizar" : "Publicar"}
-        </button>
-        <button className="px-2.5 py-2 border-l border-red-700 text-white hover:bg-red-700 transition-colors" style={{ background: "#E71D36" }}>
-          <ChevronDown size={13} />
-        </button>
-      </div>
+      {can(isPublished ? "articles.edit" : "articles.publish") && (
+        <div className="flex rounded-xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
+          <button
+            onClick={() => { void handleSave(isPublished ? "update" : "publish"); }}
+            disabled={saving}
+            className="flex items-center gap-2 text-sm font-semibold px-4 py-2 text-white transition-colors disabled:opacity-60"
+            style={{ background: "#E71D36" }}
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+            {saving ? "Salvando…" : isPublished ? "Atualizar" : "Publicar"}
+          </button>
+          <button className="px-2.5 py-2 border-l border-red-700 text-white hover:bg-red-700 transition-colors" style={{ background: "#E71D36" }}>
+            <ChevronDown size={13} />
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -690,8 +699,8 @@ export default function ArticleEdit() {
               </div>
             ) : form.imageUrl ? (
               <div
-                className="group relative rounded-xl overflow-hidden border border-slate-100 cursor-pointer bg-slate-100"
-                onClick={() => imageRef.current?.click()}
+                className={`group relative rounded-xl overflow-hidden border border-slate-100 bg-slate-100 ${canUpload ? "cursor-pointer" : ""}`}
+                onClick={() => { if (canUpload) imageRef.current?.click(); }}
               >
                 <img
                   src={form.imageUrl}
@@ -700,13 +709,15 @@ export default function ArticleEdit() {
                   style={{ maxHeight: "220px" }}
                   onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }}
                 />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <Pencil size={14} /> Clique para trocar
+                {canUpload && (
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-semibold text-slate-700">
+                      <Pencil size={14} /> Clique para trocar
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
-            ) : (
+            ) : canUpload ? (
               <div
                 ref={dropRef}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -738,6 +749,10 @@ export default function ArticleEdit() {
                 <p className="text-[11px] text-slate-400 mt-3">
                   JPG, PNG, WebP · Recomendado: 1200×630px · Máx: 8 MB
                 </p>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 text-center bg-slate-50">
+                <p className="text-sm text-slate-500">Cole uma URL de imagem no campo abaixo.</p>
               </div>
             )}
 
@@ -869,14 +884,16 @@ export default function ArticleEdit() {
                           />
                         </div>
                         {/* Upload button */}
-                        <button
-                          type="button"
-                          title="Fazer upload de imagem"
-                          onClick={() => { setGalleryUploadIdx(i); galleryFileRef.current?.click(); }}
-                          className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-[#2563EB] hover:border-[#2563EB] transition-colors shrink-0"
-                        >
-                          <ImagePlus size={15} />
-                        </button>
+                        {canUpload && (
+                          <button
+                            type="button"
+                            title="Fazer upload de imagem"
+                            onClick={() => { setGalleryUploadIdx(i); galleryFileRef.current?.click(); }}
+                            className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-[#2563EB] hover:border-[#2563EB] transition-colors shrink-0"
+                          >
+                            <ImagePlus size={15} />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setGalleryImages((prev) => prev.filter((_, j) => j !== i))}
@@ -1073,13 +1090,15 @@ export default function ArticleEdit() {
                     <div>
                       <label className="text-xs font-semibold text-slate-600 block mb-2">Imagem</label>
                       <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => inlineImgFileRef.current?.click()}
-                          className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0"
-                        >
-                          <ImagePlus size={13} /> Upload
-                        </button>
+                        {canUpload && (
+                          <button
+                            type="button"
+                            onClick={() => inlineImgFileRef.current?.click()}
+                            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-xl transition-colors shrink-0"
+                          >
+                            <ImagePlus size={13} /> Upload
+                          </button>
+                        )}
                         <div className="relative flex-1">
                           <LinkIcon size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                           <input

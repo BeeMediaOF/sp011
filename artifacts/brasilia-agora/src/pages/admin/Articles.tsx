@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import {
   Plus, Pencil, Trash2, Send, Search, Rss, Wand2,
   FileText, FileArchive, Calendar, Archive,
@@ -73,6 +74,7 @@ function QueueBadge({ inQueue }: { inQueue: boolean }) {
 }
 
 export default function Articles() {
+  const { can } = useCan();
   const [articles, setArticles]     = useState<ArticleWithViews[]>([]);
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
@@ -228,13 +230,15 @@ export default function Articles() {
               {cats.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}
             </select>
             <div className="flex-1" />
-            <Link
-              href="/admin/artigos/novo"
-              className="flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
-              style={{ background: "#E71D36" }}
-            >
-              <Plus size={15} /> Novo artigo
-            </Link>
+            {can("articles.create") && (
+              <Link
+                href="/admin/artigos/novo"
+                className="flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shrink-0"
+                style={{ background: "#E71D36" }}
+              >
+                <Plus size={15} /> Novo artigo
+              </Link>
+            )}
           </div>
 
           {/* Table */}
@@ -339,7 +343,7 @@ export default function Articles() {
                         <td className="px-6 py-3.5">
                           <div className="flex items-center justify-end gap-1">
                             {/* Rewrite with AI button — only for non-rewritten drafts */}
-                            {a.status === "draft" && !a.aiRewritten && !inQueue && (
+                            {can("articles.edit") && a.status === "draft" && !a.aiRewritten && !inQueue && (
                               <button
                                 onClick={() => void handleRewriteOne(a.id, a.title, a.content)}
                                 disabled={isRewriting}
@@ -351,7 +355,7 @@ export default function Articles() {
                                   : <Wand2 size={14} />}
                               </button>
                             )}
-                            {a.status === "draft" && !inQueue && (
+                            {can("articles.publish") && a.status === "draft" && !inQueue && (
                               <button
                                 onClick={() => void handlePublish(a.id)}
                                 disabled={publishing === a.id}
@@ -372,21 +376,25 @@ export default function Articles() {
                                 <Eye size={14} />
                               </a>
                             )}
-                            <Link
-                              href={`/admin/artigos/${a.id}`}
-                              title="Editar"
-                              className="p-2 rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-100 transition-colors"
-                            >
-                              <Pencil size={14} />
-                            </Link>
-                            <button
-                              onClick={() => void handleDelete(a.id)}
-                              disabled={deleting === a.id}
-                              title="Excluir"
-                              className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+                            {can("articles.edit") && (
+                              <Link
+                                href={`/admin/artigos/${a.id}`}
+                                title="Editar"
+                                className="p-2 rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-100 transition-colors"
+                              >
+                                <Pencil size={14} />
+                              </Link>
+                            )}
+                            {can("articles.delete") && (
+                              <button
+                                onClick={() => void handleDelete(a.id)}
+                                disabled={deleting === a.id}
+                                title="Excluir"
+                                className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>

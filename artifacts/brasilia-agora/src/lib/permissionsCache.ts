@@ -73,3 +73,20 @@ export function useEditorPermissions(role: string): { permSet: Set<string>; load
 
   return { permSet, loaded };
 }
+
+/**
+ * Permissão fina para ESCONDER ações na UI (botões de criar/editar/excluir/etc.).
+ * Admin sempre pode; editor depende do conjunto carregado. Lê o papel direto do
+ * localStorage (mesma chave de `getStoredRole` em `pages/Admin.tsx`) para não criar
+ * ciclo de import lib↔page. É fail-closed: enquanto o conjunto não carrega, `can`
+ * devolve `false` para editor (o botão só aparece depois de confirmada a permissão).
+ * As chaves são as de ESCRITA que o backend já exige (ex.: `ads.manage`,
+ * `articles.create`), nunca as `*.view`.
+ */
+export function useCan(): { can: (key: string) => boolean; loaded: boolean } {
+  const role = (typeof localStorage !== "undefined" && localStorage.getItem("admin_role")) || "";
+  const { permSet, loaded } = useEditorPermissions(role);
+  const isAdmin = role === "admin";
+  const can = useCallback((key: string) => isAdmin || permSet.has(key), [isAdmin, permSet]);
+  return { can, loaded };
+}

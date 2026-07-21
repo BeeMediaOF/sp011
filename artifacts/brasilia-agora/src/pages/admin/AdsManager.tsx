@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
+import { useCan } from "../../lib/permissionsCache";
 import { inferBlockType, type HomeBlock } from "../../lib/homeBlocks";
 import { sanitizeArticleHtml } from "../../lib/sanitize";
 import { invalidateSiteCache } from "../../hooks/useSite";
@@ -371,6 +372,7 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
   onSaveBlock: (b: HomeBlock) => Promise<void>;
   onSaveHeader: (html: string, linkUrl: string) => Promise<void>;
 }) {
+  const { can } = useCan();
   const isHeader = !block;
   const type = block ? inferBlockType(block) : "html";
   const [name, setName]         = useState(block?.name ?? "");
@@ -423,12 +425,16 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
   }
 
   const cleanPreview = sanitizeArticleHtml(html);
-  const uploadBtn = (label: string) => (
-    <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
-      className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors disabled:opacity-50">
-      <Upload size={11} /> {uploading ? "Enviando…" : label}
-    </button>
-  );
+  const uploadBtn = (label: string) => {
+    // Enviar arquivo exige `upload.images`; a entrada por URL/HTML segue disponível.
+    if (!can("upload.images")) return null;
+    return (
+      <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+        className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors disabled:opacity-50">
+        <Upload size={11} /> {uploading ? "Enviando…" : label}
+      </button>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
@@ -536,6 +542,8 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function AdsManager() {
+  const { can } = useCan();
+  const canManageAds = can("ads.manage");
   const [ads, setAds]           = useState<Ad[]>([]);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
@@ -822,10 +830,12 @@ export default function AdsManager() {
                   Blocos de imagem/HTML marcados como propaganda em Blocos da Home (abas Blocos e Notícia).
                 </p>
               </div>
-              <a href="/admin/home-blocos"
-                className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors">
-                <Pencil size={12} /> Editar em Blocos da Home
-              </a>
+              {canManageAds && (
+                <a href="/admin/home-blocos"
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors">
+                  <Pencil size={12} /> Editar em Blocos da Home
+                </a>
+              )}
             </div>
             {(() => {
               // Linhas unificadas (banner do cabeçalho + blocos), com as MESMAS
@@ -906,10 +916,14 @@ export default function AdsManager() {
                             <td className="px-4 py-3 text-center"><StatusBadge active={r.active} /></td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-center">
-                                <button onClick={r.onEdit} title="Editar propaganda"
-                                  className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors">
-                                  <Pencil size={13} />
-                                </button>
+                                {canManageAds ? (
+                                  <button onClick={r.onEdit} title="Editar propaganda"
+                                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors">
+                                    <Pencil size={13} />
+                                  </button>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -949,14 +963,16 @@ export default function AdsManager() {
                 <option value="pausado">Pausado</option>
               </select>
             </div>
-            <button
-              onClick={openNew}
-              className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: "#E71D36" }}
-            >
-              <Plus size={16} />
-              Nova propaganda
-            </button>
+            {canManageAds && (
+              <button
+                onClick={openNew}
+                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "#E71D36" }}
+              >
+                <Plus size={16} />
+                Nova propaganda
+              </button>
+            )}
           </div>
 
           {/* Table body */}
@@ -966,13 +982,15 @@ export default function AdsManager() {
             <div className="py-20 flex flex-col items-center gap-4 text-gray-400">
               <Megaphone size={36} className="text-gray-200" />
               <p className="text-sm">Nenhuma propaganda encontrada</p>
-              <button
-                onClick={openNew}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
-                style={{ backgroundColor: "#E71D36" }}
-              >
-                <Plus size={15} /> Criar primeira propaganda
-              </button>
+              {canManageAds && (
+                <button
+                  onClick={openNew}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                  style={{ backgroundColor: "#E71D36" }}
+                >
+                  <Plus size={15} /> Criar primeira propaganda
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -1036,24 +1054,30 @@ export default function AdsManager() {
                         {/* Ações */}
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              onClick={() => openEdit(ad)}
-                              title="Editar"
-                              className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                            <ToggleSwitch
-                              checked={ad.active}
-                              onChange={() => { void toggleActive(ad); }}
-                            />
-                            <button
-                              onClick={() => { void handleDelete(ad.id); }}
-                              title="Excluir"
-                              className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
-                            >
-                              <Trash2 size={13} />
-                            </button>
+                            {canManageAds ? (
+                              <>
+                                <button
+                                  onClick={() => openEdit(ad)}
+                                  title="Editar"
+                                  className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors"
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                                <ToggleSwitch
+                                  checked={ad.active}
+                                  onChange={() => { void toggleActive(ad); }}
+                                />
+                                <button
+                                  onClick={() => { void handleDelete(ad.id); }}
+                                  title="Excluir"
+                                  className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
                           </div>
                         </td>
                       </tr>

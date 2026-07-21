@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import RewriteQueueCard from "../../components/admin/RewriteQueueCard";
+import { useCan } from "../../lib/permissionsCache";
 import {
   Plus, Trash2, RefreshCw, Wand2, Send, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
@@ -282,6 +283,8 @@ function PromptEditor({
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function RSSManager() {
+  const { can } = useCan();
+  const canManage = can("rss.manage");
   // ── AI Settings ──
   const [aiSettings, setAiSettings]   = useState<AiSettings>({ provider: "gemini_paid", model: "", hasKey: false });
   const [aiApiKey, setAiApiKey]       = useState("");
@@ -471,6 +474,7 @@ export default function RSSManager() {
   }, []);
 
   async function saveFallbackSettings() {
+    if (!canManage) return;
     if (!fbCfg) return;
     setFbSaving(true); setFbSaved(false);
     try {
@@ -495,6 +499,7 @@ export default function RSSManager() {
   }
 
   async function saveCollectionSettings() {
+    if (!canManage) return;
     if (!colCfg) return;
     setColSaving(true); setColSaved(false);
     try {
@@ -696,6 +701,7 @@ export default function RSSManager() {
 
   async function saveAiSettings(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManage) return;
     setAiSaving(true); setAiError(""); setAiSaved(false);
     try {
       await apiFetch("/ai-settings", {
@@ -714,6 +720,7 @@ export default function RSSManager() {
   }
 
   async function addGeminiKey() {
+    if (!canManage) return;
     if (!newGeminiKey.trim()) return;
     setKeyAdding(true);
     try {
@@ -729,6 +736,7 @@ export default function RSSManager() {
   }
 
   async function removeGeminiKey(index: number) {
+    if (!canManage) return;
     setKeyRemoving(index);
     try {
       const res = await apiFetch<{ geminiKeyHints: string[] }>(`/ai-settings/gemini-keys/${index}`, {
@@ -743,6 +751,7 @@ export default function RSSManager() {
   // ─── Prompts ─────────────────────────────────────────────────────────────────
 
   async function savePrompts() {
+    if (!canManage) return;
     setPromptSaving(true); setPromptSaved(false);
     try {
       await apiFetch<RssPrompts>("/prompts", {
@@ -793,6 +802,7 @@ export default function RSSManager() {
 
   async function addSource(e: React.FormEvent) {
     e.preventDefault();
+    if (!canManage) return;
     if (!newName.trim() || !newUrl.trim()) { setAddError("Nome e URL são obrigatórios"); return; }
     setAdding(true); setAddError("");
     try {
@@ -811,6 +821,7 @@ export default function RSSManager() {
   }
 
   async function saveEdit() {
+    if (!canManage) return;
     if (!editingSource) return;
     try {
       await apiFetch(`/sources/${editingSource.id}`, {
@@ -828,6 +839,7 @@ export default function RSSManager() {
   }
 
   async function deleteSource(id: string) {
+    if (!canManage) return;
     if (!confirm("Remover esta fonte RSS?")) return;
     try {
       await apiFetch(`/sources/${id}`, { method: "DELETE" });
@@ -838,6 +850,7 @@ export default function RSSManager() {
   }
 
   async function toggleSource(src: RssSource) {
+    if (!canManage) return;
     try {
       await apiFetch(`/sources/${src.id}`, {
         method: "PATCH", body: JSON.stringify({ active: !src.active }),
@@ -848,6 +861,7 @@ export default function RSSManager() {
   }
 
   async function runSource(id: string) {
+    if (!canManage) return;
     setRunningId(id); setRunSuccess(null); setSourceError("");
     runStartRef.current = new Date().toISOString();
     setLogsOpen(true);
@@ -1187,7 +1201,7 @@ export default function RSSManager() {
         {/* Só quando o pipeline interno está em uso: coleta ativada E ≥1 fonte
             ativa. No padrão da rede (central-push, coleta local desligada) o
             card some — a reescrita acontece no painel central. */}
-        {colCfg?.enabled && sources.some((s) => s.active) && (
+        {canManage && colCfg?.enabled && sources.some((s) => s.active) && (
           <div className="mb-6">
             <RewriteQueueCard
               totalRewritten={rssStats.rewritten}
@@ -1501,30 +1515,32 @@ export default function RSSManager() {
                                         </td>
                                         {/* Ações */}
                                         <td className="px-4 py-3">
-                                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                              onClick={() => { void runSource(src.id); }}
-                                              disabled={runningId === src.id}
-                                              title="Coletar agora"
-                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40"
-                                            >
-                                              {runningId === src.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
-                                            </button>
-                                            <button
-                                              onClick={() => setEditingSource({ ...src })}
-                                              title="Editar"
-                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors"
-                                            >
-                                              <Pencil size={13} />
-                                            </button>
-                                            <button
-                                              onClick={() => { void deleteSource(src.id); }}
-                                              title="Remover"
-                                              className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
-                                            >
-                                              <Trash2 size={13} />
-                                            </button>
-                                          </div>
+                                          {canManage && (
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button
+                                                onClick={() => { void runSource(src.id); }}
+                                                disabled={runningId === src.id}
+                                                title="Coletar agora"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-green-600 hover:bg-green-50 transition-colors disabled:opacity-40"
+                                              >
+                                                {runningId === src.id ? <Loader2 size={13} className="animate-spin" /> : <Play size={13} />}
+                                              </button>
+                                              <button
+                                                onClick={() => setEditingSource({ ...src })}
+                                                title="Editar"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-[#EEF2FF] transition-colors"
+                                              >
+                                                <Pencil size={13} />
+                                              </button>
+                                              <button
+                                                onClick={() => { void deleteSource(src.id); }}
+                                                title="Remover"
+                                                className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                              >
+                                                <Trash2 size={13} />
+                                              </button>
+                                            </div>
+                                          )}
                                         </td>
                                       </tr>
                                     );
@@ -1705,14 +1721,16 @@ export default function RSSManager() {
                       Hoje: <b className="text-slate-600">{colCfg.status?.collectedToday ?? 0}</b> coletado(s)
                       {colCfg.maxPerDay > 0 && <> de <b className="text-slate-600">{colCfg.maxPerDay}</b></>}
                     </p>
-                    <button
-                      onClick={() => void saveCollectionSettings()}
-                      disabled={colSaving || colCfg.days.length === 0}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
-                    >
-                      {colSaving ? <Loader2 size={12} className="animate-spin" /> : colSaved ? <CheckCircle size={12} /> : null}
-                      {colSaved ? "Salvo!" : "Salvar"}
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => void saveCollectionSettings()}
+                        disabled={colSaving || colCfg.days.length === 0}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
+                      >
+                        {colSaving ? <Loader2 size={12} className="animate-spin" /> : colSaved ? <CheckCircle size={12} /> : null}
+                        {colSaved ? "Salvo!" : "Salvar"}
+                      </button>
+                    )}
                   </div>
                   {colCfg.days.length === 0 && (
                     <p className="text-[10px] text-red-500">Selecione pelo menos um dia da semana.</p>
@@ -2027,16 +2045,18 @@ export default function RSSManager() {
                     )}
                   </div>
 
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => void saveFallbackSettings()}
-                      disabled={fbSaving}
-                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
-                    >
-                      {fbSaving ? <Loader2 size={12} className="animate-spin" /> : fbSaved ? <CheckCircle size={12} /> : null}
-                      {fbSaved ? "Salvo!" : "Salvar"}
-                    </button>
-                  </div>
+                  {canManage && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => void saveFallbackSettings()}
+                        disabled={fbSaving}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0B2A66] text-white hover:bg-[#0a2255] disabled:opacity-40 transition-colors"
+                      >
+                        {fbSaving ? <Loader2 size={12} className="animate-spin" /> : fbSaved ? <CheckCircle size={12} /> : null}
+                        {fbSaved ? "Salvo!" : "Salvar"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-slate-400 text-xs py-2">
@@ -2046,7 +2066,8 @@ export default function RSSManager() {
               )}
             </div>
 
-            {/* Add source form */}
+            {/* Add source form — só quem pode gerenciar (rss.manage) */}
+            {canManage && (
             <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
               <div className="mb-4">
                 <h3 className="text-sm font-bold text-[#0B2A66]">Adicionar nova fonte RSS</h3>
@@ -2151,6 +2172,7 @@ export default function RSSManager() {
                 </p>
               </div>
             </div>
+            )}
 
             {/* ── AI Settings collapsible ─────────────────────────────────── */}
             <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
@@ -2257,59 +2279,65 @@ export default function RSSManager() {
                               <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-green-50 border border-green-200">
                                 <Key size={11} className="text-green-600 shrink-0"/>
                                 <span className="text-[11px] font-mono text-green-700 flex-1">Chave {i + 1} — {hint}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => { void removeGeminiKey(i); }}
-                                  disabled={keyRemoving === i}
-                                  className="text-red-400 hover:text-red-600 disabled:opacity-40 transition-colors"
-                                  title="Remover chave"
-                                >
-                                  {keyRemoving === i
-                                    ? <Loader2 size={12} className="animate-spin"/>
-                                    : <X size={12}/>
-                                  }
-                                </button>
+                                {canManage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => { void removeGeminiKey(i); }}
+                                    disabled={keyRemoving === i}
+                                    className="text-red-400 hover:text-red-600 disabled:opacity-40 transition-colors"
+                                    title="Remover chave"
+                                  >
+                                    {keyRemoving === i
+                                      ? <Loader2 size={12} className="animate-spin"/>
+                                      : <X size={12}/>
+                                    }
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
                         )}
 
                         {/* Add new key input */}
-                        <div className="flex gap-2">
-                          <div className="relative flex-1">
-                            <Key size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type={showApiKey ? "text" : "password"}
-                              value={newGeminiKey}
-                              onChange={(e) => setNewGeminiKey(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addGeminiKey(); } }}
-                              placeholder="AIzaSy... (nova chave)"
-                              className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-purple-400 bg-slate-50"
-                            />
-                            <button type="button" onClick={() => setShowApiKey((s) => !s)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                              {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
+                        {canManage && (
+                          <div className="flex gap-2">
+                            <div className="relative flex-1">
+                              <Key size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type={showApiKey ? "text" : "password"}
+                                value={newGeminiKey}
+                                onChange={(e) => setNewGeminiKey(e.target.value)}
+                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addGeminiKey(); } }}
+                                placeholder="AIzaSy... (nova chave)"
+                                className="w-full pl-8 pr-8 py-2 text-sm border border-slate-200 rounded-xl outline-none focus:border-purple-400 bg-slate-50"
+                              />
+                              <button type="button" onClick={() => setShowApiKey((s) => !s)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                {showApiKey ? <EyeOff size={13}/> : <Eye size={13}/>}
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { void addGeminiKey(); }}
+                              disabled={!newGeminiKey.trim() || keyAdding}
+                              className="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 transition-colors flex items-center gap-1 shrink-0"
+                            >
+                              {keyAdding ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>}
+                              Adicionar
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => { void addGeminiKey(); }}
-                            disabled={!newGeminiKey.trim() || keyAdding}
-                            className="px-3 py-2 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-40 transition-colors flex items-center gap-1 shrink-0"
-                          >
-                            {keyAdding ? <Loader2 size={13} className="animate-spin"/> : <Plus size={13}/>}
-                            Adicionar
-                          </button>
-                        </div>
+                        )}
                       </div>
                     )}
                     {aiError && <p className="text-xs text-red-500">{aiError}</p>}
-                    <button type="submit" disabled={aiSaving}
-                      className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
-                        aiSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
-                      }`}>
-                      {aiSaved ? "✓ Salvo!" : aiSaving ? "Salvando…" : "Salvar Configuração de IA"}
-                    </button>
+                    {canManage && (
+                      <button type="submit" disabled={aiSaving}
+                        className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
+                          aiSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
+                        }`}>
+                        {aiSaved ? "✓ Salvo!" : aiSaving ? "Salvando…" : "Salvar Configuração de IA"}
+                      </button>
+                    )}
                   </form>
 
                   {/* Quota indicator */}
@@ -2409,13 +2437,15 @@ export default function RSSManager() {
                           Limpar
                         </button>
                       )}
-                      <button type="button" onClick={() => { void savePrompts(); }}
-                        disabled={promptSaving}
-                        className={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 ${
-                          promptSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
-                        }`}>
-                        {promptSaved ? "✓ Salvo!" : promptSaving ? "Salvando…" : "Salvar Prompts"}
-                      </button>
+                      {canManage && (
+                        <button type="button" onClick={() => { void savePrompts(); }}
+                          disabled={promptSaving}
+                          className={`ml-auto text-xs font-semibold px-3 py-1.5 rounded-xl transition-colors disabled:opacity-50 ${
+                            promptSaved ? "bg-green-500 text-white" : "bg-purple-600 text-white hover:bg-purple-700"
+                          }`}>
+                          {promptSaved ? "✓ Salvo!" : promptSaving ? "Salvando…" : "Salvar Prompts"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
