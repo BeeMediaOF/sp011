@@ -326,7 +326,9 @@ export default function Header() {
   const menuFontSize    = settings?.menuFontSize    ?? 13;
   const menuFontWeight  = settings?.menuFontWeight  ?? 700;
   const navItemStyle = (path: string): React.CSSProperties => ({
-    color: isActive(path) ? menuActiveColor : menuTextColor,
+    // Só pinta a cor de marca do item ativo depois que /api/site respondeu; a frio
+    // (settings===null) o item ativo fica no cinza neutro do menu (sem flash do vermelho SBC).
+    color: (isActive(path) && settings) ? menuActiveColor : menuTextColor,
     fontSize: menuFontSize,
     fontWeight: menuFontWeight,
   });

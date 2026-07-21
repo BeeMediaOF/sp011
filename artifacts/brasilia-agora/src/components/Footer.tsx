@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { BRAND } from "../brand";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
@@ -134,7 +133,7 @@ export default function Footer() {
     config: settings?.footerConfig,
     contact: settings?.contact,
     menuItems: settings?.menuItems,
-    siteName: settings?.siteName || BRAND.name,
+    siteName: settings?.siteName ?? "",
     tagline: settings?.tagline,
     lang,
   });
@@ -146,7 +145,7 @@ export default function Footer() {
       <footer className="border-t border-gray-200 py-4"
         style={{ backgroundColor: bgColor ?? "#f3f4f6" }}>
         <div className="max-w-[1280px] mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-600">
-          <p>{f.copyright}</p>
+          <p>{settings ? f.copyright : ""}</p>
           <div className="flex items-center gap-4 flex-wrap justify-center">
             {firstColumnLinks.map((l) => (
               <FooterAnchor key={l.id} href={l.href} className="hover:text-gray-800 transition-colors">{l.label}</FooterAnchor>
@@ -172,7 +171,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || BRAND.name} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || ""} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -217,7 +216,7 @@ export default function Footer() {
           </div>
 
           <div className="border-t border-gray-200 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-600">
-            <p>{f.copyright}</p>
+            <p>{settings ? f.copyright : ""}</p>
             <LegalRow links={f.legalLinks} className="hover:text-gray-900 transition-colors" sepClassName="text-gray-400" />
           </div>
         </div>
@@ -229,14 +228,18 @@ export default function Footer() {
   // Cor de acento configurável (borda superior, títulos das colunas e botão da
   // newsletter); ausente = cores originais douradas.
   const accent = settings?.footerAccentColor || undefined;
+  // A frio (settings===null) não pinta o dourado de marca SBC nos acentos do
+  // rodapé dark; usa neutros até /api/site responder.
+  const accentBorder = settings ? (accent ?? "#c89110") : "rgba(255,255,255,0.12)";
+  const accentTitle  = settings ? (accent ?? "#ffd300") : "#e5e7eb";
   return (
     <footer className="text-white pt-8 pb-5 border-t-[4px]"
-      style={{ backgroundColor: bgColor ?? "#000000", borderTopColor: accent ?? "#c89110" }}>
+      style={{ backgroundColor: bgColor ?? "#000000", borderTopColor: accentBorder }}>
       <div className="max-w-[1280px] mx-auto px-4">
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || BRAND.name} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || ""} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}
@@ -250,7 +253,7 @@ export default function Footer() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
           {f.columns.map((col) => (
             <div key={col.id}>
-              <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: accent ?? "#ffd300" }}>{col.title}</h3>
+              <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: accentTitle }}>{col.title}</h3>
               <ul className="flex flex-col gap-1.5 text-xs text-gray-400">
                 {col.links.map((l) => (
                   <li key={l.id}><FooterAnchor href={l.href} className="hover:text-white transition-colors">{l.label}</FooterAnchor></li>
@@ -261,7 +264,7 @@ export default function Footer() {
 
           {(f.showContact || f.showNewsletter) && (
             <div className="col-span-2 md:col-span-2">
-              <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: accent ?? "#ffd300" }}>
+              <h3 className="font-bold mb-3 uppercase text-xs tracking-wider" style={{ color: accentTitle }}>
                 {f.showContact && f.showNewsletter ? t("footer.contactNewsletter") : f.showContact ? t("footer.contact") : t("footer.newsletter")}
               </h3>
               {f.showContact && (
@@ -273,7 +276,7 @@ export default function Footer() {
               {f.showNewsletter && (
                 <>
                   <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-400">{f.newsletterTitle}</p>
-                  <NewsletterForm dark accent={accent ?? "#ffd300"} />
+                  <NewsletterForm dark accent={accentTitle} />
                 </>
               )}
             </div>
@@ -281,7 +284,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/10 pt-4 flex flex-col sm:flex-row justify-between items-center gap-2 text-[11px] text-gray-400">
-          <p>{f.copyright}</p>
+          <p>{settings ? f.copyright : ""}</p>
           <LegalRow links={f.legalLinks} className="hover:text-white transition-colors" sepClassName="text-gray-700" />
         </div>
 

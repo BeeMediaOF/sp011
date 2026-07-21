@@ -9,7 +9,6 @@ import {
   UserCircle, Eye, AlertCircle, CheckCircle, Info,
   Camera, Pencil, Moon, Sun, Share2, FolderOpen,
 } from "lucide-react";
-import logoFallback from "../../assets/images/logo_sbc_negativo.png";
 import { getStoredUser, setStoredUser, clearAuth, getStoredRole } from "../../pages/Admin";
 import { adminApi } from "../../lib/adminApi";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
@@ -45,14 +44,20 @@ interface AdminLayoutProps {
 const LS_SIDEBAR = "admin_sidebar_color";
 const LS_ACCENT  = "admin_accent_color";
 
+// _cachedLogo: null = ainda não carregou → mostra placeholder neutro, NUNCA a
+// marca padrão embutida (evita o flash de logo de outro blog no 1º acesso);
+// string = logo real deste blog vindo de /api/site.
 let _cachedLogo: string | null = null;
 let _fetchPromise: Promise<void> | null = null;
 
 function usePanelTheme() {
+  // Seed neutro (slate-400): a frio, antes de /api/site, a barra de nav ativa e o
+  // badge de notificações ficam cinza-neutros em vez de piscar o vermelho de marca
+  // SBC (#E71D36). O valor real do blog entra quando /api/site responde.
   const [accent, setAccent] = useState(() => {
-    try { return localStorage.getItem(LS_ACCENT) || "#E71D36"; } catch { return "#E71D36"; }
+    try { return localStorage.getItem(LS_ACCENT) || "#94a3b8"; } catch { return "#94a3b8"; }
   });
-  const [logo, setLogo] = useState(_cachedLogo || logoFallback);
+  const [logo, setLogo] = useState<string | null>(_cachedLogo);
 
   useEffect(() => {
     if (!_fetchPromise) {
@@ -60,7 +65,7 @@ function usePanelTheme() {
         .then((r) => r.json())
         .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
           const ac = data.adminAccentColor || "#E71D36";
-          _cachedLogo = data.adminLogoBase64 || data.logoBase64 || logoFallback;
+          _cachedLogo = data.adminLogoBase64 || data.logoBase64 || null;
           saveAdminThemeToStorage(data.adminSidebarColor || "#0B2A66", ac);
           setAccent(ac);
           setLogo(_cachedLogo);
@@ -469,9 +474,14 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
       {/* ── Sidebar ──────────────────────────────── */}
       <aside className="w-[260px] shrink-0 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-700 flex flex-col h-full">
 
-        {/* Logo */}
+        {/* Logo — enquanto /api/site não responde, reserva o espaço em branco;
+            NUNCA renderiza a marca padrão embutida (evita o flash de logo antigo). */}
         <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-700">
-          <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
+          {logo ? (
+            <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
+          ) : (
+            <div className="h-9" aria-hidden="true" />
+          )}
           <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 tracking-wide">{t("nav.tagline")}</p>
         </div>
 

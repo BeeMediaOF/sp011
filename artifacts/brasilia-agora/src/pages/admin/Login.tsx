@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { adminApi } from "../../lib/adminApi";
 import { Lock, Mail, Eye, EyeOff, ShieldCheck } from "lucide-react";
-import logoFallback from "../../assets/images/logo_final.png";
 
 function generateCaptcha() {
   const a = Math.floor(Math.random() * 10) + 1;
@@ -17,7 +16,9 @@ export default function Login() {
   const [showPwd, setShowPwd]   = useState(false);
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
-  const [logoSrc, setLogoSrc]   = useState(logoFallback);
+  // null = ainda não carregou → reserva o espaço em branco; NUNCA a marca padrão
+  // embutida (evita o flash de logo de outro blog na tela de login).
+  const [logoSrc, setLogoSrc]   = useState<string | null>(null);
   const [sidebarColor, setSidebarColor] = useState("#0B2A66");
 
   const [failedAttempts, setFailedAttempts] = useState(0);
@@ -118,7 +119,11 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: sidebarColor }}>
       <div className="w-full max-w-sm">
         <div className="flex justify-center mb-8">
-          <img src={logoSrc} alt="Logo" className="h-20 w-auto object-contain" />
+          {logoSrc ? (
+            <img src={logoSrc} alt="Logo" className="h-20 w-auto object-contain" />
+          ) : (
+            <div className="h-20" aria-hidden="true" />
+          )}
         </div>
 
         <div className="bg-white rounded-2xl shadow-2xl p-8">

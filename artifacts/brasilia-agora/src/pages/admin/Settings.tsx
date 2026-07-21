@@ -1178,6 +1178,10 @@ export default function Settings() {
         {/* ── APARÊNCIA ───────────────────────────────────────── */}
         {activeTab === "aparencia" && (
           <div className="max-w-2xl xl:max-w-6xl space-y-5">
+            {loadingSettings ? (
+              <div className={`${CARD} p-8 text-center text-[#94A3B8]`} style={CARD_SHADOW}>{t("cfg.loading")}</div>
+            ) : (
+              <>
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
             {/* Admin panel colors */}
             <div className={`${CARD} p-6 space-y-5`} style={CARD_SHADOW}>
@@ -1188,7 +1192,7 @@ export default function Settings() {
                 <p className="text-xs font-medium text-[#64748B] mb-2">{t("cfg.readyThemes")}</p>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { label: `${BRAND.name} ${t("cfg.defaultParen")}`, sidebar: "#0B2A66", accent: "#E71D36" },
+                    { label: t("cfg.defaultParen"), sidebar: "#0B2A66", accent: "#E71D36" },
                     { label: t("cfg.themeOcean"),    sidebar: "#0b3d91", accent: "#e8a020" },
                     { label: t("cfg.themeForest"),   sidebar: "#1a3a2a", accent: "#22c55e" },
                     { label: t("cfg.themeGraphite"), sidebar: "#18181b", accent: "#f59e0b" },
@@ -1233,6 +1237,8 @@ export default function Settings() {
             </div>
 
             <SaveBar saving={savingSettings} onSave={saveSettings}/>
+            </>
+            )}
           </div>
         )}
 

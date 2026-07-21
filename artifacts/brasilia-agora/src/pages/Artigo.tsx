@@ -644,11 +644,17 @@ export default function Artigo() {
                   {/* Autor + compartilhamento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-y border-gray-100 mb-6 gap-3">
                     <div className="flex items-center gap-3">
-                      <img
-                        src={settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg"}
-                        alt={settings?.bylineName || settings?.siteName || "Portal"}
-                        className="w-9 h-9 rounded-full object-cover shrink-0"
-                      />
+                      {/* Avatar do byline só quando /api/site respondeu — nunca o
+                          favicon padrão embutido (/favicon.jpg) antes das settings. */}
+                      {settings ? (
+                        <img
+                          src={settings.bylineLogoBase64 || settings.logoBase64 || settings.faviconBase64 || "/favicon.jpg"}
+                          alt={settings.bylineName || settings.siteName || "Portal"}
+                          className="w-9 h-9 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <span className="w-9 h-9 rounded-full bg-gray-100 shrink-0" aria-hidden="true" />
+                      )}
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
                           {explicitAuthor || settings?.bylineName || settings?.siteName || t("common.newsroom")}

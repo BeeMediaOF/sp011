@@ -1,5 +1,4 @@
 import TopBar from "../components/TopBar";
-import { BRAND } from "../brand";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { Link } from "wouter";
@@ -27,7 +26,7 @@ const SECTIONS: Section[] = [
     icon: Shield,
     color: "#0B2A66",
     title: "1. Quem somos",
-    content: `O <strong>${BRAND.name}</strong> é um portal de notícias dedicado à cobertura jornalística local e regional. Somos o controlador dos dados pessoais coletados neste site, nos termos da Lei Geral de Proteção de Dados (LGPD – Lei nº 13.709/2018).`,
+    content: `<strong>{{SITE}}</strong> é um portal de notícias dedicado à cobertura jornalística local e regional. Somos o controlador dos dados pessoais coletados neste site, nos termos da Lei Geral de Proteção de Dados (LGPD – Lei nº 13.709/2018).`,
   },
   {
     id: "dados-coletados",
@@ -142,7 +141,7 @@ const SECTIONS: Section[] = [
     icon: Mail,
     color: "#0B2A66",
     title: "11. Encarregado pelo tratamento de dados (DPO)",
-    content: `O ${BRAND.name} designou um Encarregado pelo Tratamento de Dados (Data Protection Officer) para atender às solicitações dos titulares e comunicar-se com a Autoridade Nacional de Proteção de Dados (ANPD).<br/><br/>
+    content: `{{SITE}} designou um Encarregado pelo Tratamento de Dados (Data Protection Officer) para atender às solicitações dos titulares e comunicar-se com a Autoridade Nacional de Proteção de Dados (ANPD).<br/><br/>
     <strong>Contato do DPO:</strong><br/>
     • E-mail: <strong>privacidade@brasiliaagora.com.br</strong><br/>
     • Endereço: Brasília, Distrito Federal, Brasil<br/><br/>
@@ -158,7 +157,7 @@ const SECTIONS_EN: Section[] = [
     icon: Shield,
     color: "#0B2A66",
     title: "1. Who we are",
-    content: `<strong>${BRAND.name}</strong> is a news website. We are the controller of the personal data collected on this site.`,
+    content: `<strong>{{SITE}}</strong> is a news website. We are the controller of the personal data collected on this site.`,
   },
   {
     id: "dados-coletados",
@@ -277,9 +276,15 @@ export default function Privacidade() {
   // Política própria do blog (ex.: KSports/NDPA em inglês) definida no painel →
   // vira UMA seção com o HTML sanitizado; senão, o template padrão do sistema.
   const customPolicy = settings?.contact?.privacyPolicy?.trim();
-  const sections: Section[] = customPolicy
+  // Nome real do blog nos textos padrão (token {{SITE}}); fallback NEUTRO — nunca a
+  // marca embutida "SBC Agora" — enquanto /api/site não responde.
+  const siteName = settings?.siteName || (en ? "This website" : "Este portal");
+  const rawSections: Section[] = customPolicy
     ? [{ id: "policy", title: en ? "Privacy Policy" : "Política de Privacidade", icon: Shield, color: "#0B2A66", content: sanitizeArticleHtml(customPolicy) }]
     : (en ? SECTIONS_EN : SECTIONS);
+  const sections: Section[] = rawSections.map((s) =>
+    s.content.indexOf("{{SITE}}") === -1 ? s : { ...s, content: s.content.replace(/\{\{SITE\}\}/g, siteName) },
+  );
   const summary = customPolicy ? [] : (en ? SUMMARY_EN : SUMMARY_PT);
   return (
     <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col">

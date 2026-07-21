@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { BRAND } from "../brand";
 import TopBar from "../components/TopBar";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -11,7 +10,8 @@ export default function Contato() {
   const { settings } = useSite();
   const { lang } = useT();
   const en = lang === "en";
-  const siteName = settings?.siteName || BRAND.name;
+  // Nunca a marca padrão (BRAND.name): vazio até /api/site responder, depois o nome real.
+  const siteName = settings?.siteName ?? "";
   // Contato dirigido por settings (fallback = valores padrão do template).
   const contact = settings?.contact;
   const contactEmail = contact?.displayEmail || "redacao@brasiliaagora.com.br";
@@ -56,9 +56,9 @@ export default function Contato() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="text-center mb-10">
             <h1 className="text-3xl md:text-4xl font-black text-[#1a2448] uppercase tracking-tight mb-3">{en ? "Contact Us" : "Fale Conosco"}</h1>
-            <p className="text-gray-500 max-w-2xl mx-auto">{en
+            <p className="text-gray-500 max-w-2xl mx-auto min-h-[1.5rem]">{settings ? (en
               ? `Send your message to the ${siteName} newsroom. We will reply as soon as possible.`
-              : `Envie sua mensagem para a redação do ${BRAND.name}. Responderemos o mais breve possível.`}</p>
+              : `Envie sua mensagem para a redação do ${siteName}. Responderemos o mais breve possível.`) : ""}</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
