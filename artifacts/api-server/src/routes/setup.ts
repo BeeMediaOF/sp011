@@ -23,6 +23,7 @@ import { encryptionAvailable } from "../lib/crypto.js";
 import { ensureSchema } from "../lib/ensureSchema.js";
 import { hashPassword } from "../middlewares/auth.js";
 import { logger } from "../lib/logger.js";
+import { adoptDecision } from "./setupGuards.js";
 
 const router: IRouter = Router();
 
@@ -150,6 +151,7 @@ export function existingInstallRefusal(probe: ProbeResult): {
     existingArticles: probe.existingArticles,
   };
 }
+
 
 /** Executa a baseline (0000_init.sql) numa transação — tudo ou nada. */
 export async function applyBaseline(dbc: Db): Promise<number> {
@@ -283,9 +285,24 @@ router.post("/apply", setupGuard, async (req, res) => {
     // 1b) Anti-mistura: banco que já pertence a uma instalação viva só é aceito
     // com confirmação explícita — sem ela, instalar aqui faria duas instâncias
     // editarem o mesmo site (incidente ksports×sp011, 2026-07-07).
-    if (probe.hasExistingInstall && body["adoptExistingInstall"] !== true) {
+    const adopt = adoptDecision(probe, body, {
+      NODE_ENV: process.env["NODE_ENV"], SETUP_ALLOW_ADOPT: process.env["SETUP_ALLOW_ADOPT"],
+    });
+    if (!adopt.allow) {
       res.status(409).json(existingInstallRefusal(probe));
       return;
+    }
+    // Log grepável quando ADOTAMOS um banco com instalação existente (rastreio
+    // de incidente de connection string trocada).
+    if (probe.hasExistingInstall) {
+      logger.warn(
+        {
+          existingSiteName: probe.existingSiteName,
+          existingUsers: probe.existingUsers,
+          existingArticles: probe.existingArticles,
+        },
+        "ADOPT_EXISTING_INSTALL: instalando sobre banco com instalacao existente (adopt permitido)",
+      );
     }
 
     // 2) migrations: baseline só em banco sem instalação; incrementos idempotentes sempre

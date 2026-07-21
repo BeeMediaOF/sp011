@@ -134,6 +134,8 @@ export interface Article {
   keywords?: string;
   draftReason?: string;
   canonicalUrl?: string;
+  /** id da notícia no painel central (ingest) — idempotência atômica (PRD-14). */
+  centralId?: string | null;
   /** Crédito da fonte no rodapé: true/false força; null/ausente segue o padrão do site. */
   showSourceCredit?: boolean | null;
   /** Crédito da foto principal ("Foto: …"); vazio/ausente cai em rssSourceName. */
@@ -371,6 +373,10 @@ export const articleService = {
         keywords:      data.keywords,
         draftReason:   data.draftReason ?? null,
         canonicalUrl:  data.canonicalUrl ?? null,
+        // PRD-14: centralId no MESMO insert (atômico) — o índice parcial único
+        // articles_central_id_uniq faz o 2º insert concorrente falhar (23505),
+        // tratado como replay no ingest (fim do TOCTOU + artigo órfão).
+        centralId:     data.centralId ?? null,
         showSourceCredit: data.showSourceCredit ?? null,
         imageCredit:   data.imageCredit ?? null,
         showImageCredit: data.showImageCredit ?? null,

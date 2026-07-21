@@ -24,6 +24,7 @@ import { TAG_MAP } from "../lib/rssProcessor.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { sendPushToAll } from "./push.js";
 import { logAudit, getClientIp } from "../lib/audit.js";
+import { dbNonceStore, cleanupNonces } from "../lib/ingestNonce.js";
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -44,8 +45,8 @@ function getIngestSecret(): string {
   return store.getSettings().centralIngestSecret ?? process.env["CENTRAL_INGEST_SECRET"] ?? "";
 }
 
-/** Auth por assinatura HMAC — escopo exclusivo desta rota. */
-function centralIngestAuth(req: Request, res: Response, next: NextFunction): void {
+/** Auth por assinatura HMAC + nonce anti-replay — escopo exclusivo desta rota. */
+async function centralIngestAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const secret = getIngestSecret();
   if (!secret) {
     res.status(503).json({ ok: false, error: "central_not_configured", message: "Segredo do painel central não configurado neste blog." });
@@ -63,6 +64,20 @@ function centralIngestAuth(req: Request, res: Response, next: NextFunction): voi
     res.status(401).json({ ok: false, error: result.reason === "timestamp_skew" ? "timestamp_skew" : "invalid_signature" });
     return;
   }
+  // PRD-14: nonce anti-replay — a MESMA assinatura só vale UMA vez (a janela de
+  // 300s sozinha permitia reenvio). Fail-closed: se o store falhar, RECUSA (503)
+  // em vez de aceitar sem checar o nonce.
+  try {
+    const fresh = await dbNonceStore.consume(String(signature));
+    if (!fresh) {
+      res.status(401).json({ ok: false, error: "replay" });
+      return;
+    }
+  } catch {
+    res.status(503).json({ ok: false, error: "nonce_unavailable" });
+    return;
+  }
+  void cleanupNonces();
   next();
 }
 
@@ -154,7 +169,9 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
   const draftReason = !hasImage ? "no_image" : undefined;
 
   const category = article.category?.trim() || "geral";
-  const saved = await articleService.createArticle({
+  let saved;
+  try {
+    saved = await articleService.createArticle({
     // Campos de texto puro: nunca aceitar HTML vindo de fora (título com <b>
     // literal quebra card, notificação, legenda social e SEO)
     title: stripInlineHtml(article.title.trim()),
@@ -185,13 +202,25 @@ router.post("/", ingestRateLimit, centralIngestAuth, async (req, res) => {
     keywords: article.keywords?.trim() || undefined,
     canonicalUrl: article.canonicalUrl?.trim() || undefined,
     draftReason,
-  });
-
-  // Vincula o id central (idempotência de reenvios futuros)
-  await db
-    .update(articlesTable)
-    .set({ centralId: centralId.trim() })
-    .where(eq(articlesTable.id, saved.id));
+    // PRD-14: centralId no MESMO insert (atômico) — sem o UPDATE em 2 passos.
+    centralId: centralId.trim(),
+    });
+  } catch (err) {
+    // Corrida concorrente do mesmo centralId → viola o índice parcial único
+    // (Postgres 23505). Em vez de 500 + artigo órfão, trata como replay.
+    if (typeof err === "object" && err !== null && (err as { code?: string }).code === "23505") {
+      const [dup] = await db
+        .select({ id: articlesTable.id, slug: articlesTable.slug })
+        .from(articlesTable)
+        .where(eq(articlesTable.centralId, centralId.trim()))
+        .limit(1);
+      if (dup) {
+        res.json({ ok: true, result: "replay", articleId: dup.id, url: `/artigo/${dup.slug || dup.id}` });
+        return;
+      }
+    }
+    throw err;
+  }
 
   if (status === "published") {
     void sendPushToAll({
