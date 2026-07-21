@@ -62,4 +62,10 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/artifacts/api-server
 EXPOSE 8080
+# PRD-07: roda como non-root (uid 1000, usuário `node` da imagem base) para
+# reduzir o raio de escape (AP-11). /data (uploads + db-config.enc) e /app
+# precisam pertencer ao node. Volumes /data PREEXISTENTES (root) exigem um
+# `chown -R node:node /data` único na VPS ANTES do 1o up non-root.
+RUN mkdir -p /data && chown -R node:node /data /app
+USER node
 CMD ["node", "--enable-source-maps", "dist/index.mjs"]

@@ -38,4 +38,8 @@ WORKDIR /app
 COPY --from=build /app /app
 WORKDIR /app/artifacts/central-hub
 EXPOSE 8090
+# PRD-07: non-root (uid 1000). Monta central_data:/data (news-images +
+# social-videos). Volume /data preexistente exige `chown` único na VPS.
+RUN mkdir -p /data && chown -R node:node /data /app
+USER node
 CMD ["node", "--enable-source-maps", "dist/index.mjs"]

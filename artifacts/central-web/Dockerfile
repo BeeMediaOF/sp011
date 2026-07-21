@@ -19,4 +19,7 @@ WORKDIR /app
 COPY --from=build /app /app
 WORKDIR /app/artifacts/central-web
 EXPOSE 3001
+# PRD-07: non-root (uid 1000). Serve estático, sem volume.
+RUN chown -R node:node /app
+USER node
 CMD ["pnpm", "run", "start"]

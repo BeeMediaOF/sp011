@@ -21,6 +21,17 @@ services:
       blogs:
         # Alias ÚNICO na rede compartilhada — é o nome que o Caddy usa.
         aliases: ["${BLOG_ID}-api"]
+    # PRD-07: espelha o hardening do api da raiz. Volume api_data:/data
+    # preexistente exige `chown -R node:node /data` único na VPS antes do 1o up.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:8080/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   web:
     image: blog-web:${BLOG_IMAGE_TAG:-v1}
@@ -42,6 +53,16 @@ services:
       default: {}
       blogs:
         aliases: ["${BLOG_ID}-web"]
+    # PRD-07: espelha o hardening do web da raiz (serve estático).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 networks:
   blogs:

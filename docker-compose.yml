@@ -38,6 +38,18 @@ services:
         aliases: ["sp011-api"]
     depends_on:
       - ollama
+    # PRD-07: least-privilege de kernel. read_only fica de fora (Chromium/tmp
+    # gravam) — validar no canário. --no-sandbox segue no código (decisão de
+    # canário/operador, ver STATUS).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:8080/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   web:
     image: blog-web:${BLOG_IMAGE_VERSION:-v1}
@@ -57,6 +69,16 @@ services:
         aliases: ["sp011-web"]   # alias único p/ o Caddy (mesmo motivo do api)
     depends_on:
       - api
+    # PRD-07: serve estático (vite preview) — bom candidato a read_only (validar no canário).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # ── Painel Central de Notícias (coleta/reescrita/distribuição multi-blog) ──
   # Banco próprio (CENTRAL_DATABASE_URL) e segredos PRÓPRIOS (SESSION_SECRET/
@@ -78,6 +100,16 @@ services:
       - central_data:/data   # mp4 da Automação Social (/data/social-videos)
     depends_on:
       - ollama
+    # PRD-07: least-privilege. Mantém central_data:/data gravável.
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 2g
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:8090/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
   central-web:
     build:
@@ -90,6 +122,16 @@ services:
       - "3001"
     depends_on:
       - central-api
+    # PRD-07: serve estático — candidato a read_only (validar no canário).
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3001/',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # ── Postgres dos blogs replicados (um DATABASE + uma ROLE por blog) ────────
   # Sem porta no host: alcançável só pela rede blogs_shared (pg-blogs:5432).
@@ -106,6 +148,17 @@ services:
       - pgblogs_data:/var/lib/postgresql/data
     networks:
       - blogs
+    # PRD-07: Postgres oficial precisa gravar em /var/lib/postgresql/data e usa
+    # capabilities — SÓ mem_limit + no-new-privileges + healthcheck (nada de
+    # cap_drop/read_only aqui). Protege contra OOM que derrubaria os tenants.
+    mem_limit: 4g
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   # LLM local para reescrita de artigos (grátis, roda na própria VPS via CPU).
   # Não publica porta no host — só a api acessa pela rede interna do compose.
@@ -130,6 +183,18 @@ services:
       OLLAMA_CONTEXT_LENGTH: "16384"
     volumes:
       - ollama_models:/root/.ollama
+    # PRD-07 — PRIORIDADE anti-OOM: o Ollama já consumiu ~13 GiB (maior consumidor
+    # dos 31 GiB da VPS); mem_limit dá teto sem derrubar os demais tenants. 16g dá
+    # folga ao KV cache de OLLAMA_CONTEXT_LENGTH=16384. Imagem de terceiros que
+    # grava modelos em /root/.ollama → sem cap_drop/read_only (validar antes).
+    mem_limit: 16g
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   caddy:
     image: caddy:2
@@ -152,6 +217,16 @@ services:
     networks:
       - default        # sp011 + central (api/web/central-*)
       - blogs          # blogs replicados (aliases <id>-api/<id>-web)
+    # PRD-07: Caddy liga em 80/443 (<1024) — NÃO fazer cap_drop:ALL cego (perderia
+    # NET_BIND_SERVICE). Só mem_limit + no-new-privileges + healthcheck (admin API).
+    mem_limit: 512m
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 # Rede compartilhada entre o caddy/pg-blogs e os blogs replicados. O projeto
 # raiz é o dono; os compose dos blogs (/opt/blogs/*) a referenciam como

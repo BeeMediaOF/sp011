@@ -27,5 +27,8 @@ WORKDIR /app
 COPY --from=build /app /app
 WORKDIR /app/artifacts/brasilia-agora
 EXPOSE 3000
+# PRD-07: non-root (uid 1000). Serve estático via vite preview, sem volume.
+RUN chown -R node:node /app
+USER node
 # `serve` = vite preview --host 0.0.0.0 (lê PORT/BASE_PATH/API_URL do ambiente)
 CMD ["pnpm", "run", "serve"]
