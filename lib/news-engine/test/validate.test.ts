@@ -136,6 +136,8 @@ describe("validateRewrite (validação estrutural em código)", () => {
       "<script>alert(1)</script>",
       "<img src=x onerror=alert(1)>",
       '<a href="javascript:alert(1)">x</a>',
+      "<svg onload=alert(1)></svg>",           // PRD-04a: a regex antiga NAO pegava
+      '<math href="javascript:alert(1)"></math>', // idem
     ]) {
       const r = validateRewrite(reescritaOk({ content: corpoValido(mau) }), FONTE_ARSENAL);
       assert.equal(r.find((i) => i.code === "html_dangerous")?.severity, "block", mau);

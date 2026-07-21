@@ -12,6 +12,7 @@
 import type { ExtractedAI } from "./quality.ts";
 import { plainTextLength } from "./quality.ts";
 import { normForCompare } from "./score.ts";
+import { containsDangerousHtml } from "./sanitizeHtml.ts";
 
 export interface ValidationIssue {
   code: string;
@@ -25,10 +26,6 @@ export interface ValidateOptions {
   /** Texto visível máximo do corpo (default 20000). */
   maxBodyChars?: number;
 }
-
-/** HTML que jamais deveria sair da IA nem entrar no blog. */
-const DANGEROUS_HTML =
-  /<script\b|<iframe\b|<object\b|<embed\b|<form\b|\son[a-z]+\s*=|javascript:/i;
 
 /** Sinais de publieditorial/promo no material da FONTE (texto já normalizado). */
 const PROMO_PATTERNS = [
@@ -92,7 +89,7 @@ export function validateRewrite(
   } else if (bodyLen > maxBody) {
     issues.push({ code: "body_long", severity: "warn", detail: `${bodyLen} chars visíveis (máximo ${maxBody})` });
   }
-  if (DANGEROUS_HTML.test(x.content)) {
+  if (containsDangerousHtml(x.content)) {
     issues.push({ code: "html_dangerous", severity: "block" });
   }
   if (/<h1[\s>]/i.test(x.content)) {

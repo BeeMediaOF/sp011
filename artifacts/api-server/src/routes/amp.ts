@@ -9,6 +9,7 @@ import { store } from "../lib/store.js";
 import { eq, or, sql } from "drizzle-orm";
 import { db, articlesTable } from "@workspace/db";
 import { logger } from "../lib/logger.js";
+import { sanitizeAmpHtml } from "@workspace/news-engine/sanitize";
 
 const router = Router();
 
@@ -26,27 +27,13 @@ function stripHtml(s: string): string {
 }
 
 /**
- * Convert article content to AMP-safe HTML (replace <img> with <amp-img>).
- * Também remove vetores de script que sobreviveriam ao filtro antigo:
- * event handlers inline (onload/onerror/...), URLs javascript:, e elementos
- * proibidos no AMP (object/embed/form/svg/style/link/meta).
+ * Convert article content to AMP-safe HTML (PRD-04a): delega à política
+ * canônica única `sanitizeAmpHtml` (parser cheerio do @workspace/news-engine),
+ * que faz a allowlist estrita do AMP + a transformação <img>→<amp-img>
+ * responsivo, sem regex espelhada a manter.
  */
 function toAmpHtml(content: string): string {
-  const amp = content
-    .replace(
-      /<img([^>]*?)src="([^"]*)"([^>]*?)>/gi,
-      '<amp-img$1src="$2"$3 width="800" height="450" layout="responsive"></amp-img>'
-    )
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<script[^>]*>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
-    .replace(/<(object|embed|form|svg|math|style|link|meta|base)[\s\S]*?(<\/\1>|>)/gi, "")
-    .replace(/\son\w+\s*=\s*"[^"]*"/gi, "")
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, "")
-    .replace(/\son\w+\s*=\s*[^\s>]+/gi, "")
-    .replace(/(href|src)\s*=\s*(["']?)\s*javascript:[^"'\s>]*\2/gi, '$1="#"')
-    .replace(/style="[^"]*"/gi, "");
-  return amp;
+  return sanitizeAmpHtml(content);
 }
 
 const AMP_BOILERPLATE = `body{-webkit-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-moz-animation:-amp-start 8s steps(1,end) 0s 1 normal both;-ms-animation:-amp-start 8s steps(1,end) 0s 1 normal both;animation:-amp-start 8s steps(1,end) 0s 1 normal both}@-webkit-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-moz-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@-ms-keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}@keyframes -amp-start{from{visibility:hidden}to{visibility:visible}}`;

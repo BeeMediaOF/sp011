@@ -26,3 +26,16 @@ test("tag executável sem fechamento também cai", () => {
   assert.ok(!/embed|<link/i.test(out));
   assert.ok(out.includes("<p>a</p>"));
 });
+
+test("svg/math/aninhado (PRD-04a: a regex antiga NAO pegava) são neutralizados", () => {
+  for (const v of [
+    "<p>ok</p><svg onload=alert(1)></svg>",
+    '<math href="javascript:alert(1)">x</math>',
+    "<scr<script>ipt>alert(1)</script>",
+    '<a href="data:text/html,<b>x</b>">y</a>',
+  ]) {
+    const out = sanitizeIngestHtml(v);
+    assert.ok(!/<svg|<math|<script|onload|javascript:|data:text/i.test(out), out);
+  }
+  assert.ok(sanitizeIngestHtml("<p>ok</p>").includes("<p>ok</p>"));
+});

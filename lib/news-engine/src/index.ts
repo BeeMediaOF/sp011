@@ -1,6 +1,7 @@
 export * from "./types.ts";
 export * from "./highlight.ts";
 export * from "./prompts.ts";
+export * from "./sanitizeHtml.ts";
 export * from "./scrape.ts";
 export * from "./rss.ts";
 export * from "./quality.ts";
