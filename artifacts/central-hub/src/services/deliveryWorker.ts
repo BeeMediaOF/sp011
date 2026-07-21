@@ -22,6 +22,7 @@ import { logEvent } from "../lib/eventLog.js";
 import { sendSigned, INGEST_API_VERSION } from "./blogClient.js";
 import { backoffMsForAttempt, MAX_DELIVERY_ATTEMPTS } from "../lib/backoff.js";
 import { applyTitleCase, normalizeTitleCaseMode } from "../lib/titleCase.js";
+import { selectFairBatch } from "../lib/fairBatch.js";
 
 const POLL_MS = 15_000;
 const BATCH = 5;
@@ -163,16 +164,34 @@ async function tick(): Promise<void> {
     if (!s.deliveryEnabled) return;
 
     const now = new Date();
-    const due = await db
-      .select()
-      .from(deliveriesTable)
-      .where(and(
-        eq(deliveriesTable.status, "pending"),
-        or(isNull(deliveriesTable.nextRetryAt), lte(deliveriesTable.nextRetryAt, now)),
-        or(isNull(deliveriesTable.scheduledAt), lte(deliveriesTable.scheduledAt, now)),
-      ))
-      .orderBy(asc(deliveriesTable.createdAt))
-      .limit(BATCH);
+    // Candidatos: as BATCH entregas vencidas MAIS ANTIGAS DE CADA blog ativo
+    // (uma consulta por blog, indexada por deliveries_blog_idx). Buscar por
+    // created_at global encheria o lote só com o blog de maior backlog (ex.:
+    // KSports com 381 vencidas) e os demais nunca chegariam ao worker — por
+    // isso a garantia de representação é feita por blog.
+    const activeBlogs = await db
+      .select({ id: blogsTable.id })
+      .from(blogsTable)
+      .where(eq(blogsTable.isActive, true));
+    const dueConds = and(
+      eq(deliveriesTable.status, "pending"),
+      or(isNull(deliveriesTable.nextRetryAt), lte(deliveriesTable.nextRetryAt, now)),
+      or(isNull(deliveriesTable.scheduledAt), lte(deliveriesTable.scheduledAt, now)),
+    );
+    const candidates: DeliveryRow[] = [];
+    for (const b of activeBlogs) {
+      const rows = await db
+        .select()
+        .from(deliveriesTable)
+        .where(and(dueConds, eq(deliveriesTable.blogId, b.id)))
+        .orderBy(asc(deliveriesTable.createdAt))
+        .limit(BATCH);
+      candidates.push(...rows);
+    }
+    // Round-robin justo: 1 entrega por blog por passada, priorizando quem
+    // espera há mais tempo. Acaba com a prioridade implícita do FIFO; quando só
+    // um blog tem fila, ele usa toda a capacidade do lote.
+    const due = selectFairBatch(candidates, BATCH);
 
     for (const delivery of due) {
       await processDelivery(delivery);
