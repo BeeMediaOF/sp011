@@ -38,6 +38,7 @@ import {
   MAX_Q,
   type ImageFormat,
 } from "../lib/imageTransform.js";
+import { safeFetch } from "../lib/safeFetch.js";
 
 const router = Router();
 
@@ -137,25 +138,30 @@ async function getPlaceholder(): Promise<Buffer> {
   return _placeholderWebP;
 }
 
-// ── Busca a imagem de origem (com headers por domínio e validação) ────────────
+// ── Busca a imagem de origem (com headers por domínio e defesa SSRF) ──────────
+// Todo fetch de origem passa pelo safeFetch (PRD-06a): bloqueia IP privado/
+// reservado (literal e por DNS), revalida o host em CADA hop de redirect, exige
+// https (sem downgrade http para serviços internos) e limita tempo/tamanho.
 async function fetchOriginRaw(url: string): Promise<Buffer> {
   let parsed: URL;
   try { parsed = new URL(url); } catch { throw new Error("invalid_url"); }
 
   const domainHeaders = DOMAIN_HEADERS[parsed.hostname] ?? DEFAULT_FETCH_HEADERS;
 
-  const resp = await fetch(url, {
+  const { status, headers, body } = await safeFetch(url, {
+    isAllowedHost: isAllowedImageHost,
     headers: domainHeaders,
-    signal: AbortSignal.timeout(6_000),
-    redirect: "follow",
+    timeoutMs: 6_000,
+    maxBytes: 12 * 1024 * 1024,
+    allowHttp: false,
   });
 
-  if (!resp.ok) throw new Error(`origin_error:${resp.status}`);
+  if (status < 200 || status >= 300) throw new Error(`origin_error:${status}`);
 
-  const ct = resp.headers.get("content-type") ?? "";
+  const ct = headers.get("content-type") ?? "";
   if (!ct.startsWith("image/")) throw new Error("not_an_image");
 
-  return Buffer.from(await resp.arrayBuffer());
+  return body;
 }
 
 // ── Warm cache (chamado no startup para pré-aquecer artigos recentes) ─────────
