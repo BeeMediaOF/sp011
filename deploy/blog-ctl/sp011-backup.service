@@ -1,0 +1,15 @@
+# sp011-backup.service — backup diario do pg-blogs + volumes (PRD-09).
+# Instalar (VPS, root):
+#   cp /opt/sp011/deploy/blog-ctl/sp011-backup.service /etc/systemd/system/
+#   cp /opt/sp011/deploy/blog-ctl/sp011-backup.timer   /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now sp011-backup.timer
+[Unit]
+Description=Backup cifrado offsite do pg-blogs e volumes (sp011)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/sp011
+ExecStart=/opt/blog-ctl/backup-blog.sh /opt/blog-ctl/backup.conf
+ExecStart=/opt/blog-ctl/backup-volumes.sh /opt/blog-ctl/backup.conf

@@ -1,0 +1,12 @@
+# sp011-backup.timer — dispara o backup diario as 03:30 (PRD-09).
+# Persistent=true recupera a execucao se a VPS estava desligada no horario.
+# Instalar: ver cabecalho do sp011-backup.service.
+[Unit]
+Description=Agendador diario do backup sp011 (pg-blogs + volumes)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,3 @@
+# PRD-09 — nunca versionar a config preenchida nem a chave de cifra.
+backup.conf
+*.pass
