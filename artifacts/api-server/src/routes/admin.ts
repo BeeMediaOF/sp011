@@ -12,6 +12,7 @@ import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, gener
 import QRCode from "qrcode";
 import { requirePermission } from "../middlewares/permissions.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
+import { encryptSecret, decryptSecret } from "../lib/crypto.js";
 import { logAudit, logSecurity, getClientIp } from "../lib/audit.js";
 import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
@@ -148,7 +149,9 @@ router.post("/2fa/setup", authMiddleware, async (req, res) => {
     const otpauth = otpGenerateURI({ label: user.email, issuer: BRAND.adminIssuer, secret });
     const qrDataUrl = await QRCode.toDataURL(otpauth);
     // Store secret temporarily (user must verify before it's persisted)
-    await db.update(usersTable).set({ twoFactorSecret: secret }).where(eq(usersTable.id, req.userId));
+    // PRD-01b/F16: grava o segredo TOTP CIFRADO (o `secret` em claro segue só
+    // para o QR/entrada manual do usuário, no res.json abaixo).
+    await db.update(usersTable).set({ twoFactorSecret: encryptSecret(secret) }).where(eq(usersTable.id, req.userId));
     res.json({ secret, qrDataUrl });
   } catch (err) {
     req.log.error({ err }, "2FA setup error");
@@ -165,7 +168,7 @@ router.post("/2fa/verify", authMiddleware, async (req, res) => {
     const [user] = await db.select({ twoFactorSecret: usersTable.twoFactorSecret })
       .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
     if (!user?.twoFactorSecret) { res.status(400).json({ error: "Execute /2fa/setup primeiro" }); return; }
-    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret, strategy: "totp" });
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: decryptSecret(user.twoFactorSecret), strategy: "totp" });
     if (!valid) { res.status(400).json({ error: "Código inválido" }); return; }
     await db.update(usersTable).set({ twoFactorEnabled: true }).where(eq(usersTable.id, req.userId));
     res.json({ ok: true, message: "2FA ativado com sucesso" });
@@ -184,7 +187,7 @@ router.post("/2fa/disable", authMiddleware, async (req, res) => {
     const [user] = await db.select({ twoFactorSecret: usersTable.twoFactorSecret, twoFactorEnabled: usersTable.twoFactorEnabled })
       .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
     if (!user?.twoFactorEnabled) { res.json({ ok: true, message: "2FA já estava desativado" }); return; }
-    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret!, strategy: "totp" });
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: decryptSecret(user.twoFactorSecret!), strategy: "totp" });
     if (!valid) { res.status(400).json({ error: "Código inválido" }); return; }
     await db.update(usersTable).set({ twoFactorEnabled: false, twoFactorSecret: null }).where(eq(usersTable.id, req.userId));
     res.json({ ok: true, message: "2FA desativado" });
@@ -213,7 +216,7 @@ router.post("/2fa/login", async (req, res) => {
     const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
     if (!user || user.status !== "active") { res.status(401).json({ error: "Conta inativa" }); return; }
     if (!user.twoFactorSecret) { res.status(400).json({ error: "2FA não configurado" }); return; }
-    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: user.twoFactorSecret, strategy: "totp" });
+    const valid = otpVerifySync({ token: code.replace(/\s/g, ""), secret: decryptSecret(user.twoFactorSecret), strategy: "totp" });
     if (!valid) {
       await logSecurity({
         userId: user.id, userEmail: user.email,

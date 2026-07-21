@@ -7,7 +7,9 @@ import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
+import { migrateTwoFactorSecrets } from "./lib/migrateTwoFactorSecrets.js";
 import { ensureSchema } from "./lib/ensureSchema.js";
+import { assertEncryptionConfigured } from "./lib/crypto.js";
 import { db, pool, articlesTable, initDb, isDbInitialized } from "@workspace/db";
 import { desc, isNotNull } from "drizzle-orm";
 import { warmImageCache } from "./routes/image.js";
@@ -92,6 +94,10 @@ async function resolveDatabase(): Promise<void> {
   }
 }
 
+// PRD-01b/F16: em produção, recusa subir sem chave de envelope (segredos não
+// podem ser gravados em texto puro). Antes de tocar o banco.
+assertEncryptionConfigured();
+
 await resolveDatabase();
 
 if (!isDbReady()) {
@@ -143,6 +149,14 @@ async function bootWithDb(): Promise<void> {
   // Garante colunas novas/opcionais ANTES de qualquer SELECT em articles
   // (o schema do Drizzle já referencia social_title).
   await ensureSchema();
+
+  // PRD-01b/F16: cifra os twoFactorSecret legados em texto puro (idempotente,
+  // não-fatal — não pode travar o boot).
+  try {
+    await migrateTwoFactorSecrets();
+  } catch (err) {
+    logger.warn({ err }, "migrateTwoFactorSecrets falhou (não-fatal)");
+  }
 
   // Initialize store from PostgreSQL (migrates store.json data if needed)
   await initStore();

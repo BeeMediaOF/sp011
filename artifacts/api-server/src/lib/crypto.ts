@@ -42,6 +42,20 @@ export function encryptionAvailable(): boolean {
   return getKey() !== null;
 }
 
+/**
+ * Fail-closed em produção (PRD-01b/F16): recusa subir se nenhuma chave de
+ * envelope estiver configurada — segredos NÃO podem ser gravados em texto puro.
+ * Em dev, apenas mantém o warning do getKey() (não quebra o fluxo local).
+ */
+export function assertEncryptionConfigured(): void {
+  if (!getKey() && process.env["NODE_ENV"] === "production") {
+    throw new Error(
+      "[FATAL] SETTINGS_ENCRYPTION_KEY/SESSION_SECRET ausente em produção — " +
+      "segredos NÃO podem ser gravados em texto puro. Configure a chave de envelope antes de subir.",
+    );
+  }
+}
+
 /** True if a string is already in the encrypted envelope format. */
 export function isEncrypted(value: unknown): boolean {
   return typeof value === "string" && value.startsWith(PREFIX);

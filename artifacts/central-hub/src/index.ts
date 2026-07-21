@@ -1,5 +1,6 @@
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
+import { assertEncryptionConfigured } from "@workspace/news-engine";
 import { ensureSchema } from "./lib/ensureSchema.js";
 import { initStore } from "./lib/store.js";
 import { seedCentralAdmin } from "./lib/seed.js";
@@ -19,6 +20,10 @@ const port = Number(process.env["PORT"] ?? 8090);
 if (!Number.isFinite(port) || port <= 0) {
   throw new Error(`PORT inválida: "${process.env["PORT"]}"`);
 }
+
+// PRD-01b/F16: em produção, recusa subir sem chave de envelope (segredos não
+// podem ser gravados em texto puro). Fail-fast antes de escutar.
+assertEncryptionConfigured();
 
 app.listen(port, async (err?: Error) => {
   if (err) {
