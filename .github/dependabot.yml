@@ -1,0 +1,19 @@
+# Dependabot (PRD-10) — SCA report-only. Estes serao os PRIMEIROS PRs do repo
+# (o modelo e commit-direto-na-main); o dono pode mergear ou ignorar — NAO
+# bloqueia deploy. Nao rebaixar as versoes fixadas por override em
+# pnpm-workspace.yaml (undici/qs/uuid/etc.): revisar cada PR antes de mergear.
+version: 2
+updates:
+  - package-ecosystem: "npm" # cobre o pnpm-lock.yaml
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

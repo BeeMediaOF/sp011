@@ -1,0 +1,13 @@
+# Config do gitleaks — secret-scanning (PRD-10). Estende a config default.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Achados ja catalogados pela auditoria — remover conforme resolvidos."
+paths = [
+  # F1: VAPID_PRIVATE_KEY versionada no .replit (security-audit/02-mapa-riscos.md:65).
+  # Propriedade do PRD-01a (rotacao) + PRD-01b (purge do historico git).
+  # REMOVER esta linha assim que o PRD-01b concluir o purge — ai este arquivo
+  # deve deixar de existir no working tree e o allowlist perde a razao de ser.
+  '''^\.replit$''',
+]

@@ -1,0 +1,80 @@
+name: security
+
+# CI de seguranca REPORT-ONLY (PRD-10) — NAO bloqueia o push/deploy do dono
+# (modelo commit-direto-na-main). Todos os jobs sao continue-on-error nesta
+# fase; endurecer para blocking e follow-up registrado no STATUS.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 4 * * 1" # semanal (segunda, 04:17 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write # subir SARIF para a aba Security (CodeQL/gitleaks)
+
+jobs:
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # historico completo p/ o gitleaks varrer commits
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  sca:
+    name: SCA (pnpm audit)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9 # alinhar com o pnpm da VPS se divergir (ver STATUS)
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - name: install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: pnpm audit (report-only)
+        continue-on-error: true
+        run: pnpm audit --audit-level=low
+      - name: pnpm audit json
+        continue-on-error: true
+        run: pnpm audit --json > pnpm-audit.json || true
+      - name: upload audit report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pnpm-audit
+          path: pnpm-audit.json
+          if-no-files-found: ignore
+
+  codeql:
+    name: SAST (CodeQL)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: init CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - name: analyze
+        uses: github/codeql-action/analyze@v3
+        continue-on-error: true
