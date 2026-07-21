@@ -10,8 +10,7 @@
 import { sanitizePlainField, sanitizeSocialTitle } from "../highlight.ts";
 import {
   applyPromptTemplate, DEFAULT_PROMPT_TEMPLATE,
-  TRANSLATION_PROMPT_TEMPLATE, CLASSIFY_PROMPT_TEMPLATE,
-  formatCategoriesForPrompt, languageLabel,
+  buildTranslationPrompt, buildClassifyPrompt,
 } from "../prompts.ts";
 import { consoleLogger, type EngineLogger, type TokenUsage } from "../types.ts";
 import type { GeminiPool } from "./geminiPool.ts";
@@ -424,16 +423,9 @@ export async function translateRewrite(
   input: TranslateInput, cfg: RewriteEngineConfig,
 ): Promise<TranslateOutput> {
   const categories = input.categories ?? [];
-  const prompt = (input.promptTemplate?.trim() || TRANSLATION_PROMPT_TEMPLATE)
-    .replace(/\{\{IDIOMA_DESTINO\}\}/g, languageLabel(input.targetLanguage))
-    .replace(/\{\{TITULO\}\}/g, input.title)
-    .replace(/\{\{SUBTITULO\}\}/g, input.subtitle ?? "")
-    .replace(/\{\{SOCIAL_TITLE\}\}/g, input.socialTitle ?? "")
-    .replace(/\{\{SOCIAL_SUMMARY\}\}/g, input.socialSummary ?? "")
-    .replace(/\{\{SOCIAL_HASHTAGS\}\}/g, input.socialHashtags ?? "")
-    .replace(/\{\{KEYWORDS\}\}/g, input.keywords ?? "")
-    .replace(/\{\{CONTEUDO\}\}/g, input.contentHtml.slice(0, 20_000))
-    .replace(/\{\{CATEGORIAS\}\}/g, formatCategoriesForPrompt(categories));
+  // Montagem do prompt (com delimitação + neutralização de conteúdo não-confiável)
+  // centralizada em buildTranslationPrompt (PRD-05, função pura testável).
+  const prompt = buildTranslationPrompt(input);
 
   const { text, usage } = await callTextModel(prompt, cfg);
   const parsed = parseRewriteResult(text);
@@ -534,10 +526,8 @@ export async function classifyArticle(
   input: ClassifyInput, cfg: RewriteEngineConfig,
 ): Promise<ClassifyOutput> {
   if (input.categories.length === 0) return { category: null };
-  const prompt = (input.promptTemplate?.trim() || CLASSIFY_PROMPT_TEMPLATE)
-    .replace(/\{\{TITULO\}\}/g, input.title)
-    .replace(/\{\{RESUMO\}\}/g, (input.summary ?? "").slice(0, 1_000))
-    .replace(/\{\{CATEGORIAS\}\}/g, formatCategoriesForPrompt(input.categories));
+  // Montagem centralizada em buildClassifyPrompt (PRD-05, função pura testável).
+  const prompt = buildClassifyPrompt(input);
 
   const { text, usage } = await callTextModel(prompt, cfg);
   // JSON {"category": "slug", ...} ou, em último caso, o slug cru na resposta.
