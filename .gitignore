@@ -45,6 +45,7 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 
 # Replit
+.replit
 .cache/
 .local/
 artifacts/api-server/data/store.json

@@ -89,7 +89,7 @@ Preencha com base no [.env.example](.env.example). Pontos de atenção:
 | `ALLOWED_ORIGINS` | `https://seudominio.com.br` |
 | `ADMIN_DEFAULT_EMAIL` / `ADMIN_DEFAULT_PASSWORD` | credenciais do 1º admin |
 | `GEMINI_API_KEY` | chave do Google AI Studio (ver passo 7.2) |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | copie de [.replit](.replit) (push) |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | gere um par NOVO por instância: `npx web-push generate-vapid-keys` (NUNCA reuse entre blogs) |
 | `PERPLEXITY_API_KEY`, `SMTP_*` | opcionais |
 
 > O app prioriza `SUPABASE_DATABASE_URL`; `SESSION_SECRET` é **obrigatória** em produção
@@ -321,7 +321,7 @@ Admin → **Segurança → Checkup**:
 [ ] PM2 rodando 2 apps (api :8080, web :3000) + pm2 save/startup
 [ ] Nginx (/ → 3000, /api → 8080) + SSL ativo
 [ ] Provedor de IA = gemini_direct + GEMINI_API_KEY
-[ ] VAPID_* copiadas do .replit (push notifications)
+[ ] VAPID_* GERADAS novas para esta instância (npx web-push generate-vapid-keys)
 [ ] Senha do admin trocada
 ```
 
