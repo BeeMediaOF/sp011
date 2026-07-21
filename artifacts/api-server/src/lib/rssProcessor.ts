@@ -11,6 +11,7 @@ import { articleService } from "./articleService.js";
 import { logger } from "./logger.js";
 import { db, rssEventLogsTable } from "@workspace/db";
 import { sanitizePlainField, sanitizeSocialTitle } from "@workspace/social-template";
+import { safeFetch } from "./safeFetch.js";
 
 // ─── Event log ────────────────────────────────────────────────────────────────
 
@@ -801,12 +802,18 @@ export async function scrapeWithDiffbot(
 /** Fetch article URL and extract og:image + full text body */
 export async function scrapeArticle(url: string): Promise<{ text: string; imageUrl: string; description: string }> {
   try {
-    const res = await fetch(url, {
+    // Fetch da URL do artigo com defesa SSRF (PRD-06b): bloqueia IP privado/
+    // reservado (literal e por DNS), revalida cada hop de redirect, exige https
+    // e limita tempo/tamanho. Host arbitrário (URL do usuário) → allowlist aberta.
+    const res = await safeFetch(url, {
+      isAllowedHost: () => true,
+      allowHttp: false,
+      timeoutMs: 12_000,
+      maxBytes: 5 * 1024 * 1024,
       headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
-      signal: AbortSignal.timeout(12_000),
     });
-    if (!res.ok) return { text: "", imageUrl: "", description: "" };
-    const html = await res.text();
+    if (res.status < 200 || res.status >= 300) return { text: "", imageUrl: "", description: "" };
+    const html = res.body.toString("utf8");
     const $ = cheerio.load(html);
 
     // 1. Featured image from meta tags (og:image is the article's canonical share image)

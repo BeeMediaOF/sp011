@@ -5,6 +5,7 @@
  */
 import * as cheerio from "cheerio";
 import type Parser from "rss-parser";
+import { safeFetch } from "./safeFetch.ts";
 
 export const DEFAULT_USER_AGENT =
   "Mozilla/5.0 (compatible; NewsHub/1.0; news aggregation bot)";
@@ -61,12 +62,18 @@ export async function scrapeArticle(
   userAgent: string = DEFAULT_USER_AGENT,
 ): Promise<{ text: string; imageUrl: string; description: string }> {
   try {
-    const res = await fetch(url, {
+    // Fetch da URL do artigo com defesa SSRF (PRD-06b): bloqueia IP privado/
+    // reservado (literal e por DNS), revalida cada hop de redirect, exige https
+    // e limita tempo/tamanho. Host arbitrário (link de feed) → allowlist aberta.
+    const res = await safeFetch(url, {
+      isAllowedHost: () => true,
+      allowHttp: false,
+      timeoutMs: 12_000,
+      maxBytes: 5 * 1024 * 1024,
       headers: { "User-Agent": userAgent },
-      signal: AbortSignal.timeout(12_000),
     });
-    if (!res.ok) return { text: "", imageUrl: "", description: "" };
-    const html = await res.text();
+    if (res.status < 200 || res.status >= 300) return { text: "", imageUrl: "", description: "" };
+    const html = res.body.toString("utf8");
     const $ = cheerio.load(html);
 
     // 1. Imagem destacada via meta tags (og:image é a imagem canônica de share)

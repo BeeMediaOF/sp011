@@ -16,6 +16,7 @@ import { store, type ContactInfo, type SiteSettings } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
 import { articleService, type RetentionOptions } from "../lib/articleService.js";
 import { rewriteWithAI, scrapeArticle, scrapeWithDiffbot, getAIQuotaStatus } from "../lib/rssProcessor.js";
+import { assertAllowedTarget, safeFetch } from "../lib/safeFetch.js";
 import { YoutubeTranscript } from "youtube-transcript";
 
 const router = Router();
@@ -1189,12 +1190,15 @@ async function scrapeYouTube(url: string): Promise<{ title: string; text: string
     } catch (err) {
       // Captions not available — fall back to page description
       try {
-        const pageRes = await fetch(url, {
+        const pageRes = await safeFetch(url, {
+          isAllowedHost: () => true,
+          allowHttp: false,
+          timeoutMs: 12_000,
+          maxBytes: 5 * 1024 * 1024,
           headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
-          signal: AbortSignal.timeout(12_000),
         });
-        if (pageRes.ok) {
-          const html = await pageRes.text();
+        if (pageRes.status >= 200 && pageRes.status < 300) {
+          const html = pageRes.body.toString("utf8");
           const og = /<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ?? "";
           const meta = /<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ?? "";
           transcriptText = og.length >= meta.length ? og : meta;
@@ -1218,6 +1222,17 @@ router.post("/article-from-url", requirePermission("articles.create"), async (re
   };
 
   if (!url || !url.startsWith("http")) {
+    res.status(400).json({ error: "URL inválida" });
+    return;
+  }
+
+  // Portão SSRF (PRD-06b): rejeita host de IP literal privado/reservado e
+  // protocolo não-https ANTES de qualquer chamada de rede — inclusive antes de
+  // repassar a URL ao Diffbot/oEmbed/scrape. allowlist aberta (URL de notícia é
+  // arbitrária); a proteção é IP-block + https + revalidação de redirect.
+  try {
+    assertAllowedTarget(url, () => true, { allowHttp: false });
+  } catch {
     res.status(400).json({ error: "URL inválida" });
     return;
   }
@@ -1272,12 +1287,15 @@ router.post("/article-from-url", requirePermission("articles.create"), async (re
       // Try og:title / og:image / og:description if still missing
       if (!title || !imageUrl || !scrapedDescription) {
         try {
-          const pageRes = await fetch(url, {
+          const pageRes = await safeFetch(url, {
+            isAllowedHost: () => true,
+            allowHttp: false,
+            timeoutMs: 10_000,
+            maxBytes: 5 * 1024 * 1024,
             headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
-            signal: AbortSignal.timeout(10_000),
           });
-          if (pageRes.ok) {
-            const html = await pageRes.text();
+          if (pageRes.status >= 200 && pageRes.status < 300) {
+            const html = pageRes.body.toString("utf8");
             if (!title) {
               const ogTitle   = /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/.exec(html)?.[1] ??
                                 /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/.exec(html)?.[1] ?? "";
