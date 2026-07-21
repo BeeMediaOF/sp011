@@ -37,6 +37,8 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS show_image_credit boolean`,
     // Idioma do painel admin por usuário (KSports: editor em inglês).
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'pt-BR'`,
+    // Corte de revogação de token por logout (PRD-03) — se autocria no boot.
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_from timestamp`,
     sql`CREATE UNIQUE INDEX IF NOT EXISTS articles_central_id_uniq ON articles (central_id) WHERE central_id IS NOT NULL`,
     // Variante Story (1080×1920) do template: { backgroundColor, elements }.
     sql`ALTER TABLE social_templates ADD COLUMN IF NOT EXISTS story jsonb`,

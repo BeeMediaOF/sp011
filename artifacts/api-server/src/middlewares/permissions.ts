@@ -4,7 +4,9 @@ import type { Request, Response, NextFunction } from "express";
 
 export function requirePermission(key: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (req.userRole === "admin" || req.isWebhookKey) { next(); return; }
+    // PRD-03/AP-4: a webhook key NÃO fura mais requirePermission (o bypass da
+    // key foi removido); ela só autoriza as rotas de publish via publishAuth.
+    if (req.userRole === "admin") { next(); return; }
     try {
       const [perm] = await db
         .select()

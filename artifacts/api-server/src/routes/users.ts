@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, eq, ne } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
-import { authMiddleware, requireAdmin, hashPassword } from "../middlewares/auth.js";
+import { authMiddleware, requireAdmin, hashPassword, invalidateUserCache } from "../middlewares/auth.js";
 import { logAudit, getClientIp } from "../lib/audit.js";
 import { sendWelcomeEmail } from "../lib/mailer.js";
 import type { UserPublic } from "@workspace/db";
@@ -162,6 +162,9 @@ router.put("/:id/password", async (req, res) => {
       updatedAt: new Date(),
     }).where(eq(usersTable.id, id)).returning();
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
+    // PRD-03/F14: invalida o cache (TTL 60s) p/ a revogação por troca de senha
+    // (passwordChangedAt) valer imediatamente, não após o cache expirar.
+    invalidateUserCache(id);
     await logAudit({
       userId: req.userId,
       action: "change_password",

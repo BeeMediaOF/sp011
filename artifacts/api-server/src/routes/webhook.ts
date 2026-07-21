@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { BRAND } from "../lib/brand.js";
-import { authMiddleware } from "../middlewares/auth.js";
+import { publishAuth } from "../middlewares/auth.js";
 import { articleService } from "../lib/articleService.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { sendPushToAll } from "./push.js";
@@ -67,7 +67,7 @@ function deriveTitle(subtitle?: string, content?: string): string {
  *   author      string  optional  default: BRAND.author
  *   id          string  optional  if provided without title, publishes an existing draft
  */
-router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
+router.post("/", publishRateLimit, publishAuth, async (req, res) => {
   // Log apenas metadados — o corpo completo pode conter artigos inteiros e
   // inflar/poluir os logs (dados de terceiros não pertencem ao log de acesso).
   req.log.info(
@@ -187,7 +187,7 @@ router.post("/", publishRateLimit, authMiddleware, async (req, res) => {
  * POST /api/publish/:id
  * Publish an existing draft by ID.
  */
-router.post("/:id", authMiddleware, async (req, res) => {
+router.post("/:id", publishAuth, async (req, res) => {
   const article = await articleService.updateArticle(String(req.params["id"] ?? ""), {
     status: "published",
     publishedAt: new Date().toISOString(),

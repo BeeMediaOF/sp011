@@ -18,6 +18,9 @@ export const usersTable = pgTable("users", {
   failedLoginAttempts: integer("failed_login_attempts").notNull().default(0),
   lockedUntil: timestamp("locked_until"),
   passwordChangedAt: timestamp("password_changed_at"),
+  /** Corte de revogação por logout (PRD-03): token emitido antes é inválido.
+   *  null = sem revogação. A troca de senha usa passwordChangedAt. */
+  tokensValidFrom: timestamp("tokens_valid_from"),
   mustChangePassword: integer("must_change_password").notNull().default(0),
   avatarBase64: text("avatar_base64"),
   /** Idioma do PAINEL admin, por usuário (não confundir com settings.siteLanguage,

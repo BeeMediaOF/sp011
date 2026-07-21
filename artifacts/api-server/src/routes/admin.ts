@@ -6,7 +6,7 @@ import { resolve } from "path";
 import { db, usersTable, adsTable, adDailyStatsTable, parseTargetDevices, serializeTargetDevices, VALID_AD_POSITIONS, type AdPosition } from "@workspace/db";
 import {
   authMiddleware, requireAdmin, generateToken, generateTempToken, verifyTempToken,
-  verifyPassword, checkRateLimit, resetRateLimit,
+  verifyPassword, checkRateLimit, resetRateLimit, invalidateUserCache,
 } from "../middlewares/auth.js";
 import { generateSecret as otpGenerateSecret, verifySync as otpVerifySync, generateURI as otpGenerateURI } from "otplib";
 import QRCode from "qrcode";
@@ -284,6 +284,12 @@ router.put("/me", authMiddleware, async (req, res) => {
 
 /** POST /api/admin/logout */
 router.post("/logout", authMiddleware, async (req, res) => {
+  // PRD-03/F14: logout EFETIVO — marca o corte de revogação e limpa o cache,
+  // invalidando os tokens desse usuário emitidos antes (fim do logout no-op).
+  if (req.userId) {
+    await db.update(usersTable).set({ tokensValidFrom: new Date() }).where(eq(usersTable.id, req.userId));
+    invalidateUserCache(req.userId);
+  }
   await logAudit({
     userId: req.userId,
     action: "logout", module: "auth",
