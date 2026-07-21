@@ -8,6 +8,7 @@ export * from "./deliveries";
 export * from "./delivery_attempts";
 export * from "./ai_usage_events";
 export * from "./central_event_logs";
+export * from "./central_audit_log";
 export * from "./central_settings";
 export * from "./social_videos";
 export * from "./blog_social_accounts";

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { db, centralSourcesTable, distributionRulesTable, type CentralSourceRow } from "@workspace/central-db";
 import { desc, eq } from "drizzle-orm";
-import { authMiddleware } from "../middlewares/auth.js";
+import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
 import { collectSourceById, runCollectorCycle } from "../services/collector.js";
 import { sourceMatchesAnyRule } from "../lib/rules.js";
 import { logEvent } from "../lib/eventLog.js";
@@ -24,7 +24,7 @@ router.get("/", async (req, res) => {
   res.json(rows.filter((s) => sourceMatchesAnyRule(rules, { id: s.id, category: s.category })));
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<CentralSourceRow>;
   if (!body.name?.trim() || !body.url?.trim()) {
     res.status(400).json({ error: "name e url são obrigatórios." });
@@ -49,14 +49,14 @@ router.post("/", async (req, res) => {
   res.status(201).json(row);
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<CentralSourceRow>;
   delete (body as Record<string, unknown>)["id"];
   if (body.language !== undefined) body.language = body.language === "en" ? "en" : "pt-BR";
   const [row] = await db
     .update(centralSourcesTable)
     .set(body)
-    .where(eq(centralSourcesTable.id, req.params.id))
+    .where(eq(centralSourcesTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Fonte não encontrada." });
@@ -65,10 +65,10 @@ router.patch("/:id", async (req, res) => {
   res.json(row);
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireCentralRole("admin"), async (req, res) => {
   const [row] = await db
     .delete(centralSourcesTable)
-    .where(eq(centralSourcesTable.id, req.params.id))
+    .where(eq(centralSourcesTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Fonte não encontrada." });
@@ -78,9 +78,9 @@ router.delete("/:id", async (req, res) => {
 });
 
 /** Coleta imediata de uma fonte (ignora scheduleHours/janela). */
-router.post("/:id/run", async (req, res) => {
+router.post("/:id/run", requireCentralRole("admin"), async (req, res) => {
   try {
-    const collected = await collectSourceById(req.params.id);
+    const collected = await collectSourceById((req.params.id as string));
     res.json({ ok: true, collected });
   } catch (err) {
     res.status(404).json({ error: String(err instanceof Error ? err.message : err) });
@@ -88,7 +88,7 @@ router.post("/:id/run", async (req, res) => {
 });
 
 /** Dispara um ciclo completo agora (ignora intervalo/janela, respeita orçamento). */
-router.post("/run-cycle", async (_req, res) => {
+router.post("/run-cycle", requireCentralRole("admin"), async (_req, res) => {
   const result = await runCollectorCycle(true);
   res.json({ ok: true, ...result });
 });

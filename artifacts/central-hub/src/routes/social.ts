@@ -18,7 +18,7 @@ import {
 } from "@workspace/central-db";
 import { and, desc, eq, inArray, type SQL } from "drizzle-orm";
 import { decryptSecret, encryptSecret } from "@workspace/news-engine";
-import { authMiddleware } from "../middlewares/auth.js";
+import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
 import { getSettings, type HubSettings } from "../lib/store.js";
 import { getGeminiPool } from "../lib/aiPool.js";
 import { logEvent } from "../lib/eventLog.js";
@@ -434,7 +434,7 @@ router.get("/connections", async (_req, res) => {
 
 router.get("/connections/:blogId", async (req, res) => {
   const all = await listConnections(getSettings());
-  const one = all.find((c) => c.blogId === req.params.blogId);
+  const one = all.find((c) => c.blogId === (req.params.blogId as string));
   if (!one) { res.status(404).json({ error: "Blog não encontrado." }); return; }
   res.json(one);
 });
@@ -455,8 +455,8 @@ async function upsertAccount(blogId: string, values: Partial<typeof blogSocialAc
   }
 }
 
-router.put("/connections/:blogId/buffer", async (req, res) => {
-  const blogId = req.params.blogId;
+router.put("/connections/:blogId/buffer", requireCentralRole("admin"), async (req, res) => {
+  const blogId = (req.params.blogId as string);
   const [blog] = await db.select().from(blogsTable).where(eq(blogsTable.id, blogId)).limit(1);
   if (!blog) { res.status(404).json({ error: "Blog não encontrado." }); return; }
 
@@ -478,19 +478,19 @@ router.put("/connections/:blogId/buffer", async (req, res) => {
   res.json((await listConnections(getSettings())).find((c) => c.blogId === blogId));
 });
 
-router.delete("/connections/:blogId/buffer", async (req, res) => {
-  await upsertAccount(req.params.blogId, {
+router.delete("/connections/:blogId/buffer", requireCentralRole("admin"), async (req, res) => {
+  await upsertAccount((req.params.blogId as string), {
     bufferChannelId: null,
     bufferChannelName: null,
     bufferApiKeyEnc: null,
     bufferConnectedAt: null,
   });
-  logEvent({ module: "social", refType: "blog", refId: req.params.blogId, message: "Buffer/TikTok desconectado" });
+  logEvent({ module: "social", refType: "blog", refId: (req.params.blogId as string), message: "Buffer/TikTok desconectado" });
   res.json({ ok: true });
 });
 
-router.delete("/connections/:blogId/meta", async (req, res) => {
-  await upsertAccount(req.params.blogId, {
+router.delete("/connections/:blogId/meta", requireCentralRole("admin"), async (req, res) => {
+  await upsertAccount((req.params.blogId as string), {
     metaPageId: null,
     metaPageName: null,
     igUserId: null,
@@ -499,14 +499,14 @@ router.delete("/connections/:blogId/meta", async (req, res) => {
     metaConnectedAt: null,
     metaLastError: null,
   });
-  logEvent({ module: "social", refType: "blog", refId: req.params.blogId, message: "Conta Meta desconectada" });
+  logEvent({ module: "social", refType: "blog", refId: (req.params.blogId as string), message: "Conta Meta desconectada" });
   res.json({ ok: true });
 });
 
 // App Meta do PRÓPRIO blog (aba Redes Sociais). Trim SEMPRE — espaço/quebra
 // colada junto do secret causava "Error validating client secret" (cf67b35).
-router.put("/connections/:blogId/meta-app", async (req, res) => {
-  const blogId = req.params.blogId;
+router.put("/connections/:blogId/meta-app", requireCentralRole("admin"), async (req, res) => {
+  const blogId = (req.params.blogId as string);
   const [blog] = await db.select().from(blogsTable).where(eq(blogsTable.id, blogId)).limit(1);
   if (!blog) { res.status(404).json({ error: "Blog não encontrado." }); return; }
 
@@ -524,9 +524,9 @@ router.put("/connections/:blogId/meta-app", async (req, res) => {
   res.json((await listConnections(getSettings())).find((c) => c.blogId === blogId));
 });
 
-router.delete("/connections/:blogId/meta-app", async (req, res) => {
-  await upsertAccount(req.params.blogId, { metaAppId: null, metaAppSecretEnc: null });
-  logEvent({ module: "social", refType: "blog", refId: req.params.blogId, message: "App Meta do blog removido (volta ao global, se houver)" });
+router.delete("/connections/:blogId/meta-app", requireCentralRole("admin"), async (req, res) => {
+  await upsertAccount((req.params.blogId as string), { metaAppId: null, metaAppSecretEnc: null });
+  logEvent({ module: "social", refType: "blog", refId: (req.params.blogId as string), message: "App Meta do blog removido (volta ao global, se houver)" });
   res.json({ ok: true });
 });
 
@@ -594,7 +594,7 @@ router.get("/meta/oauth/start", async (req, res) => {
   res.json({ url: `${META_DIALOG}?${params.toString()}`, state });
 });
 
-router.post("/meta/oauth/exchange", async (req, res) => {
+router.post("/meta/oauth/exchange", requireCentralRole("admin"), async (req, res) => {
   const { code, state } = (req.body ?? {}) as { code?: string; state?: string };
   if (!code) { res.status(400).json({ error: "code ausente" }); return; }
   const sess = state ? metaStates.get(state) : undefined;
@@ -653,7 +653,7 @@ router.post("/meta/oauth/exchange", async (req, res) => {
   }
 });
 
-router.post("/meta/oauth/save", async (req, res) => {
+router.post("/meta/oauth/save", requireCentralRole("admin"), async (req, res) => {
   const { sessionId, pageId } = (req.body ?? {}) as { sessionId?: string; pageId?: string };
   const sess = sessionId ? metaOauthCache.get(sessionId) : undefined;
   if (!sess || sess.expires < Date.now()) {

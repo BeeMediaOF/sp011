@@ -146,6 +146,12 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   next();
 }
 
+// ─── Autorização por papel (RBAC — PRD-02) ────────────────────────────────────
+// `requireCentralRole` vive em `./rbac.ts` (módulo PURO, sem import de banco,
+// para ser testável sem DB). Re-exportado aqui para as rotas importarem tudo de
+// auth (`import { authMiddleware, requireCentralRole } from "../middlewares/auth.js"`).
+export { requireCentralRole } from "./rbac.js";
+
 // ─── Rate limit simples de login (em memória, 10/min por IP) ──────────────────
 
 const _loginAttempts = new Map<string, { count: number; resetAt: number }>();

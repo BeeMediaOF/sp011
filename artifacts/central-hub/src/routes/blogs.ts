@@ -3,9 +3,10 @@ import { Router } from "express";
 import { db, blogsTable, type BlogRow, type BlogCategory } from "@workspace/central-db";
 import { encryptSecret } from "@workspace/news-engine";
 import { desc, eq } from "drizzle-orm";
-import { authMiddleware } from "../middlewares/auth.js";
+import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
 import { testBlogConnection } from "../services/blogClient.js";
 import { logEvent } from "../lib/eventLog.js";
+import { logAudit } from "../lib/auditLog.js";
 import { normalizeTitleCaseMode } from "../lib/titleCase.js";
 
 const router = Router();
@@ -44,7 +45,7 @@ router.get("/", async (_req, res) => {
   res.json(rows.map(sanitize));
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<BlogRow> & { name?: string; apiUrl?: string };
   if (!body.name?.trim() || !body.apiUrl?.trim()) {
     res.status(400).json({ error: "name e apiUrl são obrigatórios." });
@@ -78,11 +79,12 @@ router.post("/", async (req, res) => {
     .returning();
 
   logEvent({ module: "api", refType: "blog", refId: id, message: `Blog cadastrado: ${body.name}` });
+  logAudit(req, { action: "blog.create", targetType: "blog", targetId: id, meta: { blogName: body.name.trim() } });
   // O segredo é exibido UMA única vez — o painel deve avisar o operador.
   res.status(201).json({ blog: sanitize(row!), ingestSecret: secret });
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<BlogRow>;
   // Segredo só muda por rotate-secret; nunca por PATCH direto.
   delete (body as Record<string, unknown>)["ingestSecretEnc"];
@@ -99,7 +101,7 @@ router.patch("/:id", async (req, res) => {
   const [row] = await db
     .update(blogsTable)
     .set({ ...body, updatedAt: new Date() })
-    .where(eq(blogsTable.id, req.params.id))
+    .where(eq(blogsTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Blog não encontrado." });
@@ -108,33 +110,36 @@ router.patch("/:id", async (req, res) => {
   res.json(sanitize(row));
 });
 
-router.delete("/:id", async (req, res) => {
-  const [row] = await db.delete(blogsTable).where(eq(blogsTable.id, req.params.id)).returning();
+router.delete("/:id", requireCentralRole("admin"), async (req, res) => {
+  const [row] = await db.delete(blogsTable).where(eq(blogsTable.id, (req.params.id as string))).returning();
   if (!row) {
     res.status(404).json({ error: "Blog não encontrado." });
     return;
   }
   logEvent({ module: "api", refType: "blog", refId: row.id, message: `Blog removido: ${row.name}` });
+  logAudit(req, { action: "blog.delete", targetType: "blog", targetId: row.id, meta: { blogName: row.name } });
   res.json({ ok: true });
 });
 
-router.post("/:id/rotate-secret", async (req, res) => {
+router.post("/:id/rotate-secret", requireCentralRole("admin"), async (req, res) => {
   const secret = newSecret();
   const [row] = await db
     .update(blogsTable)
     .set({ ingestSecretEnc: encryptSecret(secret), updatedAt: new Date() })
-    .where(eq(blogsTable.id, req.params.id))
+    .where(eq(blogsTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Blog não encontrado." });
     return;
   }
   logEvent({ module: "auth", refType: "blog", refId: row.id, message: `Segredo rotacionado: ${row.name}` });
+  // Auditoria: registra o FATO (autor/alvo), NUNCA o segredo rotacionado.
+  logAudit(req, { action: "blog.rotate_secret", targetType: "blog", targetId: row.id, meta: { blogName: row.name } });
   res.json({ blog: sanitize(row), ingestSecret: secret });
 });
 
 router.post("/:id/test", async (req, res) => {
-  const rows = await db.select().from(blogsTable).where(eq(blogsTable.id, req.params.id)).limit(1);
+  const rows = await db.select().from(blogsTable).where(eq(blogsTable.id, (req.params.id as string))).limit(1);
   const blog = rows[0];
   if (!blog) {
     res.status(404).json({ error: "Blog não encontrado." });

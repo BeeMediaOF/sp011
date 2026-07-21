@@ -209,6 +209,21 @@ const STATEMENTS: Array<{ name: string; query: ReturnType<typeof sql> }> = [
   { name: "central_event_logs_ts_idx", query: sql`CREATE INDEX IF NOT EXISTS central_event_logs_ts_idx ON central_event_logs (ts)` },
   { name: "central_event_logs_module_ts_idx", query: sql`CREATE INDEX IF NOT EXISTS central_event_logs_module_ts_idx ON central_event_logs (module, ts)` },
   {
+    name: "central_audit_log",
+    query: sql`CREATE TABLE IF NOT EXISTS central_audit_log (
+      id serial PRIMARY KEY,
+      ts timestamptz NOT NULL DEFAULT now(),
+      user_id text,
+      user_email text,
+      action text NOT NULL,
+      target_type text,
+      target_id text,
+      meta jsonb
+    )`,
+  },
+  { name: "central_audit_log_ts_idx", query: sql`CREATE INDEX IF NOT EXISTS central_audit_log_ts_idx ON central_audit_log (ts)` },
+  { name: "central_audit_log_user_ts_idx", query: sql`CREATE INDEX IF NOT EXISTS central_audit_log_user_ts_idx ON central_audit_log (user_id, ts)` },
+  {
     name: "central_settings",
     query: sql`CREATE TABLE IF NOT EXISTS central_settings (
       key text PRIMARY KEY,

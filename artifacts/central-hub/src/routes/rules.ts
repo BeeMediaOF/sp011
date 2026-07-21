@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Router } from "express";
 import { db, distributionRulesTable, type DistributionRuleRow } from "@workspace/central-db";
 import { desc, eq } from "drizzle-orm";
-import { authMiddleware } from "../middlewares/auth.js";
+import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -23,7 +23,7 @@ router.get("/", async (req, res) => {
   res.json(rows);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<DistributionRuleRow>;
   if (!body.blogId || !body.name?.trim()) {
     res.status(400).json({ error: "blogId e name são obrigatórios." });
@@ -50,7 +50,7 @@ router.post("/", async (req, res) => {
   res.status(201).json(row);
 });
 
-router.patch("/:id", async (req, res) => {
+router.patch("/:id", requireCentralRole("admin"), async (req, res) => {
   const body = (req.body ?? {}) as Partial<DistributionRuleRow>;
   delete (body as Record<string, unknown>)["id"];
   const set: Partial<DistributionRuleRow> = { ...body, updatedAt: new Date() };
@@ -63,7 +63,7 @@ router.patch("/:id", async (req, res) => {
   const [row] = await db
     .update(distributionRulesTable)
     .set(set)
-    .where(eq(distributionRulesTable.id, req.params.id))
+    .where(eq(distributionRulesTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Regra não encontrada." });
@@ -72,10 +72,10 @@ router.patch("/:id", async (req, res) => {
   res.json(row);
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireCentralRole("admin"), async (req, res) => {
   const [row] = await db
     .delete(distributionRulesTable)
-    .where(eq(distributionRulesTable.id, req.params.id))
+    .where(eq(distributionRulesTable.id, (req.params.id as string)))
     .returning();
   if (!row) {
     res.status(404).json({ error: "Regra não encontrada." });
