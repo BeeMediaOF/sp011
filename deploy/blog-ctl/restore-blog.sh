@@ -45,7 +45,7 @@ if ! $COMPOSE exec -T pg-blogs psql -U postgres -tAc "SELECT 1 FROM pg_database 
 fi
 
 gpg --batch --quiet --decrypt --passphrase-file "$PASSPHRASE_FILE" "$DUMP" \
-  | $COMPOSE exec -T pg-blogs pg_restore --no-owner --no-privileges -d "$TARGET"
+  | $COMPOSE exec -T pg-blogs pg_restore -U postgres --no-owner --no-privileges -d "$TARGET"
 
 echo -n "[restore] tabelas em $TARGET (schema public): "
 $COMPOSE exec -T pg-blogs psql -U postgres -d "$TARGET" -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
