@@ -133,9 +133,9 @@ no painel (`?period=today|yesterday|7d|30d|custom`), ecoado em `stats.period`.
 | Localização | `pageview.city/region` | agregado por evento DA JANELA; cidade nula = **“Não identificado”** (nunca inventamos local). `geo_stats` virou histórico bruto, não alimenta o painel | selecionada | — |
 | Profundidade de leitura | `scroll` (25/50/75/100) | **sessões únicas** (sessão+artigo) por marco; % medido sobre o BLOCO do corpo do artigo (contentRef — cabeçalho/lateral/rodapé não contam); página curta = 100% após 3s | selecionada | sessionStorage `bee_scroll_<artigo>` — remount não redispara |
 | Leram 100% | `scroll depth=100` | tamanho do set de sessões | selecionada | idem |
-| Impressões de anúncio | `POST /api/ads/:id/impression` | IntersectionObserver ≥50% visível por **1s contínuo** (dwell IAB); anúncio inativo/expirado não conta (checado no servidor) | selecionada (`ad_daily_stats` por dia BRT) | 1× por anúncio por sessão (`bee_adimp_<id>`); admin/dev não envia |
-| Blocos "É uma propaganda" | idem, com chave `block:<id do bloco>` | blocos de imagem/HTML da home ou da lateral marcados `isAd` medem impressão (mesma regra de dwell) e clique (qualquer link do bloco); validados contra as settings no servidor; contadores só em `ad_daily_stats` (sem linha na tabela `ads`); entram em adStats/adKpis como posição "bloco da home" | selecionada | 1× por sessão; bloco oculto não conta |
-| Cliques de anúncio | `POST /api/ads/:id/click` | registrado antes do redirect (target=_blank) | selecionada | admin/dev não envia |
+| Impressões de anúncio | `POST /api/ads/:id/impression` | IntersectionObserver ≥50% visível por **1s contínuo** (dwell IAB); anúncio inativo/expirado não conta (checado no servidor). Gravação ATÔMICA por `(ad_id, date)` com índice único (PRD 04 RF1 — antes: upsert sem UNIQUE inflava ~quadraticamente) | selecionada (`ad_daily_stats` por dia BRT) | cliente 1×/aba (`bee_adimp_<id>`) **+ servidor 1×/sessão/anúncio em 30min** (PRD 04 RF4); admin/dev envia `internal:true` → conta em `internal_impressions`, fora do público |
+| Blocos "É uma propaganda" | idem, com chave `block:<id do bloco>` | blocos de imagem/HTML da home ou da lateral marcados `isAd` medem impressão (mesma regra de dwell) e clique (qualquer link do bloco); validados contra as settings no servidor; contadores só em `ad_daily_stats` (sem linha na tabela `ads`); entram em adStats/adKpis como posição "bloco da home" | selecionada | cliente 1×/aba + servidor 1×/sessão em 30min; bloco oculto não conta |
+| Cliques de anúncio | `POST /api/ads/:id/click` | registrado antes do redirect (target=_blank) | selecionada | servidor dedup 10s por sessão/anúncio (mata duplo-clique); admin/dev envia `internal:true` → `internal_clicks` |
 | CTR | derivado | cliques válidos ÷ impressões válidas × 100, por anúncio e médio | selecionada | — |
 | Melhor anúncio | derivado | maior CTR entre anúncios com impressão > 0 na janela; `—` sem dados | selecionada | — |
 | “sem dados no período” (ads) | `ad_daily_stats` | anúncio sem NENHUMA linha diária na janela (≠ zero real); `adHasAnyData=false` = coleta nunca começou (“Acumulando…”) | selecionada | — |
@@ -146,8 +146,11 @@ no painel (`?period=today|yesterday|7d|30d|custom`), ecoado em `stats.period`.
 Contadores **em memória desde o boot** (reiniciar o container zera — proposital,
 é diagnóstico, não histórico): `received, droppedBot, droppedRate,
 droppedInvalid, droppedDuplicate, flaggedInternal, flushedOk, flushFailed,
-buffered, lastEventAt, lastFlushAt, reliableSince, filters[]`. Exibidos na faixa
-“Saúde da coleta” do painel. `flushFailed > 0` aparece em vermelho.
+buffered, lastEventAt, lastFlushAt, reliableSince, filters[]`, mais
+`adsReliableSince` (PRD 04 — data a partir da qual as métricas de anúncio são
+contagem exata; anteriores são reparadas por estimativa; `null` = reparo ainda não
+rodou). Exibidos na faixa “Saúde da coleta” do painel (a UI do `adsReliableSince`
+é do PRD 08). `flushFailed > 0` aparece em vermelho.
 
 ## LGPD / privacidade
 
@@ -181,6 +184,15 @@ buffered, lastEventAt, lastFlushAt, reliableSince, filters[]`. Exibidos na faixa
 7. **Impressões de anúncio caíram após 08/07/2026** — é o número honesto
    (dwell de 1s + 1× por sessão). Comparações com o histórico anterior
    superestimado não são válidas. Totais all-time seguem no AdsManager.
+8. **Reparo histórico do PRD 04 (`ad_daily_stats`)** — o upsert antigo, sem índice
+   único em `(ad_id, date)`, inflava a contagem diária ~quadraticamente (medido: de
+   ~3× a ~27× por blog). O boot da imagem do PRD 04 faz, uma vez por banco: backup
+   (`ad_daily_stats_backup_prd04`), reparo por estimativa (`MAX−1` por par — validado
+   contra o all-time: 65 = 65 num anúncio real) e criação do índice único. Datas
+   ANTERIORES ao marcador `settings.ads_reliable_since` são reparadas por estimativa;
+   a partir dele, contagem exata. **Os números de impressão caem de novo após o
+   reparo — é o valor honesto.** O all-time de `ads` (contador independente) não é
+   tocado.
 8. Revisita à mesma página na mesma sessão conta o MAX de tempo (não a soma) —
    leve subestimação, preferida a duplicar leituras.
 

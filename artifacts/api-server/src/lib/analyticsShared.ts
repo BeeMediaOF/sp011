@@ -353,3 +353,42 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
 export function pctChange(cur: number, prev: number): number | null {
   return prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
 }
+
+// ─── Sanidade de anúncios (PRD 04 RF6 — fórmula/fonte; motor contínuo é o PRD 11) ─
+export interface SanityResult {
+  ok: boolean;
+  ratio: number; // impressões / limite (>1 = estouro)
+  limit: number;
+}
+
+/**
+ * `impressoes_publicas(A,D) ≤ max(pageviews_nao_internos(D),1) × slots × margem`.
+ * Piso `max(pv,1)`: um dia com 0 pageview ainda admite algumas impressões — impressão
+ * NÃO passa por gate LGPD e pageview passa, então há tráfego que gera impressão sem
+ * pageview (assimetria confirmada com dados, auditoria §9.3). NÃO remover o piso nem
+ * inflar a margem para "zerar" alerta: seria esconder o achado. Margem = 3 enquanto a
+ * assimetria existir (severidade warning), 1.5 depois que o PRD 02 alinhar a admissão.
+ */
+export function checkAdSanity(
+  impressions: number,
+  pageviews: number,
+  slots: number,
+  margin: number,
+): SanityResult {
+  const limit = Math.max(pageviews, 1) * slots * margin;
+  return { ok: impressions <= limit, ratio: limit > 0 ? impressions / limit : 0, limit };
+}
+
+/**
+ * Regra irmã (PRD 04 RF6): `clicks_publicos(A,D) ≤ impressoes_publicas(A,D) + 1`.
+ * O `+1` é folga TEÓRICA para o clique legítimo antes do dwell de 1s (nenhum caso
+ * empírico na rede — os candidatos eram artefato da inflação, §9.6). Apertar para `≤`
+ * estrito é decisão do PRD 11 após o reparo — não neste PRD.
+ */
+export function checkClicksVsImpressions(
+  clicks: number,
+  impressions: number,
+): { ok: boolean; limit: number } {
+  const limit = impressions + 1;
+  return { ok: clicks <= limit, limit };
+}

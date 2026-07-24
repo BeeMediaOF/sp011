@@ -69,6 +69,11 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`CREATE INDEX IF NOT EXISTS behavior_session_idx ON behavior_events (session_id)`,
     sql`CREATE INDEX IF NOT EXISTS geo_stats_region_idx ON geo_stats (region)`,
     sql`CREATE INDEX IF NOT EXISTS geo_stats_city_idx ON geo_stats (city)`,
+    // PRD 04 RF3 — dimensão interna de ad_daily_stats (marcado, nunca dropado — §17).
+    // A CONTAGEM interna vai para estas colunas; leitores públicos somam só impressions/
+    // clicks e passam a enxergar só o público sem mudar nenhuma query.
+    sql`ALTER TABLE ad_daily_stats ADD COLUMN IF NOT EXISTS internal_impressions integer NOT NULL DEFAULT 0`,
+    sql`ALTER TABLE ad_daily_stats ADD COLUMN IF NOT EXISTS internal_clicks integer NOT NULL DEFAULT 0`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,
@@ -95,4 +100,76 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     }
   }
   logger.info("ensureSchema: colunas verificadas/criadas");
+
+  // PRD 04 RF2 — reparo dos dados históricos inflados de ad_daily_stats (roda no boot,
+  // uma vez por banco, guardado pela existência do índice único). Depois das colunas
+  // internas acima já existirem. Não-fatal: falha é logada e o boot segue.
+  await ensureAdDailyStatsIntegrity(target);
+}
+
+/**
+ * ensureAdDailyStatsIntegrity — desinfla ad_daily_stats e trava a regravação (PRD 04).
+ *
+ * O escritor legado (INSERT-sempre + UPDATE-em-todas-as-linhas do par, sem UNIQUE em
+ * (ad_id,date)) acumulou linhas duplicadas com soma ~quadrática. Este reparo, numa
+ * única transação:
+ *   a. faz BACKUP do estado original (ad_daily_stats_backup_prd04);
+ *   b. colapsa cada par para 1 linha com o valor real estimado (MAX−1 por campo —
+ *      estimador validado contra produção: 65 = 65 no anúncio "Start", auditoria §9.1);
+ *   c. cria o índice ÚNICO ad_daily_ad_date_uniq e dropa o comum ad_daily_ad_date_idx;
+ *   d. grava o marcador settings.ads_reliable_since (datas anteriores = reparadas por
+ *      estimativa; a partir dele = contagem exata do código novo).
+ *
+ * Guarda de idempotência: a EXISTÊNCIA do índice único. O estimador NÃO é idempotente
+ * (reaplicar decrementaria de novo), por isso reparo+índice são a MESMA transação —
+ * não existe estado "reparado sem índice" persistido. Falha → rollback e retry no
+ * próximo boot; o all-time de adsTable permanece correto como contraprova.
+ */
+export async function ensureAdDailyStatsIntegrity(target: Db = db): Promise<void> {
+  try {
+    const guard = await target.execute(
+      sql`SELECT 1 AS ok FROM pg_indexes WHERE tablename = 'ad_daily_stats' AND indexname = 'ad_daily_ad_date_uniq' LIMIT 1`,
+    );
+    const already = (((guard as { rows?: unknown[] }).rows?.length) ?? 0) > 0;
+    if (already) return; // já reparado neste banco — nunca reexecuta
+
+    await target.transaction(async (tx) => {
+      // a. Backup do estado ORIGINAL (antes de qualquer reescrita). Descartável após
+      //    validação (CA5); fora do schema Drizzle por design (tabela operacional).
+      await tx.execute(
+        sql`CREATE TABLE IF NOT EXISTS ad_daily_stats_backup_prd04 AS SELECT * FROM ad_daily_stats`,
+      );
+      // b1. Colapsa: mantém a linha de menor id do par com o valor real (MAX−1, piso 0).
+      await tx.execute(sql`
+        WITH rep AS (
+          SELECT ad_id, date, min(id) AS keep_id,
+                 CASE WHEN max(impressions) = 0 THEN 0 ELSE max(impressions) - 1 END AS imp_fix,
+                 CASE WHEN max(clicks)      = 0 THEN 0 ELSE max(clicks)      - 1 END AS clk_fix
+          FROM ad_daily_stats GROUP BY ad_id, date
+        )
+        UPDATE ad_daily_stats s
+        SET impressions = rep.imp_fix, clicks = rep.clk_fix
+        FROM rep
+        WHERE s.id = rep.keep_id
+      `);
+      // b2. Remove as demais linhas do par (as que não são a keep_id).
+      await tx.execute(sql`
+        DELETE FROM ad_daily_stats s
+        USING (SELECT ad_id, date, min(id) AS keep_id FROM ad_daily_stats GROUP BY ad_id, date) rep
+        WHERE s.ad_id = rep.ad_id AND s.date = rep.date AND s.id <> rep.keep_id
+      `);
+      // c. Índice único (o upsert atômico depende dele) + drop do comum redundante.
+      await tx.execute(sql`CREATE UNIQUE INDEX ad_daily_ad_date_uniq ON ad_daily_stats (ad_id, date)`);
+      await tx.execute(sql`DROP INDEX IF EXISTS ad_daily_ad_date_idx`);
+      // d. Marcador "dados de anúncio confiáveis desde" (data BRT do 1º boot pós-fix).
+      await tx.execute(sql`
+        INSERT INTO settings (key, value)
+        SELECT 'ads_reliable_since', to_char((now() AT TIME ZONE 'America/Sao_Paulo')::date, 'YYYY-MM-DD')
+        WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'ads_reliable_since')
+      `);
+    });
+    logger.info("ensureSchema: ad_daily_stats reparado e índice único criado (PRD 04)");
+  } catch (err) {
+    logger.warn({ err }, "ensureSchema: reparo de ad_daily_stats falhou (não-fatal, retry no próximo boot)");
+  }
 }

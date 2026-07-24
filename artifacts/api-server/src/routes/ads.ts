@@ -1,11 +1,29 @@
 import { Router } from "express";
-import { and, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { eq, gte, isNull, or, and, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
 import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
+import { cleanStr, normalizeIp, isPrivateIp } from "../lib/analyticsShared.js";
+import { internalIpSet } from "../lib/internalTraffic.js";
+import { DedupStore } from "../lib/adsDaily.js";
+import { logger } from "../lib/logger.js";
 import { store } from "../lib/store.js";
 
 const router = Router();
+
+// ─── Dedup server-side por sessão/anúncio (PRD 04 RF4) ────────────────────────
+// O client já promete 1×/aba; o servidor garante ~1×/sessão/anúncio mesmo com N
+// abas, storage bloqueado ou script direto. Chave: adimp|adclick:<adId>:<sessão|ip>.
+// Não usa isRecentDuplicate do trafficGuard (sweeper de 60s, incompatível com 30 min).
+const IMPRESSION_DEDUP_MS = 30 * 60_000; // 30 min
+const CLICK_DEDUP_MS      = 10_000;      // 10 s — mata double-fire sem barrar clique real
+const adDedup = new DedupStore(50_000);
+setInterval(() => adDedup.sweep(Date.now()), 5 * 60_000).unref();
+
+/** Decisão de interno: MESMA tripla do /event (analytics.ts). */
+function isInternalReq(body: Record<string, unknown>, ip: string): boolean {
+  return body["internal"] === true || internalIpSet().has(ip) || isPrivateIp(ip);
+}
 
 // ─── Blocos "É uma propaganda" ────────────────────────────────────────────────
 // Blocos de imagem/HTML da home ou da lateral da notícia marcados isAd também
@@ -33,20 +51,40 @@ function todayStr(): string {
   return new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10);
 }
 
-async function upsertDailyStat(adId: string, field: "impressions" | "clicks") {
+/**
+ * Grava +1 no par (ad_id, date) de forma ATÔMICA (PRD 04 RF1). O índice único
+ * ad_daily_ad_date_uniq (criado pelo reparo no boot) faz o ON CONFLICT colapsar tudo
+ * numa linha: 1º evento do dia = 1 (não 2), demais = +1, concorrência resolvida pelo
+ * banco. Interno (RF3) vai para internal_*, sem tocar impressions/clicks públicos.
+ * Fire-and-forget: try/catch evita unhandled rejection (chamado via `void`); se o
+ * índice ainda não existir (reparo falhou), o ON CONFLICT erra, é logado e o boot
+ * seguinte reexecuta o reparo — o all-time de adsTable continua correto.
+ */
+async function upsertDailyStat(adId: string, field: "impressions" | "clicks", internal: boolean) {
   const date = todayStr();
-  await db
-    .insert(adDailyStatsTable)
-    .values({ adId, date, impressions: field === "impressions" ? 1 : 0, clicks: field === "clicks" ? 1 : 0 })
-    .onConflictDoNothing();
-  await db
-    .update(adDailyStatsTable)
-    .set(
-      field === "impressions"
-        ? { impressions: sql`${adDailyStatsTable.impressions} + 1` }
-        : { clicks: sql`${adDailyStatsTable.clicks} + 1` }
-    )
-    .where(and(eq(adDailyStatsTable.adId, adId), eq(adDailyStatsTable.date, date)));
+  const set =
+    internal && field === "impressions"
+      ? { internalImpressions: sql`${adDailyStatsTable.internalImpressions} + 1` }
+      : internal
+        ? { internalClicks: sql`${adDailyStatsTable.internalClicks} + 1` }
+        : field === "impressions"
+          ? { impressions: sql`${adDailyStatsTable.impressions} + 1` }
+          : { clicks: sql`${adDailyStatsTable.clicks} + 1` };
+  try {
+    await db
+      .insert(adDailyStatsTable)
+      .values({
+        adId,
+        date,
+        impressions:         !internal && field === "impressions" ? 1 : 0,
+        clicks:              !internal && field === "clicks"      ? 1 : 0,
+        internalImpressions: internal && field === "impressions"  ? 1 : 0,
+        internalClicks:      internal && field === "clicks"       ? 1 : 0,
+      })
+      .onConflictDoUpdate({ target: [adDailyStatsTable.adId, adDailyStatsTable.date], set });
+  } catch (err) {
+    logger.warn({ err, adId }, "ads: falha ao gravar stat diário (não-fatal)");
+  }
 }
 
 /*
@@ -147,6 +185,18 @@ router.post("/:id/click", async (req, res) => {
     return;
   }
 
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const ip = normalizeIp(req.ip ?? "");
+  const sessionId = cleanStr(b["sessionId"], 100);
+  const internal = isInternalReq(b, ip);
+
+  // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 10s = duplo clique.
+  if (adDedup.isDuplicate(`adclick:${id}:${sessionId ?? `ip:${ip}`}`, CLICK_DEDUP_MS, Date.now())) {
+    // PRD 03: bumpHealth aqui
+    res.json({ ok: true });
+    return;
+  }
+
   // Bloco da home marcado "É uma propaganda" — só o histórico diário.
   if (id.startsWith(BLOCK_PREFIX)) {
     const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
@@ -154,7 +204,7 @@ router.post("/:id/click", async (req, res) => {
       res.status(404).json({ ok: false, error: "Ad not found or inactive" });
       return;
     }
-    void upsertDailyStat(id, "clicks");
+    void upsertDailyStat(id, "clicks", internal);
     res.json({ ok: true, message: "Click tracked" });
     return;
   }
@@ -170,12 +220,15 @@ router.post("/:id/click", async (req, res) => {
     return;
   }
 
-  await db
-    .update(adsTable)
-    .set({ clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
-    .where(eq(adsTable.id, id));
+  // Interno (RF3) não incrementa o all-time público — só a coluna internal_*.
+  if (!internal) {
+    await db
+      .update(adsTable)
+      .set({ clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
+      .where(eq(adsTable.id, id));
+  }
 
-  void upsertDailyStat(id, "clicks");
+  void upsertDailyStat(id, "clicks", internal);
 
   res.json({ ok: true, message: "Click tracked" });
 });
@@ -189,10 +242,22 @@ router.post("/:id/impression", async (req, res) => {
     return;
   }
 
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const ip = normalizeIp(req.ip ?? "");
+  const sessionId = cleanStr(b["sessionId"], 100);
+  const internal = isInternalReq(b, ip);
+
+  // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 30min = mesma visita.
+  if (adDedup.isDuplicate(`adimp:${id}:${sessionId ?? `ip:${ip}`}`, IMPRESSION_DEDUP_MS, Date.now())) {
+    // PRD 03: bumpHealth aqui
+    res.json({ ok: true });
+    return;
+  }
+
   // Bloco da home marcado "É uma propaganda" — só bloco visível conta.
   if (id.startsWith(BLOCK_PREFIX)) {
     const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
-    if (blk && blk.visible) void upsertDailyStat(id, "impressions");
+    if (blk && blk.visible) void upsertDailyStat(id, "impressions", internal);
     res.json({ ok: true });
     return;
   }
@@ -209,12 +274,15 @@ router.post("/:id/impression", async (req, res) => {
     return;
   }
 
-  await db
-    .update(adsTable)
-    .set({ impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() })
-    .where(eq(adsTable.id, id));
+  // Interno (RF3) não incrementa o all-time público — só a coluna internal_*.
+  if (!internal) {
+    await db
+      .update(adsTable)
+      .set({ impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() })
+      .where(eq(adsTable.id, id));
+  }
 
-  void upsertDailyStat(id, "impressions");
+  void upsertDailyStat(id, "impressions", internal);
 
   res.json({ ok: true });
 });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { and, eq, gte, lt, lte, sql } from "drizzle-orm";
-import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, behaviorEventsTable } from "@workspace/db";
+import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, behaviorEventsTable, settingsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
@@ -10,12 +10,13 @@ import { isBotRequest, overRateLimit, isRecentDuplicate } from "../lib/trafficGu
 import {
   DAY, brtDayKey, brtDayStartMs,
   VALID_TYPES, BEHAVIOR_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
-  cleanStr, normalizeIp, isPrivateIp, parseInternalIps,
+  cleanStr, normalizeIp, isPrivateIp,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
   ANALYTICS_V2_SINCE, type EventLike,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
+import { internalIpSet } from "../lib/internalTraffic.js";
 
 const router = Router();
 
@@ -135,18 +136,7 @@ export function getPendingAnalyticsEvents(): AnalyticsEvent[] {
 }
 
 // ─── Tráfego interno ──────────────────────────────────────────────────────────
-// IPs configurados no painel (Configurações) — memoizado; o sync periódico de
-// settings atualiza a string e o Set é reconstruído sem restart.
-let _internalIpsRaw: string | undefined;
-let _internalIpSet = new Set<string>();
-function internalIpSet(): Set<string> {
-  const raw = store.getSettings().internalIps;
-  if (raw !== _internalIpsRaw) {
-    _internalIpsRaw = raw;
-    _internalIpSet = new Set(parseInternalIps(raw));
-  }
-  return _internalIpSet;
-}
+// IPs internos: fonte única em lib/internalTraffic.ts (compartilhada com routes/ads.ts).
 
 // ─── IP Geolocation via ip-api.com (async, cached, non-blocking) ──────────────
 // LIMITAÇÃO CONHECIDA (decisão registrada): plano grátis do ip-api é HTTP-only e
@@ -347,10 +337,22 @@ router.post("/behavior", async (req, res) => {
 });
 
 // ─── GET /api/analytics/health — saúde da coleta (admin) ─────────────────────
-router.get("/health", authMiddleware, (_req, res) => {
+router.get("/health", authMiddleware, async (_req, res) => {
+  // PRD 04 CA6: marcador "dados de anúncio confiáveis desde" (null = reparo ainda não
+  // rodou). Leitura direta com try/catch — endpoint de baixo tráfego. UI é o PRD 08.
+  let adsReliableSince: string | null = null;
+  try {
+    const [row] = await db
+      .select({ value: settingsTable.value })
+      .from(settingsTable)
+      .where(eq(settingsTable.key, "ads_reliable_since"))
+      .limit(1);
+    adsReliableSince = row?.value ?? null;
+  } catch { /* baixo tráfego — não derruba o /health */ }
   res.json({
     ...healthSnapshot({ buffered: _buffer.length }),
     reliableSince: ANALYTICS_V2_SINCE,
+    adsReliableSince,
     filters: [
       "user-agent de bot/CLI",
       "rate limit 120 eventos/min por IP",
@@ -654,10 +656,12 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     adDailyByDate[d] = {};
     for (const adId of top3AdIds) adDailyByDate[d]![adId] = { impressions: 0, clicks: 0 };
   }
+  // PRD 04 RF5: ACUMULAR (não sobrescrever). Pós-RF1/RF2 há 1 linha por par e `=`/`+=`
+  // coincidem; o acúmulo mantém o gráfico consistente com adWindowTotals mesmo durante
+  // qualquer estado transitório com linhas duplicadas residuais (defesa em profundidade).
   for (const row of adDailyRows) {
-    if (top3AdIds.includes(row.adId) && adDailyByDate[row.date]) {
-      adDailyByDate[row.date]![row.adId] = { impressions: row.impressions, clicks: row.clicks };
-    }
+    const slot = adDailyByDate[row.date]?.[row.adId];
+    if (slot) { slot.impressions += row.impressions; slot.clicks += row.clicks; }
   }
   const adDailyChart = Object.entries(adDailyByDate).map(([date, byAd]) => {
     const entry: Record<string, unknown> = { date };

@@ -87,7 +87,6 @@ export const adminApi = {
     req<{ ad: Ad }>("POST", "/ads", data),
   updateAd: (id: string, data: Partial<Ad>) => req<{ ad: Ad }>("PUT", `/ads/${id}`, data),
   deleteAd: (id: string) => req<{ success: boolean }>("DELETE", `/ads/${id}`),
-  trackAdClick: (id: string) => fetch(`/api/ads/${id}/click`, { method: "POST" }).then((r) => r.json()),
 
   // 2FA
   twoFaStatus: () => req<{ twoFactorEnabled: boolean }>("GET", "/2fa/status"),

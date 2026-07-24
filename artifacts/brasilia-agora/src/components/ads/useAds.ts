@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getSessionId } from "../../hooks/useAnalytics";
 
 export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07" | "slot_08" | "slot_09" | "slot_10" | "slot_11";
 
@@ -103,7 +104,9 @@ export function useAds() {
   return { ads, getSlot, getSlotAll, banners, sidebars, centrals, loading };
 }
 
-/** Publicidade de admin logado (ou ambiente dev) não entra nos números oficiais. */
+/** Admin logado (ou ambiente dev): antes SUPRIMIA o envio; agora envia com internal:true
+ *  (alinhado ao SDK de pageview) — o servidor conta em internal_* e não polui o público
+ *  (PRD 04 RF3). Consentimento LGPD/viewability/dedup por aba ficam no PRD 02. */
 function isInternalTraffic(): boolean {
   if (import.meta.env.DEV) return true;
   try {
@@ -113,14 +116,28 @@ function isInternalTraffic(): boolean {
   }
 }
 
+function trackBody(): string {
+  return JSON.stringify({
+    sessionId: getSessionId(),                                    // mesmo id do SDK
+    path: typeof location !== "undefined" ? location.pathname : undefined,
+    internal: isInternalTraffic() || undefined,
+  });
+}
+
 export function trackClick(adId: string) {
-  if (isInternalTraffic()) return Promise.resolve();
-  return fetch(`/api/ads/${adId}/click`, { method: "POST" }).catch(() => {});
+  return fetch(`/api/ads/${adId}/click`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: trackBody(),
+  }).catch(() => {});
 }
 
 export function trackImpression(adId: string) {
-  if (isInternalTraffic()) return Promise.resolve();
-  return fetch(`/api/ads/${adId}/impression`, { method: "POST" }).catch(() => {});
+  return fetch(`/api/ads/${adId}/impression`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: trackBody(),
+  }).catch(() => {});
 }
 
 /** Tempo mínimo de visibilidade CONTÍNUA (≥50% na tela) para valer impressão —

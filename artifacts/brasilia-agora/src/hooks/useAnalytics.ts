@@ -18,7 +18,9 @@ const ADMIN_RE   = /^\/admin(\/|$)/;
  *  enviar também o pageview genérico contaria cada visita em dobro. */
 const ARTICLE_RE = /^\/artigo\//;
 
-function getSessionId(): string {
+/** Id de sessão do SDK (chave bee_session_id) — reusado pelas rotas de anúncio
+ *  (components/ads/useAds.ts) para o dedup server-side do PRD 04, sem duplicar a chave. */
+export function getSessionId(): string {
   try {
     let id = sessionStorage.getItem(SESSION_KEY);
     if (!id) {
