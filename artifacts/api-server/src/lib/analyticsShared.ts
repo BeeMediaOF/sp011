@@ -70,6 +70,25 @@ export function parseInternalIps(raw?: string): string[] {
   return raw.split(/[\s,;]+/).map((s) => normalizeIp(s.trim())).filter((s) => s.length > 0);
 }
 
+// ─── Detecção de tráfego interno (PRD 03 RF4 — tripla canônica) ───────────────
+export type InternalReason = "flag" | "configuredIp" | "privateIp";
+
+/**
+ * Tripla canônica de detecção de tráfego interno (mesma semântica do /event).
+ * Precedência de ATRIBUIÇÃO de razão: flag > configuredIp > privateIp (o resultado
+ * booleano independe da ordem). Puro — o chamador injeta o Set de IPs configurados
+ * (memoizado em internalTraffic.ts). `configured` já vem normalizado (parseInternalIps),
+ * simétrico ao `ip` normalizado (normalizeIp) — sem assimetria ::ffff:.
+ */
+export function detectInternal(
+  flag: boolean, ip: string, configured: ReadonlySet<string>,
+): { internal: boolean; reason: InternalReason | null } {
+  if (flag) return { internal: true, reason: "flag" };
+  if (configured.has(ip)) return { internal: true, reason: "configuredIp" };
+  if (isPrivateIp(ip)) return { internal: true, reason: "privateIp" };
+  return { internal: false, reason: null };
+}
+
 // ─── Dispositivo / navegador / SO (parse próprio, sem dependência) ────────────
 export function detectDevice(ua: string): "mobile" | "desktop" | "tablet" {
   if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
@@ -464,6 +483,24 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
 /** Variação % (1 casa) — null quando não há base de comparação (nunca inventa 0%). */
 export function pctChange(cur: number, prev: number): number | null {
   return prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
+}
+
+// ─── Reconciliação do buffer (PRD 03 RF6 — puro, testável) ────────────────────
+/**
+ * Quando o flush falha inteiro (banco fora), quantos eventos cabem de volta no
+ * buffer e quantos são descartados por falta de espaço. `discard + requeue`
+ * SEMPRE = `failedLen` (fecha a identidade received = flushedOk + flushFailed +
+ * buffered do card Saúde).
+ */
+export function planRequeue(failedLen: number, bufferLen: number, max: number): { requeue: number; discard: number } {
+  const room = Math.max(0, max - bufferLen);
+  const requeue = Math.min(failedLen, room);
+  return { requeue, discard: failedLen - requeue };
+}
+
+/** Excedente a descartar quando o buffer passa do teto duro (nunca negativo). */
+export function capExcess(len: number, cap: number): number {
+  return Math.max(0, len - cap);
 }
 
 // ─── Sanidade de anúncios (PRD 04 RF6 — fórmula/fonte; motor contínuo é o PRD 11) ─

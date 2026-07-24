@@ -100,10 +100,11 @@ referenciam artigo/categoria/anúncio por id textual e sobrevivem à exclusão d
 | Sem consentimento LGPD | cliente | nada é enviado; visitor_id nem existe |
 
 Tráfego interno é **marcado, não apagado** (`is_internal=true`) — auditável via
-SQL. Exceção transitória: em `behavior_events` (busca/link/newsletter) o evento
-interno ainda é **dropado** em vez de marcado. A coluna `is_internal` já existe na
-tabela (PRD 01), mas a troca do drop por marcação no ingest é do PRD 03 — até lá,
-toda linha gravada é `is_internal=false`.
+SQL, tanto em `analytics_events` quanto em `behavior_events` (PRD 03 fechou a
+exceção antiga: o `/behavior` agora GRAVA `is_internal` em vez de dropar, com a
+tripla completa flag do client / IP configurado / IP privado; os leitores públicos
+excluem `is_internal=true`). A razão de cada marcação (flag/configuredIp/privateIp)
+é contabilizada no `/health` (`internalByReason`) para diagnóstico.
 
 ## Dicionário de métricas
 
@@ -152,6 +153,26 @@ contagem exata; anteriores são reparadas por estimativa; `null` = reparo ainda 
 rodou). Exibidos na faixa “Saúde da coleta” do painel (a UI do `adsReliableSince`
 é do PRD 08). `flushFailed > 0` aparece em vermelho.
 
+**Contadores por endpoint (PRD 03).** O `/health` agora inclui `byEndpoint`
+(`event`/`behavior`/`adImpression`/`adClick`, cada um com received/droppedBot/
+droppedRate/droppedInvalid/droppedDuplicate/flaggedInternal) e `internalByReason`
+(flag/configuredIp/privateIp). Antes só o `/event` contava — o card exibia
+"0 bots filtrados" mesmo com as rotas de `behavior`/ads descartando em silêncio.
+A exibição desses campos no painel é do PRD 08. **Reconciliação** (regra do PRD 11):
+`received = flushedOk + flushFailed + buffered` (do pipeline do `/event`, com
+tolerância do lote em voo) — fecha sempre desde o PRD 03 (o excedente do flush
+degradado passou a contar em `flushFailed`; teto duro do buffer em `2×BUFFER_MAX`).
+
+**Comportamento em restart (fail-open).** As janelas de rate limit e de dedup e
+TODOS os contadores vivem em memória e zeram no restart — nunca bloqueiam tráfego
+legítimo por estado perdido; `bootAt`/`uptimeSeconds` datam o zero. Um F5 nos
+primeiros 15s após o deploy pode contar 2× (janela de dedup perdida — aceito). O
+buffer é drenado no shutdown limpo e perdido em crash (até `2×BUFFER_MAX` eventos).
+Tetos de rate limit em fonte única (`INGEST_RATE_LIMITS`): 120/min event, 30/min
+behavior, 60/min impressão, 30/min clique. ⚠️ **Risco de `internalIps` com CGNAT:**
+cadastrar um IP compartilhado (CGNAT, Wi-Fi público) marca TODO visitante atrás dele
+como interno — diagnosticável por `internalByReason.configuredIp` desproporcional.
+
 ## LGPD / privacidade
 
 - Nada é enviado antes do aceite do banner (`bee_analytics_consent`).
@@ -173,9 +194,9 @@ rodou). Exibidos na faixa “Saúde da coleta” do painel (a UI do `adsReliable
 2. **Toggles de categoria do banner LGPD são cosméticos** — aceite/rejeição é
    tudo-ou-nada (`bee_analytics_consent` único).
 3. **Contadores de saúde zeram no restart** (em memória).
-4. **`behavior_events`: interno ainda é dropado** — a coluna `is_internal` já
-   existe (PRD 01), mas o handler continua descartando o evento interno em vez
-   de marcá-lo; a troca por marcação (com trilha de auditoria) é do PRD 03.
+4. **~~`behavior_events`: interno ainda é dropado~~ — RESOLVIDO (PRD 03)**: o
+   `/behavior` grava `is_internal=true` (tripla completa) e os leitores excluem
+   interno. Deixou de ser limitação.
 5. **visitor_id/UTM/navegador/SO/interno só existem a partir de 08/07/2026** —
    períodos anteriores mostram esses cards zerados/parciais (o card Visitantes
    avisa “desde 08/07/2026”).

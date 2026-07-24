@@ -19,6 +19,13 @@ export function isBotRequest(req: Request): boolean {
   return ua.length === 0 || BOT_RE.test(ua);
 }
 
+/** Tetos por IP por minuto, por endpoint de ingest (PRD 03 RF7 — fonte única).
+ *  Fail-open: as janelas em memória zeram no restart (nunca bloqueiam tráfego
+ *  legítimo por estado perdido). Revisão PRD 03 (2026-07): valores MANTIDOS. */
+export const INGEST_RATE_LIMITS = {
+  event: 120, behavior: 30, adImpression: 60, adClick: 30,
+} as const;
+
 interface HitWindow { count: number; resetAt: number }
 
 const _hits = new Map<string, HitWindow>();
@@ -57,4 +64,53 @@ export function overRateLimit(key: string, maxPerMinute: number): boolean {
   }
   w.count++;
   return w.count > maxPerMinute;
+}
+
+// ─── Dedup genérico com retenção configurável (PRD 03 RF5) ────────────────────
+// `isRecentDuplicate` acima serve só janelas curtas (o sweeper de _lastSeen limpa
+// >60s). Este helper serve janelas longas (ex.: impressão de anúncio 30min do PRD 04)
+// com teto de memória e varredura própria. Relógio injetável para os testes.
+export interface DedupWindowOpts {
+  windowMs: number;
+  maxKeys?: number;          // default 50_000; excedeu → descarta a mais antiga
+  sliding?: boolean;         // false (default): janela fixa a partir do 1º hit; true: cada hit renova
+  now?: () => number;
+}
+export interface DedupWindow {
+  /** true = chave já vista dentro da janela (duplicata); false = primeira vez. */
+  hit(key: string): boolean;
+  size(): number;
+}
+
+export function createDedupWindow(opts: DedupWindowOpts): DedupWindow {
+  const { windowMs } = opts;
+  const maxKeys = opts.maxKeys ?? 50_000;
+  const sliding = opts.sliding ?? false;
+  const now = opts.now ?? Date.now;
+  const m = new Map<string, number>(); // chave -> expiraMs
+
+  const sweeper = setInterval(() => {
+    const t = now();
+    for (const [k, exp] of m) if (exp <= t) m.delete(k);
+  }, Math.max(30_000, Math.min(windowMs, 5 * 60_000)));
+  if (typeof sweeper.unref === "function") sweeper.unref();
+
+  return {
+    hit(key: string): boolean {
+      const t = now();
+      const exp = m.get(key);
+      if (exp !== undefined && exp > t) {
+        if (sliding) { m.delete(key); m.set(key, t + windowMs); } // renova a janela
+        return true;
+      }
+      m.delete(key);
+      m.set(key, t + windowMs); // (re)insere no fim: ordem por recência para o eviction
+      if (m.size > maxKeys) {
+        const oldest = m.keys().next().value;
+        if (oldest !== undefined) m.delete(oldest);
+      }
+      return false;
+    },
+    size(): number { return m.size; },
+  };
 }

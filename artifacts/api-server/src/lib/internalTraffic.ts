@@ -7,7 +7,7 @@
  * de settings muda a string e o Set é reconstruído sem restart.
  */
 import { store } from "./store.js";
-import { parseInternalIps } from "./analyticsShared.js";
+import { parseInternalIps, detectInternal, type InternalReason } from "./analyticsShared.js";
 
 let _internalIpsRaw: string | undefined;
 let _internalIpSet = new Set<string>();
@@ -19,4 +19,12 @@ export function internalIpSet(): Set<string> {
     _internalIpSet = new Set(parseInternalIps(raw));
   }
   return _internalIpSet;
+}
+
+/** Conveniência (PRD 03 RF4): decide interno + razão a partir da flag do body e do
+ *  IP, usando o Set memoizado. Reusado por /event, /behavior e (PRD 04) rotas de ads. */
+export function detectInternalRequest(
+  bodyFlag: boolean, ip: string,
+): { internal: boolean; reason: InternalReason | null } {
+  return detectInternal(bodyFlag, ip, internalIpSet());
 }

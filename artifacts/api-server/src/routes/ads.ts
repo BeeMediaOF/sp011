@@ -2,27 +2,27 @@ import { Router } from "express";
 import { eq, gte, isNull, or, and, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
-import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
-import { cleanStr, normalizeIp, isPrivateIp } from "../lib/analyticsShared.js";
-import { internalIpSet } from "../lib/internalTraffic.js";
-import { DedupStore } from "../lib/adsDaily.js";
+import { isBotRequest, overRateLimit, createDedupWindow, INGEST_RATE_LIMITS } from "../lib/trafficGuard.js";
+import { cleanStr, normalizeIp, type InternalReason } from "../lib/analyticsShared.js";
+import { detectInternalRequest } from "../lib/internalTraffic.js";
+import { bumpEndpoint, bumpInternalReason, type IngestEndpointId } from "../lib/analyticsHealth.js";
 import { logger } from "../lib/logger.js";
 import { store } from "../lib/store.js";
 
 const router = Router();
 
-// ─── Dedup server-side por sessão/anúncio (PRD 04 RF4) ────────────────────────
+// ─── Dedup server-side por sessão/anúncio (PRD 04 RF4; mecanismo do PRD 03 RF5) ─
 // O client já promete 1×/aba; o servidor garante ~1×/sessão/anúncio mesmo com N
 // abas, storage bloqueado ou script direto. Chave: adimp|adclick:<adId>:<sessão|ip>.
-// Não usa isRecentDuplicate do trafficGuard (sweeper de 60s, incompatível com 30 min).
-const IMPRESSION_DEDUP_MS = 30 * 60_000; // 30 min
-const CLICK_DEDUP_MS      = 10_000;      // 10 s — mata double-fire sem barrar clique real
-const adDedup = new DedupStore(50_000);
-setInterval(() => adDedup.sweep(Date.now()), 5 * 60_000).unref();
+// createDedupWindow (trafficGuard) tem varredura e teto próprios — janela fixa.
+const adImpDedup   = createDedupWindow({ windowMs: 30 * 60_000 }); // 30 min
+const adClickDedup = createDedupWindow({ windowMs: 10_000 });      // 10 s (mata double-fire)
 
-/** Decisão de interno: MESMA tripla do /event (analytics.ts). */
-function isInternalReq(body: Record<string, unknown>, ip: string): boolean {
-  return body["internal"] === true || internalIpSet().has(ip) || isPrivateIp(ip);
+/** Contabiliza um evento de anúncio ACEITO (PRD 03 RF1): `received` sempre; se
+ *  interno (PRD 04 RF3), soma `flaggedInternal` + a razão. Espelha o /event. */
+function noteAdAccept(ep: IngestEndpointId, det: { internal: boolean; reason: InternalReason | null }): void {
+  bumpEndpoint(ep, "received");
+  if (det.internal && det.reason) { bumpEndpoint(ep, "flaggedInternal"); bumpInternalReason(det.reason); }
 }
 
 // ─── Blocos "É uma propaganda" ────────────────────────────────────────────────
@@ -179,20 +179,21 @@ router.get("/", async (_req, res) => {
 router.post("/:id/click", async (req, res) => {
   const id = req.params.id ?? "";
 
-  // Bots e flood não viram métrica de cobrança — descarte silencioso.
-  if (isBotRequest(req) || overRateLimit(`adclick:${req.ip ?? ""}`, 30)) {
-    res.json({ ok: true });
-    return;
+  // Bots e flood não viram métrica de cobrança — descarte silencioso, agora contado.
+  if (isBotRequest(req)) { bumpEndpoint("adClick", "droppedBot"); res.json({ ok: true }); return; }
+  if (overRateLimit(`adclick:${req.ip ?? ""}`, INGEST_RATE_LIMITS.adClick)) {
+    bumpEndpoint("adClick", "droppedRate"); res.json({ ok: true }); return;
   }
 
   const b = (req.body ?? {}) as Record<string, unknown>;
   const ip = normalizeIp(req.ip ?? "");
   const sessionId = cleanStr(b["sessionId"], 100);
-  const internal = isInternalReq(b, ip);
+  const det = detectInternalRequest(b["internal"] === true, ip);
+  const internal = det.internal;
 
   // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 10s = duplo clique.
-  if (adDedup.isDuplicate(`adclick:${id}:${sessionId ?? `ip:${ip}`}`, CLICK_DEDUP_MS, Date.now())) {
-    // PRD 03: bumpHealth aqui
+  if (adClickDedup.hit(`adclick:${id}:${sessionId ?? `ip:${ip}`}`)) {
+    bumpEndpoint("adClick", "droppedDuplicate");
     res.json({ ok: true });
     return;
   }
@@ -201,9 +202,11 @@ router.post("/:id/click", async (req, res) => {
   if (id.startsWith(BLOCK_PREFIX)) {
     const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
     if (!blk || !blk.visible) {
+      bumpEndpoint("adClick", "droppedInvalid");
       res.status(404).json({ ok: false, error: "Ad not found or inactive" });
       return;
     }
+    noteAdAccept("adClick", det);
     void upsertDailyStat(id, "clicks", internal);
     res.json({ ok: true, message: "Click tracked" });
     return;
@@ -216,6 +219,7 @@ router.post("/:id/click", async (req, res) => {
     .limit(1);
 
   if (!row || !row.active) {
+    bumpEndpoint("adClick", "droppedInvalid");
     res.status(404).json({ ok: false, error: "Ad not found or inactive" });
     return;
   }
@@ -227,6 +231,7 @@ router.post("/:id/click", async (req, res) => {
       .set({ clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
       .where(eq(adsTable.id, id));
   }
+  noteAdAccept("adClick", det);
 
   void upsertDailyStat(id, "clicks", internal);
 
@@ -237,19 +242,20 @@ router.post("/:id/click", async (req, res) => {
 router.post("/:id/impression", async (req, res) => {
   const id = req.params.id ?? "";
 
-  if (isBotRequest(req) || overRateLimit(`adimp:${req.ip ?? ""}`, 60)) {
-    res.json({ ok: true });
-    return;
+  if (isBotRequest(req)) { bumpEndpoint("adImpression", "droppedBot"); res.json({ ok: true }); return; }
+  if (overRateLimit(`adimp:${req.ip ?? ""}`, INGEST_RATE_LIMITS.adImpression)) {
+    bumpEndpoint("adImpression", "droppedRate"); res.json({ ok: true }); return;
   }
 
   const b = (req.body ?? {}) as Record<string, unknown>;
   const ip = normalizeIp(req.ip ?? "");
   const sessionId = cleanStr(b["sessionId"], 100);
-  const internal = isInternalReq(b, ip);
+  const det = detectInternalRequest(b["internal"] === true, ip);
+  const internal = det.internal;
 
   // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 30min = mesma visita.
-  if (adDedup.isDuplicate(`adimp:${id}:${sessionId ?? `ip:${ip}`}`, IMPRESSION_DEDUP_MS, Date.now())) {
-    // PRD 03: bumpHealth aqui
+  if (adImpDedup.hit(`adimp:${id}:${sessionId ?? `ip:${ip}`}`)) {
+    bumpEndpoint("adImpression", "droppedDuplicate");
     res.json({ ok: true });
     return;
   }
@@ -257,7 +263,12 @@ router.post("/:id/impression", async (req, res) => {
   // Bloco da home marcado "É uma propaganda" — só bloco visível conta.
   if (id.startsWith(BLOCK_PREFIX)) {
     const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
-    if (blk && blk.visible) void upsertDailyStat(id, "impressions", internal);
+    if (blk && blk.visible) {
+      noteAdAccept("adImpression", det);
+      void upsertDailyStat(id, "impressions", internal);
+    } else {
+      bumpEndpoint("adImpression", "droppedInvalid");
+    }
     res.json({ ok: true });
     return;
   }
@@ -270,6 +281,7 @@ router.post("/:id/impression", async (req, res) => {
     .limit(1);
 
   if (!row || !row.active || (row.expiresAt && row.expiresAt < new Date())) {
+    bumpEndpoint("adImpression", "droppedInvalid");
     res.json({ ok: true });
     return;
   }
@@ -281,6 +293,7 @@ router.post("/:id/impression", async (req, res) => {
       .set({ impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() })
       .where(eq(adsTable.id, id));
   }
+  noteAdAccept("adImpression", det);
 
   void upsertDailyStat(id, "impressions", internal);
 

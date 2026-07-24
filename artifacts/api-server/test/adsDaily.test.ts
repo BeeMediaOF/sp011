@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { estimateRealCount, repairPair, DedupStore } from "../src/lib/adsDaily.ts";
+import { estimateRealCount, repairPair } from "../src/lib/adsDaily.ts";
 import { checkAdSanity, checkClicksVsImpressions, cleanStr } from "../src/lib/analyticsShared.ts";
 
 // PRD 04 — provas do reparo (RF2), da sanidade (RF6) e do dedup (RF4). Tudo puro,
@@ -102,42 +102,8 @@ test("checkClicksVsImpressions: folga +1 do clique rápido", () => {
   assert.equal(checkClicksVsImpressions(12, 10).ok, false);
 });
 
-// ─── RF4: dedup server-side (relógio injetado) ───────────────────────────────
-test("DedupStore: mesma chave na janela = duplicata; após a janela = aceita", () => {
-  const d = new DedupStore();
-  assert.equal(d.isDuplicate("k", 1000, 0), false);   // 1ª vez: fresca
-  assert.equal(d.isDuplicate("k", 1000, 500), true);  // dentro da janela: duplicata
-  assert.equal(d.isDuplicate("k", 1000, 1000), false); // janela expirou: fresca de novo
-});
-
-test("DedupStore: chaves de impressão (30min) e clique (10s) são independentes", () => {
-  const d = new DedupStore();
-  const now = 0;
-  assert.equal(d.isDuplicate("adimp:x:s", 30 * 60_000, now), false);
-  assert.equal(d.isDuplicate("adclick:x:s", 10_000, now), false); // chave diferente
-  assert.equal(d.isDuplicate("adclick:x:s", 10_000, 5_000), true); // dentro dos 10s
-  assert.equal(d.isDuplicate("adimp:x:s", 30 * 60_000, 5_000), true); // ainda nos 30min
-});
-
-test("DedupStore: teto de chaves descarta a mais antiga", () => {
-  const d = new DedupStore(2);
-  d.isDuplicate("a", 1_000_000, 0);
-  d.isDuplicate("b", 1_000_000, 1);
-  d.isDuplicate("c", 1_000_000, 2); // excede o teto de 2 -> "a" é despejada
-  assert.equal(d.size, 2);
-  assert.equal(d.isDuplicate("a", 1_000_000, 3), false); // "a" saiu -> volta a ser fresca
-  assert.equal(d.isDuplicate("c", 1_000_000, 4), true);  // "c" continua vivo
-});
-
-test("DedupStore.sweep remove as expiradas", () => {
-  const d = new DedupStore();
-  d.isDuplicate("a", 1000, 0);
-  d.isDuplicate("b", 5000, 0);
-  d.sweep(1500); // "a" (exp 1000) sai; "b" (exp 5000) fica
-  assert.equal(d.size, 1);
-  assert.equal(d.isDuplicate("a", 1000, 1600), false); // já não estava viva
-  assert.equal(d.isDuplicate("b", 5000, 1600), true);
-});
+// (o dedup server-side migrou para trafficGuard.createDedupWindow — PRD 03 RF5;
+//  testes em trafficGuard.dedupWindow.test.ts)
 
 // ─── §7.1: validação/clamp do payload das rotas ──────────────────────────────
 test("cleanStr: clamps de sessionId (<=100) e path (<=500); ausente/vazio = undefined", () => {

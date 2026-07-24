@@ -2,9 +2,9 @@
  * adsDaily — lógica pura das métricas de anúncio (PRD 04), sem Express/Drizzle/I/O.
  *
  * Alvo direto dos testes `node --test` (test/adsDaily.test.ts, imports .ts).
- * Contém: o estimador do reparo histórico (RF2) e o dedup server-side em memória
- * (RF4). O SQL do reparo vive no ensureSchema; aqui fica só a matemática, para
- * poder ser provada contra o simulador do escritor legado.
+ * Contém o estimador do reparo histórico (RF2). O SQL do reparo vive no ensureSchema;
+ * aqui fica só a matemática, para poder ser provada contra o simulador do escritor
+ * legado. O dedup server-side foi para trafficGuard.createDedupWindow (PRD 03 RF5).
  */
 
 /**
@@ -36,44 +36,4 @@ export function repairPair(
     if (r.clicks > maxClk) maxClk = r.clicks;
   }
   return { impressions: estimateRealCount(maxImp), clicks: estimateRealCount(maxClk) };
-}
-
-/**
- * Dedup server-side por chave (RF4). Guarda, por chave, o instante de EXPIRAÇÃO
- * (agora + janela). `isDuplicate` responde true se a chave ainda está viva (segunda
- * impressão/clique da mesma sessão+anúncio na janela) — nesse caso o chamador
- * responde ok sem gravar. Não desliza a janela: conta ~1× por janela por chave.
- *
- * O relógio é injetado (`now`) para os testes; o teto de chaves protege a memória
- * (ao exceder, descarta a mais antiga por ordem de inserção). `sweep` remove as
- * expiradas (varredura periódica no chamador). Zera no restart — mesma limitação
- * declarada do rate limit; observabilidade dos descartes é PRD 03/08.
- */
-export class DedupStore {
-  private readonly m = new Map<string, number>(); // chave -> expiraMs
-  private readonly maxKeys: number;
-  constructor(maxKeys = 50_000) {
-    this.maxKeys = maxKeys;
-  }
-
-  isDuplicate(key: string, windowMs: number, now: number): boolean {
-    const exp = this.m.get(key);
-    if (exp !== undefined && exp > now) return true;
-    // Fresca: (re)insere no fim para manter a ordem por recência (eviction FIFO).
-    this.m.delete(key);
-    this.m.set(key, now + windowMs);
-    if (this.m.size > this.maxKeys) {
-      const oldest = this.m.keys().next().value;
-      if (oldest !== undefined) this.m.delete(oldest);
-    }
-    return false;
-  }
-
-  sweep(now: number): void {
-    for (const [k, exp] of this.m) if (exp <= now) this.m.delete(k);
-  }
-
-  get size(): number {
-    return this.m.size;
-  }
 }

@@ -6,17 +6,17 @@ import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
 import { articleService } from "../lib/articleService.js";
 import { logger } from "../lib/logger.js";
-import { isBotRequest, overRateLimit, isRecentDuplicate } from "../lib/trafficGuard.js";
+import { isBotRequest, overRateLimit, isRecentDuplicate, INGEST_RATE_LIMITS } from "../lib/trafficGuard.js";
 import {
   DAY, brtDayKey, brtDayStartMs,
   VALID_TYPES, BEHAVIOR_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
-  cleanStr, normalizeIp, isPrivateIp,
+  cleanStr, normalizeIp, isPrivateIp, planRequeue, capExcess,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
   ANALYTICS_V2_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
-import { bumpHealth, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
-import { internalIpSet } from "../lib/internalTraffic.js";
+import { bumpHealth, bumpEndpoint, bumpInternalReason, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
+import { detectInternalRequest } from "../lib/internalTraffic.js";
 
 const router = Router();
 
@@ -113,7 +113,14 @@ async function flushBuffer(): Promise<void> {
     }
     if (ok > 0) noteFlush(true, ok);
     if (ok === 0 && failed.length > 0) {
-      _buffer.unshift(...failed.slice(0, Math.max(0, BUFFER_MAX - _buffer.length)));
+      // Banco fora: recoloca o que couber no buffer; o excedente é CONTADO como
+      // flushFailed (PRD 03 RF6 — fecha received = flushedOk + flushFailed + buffered).
+      const { requeue, discard } = planRequeue(failed.length, _buffer.length, BUFFER_MAX);
+      _buffer.unshift(...failed.slice(0, requeue));
+      if (discard > 0) {
+        noteFlush(false, discard);
+        logger.warn({ discarded: discard }, "analytics: excedente do buffer descartado em flush degradado");
+      }
     } else if (failed.length > 0) {
       noteFlush(false, failed.length);
       logger.warn({ dropped: failed.length }, "analytics: eventos inválidos descartados no flush");
@@ -127,6 +134,11 @@ setInterval(() => { void flushBuffer(); }, 30_000);
 
 function pushEvent(ev: AnalyticsEvent): void {
   _buffer.push(ev);
+  // Teto duro (PRD 03 RF6): banco fora por muito tempo não pode estourar a memória.
+  // Descarta os MAIS ANTIGOS (os novos têm mais chance de flush com geo retro-preenchida)
+  // e conta o descarte (flushFailed).
+  const excess = capExcess(_buffer.length, 2 * BUFFER_MAX);
+  if (excess > 0) { _buffer.splice(0, excess); noteFlush(false, excess); }
   if (_buffer.length >= BUFFER_MAX) void flushBuffer();
 }
 
@@ -222,7 +234,7 @@ router.post("/event", (req, res) => {
   // trust proxy (app.ts) já resolve o X-Forwarded-For adicionado pelo Caddy;
   // ler o header na mão pegaria o primeiro valor, que o cliente pode forjar.
   const ip = normalizeIp(req.ip ?? "");
-  if (overRateLimit(`ev:${ip}`, 120)) { bumpHealth("droppedRate"); res.json({ ok: true }); return; }
+  if (overRateLimit(`ev:${ip}`, INGEST_RATE_LIMITS.event)) { bumpHealth("droppedRate"); res.json({ ok: true }); return; }
 
   const b = (req.body ?? {}) as Record<string, unknown>;
 
@@ -247,13 +259,19 @@ router.post("/event", (req, res) => {
     res.json({ ok: true });
     return;
   }
+  // PRD 03 RF2: F5/remount na página de categoria não é clique novo (o pageview já
+  // é dedupado — o evento `category` escapava). Chave `cat:` própria, mesma janela.
+  if (type === "category" && isRecentDuplicate(`cat:${sessionId}|${path}`, 15_000)) {
+    bumpHealth("droppedDuplicate");
+    res.json({ ok: true });
+    return;
+  }
 
   // Tráfego interno: marcado e gravado (auditável), mas fora das métricas públicas.
-  const isInternal =
-    b["internal"] === true ||       // cliente detectou admin logado ou ambiente dev
-    internalIpSet().has(ip) ||      // IP cadastrado em Configurações
-    isPrivateIp(ip);                // localhost/rede privada (dev, health checks)
-  if (isInternal) bumpHealth("flaggedInternal");
+  // PRD 03 RF4: mesma tripla, agora com atribuição de razão (flag/configuredIp/privateIp).
+  const det = detectInternalRequest(b["internal"] === true, ip);
+  const isInternal = det.internal;
+  if (isInternal && det.reason) { bumpHealth("flaggedInternal"); bumpInternalReason(det.reason); }
 
   const title     = cleanStr(b["title"], 300);
   const category  = cleanStr(b["category"], 100);
@@ -337,20 +355,22 @@ router.post("/event", (req, res) => {
 // ─── POST /api/analytics/behavior — track search / link_click / newsletter ────
 router.post("/behavior", async (req, res) => {
   try {
-    if (isBotRequest(req)) { res.json({ ok: true }); return; }
+    if (isBotRequest(req)) { bumpEndpoint("behavior", "droppedBot"); res.json({ ok: true }); return; }
     const ip = normalizeIp(req.ip ?? "");
-    if (overRateLimit(`bh:${ip}`, 30)) { res.json({ ok: true }); return; }
+    if (overRateLimit(`bh:${ip}`, INGEST_RATE_LIMITS.behavior)) { bumpEndpoint("behavior", "droppedRate"); res.json({ ok: true }); return; }
 
     const b = (req.body ?? {}) as Record<string, unknown>;
     const eventType = cleanStr(b["eventType"], 30);
     const sessionId = cleanStr(b["sessionId"], 100);
-    if (!eventType || !sessionId) { res.status(400).json({ ok: false }); return; }
+    if (!eventType || !sessionId) { bumpEndpoint("behavior", "droppedInvalid"); res.status(400).json({ ok: false }); return; }
 
-    if (!BEHAVIOR_TYPES.has(eventType)) { res.status(400).json({ ok: false }); return; }
+    if (!BEHAVIOR_TYPES.has(eventType)) { bumpEndpoint("behavior", "droppedInvalid"); res.status(400).json({ ok: false }); return; }
 
-    // behavior_events não tem coluna de tráfego interno (limitação documentada):
-    // eventos internos são simplesmente não gravados para não sujar os oficiais.
-    if (b["internal"] === true || internalIpSet().has(ip)) { res.json({ ok: true }); return; }
+    // PRD 03 RF3: tráfego interno agora é MARCADO (is_internal), não mais dropado
+    // (§17 "marcado, nunca dropado"). Tripla COMPLETA — inclui isPrivateIp, que
+    // faltava aqui (evento de rede privada entrava como público).
+    const det = detectInternalRequest(b["internal"] === true, ip);
+    if (det.internal && det.reason) { bumpEndpoint("behavior", "flaggedInternal"); bumpInternalReason(det.reason); }
 
     const value     = cleanStr(b["value"], 500);
     const articleId = cleanStr(b["articleId"], 100);
@@ -363,7 +383,9 @@ router.post("/behavior", async (req, res) => {
       device:    detectDevice(ua),
       articleId: articleId ?? null,
       ts:        new Date(),
+      isInternal: det.internal,
     });
+    bumpEndpoint("behavior", "received");
     res.json({ ok: true });
   } catch {
     res.json({ ok: true }); // silent — never fail the client
@@ -388,11 +410,11 @@ router.get("/health", authMiddleware, async (_req, res) => {
     reliableSince: ANALYTICS_V2_SINCE,
     adsReliableSince,
     filters: [
-      "user-agent de bot/CLI",
-      "rate limit 120 eventos/min por IP",
-      "pageview duplicado (mesma sessão+página em <15s)",
+      "user-agent de bot/CLI (todos os endpoints: event, behavior, impressão e clique de anúncio)",
+      "rate limit por IP: 120/min event, 30/min behavior, 60/min impressão, 30/min clique",
+      "duplicado: pageview e category (mesma sessão+página em <15s); impressão/clique: dedup do PRD 04",
       "caminhos /admin",
-      "tráfego interno marcado (admin logado, dev, IPs configurados, rede privada)",
+      "tráfego interno marcado, nunca dropado (admin logado, dev, IPs configurados, rede privada) — event e behavior; ads: dimensão interna do PRD 04",
     ],
   });
 });
@@ -527,6 +549,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     )),
     db.execute(sql`SELECT EXISTS (SELECT 1 FROM ad_daily_stats) AS has`),
     db.select().from(behaviorEventsTable).where(and(
+      eq(behaviorEventsTable.isInternal, false), // PRD 03 RF3: exclui interno da leitura pública
       gte(behaviorEventsTable.ts, winFrom),
       lt(behaviorEventsTable.ts, winTo),
     )),
