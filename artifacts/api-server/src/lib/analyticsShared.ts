@@ -25,6 +25,13 @@ export const ANALYTICS_V2_SINCE = "2026-07-08";
 // valor fora do enum do Postgres faria o INSERT em lote falhar e travaria o
 // buffer inteiro — por isso whitelist + clamps antes de enfileirar.
 export const VALID_TYPES: ReadonlySet<string> = new Set(["pageview", "read", "category", "scroll", "share"]);
+/** Tipos de behavior_events (POST /api/analytics/behavior). Fonte única — o handler
+ *  importa daqui. video_play/download: RESERVADOS (sem emissor no client; linha
+ *  existente = anomalia — ver docs/ANALYTICS.md, Taxonomia). Valores são
+ *  persistidos: nunca renomear. */
+export const BEHAVIOR_TYPES: ReadonlySet<string> = new Set([
+  "search", "link_click", "newsletter", "video_play", "download",
+]);
 export const SCROLL_MILESTONES: ReadonlySet<number> = new Set([25, 50, 75, 100]);
 /** Teto de duração de leitura — aba esquecida aberta não pode distorcer a média. */
 export const MAX_READ_SECONDS = 1800;

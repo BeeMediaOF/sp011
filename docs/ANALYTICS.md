@@ -38,6 +38,53 @@ contadores em `src/lib/analyticsHealth.ts`, filtros em `src/lib/trafficGuard.ts`
 Cliente: `artifacts/brasilia-agora/src/hooks/useAnalytics.ts` + lógica pura em
 `src/lib/analyticsClient.ts` (testada em `src/lib/analyticsClient.test.ts`).
 
+## Taxonomia canônica de eventos
+
+Dicionário único dos tipos de evento. **Valores são persistidos — nunca renomear**
+(enum `analytics_event_type`, strings de `event_type`, chaves `block:<id>`): o nome
+canônico é o que JÁ está no banco. A coluna "alias doc v2" registra sinônimos só de
+documentação. Fonte em código: `VALID_TYPES` e `BEHAVIOR_TYPES` em
+`analyticsShared.ts` (travadas pelo teste `test/analyticsTaxonomy.test.ts`).
+
+**Família A — audiência** (`analytics_events`, `POST /api/analytics/event`, enum PG):
+
+| Evento | Alias doc v2 | Payload essencial (client → servidor) | Dedup |
+|---|---|---|---|
+| `pageview` | pageview | `{type, path*, sessionId*, title?, category?, articleId?, visitorId?}` + first-touch 1×/sessão: `{firstTouch, refHost?, utmSource?, utmMedium?, utmCampaign?, paidClick?}` + `internal?` | servidor: 15s por `sessionId\|path` |
+| `read` | heartbeat | `{type, path*, sessionId*, duration* (segundos CUMULATIVOS ≤1800), articleId?}` | agregado por **MAX** por `sessionId\|path` (reenvio nunca soma) |
+| `category` | — | `{type, path*, sessionId*, category*}` (mount da listagem) | nenhum (dedup do evento `category` → PRD 03) |
+| `scroll` | scroll_depth | `{type, path*, sessionId*, scrollDepth* ∈ {25,50,75,100}, articleId?}` | client: sessão×conteúdo; agregação: Set por `sessionId\|articleId ?? path` |
+| `share` | share | `{type, path*, sessionId*, platform*, articleId?}` | nenhum (cada clique conta) |
+
+Derivados pelo SERVIDOR (nunca do body): `device`, `browser`/`os` (UA), `ts`,
+`city`/`region` (geo por IP, só pageview não-interno), `is_internal`, `referrer` =
+canal classificado (`classifyChannel`).
+
+**Família B — comportamento** (`behavior_events`, `POST /api/analytics/behavior`,
+`event_type` text + whitelist `BEHAVIOR_TYPES`):
+
+| Evento | Alias doc v2 | Payload | Observação |
+|---|---|---|---|
+| `search` | search | `{eventType, sessionId*, value* = termo}` | — |
+| `link_click` | click_external | `{eventType, sessionId*, value* = URL externa, articleId?}` | emissores só no corpo do artigo (item 23) |
+| `newsletter` | newsletter_signup | `{eventType, sessionId*, value = e-mail}` | 2 formulários fora do gate de consentimento — correção no PRD 02 |
+| `video_play` | — | **RESERVADO** | sem emissor no client — linha existente = anomalia (sinal de forja/teste) |
+| `download` | — | **RESERVADO** | idem |
+
+**Família C — anúncios** (agregados em `ad_daily_stats` por dia BRT + all-time em
+`ads`; SEM evento individual persistido):
+
+| Conceito | Alias doc v2 | Endpoint |
+|---|---|---|
+| impressão de anúncio | impression_ad | `POST /api/ads/:id/impression` (id de `ads` ou chave `block:<id>`) |
+| clique de anúncio | click_ad | `POST /api/ads/:id/click` |
+
+**Entidades derivadas (NUNCA criar endpoint):** sessão (`session_start`) = `sessionId`
+por aba; visitante = `visitorId` pós-consentimento; leitura-100%
+(`article_read_complete`) = pares sessão×conteúdo com marco `scroll=100`; canal de
+origem = `referrer` da linha first-touch. **Sem foreign keys por design** — eventos
+referenciam artigo/categoria/anúncio por id textual e sobrevivem à exclusão do alvo.
+
 ## Regras de exclusão de tráfego (aplicadas a TODAS as métricas públicas)
 
 | Regra | Onde | Efeito |
@@ -53,8 +100,10 @@ Cliente: `artifacts/brasilia-agora/src/hooks/useAnalytics.ts` + lógica pura em
 | Sem consentimento LGPD | cliente | nada é enviado; visitor_id nem existe |
 
 Tráfego interno é **marcado, não apagado** (`is_internal=true`) — auditável via
-SQL; apenas `behavior_events` (busca/link/newsletter) não tem a coluna e nesses
-casos o evento interno simplesmente não é gravado.
+SQL. Exceção transitória: em `behavior_events` (busca/link/newsletter) o evento
+interno ainda é **dropado** em vez de marcado. A coluna `is_internal` já existe na
+tabela (PRD 01), mas a troca do drop por marcação no ingest é do PRD 03 — até lá,
+toda linha gravada é `is_internal=false`.
 
 ## Dicionário de métricas
 
@@ -121,8 +170,9 @@ buffered, lastEventAt, lastFlushAt, reliableSince, filters[]`. Exibidos na faixa
 2. **Toggles de categoria do banner LGPD são cosméticos** — aceite/rejeição é
    tudo-ou-nada (`bee_analytics_consent` único).
 3. **Contadores de saúde zeram no restart** (em memória).
-4. **`behavior_events` não tem coluna `is_internal`** — evento interno é
-   descartado em vez de marcado (sem trilha de auditoria nesse caso).
+4. **`behavior_events`: interno ainda é dropado** — a coluna `is_internal` já
+   existe (PRD 01), mas o handler continua descartando o evento interno em vez
+   de marcá-lo; a troca por marcação (com trilha de auditoria) é do PRD 03.
 5. **visitor_id/UTM/navegador/SO/interno só existem a partir de 08/07/2026** —
    períodos anteriores mostram esses cards zerados/parciais (o card Visitantes
    avisa “desde 08/07/2026”).
@@ -134,12 +184,46 @@ buffered, lastEventAt, lastFlushAt, reliableSince, filters[]`. Exibidos na faixa
 8. Revisita à mesma página na mesma sessão conta o MAX de tempo (não a soma) —
    leve subestimação, preferida a duplicar leituras.
 
+## Processo de migração de schema (obrigatório)
+
+O deploy **NÃO roda `drizzle-kit push`**. Toda mudança de schema de analytics vai a
+DOIS lugares no mesmo commit (Drizzle é a verdade de tipos/queries; `ensureSchema`
+aplica no boot de cada banco — colunas se autocriam sem passo manual por blog):
+
+1. Editar o schema Drizzle (`lib/db/src/schema/*.ts`).
+2. `cd lib/db && pnpm exec tsc -b` (pacote composite; `dist` gitignored) ANTES de
+   typecheckar o api-server.
+3. Adicionar statement idempotente equivalente em `api/src/lib/ensureSchema.ts`:
+   `ADD COLUMN IF NOT EXISTS` / `CREATE [UNIQUE] INDEX IF NOT EXISTS` /
+   `CREATE TABLE IF NOT EXISTS` (tabela nova de feature).
+4. **UNIQUE sobre dados possivelmente violadores**: precedê-lo de dedup/reparo
+   transacional com guarda de idempotência (senão o CREATE UNIQUE INDEX falha para
+   sempre no try/catch não-fatal).
+5. **Tipo novo de evento**: preferir a família B (basta ampliar `BEHAVIOR_TYPES`).
+   Se for inevitável ampliar o enum `analytics_event_type`, usar
+   `ALTER TYPE … ADD VALUE IF NOT EXISTS '<valor>'` como statement isolado E
+   adicionar o valor ao pgEnum do Drizzle e a `VALID_TYPES`. Nunca REMOVER/RENOMEAR.
+6. Leitura defensiva: `ensureSchema` é não-fatal — código que lê coluna nova deve
+   tolerar `NULL`/ausência sem lançar.
+7. `node --test` no api-server + typecheck por pacote.
+8. Rollout §6 do CLAUDE.md (bump `BLOG_IMAGE_VERSION`, canário resenhavip, demais) +
+   verificação por banco com `information_schema.columns`/`pg_indexes`.
+9. Registrar aqui (Taxonomia/limitações).
+
+**Proibições permanentes** (quebram invariante do CLAUDE.md §17): depender de
+`drizzle-kit push` no deploy; statement destrutivo (`DROP COLUMN`/`ALTER … TYPE` que
+reescreva dados) no `ensureSchema`; `UPDATE` em massa de `analytics_events`/
+`behavior_events` (linhas históricas nunca são reescritas); renomear valores
+persistidos; condicionar schema a `BLOG_ID`.
+
 ## Testes
 
 - `artifacts/api-server`: `pnpm run test` (node --test) — classificação de
   canal, parse de UA/bot (inclui CUBOT ≠ bot), períodos com virada de mês BRT,
   reducer de agregação (bounce, scroll por sessão, read MAX com heartbeats,
-  janela vazia, remap legado), validação/caps/dedup.
+  janela vazia, remap legado), validação/caps/dedup, e taxonomia canônica
+  (`analyticsTaxonomy.test.ts` — trava `VALID_TYPES`/`BEHAVIOR_TYPES`/
+  `SCROLL_MILESTONES`/`CHANNELS` contra rename/adição acidental).
 - `artifacts/brasilia-agora`: `pnpm run test` (tsx --test) — parseUtm,
   refHostOf, scroll relativo ao conteúdo, decisor de dwell com clock injetado.
 - Roteiro manual: `docs/ANALYTICS-VALIDACAO.md`.

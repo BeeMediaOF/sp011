@@ -9,7 +9,7 @@ import { logger } from "../lib/logger.js";
 import { isBotRequest, overRateLimit, isRecentDuplicate } from "../lib/trafficGuard.js";
 import {
   DAY, brtDayKey, brtDayStartMs,
-  VALID_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
+  VALID_TYPES, BEHAVIOR_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
   cleanStr, normalizeIp, isPrivateIp, parseInternalIps,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
@@ -322,8 +322,7 @@ router.post("/behavior", async (req, res) => {
     const sessionId = cleanStr(b["sessionId"], 100);
     if (!eventType || !sessionId) { res.status(400).json({ ok: false }); return; }
 
-    const ALLOWED = new Set(["search", "link_click", "newsletter", "video_play", "download"]);
-    if (!ALLOWED.has(eventType)) { res.status(400).json({ ok: false }); return; }
+    if (!BEHAVIOR_TYPES.has(eventType)) { res.status(400).json({ ok: false }); return; }
 
     // behavior_events não tem coluna de tráfego interno (limitação documentada):
     // eventos internos são simplesmente não gravados para não sujar os oficiais.

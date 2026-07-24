@@ -55,6 +55,20 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS browser text`,
     sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS os text`,
     sql`CREATE INDEX IF NOT EXISTS analytics_visitor_ts_idx ON analytics_events (visitor_id, ts)`,
+    // PRD 01 — dimensão interna de behavior_events (coluna aqui; marcação no PRD 03).
+    // Até o PRD 03, o handler DROPA interno — toda linha nasce false (mudança inerte).
+    sql`ALTER TABLE behavior_events ADD COLUMN IF NOT EXISTS is_internal boolean NOT NULL DEFAULT false`,
+    // PRD 01 — índices-base espelhados (hoje só na migração 0000_init.sql; no-op onde
+    // já existem — fecham a lacuna "4 dos 5 índices dependem de drizzle-kit push manual").
+    sql`CREATE INDEX IF NOT EXISTS analytics_ts_idx ON analytics_events (ts)`,
+    sql`CREATE INDEX IF NOT EXISTS analytics_type_ts_idx ON analytics_events (type, ts)`,
+    sql`CREATE INDEX IF NOT EXISTS analytics_session_idx ON analytics_events (session_id)`,
+    sql`CREATE INDEX IF NOT EXISTS analytics_article_idx ON analytics_events (article_id)`,
+    sql`CREATE INDEX IF NOT EXISTS behavior_type_ts_idx ON behavior_events (event_type, ts)`,
+    sql`CREATE INDEX IF NOT EXISTS behavior_ts_idx ON behavior_events (ts)`,
+    sql`CREATE INDEX IF NOT EXISTS behavior_session_idx ON behavior_events (session_id)`,
+    sql`CREATE INDEX IF NOT EXISTS geo_stats_region_idx ON geo_stats (region)`,
+    sql`CREATE INDEX IF NOT EXISTS geo_stats_city_idx ON geo_stats (city)`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,
