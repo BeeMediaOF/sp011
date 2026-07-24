@@ -9,8 +9,12 @@ export interface UtmSignals {
   utmSource?: string;
   utmMedium?: string;
   utmCampaign?: string;
-  /** gclid/fbclid presente na URL de entrada — só a PRESENÇA é enviada, nunca o ID. */
+  /** gclid OU fbclid presente — fundido, mantido por retrocompat (PRD 05 separou os dois). */
   paidClick: boolean;
+  /** Presença de gclid/fbclid na URL de entrada — só a PRESENÇA, nunca o ID. O servidor
+   *  decide o canal: gclid/fbclid só viram "pago" se casarem uma campanha cadastrada. */
+  gclid?: boolean;
+  fbclid?: boolean;
 }
 
 export function parseUtm(search: string): UtmSignals {
@@ -20,13 +24,17 @@ export function parseUtm(search: string): UtmSignals {
       const v = p.get(k)?.trim();
       return v ? v.slice(0, 120) : undefined;
     };
-    const out: UtmSignals = { paidClick: p.has("gclid") || p.has("fbclid") };
+    const gclid = p.has("gclid");
+    const fbclid = p.has("fbclid");
+    const out: UtmSignals = { paidClick: gclid || fbclid };
     const source = get("utm_source");
     const medium = get("utm_medium");
     const campaign = get("utm_campaign");
     if (source) out.utmSource = source;
     if (medium) out.utmMedium = medium;
     if (campaign) out.utmCampaign = campaign;
+    if (gclid) out.gclid = true;
+    if (fbclid) out.fbclid = true;
     return out;
   } catch {
     return { paidClick: false };

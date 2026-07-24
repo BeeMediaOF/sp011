@@ -54,6 +54,10 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS is_internal boolean NOT NULL DEFAULT false`,
     sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS browser text`,
     sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS os text`,
+    // PRD 05 RF-4 — presença de click-id (booleano) na linha first-touch; habilita
+    // as checagens contínuas do PRD 11/08 ("linha pago sem campanha correspondente").
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS gclid boolean`,
+    sql`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS fbclid boolean`,
     sql`CREATE INDEX IF NOT EXISTS analytics_visitor_ts_idx ON analytics_events (visitor_id, ts)`,
     // PRD 01 — dimensão interna de behavior_events (coluna aqui; marcação no PRD 03).
     // Até o PRD 03, o handler DROPA interno — toda linha nasce false (mudança inerte).

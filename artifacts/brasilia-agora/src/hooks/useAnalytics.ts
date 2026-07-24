@@ -94,7 +94,9 @@ function takeFirstTouch(): Record<string, unknown> | null {
       if (u.utmSource)   out["utmSource"]   = u.utmSource;
       if (u.utmMedium)   out["utmMedium"]   = u.utmMedium;
       if (u.utmCampaign) out["utmCampaign"] = u.utmCampaign;
-      if (u.paidClick)   out["paidClick"]   = true;
+      if (u.paidClick)   out["paidClick"]   = true;   // legado (bundle antigo)
+      if (u.gclid)       out["gclid"]        = true;
+      if (u.fbclid)      out["fbclid"]       = true;
     }
   } catch { /* ignore */ }
   return out;

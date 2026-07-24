@@ -298,6 +298,22 @@ export interface SiteCategory {
 }
 import type { FooterConfig } from "./footerConfig";
 
+/** Campanha de tráfego pago cadastrada pelo operador (PRD 05). Espelha o tipo do
+ *  servidor (api/lib/analyticsShared.ts) — "pago" só é classificado quando uma
+ *  campanha ativa casa os sinais da visita. */
+export interface PaidCampaign {
+  id: string;
+  name: string;
+  active: boolean;
+  utmCampaign?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  acceptGclid?: boolean;
+  acceptFbclid?: boolean;
+  startDay?: string;
+  endDay?: string;
+}
+
 export interface SiteSettings {
   siteName: string;
   tagline: string;
@@ -322,6 +338,9 @@ export interface SiteSettings {
   /** IPs de tráfego interno (analytics), separados por vírgula/espaço — eventos
    *  desses IPs são marcados internos e ficam fora das métricas públicas. */
   internalIps?: string;
+  /** Campanhas de tráfego pago (PRD 05): "pago" só é classificado quando uma
+   *  campanha ativa casa os sinais da visita. */
+  paidCampaigns?: PaidCampaign[];
   mobileEnabled: boolean;
   desktopEnabled: boolean;
   showTickerBar?: boolean;

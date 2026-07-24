@@ -9,9 +9,17 @@ test("parseUtm: captura utm_* e presença de gclid/fbclid (o ID em si nunca sai)
   assert.equal(u.utmCampaign, "julho");
   assert.equal(u.paidClick, false);
 
+  // PRD 05: gclid/fbclid vêm separados (paidClick mantido por retrocompat).
   const paid = parseUtm("?gclid=abc123xyz");
   assert.equal(paid.paidClick, true);
+  assert.equal(paid.gclid, true);
+  assert.equal(paid.fbclid, undefined);
   assert.equal(paid.utmSource, undefined);
+
+  const fb = parseUtm("?fbclid=xyz");
+  assert.equal(fb.paidClick, true);
+  assert.equal(fb.fbclid, true);
+  assert.equal(fb.gclid, undefined);
 
   assert.deepEqual(parseUtm(""), { paidClick: false });
 });

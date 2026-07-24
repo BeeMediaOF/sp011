@@ -13,7 +13,7 @@ import {
   cleanStr, normalizeIp, isPrivateIp,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
-  ANALYTICS_V2_SINCE, type EventLike,
+  ANALYTICS_V2_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
 import { internalIpSet } from "../lib/internalTraffic.js";
@@ -41,6 +41,9 @@ export interface AnalyticsEvent {
   utmMedium?: string;
   utmCampaign?: string;
   refHost?: string;
+  /** Presença de click-id na linha first-touch (PRD 05); undefined = não first-touch. */
+  gclid?: boolean;
+  fbclid?: boolean;
   isInternal?: boolean;
   browser?: string;
   os?: string;
@@ -76,6 +79,8 @@ function toRow(ev: AnalyticsEvent) {
     utmMedium:   ev.utmMedium ?? null,
     utmCampaign: ev.utmCampaign ?? null,
     refHost:     ev.refHost ?? null,
+    gclid:       ev.gclid ?? null,
+    fbclid:      ev.fbclid ?? null,
     isInternal:  ev.isInternal ?? false,
     browser:     ev.browser ?? null,
     os:          ev.os ?? null,
@@ -137,6 +142,24 @@ export function getPendingAnalyticsEvents(): AnalyticsEvent[] {
 
 // ─── Tráfego interno ──────────────────────────────────────────────────────────
 // IPs internos: fonte única em lib/internalTraffic.ts (compartilhada com routes/ads.ts).
+
+// Campanhas de tráfego pago (PRD 05 RF-3) — memoizado no padrão do internalIpSet:
+// devolve só as `active:true` (a janela de datas é decidida por ingest na
+// matchesPaidCampaign, com o todayKey do momento). Settings malformadas → [].
+let _paidCampaignsRaw = "";
+let _activePaidCampaigns: PaidCampaign[] = [];
+function activePaidCampaigns(): PaidCampaign[] {
+  const arr = store.getSettings().paidCampaigns;
+  const raw = JSON.stringify(arr ?? []);
+  if (raw !== _paidCampaignsRaw) {
+    _paidCampaignsRaw = raw;
+    _activePaidCampaigns = Array.isArray(arr)
+      ? arr.filter((c): c is PaidCampaign =>
+          !!c && typeof c === "object" && typeof c.id === "string" && c.active === true)
+      : [];
+  }
+  return _activePaidCampaigns;
+}
 
 // ─── IP Geolocation via ip-api.com (async, cached, non-blocking) ──────────────
 // LIMITAÇÃO CONHECIDA (decisão registrada): plano grátis do ip-api é HTTP-only e
@@ -243,15 +266,23 @@ router.post("/event", (req, res) => {
   const utmMedium   = cleanStr(b["utmMedium"], 120);
   const utmCampaign = cleanStr(b["utmCampaign"], 120);
   const refHost     = cleanStr(b["refHost"], 253)?.toLowerCase().replace(/^www\./, "");
-  const paidClick   = b["paidClick"] === true;
+  const paidClick   = b["paidClick"] === true;                // legado (bundle antigo, fundido)
+  const gclid       = b["gclid"] === true;                    // presença de gclid (Google)
+  const fbclid      = b["fbclid"] === true;                   // presença de fbclid (Meta)
   const legacyChannel = cleanStr(b["referrer"], 20); // bundle antigo: direto|busca|social|outro
 
   // Canal só no pageview de entrada da sessão (first-touch); navegações internas
   // não reenviam origem. `firstTouch` marca inclusive a entrada direta sem sinais.
   const firstTouch = b["firstTouch"] === true ||
-    Boolean(refHost || utmSource || utmMedium || paidClick || legacyChannel);
+    Boolean(refHost || utmSource || utmMedium || paidClick || gclid || fbclid || legacyChannel);
+  // PRD 05: "pago" só via campanha ativa cadastrada (activePaidCampaigns); gclid/fbclid
+  // órfãos caem em social/busca. O servidor continua sendo o único que classifica.
   const referrer = firstTouch
-    ? (isInternal ? "interno" : classifyChannel({ utmSource, utmMedium, paidClick, refHost, legacyChannel }))
+    ? (isInternal ? "interno" : classifyChannel(
+        { utmSource, utmMedium, utmCampaign, paidClick, gclid, fbclid, refHost, legacyChannel },
+        activePaidCampaigns(),
+        brtDayKey(Date.now()),
+      ))
     : undefined;
 
   const durationRaw = Number(b["duration"]);
@@ -285,6 +316,9 @@ router.post("/event", (req, res) => {
     region: cachedGeo?.region,
     visitorId,
     utmSource, utmMedium, utmCampaign, refHost,
+    // Só grava click-id na linha first-touch (RF-4); demais/legado ficam NULL.
+    gclid:  firstTouch ? gclid : undefined,
+    fbclid: firstTouch ? fbclid : undefined,
     isInternal,
     browser, os,
     _ip: isPrivateIp(ip) ? undefined : ip,
@@ -403,6 +437,8 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       platform:    analyticsEventsTable.platform,
       refHost:     analyticsEventsTable.refHost,
       utmCampaign: analyticsEventsTable.utmCampaign,
+      utmMedium:   analyticsEventsTable.utmMedium,
+      utmSource:   analyticsEventsTable.utmSource,
     }).from(analyticsEventsTable).where(and(
       gte(analyticsEventsTable.ts, winFrom),
       lt(analyticsEventsTable.ts, winTo),

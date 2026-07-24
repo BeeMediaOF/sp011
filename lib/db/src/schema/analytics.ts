@@ -31,6 +31,10 @@ export const analyticsEventsTable = pgTable("analytics_events", {
   utmMedium:   text("utm_medium"),
   utmCampaign: text("utm_campaign"),
   refHost:     text("ref_host"),
+  // Presença de click-id na URL de entrada (só o booleano; o valor do id nunca
+  // sai do navegador). NULL = anterior à regra (PRD 05) OU linha não-first-touch.
+  gclid:       boolean("gclid"),
+  fbclid:      boolean("fbclid"),
   // Tráfego interno (admin/dev/IP configurado): gravado para auditoria,
   // excluído de todas as agregações públicas.
   isInternal:  boolean("is_internal").notNull().default(false),

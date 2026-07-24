@@ -24,6 +24,8 @@ router.get("/site", (_req, res) => {
   delete settings.homeTemplates;
   // IPs internos da redação são configuração de Analytics — vazariam ao público.
   delete settings.internalIps;
+  // Campanhas pagas são configuração interna de Analytics (PRD 05) — não ao público.
+  delete settings.paidCampaigns;
   const menuItems = store.getMenuItems()
     .filter((m) => m.visible)
     .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));

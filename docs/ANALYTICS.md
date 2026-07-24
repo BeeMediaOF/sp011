@@ -124,7 +124,7 @@ no painel (`?period=today|yesterday|7d|30d|custom`), ecoado em `stats.period`.
 | Tendências (badges) | todos | janela atual vs janela imediatamente anterior de mesmo tamanho; `null` = sem base → sem badge (nunca inventa %) | selecionada | — |
 | Tráfego ao longo do tempo | `pageview` | contagem por dia BRT | selecionada | — |
 | Pico por hora / dia da semana | `pageview` | bucket hora/dia BRT; `null` sem dados | selecionada | — |
-| Fontes de tráfego | `pageview.referrer` (canal) | canal atribuído 1× por sessão (first-touch); classificado NO SERVIDOR a partir de refHost+UTM+gclid/fbclid: `direto, busca, social, referencia, email, pago, desconhecido` (linhas legadas `outro`→`referencia` só na agregação) | selecionada | 1 por sessão (`bee_ref_done`) |
+| Fontes de tráfego | `pageview.referrer` (canal) | canal atribuído 1× por sessão (first-touch); classificado NO SERVIDOR a partir de refHost+UTM+gclid/fbclid: `direto, busca, social, referencia, email, pago, desconhecido`. **"pago" SÓ quando uma campanha ativa cadastrada casa os sinais (PRD 05)** — `gclid`/`fbclid` órfão vira `busca`/`social`, nunca `pago`; `utm_medium=cpc\|ppc\|…` sem campanha vira `desconhecido`/host. Linhas legadas: `outro`→`referencia` e `pago` anterior a `PAID_RULE_SINCE` são remapeadas só na agregação (nunca reescritas) | selecionada | 1 por sessão (`bee_ref_done`) |
 | Domínios de origem / Campanhas | `pageview.ref_host` / `utm_campaign` | contagem, top 10 | selecionada | first-touch por sessão |
 | Dispositivos | `pageview.device` | derivado do UA no servidor (mobile/desktop/tablet) | selecionada | — |
 | Navegadores / Sistemas | `pageview.browser/os` | parse próprio do UA no ingest (8 famílias; fora do catálogo = `outro`) | selecionada | — |
@@ -193,8 +193,19 @@ rodou). Exibidos na faixa “Saúde da coleta” do painel (a UI do `adsReliable
    a partir dele, contagem exata. **Os números de impressão caem de novo após o
    reparo — é o valor honesto.** O all-time de `ads` (contador independente) não é
    tocado.
-8. Revisita à mesma página na mesma sessão conta o MAX de tempo (não a soma) —
+9. Revisita à mesma página na mesma sessão conta o MAX de tempo (não a soma) —
    leve subestimação, preferida a duplicar leituras.
+10. **"Tráfego pago" exige campanha cadastrada (PRD 05)** — o canal `pago` só é
+   atribuído quando o operador cadastra uma campanha ativa (Configurações →
+   "Campanhas de tráfego pago") cujos identificadores (`utm_campaign`, o par
+   `utm_source`+`utm_medium`, ou aceitar `gclid`/`fbclid`) casem a visita.
+   ANTES: a mera presença de `gclid`/`fbclid` (incl. cliques ORGÂNICOS do
+   Facebook, que anexam `fbclid` a qualquer link) marcava `pago` e vencia
+   `social` — daí o falso "Tráfego pago" na rede sem campanha comprada. As
+   linhas `pago` gravadas pela regra antiga (antes de `PAID_RULE_SINCE`) são
+   remapeadas para social/busca/referência/desconhecido **só na agregação**
+   (nenhuma reescrita no banco); as colunas booleanas `gclid`/`fbclid` passam a
+   ser persistidas (só a presença, nunca o id) para auditoria futura.
 
 ## Processo de migração de schema (obrigatório)
 

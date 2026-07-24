@@ -4,7 +4,7 @@ import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import DatabaseCard from "../../components/admin/DatabaseCard";
 import { getStoredRole } from "../Admin";
-import { adminApi, type SiteSettings, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission, type RetentionOptions } from "../../lib/adminApi";
+import { adminApi, type SiteSettings, type PaidCampaign, type ContactInfo, type AuditLog, type SecurityLog, type LogStats, type EditorPermission, type RetentionOptions } from "../../lib/adminApi";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { useToast } from "@/hooks/use-toast";
@@ -608,6 +608,14 @@ export default function Settings() {
                       placeholder={t("cfg.internalIpsPh")}/>
                     <p className="text-[11px] text-[#94A3B8] mt-1.5">
                       {t("cfg.internalIpsDesc")}
+                    </p>
+                  </Field>
+                  <Field label={t("cfg.paidCampaigns")}>
+                    <PaidCampaignsEditor
+                      value={settings.paidCampaigns ?? []}
+                      onChange={v => setField("paidCampaigns", v)}/>
+                    <p className="text-[11px] text-[#94A3B8] mt-1.5">
+                      {t("cfg.paidCampaignsDesc")}
                     </p>
                   </Field>
                 </div>
@@ -2352,6 +2360,89 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
         {hint && <span className="text-[11px] text-[#94A3B8]">{hint}</span>}
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Cadastro leve de campanhas de tráfego pago (PRD 05 RF-6). "pago" só é
+ *  classificado quando uma campanha ativa casa os sinais da visita. */
+function PaidCampaignsEditor({ value, onChange }: {
+  value: PaidCampaign[]; onChange: (v: PaidCampaign[]) => void;
+}) {
+  const { t } = useAdminT();
+  const genId = () =>
+    (typeof crypto !== "undefined" && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2);
+  const patch = (id: string, p: Partial<PaidCampaign>) =>
+    onChange(value.map(c => (c.id === id ? { ...c, ...p } : c)));
+  const add = () => onChange([...value, { id: genId(), name: "", active: true }]);
+  const remove = (id: string) => onChange(value.filter(c => c.id !== id));
+  const hasIdentifier = (c: PaidCampaign) => Boolean(
+    c.utmCampaign?.trim() ||
+    (c.utmSource?.trim() && c.utmMedium?.trim()) ||
+    c.acceptGclid || c.acceptFbclid,
+  );
+
+  return (
+    <div className="space-y-3">
+      {value.length === 0 && (
+        <p className="text-[13px] text-[#94A3B8]">{t("cfg.paidCampaignNone")}</p>
+      )}
+      {value.map(c => (
+        <div key={c.id} className="border border-[#E2E8F0] rounded-xl p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <input value={c.name} onChange={e => patch(c.id, { name: e.target.value })}
+              className={INPUT} placeholder={t("cfg.paidCampaignNamePh")}/>
+            <label className="flex items-center gap-1.5 text-sm text-[#0F172A] whitespace-nowrap">
+              <input type="checkbox" checked={c.active}
+                onChange={e => patch(c.id, { active: e.target.checked })}/>
+              {t("cfg.paidCampaignActive")}
+            </label>
+            <button type="button" onClick={() => remove(c.id)}
+              className="text-[12px] text-[#94A3B8] hover:text-[#E71D36] whitespace-nowrap">
+              {t("cfg.paidCampaignRemove")}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input value={c.utmCampaign ?? ""} onChange={e => patch(c.id, { utmCampaign: e.target.value })}
+              className={INPUT} placeholder="utm_campaign"/>
+            <input value={c.utmSource ?? ""} onChange={e => patch(c.id, { utmSource: e.target.value })}
+              className={INPUT} placeholder="utm_source"/>
+            <input value={c.utmMedium ?? ""} onChange={e => patch(c.id, { utmMedium: e.target.value })}
+              className={INPUT} placeholder="utm_medium"/>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            <label className="flex items-center gap-1.5 text-[13px] text-[#0F172A]">
+              <input type="checkbox" checked={!!c.acceptGclid}
+                onChange={e => patch(c.id, { acceptGclid: e.target.checked })}/>
+              {t("cfg.paidCampaignGclid")}
+            </label>
+            <label className="flex items-center gap-1.5 text-[13px] text-[#0F172A]">
+              <input type="checkbox" checked={!!c.acceptFbclid}
+                onChange={e => patch(c.id, { acceptFbclid: e.target.checked })}/>
+              {t("cfg.paidCampaignFbclid")}
+            </label>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-[11px] text-[#94A3B8]">{t("cfg.paidCampaignStart")}
+              <input type="date" value={c.startDay ?? ""} className={INPUT}
+                onChange={e => patch(c.id, { startDay: e.target.value || undefined })}/>
+            </label>
+            <label className="text-[11px] text-[#94A3B8]">{t("cfg.paidCampaignEnd")}
+              <input type="date" value={c.endDay ?? ""} className={INPUT}
+                onChange={e => patch(c.id, { endDay: e.target.value || undefined })}/>
+            </label>
+          </div>
+          {!hasIdentifier(c) && (
+            <p className="text-[11px] text-[#E71D36]">{t("cfg.paidCampaignEmpty")}</p>
+          )}
+        </div>
+      ))}
+      <button type="button" onClick={add}
+        className="text-sm text-[#0B2A66] font-medium hover:underline">
+        {t("cfg.paidCampaignsAdd")}
+      </button>
     </div>
   );
 }

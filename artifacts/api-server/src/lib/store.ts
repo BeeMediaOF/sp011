@@ -8,6 +8,7 @@
 
 import { createHash, randomUUID } from "crypto";
 import { BRAND } from "./brand.js";
+import type { PaidCampaign } from "./analyticsShared.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -187,6 +188,10 @@ export interface SiteSettings {
    *  eventos desses IPs são marcados internos e excluídos do Analytics público.
    *  NUNCA vai no payload público de /api/site (redigido em routes/site.ts). */
   internalIps?: string;
+  /** Campanhas de tráfego pago cadastradas pelo operador (PRD 05): "pago" só é
+   *  classificado quando uma campanha ativa casa os sinais. NUNCA vai no payload
+   *  público de /api/site (redigido em routes/site.ts). */
+  paidCampaigns?: PaidCampaign[];
   mobileEnabled: boolean; desktopEnabled: boolean;
   showTickerBar?: boolean; showHeroStrip?: boolean;
   headerStyle?: "standard" | "compact" | "centered";

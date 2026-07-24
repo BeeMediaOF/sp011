@@ -20,6 +20,14 @@ export const brtDayStartMs = (dayKey: string): number => Date.parse(`${dayKey}T0
 /** Dados coletados com as regras da rodada 2 (visitante/UTM/interno) valem a partir daqui. */
 export const ANALYTICS_V2_SINCE = "2026-07-08";
 
+/** Corte da regra de "pago exige campanha" (PRD 05 RF-5): linhas `referrer='pago'`
+ *  a partir deste dia BRT foram validadas por campanha no ingest e são confiadas na
+ *  leitura; ANTES dele são legado (fbclid/gclid órfão) e sofrem remap na agregação.
+ *  DEVE ser >= o dia do rollout (dia SEGUINTE ao deploy é o conservador — todas as
+ *  linhas do próprio dia do deploy, escritas em parte pelo código antigo, caem no
+ *  remap). Se o rollout escorregar de dia, ATUALIZAR antes do build. */
+export const PAID_RULE_SINCE = "2026-07-25";
+
 // ─── Validação de entrada ─────────────────────────────────────────────────────
 // O endpoint é público: tudo que chega é hostil até prova em contrário. Um único
 // valor fora do enum do Postgres faria o INSERT em lote falhar e travaria o
@@ -111,26 +119,81 @@ const SOCIAL_HOST_RE =
 const MAIL_HOST_RE =
   /(^|\.)(mail\.google\.com|outlook\.(live|office)\.com|mail\.yahoo\.com)$|^webmail\./;
 
+/** utm_source de rede social conhecida (para o remap do legado — PRD 05 RF-5). */
+const SOCIAL_SOURCE_RE = /^(facebook|fb|instagram|ig|meta|twitter|x|tiktok|youtube|linkedin|threads|whatsapp|wa|telegram|reddit|pinterest)$/;
+
 export interface ChannelSignals {
   utmSource?: string | undefined;
   utmMedium?: string | undefined;
-  paidClick?: boolean | undefined;    // gclid/fbclid presente na URL de entrada
+  utmCampaign?: string | undefined;   // casa com PaidCampaign.utmCampaign (PRD 05)
+  paidClick?: boolean | undefined;    // legado: gclid OU fbclid fundidos (bundle antigo)
+  gclid?: boolean | undefined;        // presença de gclid na URL (Google) — só booleano
+  fbclid?: boolean | undefined;       // presença de fbclid na URL (Meta) — só booleano
   refHost?: string | undefined;       // hostname cru do document.referrer
   legacyChannel?: string | undefined; // bundle antigo do cliente: direto|busca|social|outro
 }
 
+/** Campanha de tráfego pago cadastrada pelo operador (settings, por blog) — PRD 05 RF-1.
+ *  "pago" só existe quando uma campanha ativa casa os sinais da visita. */
+export interface PaidCampaign {
+  id: string;
+  name: string;
+  active: boolean;
+  utmCampaign?: string;   // casa com lower(trim(utm_campaign)) da visita
+  utmSource?: string;     // casam JUNTOS (par) com utm_source + utm_medium
+  utmMedium?: string;
+  acceptGclid?: boolean;  // cliques com gclid pertencem a esta campanha (Google Ads)
+  acceptFbclid?: boolean; // cliques com fbclid pertencem a esta campanha (Meta Ads)
+  startDay?: string;      // "YYYY-MM-DD" (dia BRT, inclusivo) — opcional
+  endDay?: string;        // "YYYY-MM-DD" (dia BRT, inclusivo) — opcional
+}
+
 /**
- * Precedência: pago → email → medium explícito → host de busca → host social →
- * qualquer host externo = referência → UTM irreconhecível = desconhecido →
- * canal legado → direto. O servidor é o único que classifica; o cliente envia
- * apenas sinais crus.
+ * Uma campanha CASA a visita (PRD 05 RF-1) se estiver ativa, dentro da janela de
+ * datas BRT (extremos inclusivos; datas inválidas/ausentes = sem limite) e QUALQUER
+ * um dos identificadores DEFINIDOS casar: (a) utm_campaign igual; (b) utm_source E
+ * utm_medium (par) iguais; (c) acceptGclid + gclid presente; (d) acceptFbclid +
+ * fbclid presente. Campanha SEM identificador nunca casa nada. `todayKey` (dia BRT)
+ * é injetado — a função é pura/determinística (o ingest passa brtDayKey(Date.now())).
  */
-export function classifyChannel(sig: ChannelSignals): Channel {
+export function matchesPaidCampaign(sig: ChannelSignals, c: PaidCampaign, todayKey: string): boolean {
+  if (!c.active) return false;
+  if (c.startDay && isDayKey(c.startDay) && todayKey < c.startDay) return false;
+  if (c.endDay && isDayKey(c.endDay) && todayKey > c.endDay) return false;
+
+  const sigC = (sig.utmCampaign ?? "").toLowerCase().trim();
+  const sigS = (sig.utmSource ?? "").toLowerCase().trim();
+  const sigM = (sig.utmMedium ?? "").toLowerCase().trim();
+  const campC = (c.utmCampaign ?? "").toLowerCase().trim();
+  const campS = (c.utmSource ?? "").toLowerCase().trim();
+  const campM = (c.utmMedium ?? "").toLowerCase().trim();
+
+  if (campC && sigC && sigC === campC) return true;
+  if (campS && campM && sigS === campS && sigM === campM) return true;
+  if (c.acceptGclid && sig.gclid) return true;
+  if (c.acceptFbclid && sig.fbclid) return true;
+  return false;
+}
+
+/**
+ * Precedência (PRD 05 RF-2): pago (SÓ via campanha ativa) → email → medium explícito
+ * → host → click-id sem host (fbclid→social, gclid→busca) → medium/source/paidClick
+ * legado = desconhecido → canal legado → direto. `gclid`/`fbclid` NÃO são mais
+ * gatilhos autônomos de "pago" — só a mera presença de campanha casando. O servidor
+ * é o único que classifica; o cliente envia apenas sinais crus.
+ */
+export function classifyChannel(
+  sig: ChannelSignals,
+  campaigns: PaidCampaign[] = [],
+  todayKey: string = brtDayKey(Date.now()),
+): Channel {
   const medium = (sig.utmMedium ?? "").toLowerCase().trim();
   const source = (sig.utmSource ?? "").toLowerCase().trim();
   const host   = (sig.refHost ?? "").toLowerCase().trim();
 
-  if (sig.paidClick || /^(cpc|ppc|paid|display|cpm|banner|retargeting)$/.test(medium)) return "pago";
+  // 1. pago SÓ quando uma campanha ativa cadastrada casa os sinais (única porta).
+  for (const c of campaigns) if (matchesPaidCampaign(sig, c, todayKey)) return "pago";
+
   if (/^(email|e-mail|newsletter)$/.test(medium) || MAIL_HOST_RE.test(host)) return "email";
   if (/^(social|sm)$/.test(medium)) return "social";
   if (/^(organic|search)$/.test(medium)) return "busca";
@@ -139,7 +202,11 @@ export function classifyChannel(sig: ChannelSignals): Channel {
     if (SOCIAL_HOST_RE.test(host)) return "social";
     return "referencia";
   }
-  if (medium || source) return "desconhecido";
+  // click-id sem host (in-app browser do Meta/Google não manda referrer): determinístico.
+  if (sig.fbclid) return "social";
+  if (sig.gclid)  return "busca";
+  // paidClick legado (bundle antigo, plataforma indistinguível) ou UTM irreconhecível.
+  if (medium || source || sig.paidClick) return "desconhecido";
 
   const legacy = sig.legacyChannel;
   if (legacy === "direto" || legacy === "busca" || legacy === "social") return legacy;
@@ -151,6 +218,45 @@ export function classifyChannel(sig: ChannelSignals): Channel {
 export function normalizeLegacyChannel(v: string): Channel {
   if (v === "outro") return "referencia";
   return (CHANNELS as readonly string[]).includes(v) ? (v as Channel) : "desconhecido";
+}
+
+/**
+ * Canal de uma linha PERSISTIDA, na leitura (PRD 05 RF-5). Estende o precedente do
+ * `normalizeLegacyChannel` (nenhum UPDATE no banco — invariante §17). Só o canal
+ * `"pago"` recebe tratamento especial:
+ *   - `ts >= PAID_RULE_SINCE` → mantém `"pago"` (já validado por campanha no ingest);
+ *   - `ts < PAID_RULE_SINCE` (legado, fbclid/gclid órfão) → reconstrói o canal
+ *     NÃO-pago pelos sinais persistidos, UTM ANTES do host (§9.2: há linha social
+ *     legada com `utm_medium=social` e `ref_host` NULO — a automação social da rede).
+ * Demais canais delegam a `normalizeLegacyChannel`.
+ */
+export function resolveStoredChannel(
+  referrer: string,
+  tsMs: number,
+  refHost?: string,
+  utmMedium?: string,
+  utmSource?: string,
+): Channel {
+  if (referrer !== "pago") return normalizeLegacyChannel(referrer);
+  if (tsMs >= brtDayStartMs(PAID_RULE_SINCE)) return "pago";
+
+  const medium = (utmMedium ?? "").toLowerCase().trim();
+  const source = (utmSource ?? "").toLowerCase().trim();
+  const host   = (refHost ?? "").toLowerCase().trim();
+
+  // 1. UTM social (medium=social OU source de rede social conhecida) — antes do host.
+  if (/^(social|sm)$/.test(medium) || SOCIAL_SOURCE_RE.test(source)) return "social";
+  // 2. UTM e-mail.
+  if (/^(email|e-mail|newsletter)$/.test(medium)) return "email";
+  // 3. Fallback por host.
+  if (host) {
+    if (MAIL_HOST_RE.test(host)) return "email";
+    if (SEARCH_HOST_RE.test(host)) return "busca";
+    if (SOCIAL_HOST_RE.test(host)) return "social";
+    return "referencia";
+  }
+  // 4. Sem UTM útil e sem host — gclid/fbclid indistinguíveis no legado (c7).
+  return "desconhecido";
 }
 
 // ─── Janela de período (dias BRT, `to` inclusivo) ─────────────────────────────
@@ -239,6 +345,8 @@ export interface EventLike {
   platform?: string | null;
   refHost?: string | null;
   utmCampaign?: string | null;
+  utmMedium?: string | null;   // PRD 05 RF-5: remap do canal 'pago' legado
+  utmSource?: string | null;
 }
 
 export interface WindowAggregates {
@@ -302,8 +410,12 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
       if (ev.device) deviceMap[ev.device] = (deviceMap[ev.device] ?? 0) + 1;
 
       // Origem é atribuída por sessão: só o pageview de entrada carrega canal.
+      // PRD 05 RF-5: 'pago' legado (< PAID_RULE_SINCE) é remapeado pelos sinais
+      // persistidos; nenhuma linha é reescrita no banco.
       if (ev.referrer) {
-        const ch = normalizeLegacyChannel(ev.referrer);
+        const ch = resolveStoredChannel(
+          ev.referrer, ev.ts, ev.refHost ?? undefined, ev.utmMedium ?? undefined, ev.utmSource ?? undefined,
+        );
         if (ch !== "interno") channelMap[ch] = (channelMap[ch] ?? 0) + 1;
       }
       if (ev.refHost) refHostMap[ev.refHost] = (refHostMap[ev.refHost] ?? 0) + 1;

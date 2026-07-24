@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildWindowAggregates, brtDayStartMs, DAY, type EventLike } from "../src/lib/analyticsShared.ts";
+import { buildWindowAggregates, brtDayStartMs, DAY, PAID_RULE_SINCE, type EventLike } from "../src/lib/analyticsShared.ts";
 
 // Janela fixa de 7 dias BRT: 01..07/07/2026.
 const FROM = brtDayStartMs("2026-07-01");
@@ -71,6 +71,41 @@ test("canais: remap do legado 'outro' → referencia; refHost/campanha rankeados
   assert.equal(agg.channelMap["direto"], 0);
   assert.equal(agg.refHostMap["blogx.com"], 1);
   assert.equal(agg.campaignMap["verao"], 1);
+});
+
+test("PRD 05 RF-5: 'pago' legado (< corte) remapeado por UTM/host; >= corte mantém pago", () => {
+  const cut = brtDayStartMs(PAID_RULE_SINCE);
+  const before = cut - DAY;
+  const after = cut + DAY;
+  const win = { fromMs: before - DAY, toMs: after + DAY };
+  const agg = buildWindowAggregates([
+    pv({ sessionId: "s1", referrer: "pago", ts: before, refHost: "facebook.com" }),   // host social
+    pv({ sessionId: "s2", referrer: "pago", ts: before, refHost: "google.com" }),     // host busca
+    pv({ sessionId: "s3", referrer: "pago", ts: before, refHost: "parceiro.com.br" }),// referência
+    pv({ sessionId: "s4", referrer: "pago", ts: before }),                            // sem host -> desconhecido
+    pv({ sessionId: "s5", referrer: "pago", ts: before, utmMedium: "social" }),       // UTM social, host nulo (§9.2)
+    pv({ sessionId: "s6", referrer: "pago", ts: before, refHost: "mail.google.com" }),// e-mail vence busca
+    pv({ sessionId: "s7", referrer: "pago", ts: after }),                             // novo -> mantém pago
+  ], win);
+  assert.equal(agg.channelMap["social"], 2);   // facebook + utm_medium=social
+  assert.equal(agg.channelMap["busca"], 1);
+  assert.equal(agg.channelMap["referencia"], 1);
+  assert.equal(agg.channelMap["email"], 1);
+  assert.equal(agg.channelMap["desconhecido"], 1);
+  assert.equal(agg.channelMap["pago"], 1);      // só a linha >= corte
+});
+
+test("PRD 05 CA-5: remap preserva o total (linhas trocam de canal, nunca somem)", () => {
+  const cut = brtDayStartMs(PAID_RULE_SINCE);
+  const win = { fromMs: cut - 2 * DAY, toMs: cut };
+  const rows = [
+    pv({ sessionId: "s1", referrer: "pago", ts: cut - DAY, refHost: "facebook.com" }),
+    pv({ sessionId: "s2", referrer: "social", ts: cut - DAY }),
+    pv({ sessionId: "s3", referrer: "direto", ts: cut - DAY }),
+    pv({ sessionId: "s4", referrer: "pago", ts: cut - DAY }),
+  ];
+  const total = Object.values(buildWindowAggregates(rows, win).channelMap).reduce((a, b) => a + b, 0);
+  assert.equal(total, 4); // 4 pageviews com referrer -> soma dos canais = 4 (nada sumiu)
 });
 
 test("artigos/categorias/share/dispositivos agregam na janela", () => {
