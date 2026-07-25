@@ -13,6 +13,7 @@ import {
   cleanStr, normalizeIp, isPrivateIp, planRequeue, capExcess,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
+  compareTopCategories, dowOccurrences, pickPeakDow,
   ANALYTICS_V2_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, bumpEndpoint, bumpInternalReason, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
@@ -535,8 +536,12 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       )
       SELECT
         (SELECT count(*) FROM win_visitors)::int AS uniq,
+        -- PRD 06 RF-2: "recorrente" = visitante da janela com pageview PÚBLICO
+        -- anterior à janela — MESMOS filtros do uniq (is_internal=false, pageview).
+        -- Sem eles, histórico 100% interno (ex.: operador logado) virava recorrente.
         (SELECT count(*) FROM win_visitors w WHERE EXISTS (
           SELECT 1 FROM analytics_events e WHERE e.visitor_id = w.vid AND e.ts < ${winFrom}
+            AND e.is_internal = false AND e.type = 'pageview'
         ))::int AS returning
     `),
     db.select({
@@ -646,7 +651,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     views:    agg.catViewMap[name]  ?? 0,
     clicks:   agg.catClickMap[name] ?? 0,
     articles: articleCountByCategory[name] ?? 0,
-  })).sort((a, b) => (b.clicks + b.views || b.articles) - (a.clicks + a.views || a.articles)).slice(0, 10);
+  })).sort(compareTopCategories).slice(0, 10); // PRD 06 RF-1: acessos DESC, artigos DESC, nome ASC
 
   const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
@@ -772,7 +777,10 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     .map(([domain, count]) => ({ domain, count }));
 
   const maxHourViews = Math.max(...agg.byHour);
-  const maxDowViews  = Math.max(...agg.byDow);
+  // PRD 06 RF-3: pico por dia da semana normalizado pelas ocorrências de cada dia
+  // na janela (elimina o viés estrutural da soma bruta).
+  const dowOcc = dowOccurrences(win);
+  const peakDowIdx = pickPeakDow(agg.byDow, dowOcc);
 
   res.json({
     period: { key: win.key, from: win.fromDay, to: win.toDay, label: win.label, days: win.days },
@@ -788,8 +796,11 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     dailyChart:      Object.entries(agg.byDay).map(([date, views]) => ({ date, views })),
     hourlyChart:     agg.byHour.map((views, hour) => ({ hour, views })),
     peakHour:        maxHourViews > 0 ? agg.byHour.indexOf(maxHourViews) : null,
-    dayOfWeekChart:  agg.byDow.map((views, day) => ({ day: DAY_NAMES[day]!, views })),
-    peakDay:         maxDowViews > 0 ? DAY_NAMES[agg.byDow.indexOf(maxDowViews)]! : null,
+    dayOfWeekChart:  agg.byDow.map((views, day) => {
+      const o = dowOcc[day] ?? 0;
+      return { day: DAY_NAMES[day]!, views, occurrences: o, avg: o > 0 ? Math.round((views / o) * 10) / 10 : null };
+    }),
+    peakDay:         peakDowIdx !== null ? DAY_NAMES[peakDowIdx]! : null,
     topArticles,
     topCategories,
     topCities:  Object.entries(cityTotals).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, views]) => ({ name, views })),

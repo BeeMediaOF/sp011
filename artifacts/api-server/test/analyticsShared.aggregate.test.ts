@@ -58,6 +58,36 @@ test("scroll: cada marco vale 1× por sessão+artigo (evento repetido não soma)
   assert.equal(agg.scrollSessions[25]?.size, 0);
 });
 
+test("PRD 06 RF-4: mesmo marco só com path (skeleton) e depois com path+articleId conta 1×", () => {
+  const agg = buildWindowAggregates([
+    { type: "scroll", sessionId: "s1", path: "/noticia/x", scrollDepth: 50, ts: T },                        // durante o load (sem articleId)
+    { type: "scroll", sessionId: "s1", path: "/noticia/x", articleId: "a1", scrollDepth: 50, ts: T + 1000 }, // após o load
+    { type: "scroll", sessionId: "s1", path: "/noticia/x", articleId: "a1", scrollDepth: 100, ts: T + 2000 },
+    { type: "scroll", sessionId: "s1", path: "/noticia/x", articleId: "a1", scrollDepth: 100, ts: T + 3000 }, // reenvio idêntico
+  ], WIN);
+  assert.equal(agg.scrollSessions[50]?.size, 1);  // colapsam na chave s1|/noticia/x
+  assert.equal(agg.scrollSessions[100]?.size, 1);
+});
+
+test("PRD 06 RF-4: paths distintos na mesma sessão contam separado (sessão×conteúdo)", () => {
+  const agg = buildWindowAggregates([
+    { type: "scroll", sessionId: "s1", path: "/a", scrollDepth: 50, ts: T },
+    { type: "scroll", sessionId: "s1", path: "/b", scrollDepth: 50, ts: T },
+  ], WIN);
+  assert.equal(agg.scrollSessions[50]?.size, 2);
+});
+
+test("PRD 06 CA-9 (reducer): soma de views por categoria <= windowPv; sessões >= visitantes do fixture", () => {
+  const agg = buildWindowAggregates([
+    pv({ sessionId: "s1", category: "a" }),
+    pv({ sessionId: "s1", category: "b" }), // mesma sessão, 2 pageviews
+    pv({ sessionId: "s2" }),                // sem categoria
+  ], WIN);
+  const catSum = Object.values(agg.catViewMap).reduce((a, b) => a + b, 0);
+  assert.ok(catSum <= agg.windowPv);                          // 2 <= 3
+  assert.ok(Object.keys(agg.sessionPageviews).length >= 2);   // 2 sessões distintas
+});
+
 test("canais: remap do legado 'outro' → referencia; refHost/campanha rankeados", () => {
   const agg = buildWindowAggregates([
     pv({ sessionId: "s1", referrer: "outro" }),

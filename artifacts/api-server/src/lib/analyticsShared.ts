@@ -465,7 +465,10 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
     }
 
     if (ev.type === "scroll" && ev.scrollDepth) {
-      scrollSessions[ev.scrollDepth]?.add(`${ev.sessionId}|${ev.articleId ?? ev.path ?? ""}`);
+      // PRD 06 RF-4: chave IDÊNTICA à do read (path-first) — o mesmo marco chegando
+      // uma vez só com path (durante o load do artigo) e outra com articleId colapsa
+      // numa chave só; sem isso o par sessão×conteúdo contaria 2x.
+      scrollSessions[ev.scrollDepth]?.add(`${ev.sessionId}|${ev.path ?? ev.articleId ?? ""}`);
     }
 
     if (ev.type === "share" && ev.platform) {
@@ -483,6 +486,59 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
 /** Variação % (1 casa) — null quando não há base de comparação (nunca inventa 0%). */
 export function pctChange(cur: number, prev: number): number | null {
   return prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null;
+}
+
+// ─── Top categorias / dia da semana (PRD 06 — ordenação e pico corretos) ──────
+export interface TopCategoryRow { name: string; views: number; clicks: number; articles: number; }
+
+/**
+ * PRD 06 RF-1: ordenação do "Top categorias" (card "por acessos"). Chave primária
+ * = acessos (clicks+views) DESC; desempate por nº de artigos DESC; desempate final
+ * por nome ASC (estável/determinística entre requests). Categoria com acessos > 0
+ * NUNCA fica abaixo de categoria com 0 acessos — o `|| articles` do sort antigo
+ * deixava categoria sem nenhum acesso liderar por ter muitos artigos.
+ */
+export function compareTopCategories(a: TopCategoryRow, b: TopCategoryRow): number {
+  const accA = a.clicks + a.views;
+  const accB = b.clicks + b.views;
+  if (accB !== accA) return accB - accA;
+  if (b.articles !== a.articles) return b.articles - a.articles;
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+}
+
+/**
+ * PRD 06 RF-3: quantas vezes cada dia da semana (0=Dom..6=Sáb, BRT) ocorre na
+ * janela [fromMs, toMs) — mesmo passo do zero-init de byDay (DAY a partir de fromMs,
+ * que já é início de dia BRT). Numa janela de 30 dias, 2 dias ocorrem 5x e 5 ocorrem
+ * 4x: sem normalizar por isso, o "pico por dia da semana" tem viés estrutural de até
+ * ~25% independente dos dados.
+ */
+export function dowOccurrences(win: { fromMs: number; toMs: number }): number[] {
+  const occ: number[] = Array(7).fill(0);
+  for (let t = win.fromMs; t < win.toMs; t += DAY) occ[brtDow(t)]!++;
+  return occ;
+}
+
+/**
+ * PRD 06 RF-3: dia da semana de maior MÉDIA (views/ocorrência), entre os dias com
+ * ocorrência > 0 e views > 0. Empate de média → maior soma bruta; empate persistindo
+ * → menor índice (varredura ascendente + substituição só estrita). Sem dia com
+ * views > 0 → null (preserva o contrato peakDay:null).
+ */
+export function pickPeakDow(byDow: number[], occ: number[]): number | null {
+  let best: number | null = null;
+  let bestAvg = -1;
+  let bestSum = -1;
+  for (let d = 0; d < 7; d++) {
+    const views = byDow[d] ?? 0;
+    const o = occ[d] ?? 0;
+    if (o <= 0 || views <= 0) continue;
+    const avg = views / o;
+    if (avg > bestAvg || (avg === bestAvg && views > bestSum)) {
+      best = d; bestAvg = avg; bestSum = views;
+    }
+  }
+  return best;
 }
 
 // ─── Reconciliação do buffer (PRD 03 RF6 — puro, testável) ────────────────────
