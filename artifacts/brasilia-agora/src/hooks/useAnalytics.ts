@@ -1,9 +1,12 @@
 import { useEffect, useRef, type RefObject } from "react";
 import { useLocation } from "wouter";
 import { getConsent } from "../components/LGPDConsent";
-import { parseUtm, refHostOf, contentScrollPct, newMilestones, type UtmSignals } from "../lib/analyticsClient";
+import {
+  parseUtm, refHostOf, contentScrollPct, newMilestones,
+  externalHrefOf, createLinkClickDebouncer, newSharePlatforms, type UtmSignals,
+} from "../lib/analyticsClient";
+import { getSessionId, isInternalContext, captureAdminPreviewOnce } from "../lib/trackingContext";
 
-const SESSION_KEY = "bee_session_id";
 const VISITOR_KEY = "bee_visitor_id";
 const REF_KEY     = "bee_ref_done";
 const UTM_KEY     = "bee_utm";
@@ -17,21 +20,6 @@ const ADMIN_RE   = /^\/admin(\/|$)/;
 /** Páginas de artigo: o pageview sai de trackArticle (com id/categoria/título) —
  *  enviar também o pageview genérico contaria cada visita em dobro. */
 const ARTICLE_RE = /^\/artigo\//;
-
-/** Id de sessão do SDK (chave bee_session_id) — reusado pelas rotas de anúncio
- *  (components/ads/useAds.ts) para o dedup server-side do PRD 04, sem duplicar a chave. */
-export function getSessionId(): string {
-  try {
-    let id = sessionStorage.getItem(SESSION_KEY);
-    if (!id) {
-      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      sessionStorage.setItem(SESSION_KEY, id);
-    }
-    return id;
-  } catch {
-    return "unknown";
-  }
-}
 
 /** Visitante anônimo persistente: UUID aleatório em localStorage, criado SÓ após
  *  o aceite LGPD (sem fingerprinting; rejeitou = nunca existe). */
@@ -48,17 +36,6 @@ function getVisitorId(): string | undefined {
     return id;
   } catch {
     return undefined;
-  }
-}
-
-/** Tráfego interno: sessão com admin logado neste navegador, ou ambiente dev.
- *  O servidor grava o evento marcado (auditável) e o exclui das métricas. */
-function isInternalClient(): boolean {
-  if (import.meta.env.DEV) return true;
-  try {
-    return Boolean(localStorage.getItem("admin_token"));
-  } catch {
-    return false;
   }
 }
 
@@ -112,7 +89,7 @@ function send(payload: Record<string, unknown>): boolean {
   const data: Record<string, unknown> = { ...payload, sessionId: getSessionId() };
   const visitorId = getVisitorId();
   if (visitorId) data["visitorId"] = visitorId;
-  if (isInternalClient()) data["internal"] = true;
+  if (isInternalContext()) data["internal"] = true;
   if (navigator.sendBeacon) {
     navigator.sendBeacon(
       "/api/analytics/event",
@@ -137,6 +114,25 @@ function sendPageview(extra: Record<string, unknown>): void {
   if (ok && firstTouch) markReferrerDone();
 }
 
+// Dedup de share por (aba, conteúdo): sessionStorage com fallback em memória por
+// página (mesma degradação do scroll quando o storage está bloqueado).
+const memShares = new Map<string, Set<string>>();
+function readShareSet(key: string): Set<string> {
+  try {
+    const raw = sessionStorage.getItem(key);
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return memShares.get(key) ?? new Set<string>();
+  }
+}
+function writeShareSet(key: string, set: Set<string>): void {
+  try {
+    sessionStorage.setItem(key, JSON.stringify([...set]));
+  } catch {
+    memShares.set(key, set);
+  }
+}
+
 export function useAnalytics() {
   const [location] = useLocation();
   const prevPathRef  = useRef<string>("");
@@ -146,8 +142,30 @@ export function useAnalytics() {
   const activeMsRef     = useRef(0);
   const visibleSinceRef = useRef<number | null>(null);
 
-  // Captura UTM da URL de entrada antes de qualquer envio (efeitos rodam na ordem).
-  useEffect(() => { captureUtmOnce(); }, []);
+  // Captura UTM + marca de prévia do admin da URL de entrada antes de qualquer
+  // envio (efeitos rodam na ordem de definição — este é o primeiro).
+  useEffect(() => { captureAdminPreviewOnce(); captureUtmOnce(); }, []);
+
+  // link_click de SITE INTEIRO: um único listener delegado em capture (não o
+  // corpo do artigo isolado). Só conta href http(s) de outro origin, fora de
+  // /admin e de qualquer contêiner de anúncio ([data-bee-ad]); debounce de 1s
+  // por href (RF2). O gate LGPD/interno é aplicado dentro de trackLinkClick.
+  useEffect(() => {
+    const debouncer = createLinkClickDebouncer(1000);
+    const handler = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const path = window.location.pathname;
+      if (ADMIN_RE.test(path)) return;
+      if (a.closest("[data-bee-ad]")) return;              // clique de anúncio ≠ link externo
+      const href = externalHrefOf(a.href, window.location.origin);
+      if (!href) return;
+      if (!debouncer.shouldCount(href)) return;
+      trackLinkClick(href, ARTICLE_RE.test(path) ? articleIdRef.current : undefined);
+    };
+    document.addEventListener("click", handler, true);
+    return () => document.removeEventListener("click", handler, true);
+  }, []);
 
   // Consentimento aceito no meio da navegação: registra a página atual.
   useEffect(() => {
@@ -243,8 +261,14 @@ export function useAnalytics() {
   }
 
   function trackShare(platform: string) {
-    send({ type: "share", path: location, platform,
-           articleId: articleIdRef.current });
+    // 1× por (aba, conteúdo, plataforma): repetir a MESMA plataforma não é novo
+    // compartilhamento; plataforma diferente conta (RF4).
+    const key = `bee_share_${articleIdRef.current ?? location}`;
+    const already = readShareSet(key);
+    if (newSharePlatforms(platform, already).length === 0) return;
+    already.add(platform);
+    writeShareSet(key, already);
+    send({ type: "share", path: location, platform, articleId: articleIdRef.current });
   }
 
   return { trackCategory, trackArticle, trackShare };
@@ -253,7 +277,7 @@ export function useAnalytics() {
 function sendBehavior(payload: Record<string, unknown>) {
   if (getConsent() !== "accepted") return;
   const data: Record<string, unknown> = { ...payload, sessionId: getSessionId() };
-  if (isInternalClient()) data["internal"] = true;
+  if (isInternalContext()) data["internal"] = true;
   fetch("/api/analytics/behavior", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -271,6 +295,16 @@ export function trackLinkClick(url: string, articleId?: string) {
   sendBehavior({ eventType: "link_click", value: url.slice(0, 500), articleId });
 }
 
+/** Adesão à newsletter DENTRO do gate (RF1/QUICK WIN LGPD): antes os formulários
+ *  faziam fetch direto a /behavior sem consentimento e sem marcação interna. O
+ *  e-mail (dado pessoal) só sai com aceite; inscrição de admin vai internal:true
+ *  (servidor descarta). É SÓ métrica — não há backend de mailing (§11). */
+export function trackNewsletter(email: string) {
+  const v = email.trim();
+  if (!v) return;
+  sendBehavior({ eventType: "newsletter", value: v.slice(0, 200) });
+}
+
 /**
  * Scroll depth (25/50/75/100%) relativo ao BLOCO DE CONTEÚDO quando `contentRef`
  * é passado (cabeçalho/lateral/rodapé não contam); cai para a página inteira sem
@@ -280,10 +314,16 @@ export function trackLinkClick(url: string, articleId?: string) {
 export function useScrollDepth(
   articleId: string | undefined,
   contentRef?: RefObject<HTMLElement | null>,
+  opts?: { waitForId?: boolean },
 ) {
   const [location] = useLocation();
 
   useEffect(() => {
+    // RF3: em artigo (waitForId), não instala NADA até o articleId resolver —
+    // rolar durante o skeleton não grava marcos sob a chave `path` que depois
+    // seriam recontados sob a chave `articleId` (dupla contagem, item 18).
+    if (opts?.waitForId && articleId === undefined) return;
+
     const storeKey = articleId ? `bee_scroll_${articleId}` : `bee_scroll_p:${location}`;
     const fired = new Set<number>();
     try {

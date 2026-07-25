@@ -19,7 +19,7 @@ export default function AdCentral() {
   }
 
   return (
-    <div ref={impressionRef} className="w-full flex justify-center">
+    <div ref={impressionRef} data-bee-ad="1" className="w-full flex justify-center">
       <a
         href={ad.link}
         target="_blank"

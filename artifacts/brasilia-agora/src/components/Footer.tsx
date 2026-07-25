@@ -6,6 +6,7 @@ import logoImg from "../assets/images/logo_sbc_negativo.png";
 import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
+import { trackNewsletter } from "../hooks/useAnalytics";
 import {
   resolveFooterConfig, type FooterLink, type FooterSocialKey, type ResolvedFooter,
 } from "../lib/footerConfig";
@@ -42,35 +43,19 @@ function SocialIcons({ social, className }: {
   );
 }
 
-function getSessionId(): string {
-  try {
-    let id = sessionStorage.getItem("bee_session_id");
-    if (!id) {
-      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      sessionStorage.setItem("bee_session_id", id);
-    }
-    return id;
-  } catch { return "unknown"; }
-}
-
-/** Formulário de newsletter funcional: registra a adesão via analytics. */
+/** Formulário de newsletter funcional: registra a adesão via analytics (dentro
+ *  do gate LGPD — PRD 02 RF1). Fire-and-forget: mostra "ok" após validar o
+ *  e-mail localmente; sem consentimento nada sai do dispositivo. */
 function NewsletterForm({ dark, accent }: { dark: boolean; accent: string }) {
   const { t } = useT();
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<"idle" | "sending" | "ok">("idle");
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     const v = email.trim();
     if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return;
-    setStatus("sending");
-    try {
-      await fetch("/api/analytics/behavior", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: "newsletter", value: v, sessionId: getSessionId() }),
-      });
-    } catch { /* silencioso — nunca quebra o rodapé */ }
+    trackNewsletter(v);
     setStatus("ok");
     setEmail("");
   }

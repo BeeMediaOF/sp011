@@ -67,7 +67,7 @@ canal classificado (`classifyChannel`).
 |---|---|---|---|
 | `search` | search | `{eventType, sessionId*, value* = termo}` | — |
 | `link_click` | click_external | `{eventType, sessionId*, value* = URL externa, articleId?}` | emissores só no corpo do artigo (item 23) |
-| `newsletter` | newsletter_signup | `{eventType, sessionId*, value = e-mail}` | 2 formulários fora do gate de consentimento — correção no PRD 02 |
+| `newsletter` | newsletter_signup | `{eventType, sessionId*, value = e-mail, internal?}` | via `trackNewsletter` DENTRO do gate LGPD (PRD 02 RF1); admin envia `internal:true` (servidor descarta). É só métrica — sem backend de mailing |
 | `video_play` | — | **RESERVADO** | sem emissor no client — linha existente = anomalia (sinal de forja/teste) |
 | `download` | — | **RESERVADO** | idem |
 
@@ -94,10 +94,11 @@ referenciam artigo/categoria/anúncio por id textual e sobrevivem à exclusão d
 | Caminho `/admin*` | cliente E servidor | não enviado / descartado |
 | Pageview repetido (mesma sessão+path em <15s — F5) | servidor | descartado |
 | Admin logado no navegador (`admin_token` no localStorage) | cliente envia `internal:true` | gravado com `is_internal=true`, fora das métricas |
+| Prévia do admin (`?adminPreview=1` capturado nesta aba) | cliente envia `internal:true` (PRD 02 RF5) | idem — inclui impressão/clique de anúncio (`internal_*`) |
 | Ambiente dev (`import.meta.env.DEV`) | cliente | idem |
 | IP na lista de Configurações → “IPs internos (Analytics)” | servidor (`settings.internalIps`) | idem |
 | IP privado/loopback (dev local, health checks) | servidor | idem |
-| Sem consentimento LGPD | cliente | nada é enviado; visitor_id nem existe |
+| Sem consentimento LGPD | cliente | nada é enviado — **inclusive newsletter e impressão/clique de anúncio** (PRD 02 RF1/RF6); visitor_id nem existe |
 
 Tráfego interno é **marcado, não apagado** (`is_internal=true`) — auditável via
 SQL, tanto em `analytics_events` quanto em `behavior_events` (PRD 03 fechou a
@@ -134,13 +135,13 @@ no painel (`?period=today|yesterday|7d|30d|custom`), ecoado em `stats.period`.
 | Localização | `pageview.city/region` | agregado por evento DA JANELA; cidade nula = **“Não identificado”** (nunca inventamos local). `geo_stats` virou histórico bruto, não alimenta o painel | selecionada | — |
 | Profundidade de leitura | `scroll` (25/50/75/100) | **sessões únicas** (sessão+artigo) por marco; % medido sobre o BLOCO do corpo do artigo (contentRef — cabeçalho/lateral/rodapé não contam); página curta = 100% após 3s | selecionada | sessionStorage `bee_scroll_<artigo>` — remount não redispara |
 | Leram 100% | `scroll depth=100` | tamanho do set de sessões | selecionada | idem |
-| Impressões de anúncio | `POST /api/ads/:id/impression` | IntersectionObserver ≥50% visível por **1s contínuo** (dwell IAB); anúncio inativo/expirado não conta (checado no servidor). Gravação ATÔMICA por `(ad_id, date)` com índice único (PRD 04 RF1 — antes: upsert sem UNIQUE inflava ~quadraticamente) | selecionada (`ad_daily_stats` por dia BRT) | cliente 1×/aba (`bee_adimp_<id>`) **+ servidor 1×/sessão/anúncio em 30min** (PRD 04 RF4); admin/dev envia `internal:true` → conta em `internal_impressions`, fora do público |
+| Impressões de anúncio | `POST /api/ads/:id/impression` | IntersectionObserver ≥50% visível por **1s contínuo** (dwell IAB) **e só com consentimento LGPD** (PRD 02 RF6 — mesmo gate do pageview; sem aceite, zero impressão pública); anúncio inativo/expirado não conta (checado no servidor). Gravação ATÔMICA por `(ad_id, date)` com índice único (PRD 04 RF1 — antes: upsert sem UNIQUE inflava ~quadraticamente) | selecionada (`ad_daily_stats` por dia BRT) | cliente 1×/aba (`bee_adimp_<id>`) **+ servidor 1×/sessão/anúncio em 30min** (PRD 04 RF4); admin/dev/prévia envia `internal:true` → conta em `internal_impressions`, fora do público |
 | Blocos "É uma propaganda" | idem, com chave `block:<id do bloco>` | blocos de imagem/HTML da home ou da lateral marcados `isAd` medem impressão (mesma regra de dwell) e clique (qualquer link do bloco); validados contra as settings no servidor; contadores só em `ad_daily_stats` (sem linha na tabela `ads`); entram em adStats/adKpis como posição "bloco da home" | selecionada | cliente 1×/aba + servidor 1×/sessão em 30min; bloco oculto não conta |
-| Cliques de anúncio | `POST /api/ads/:id/click` | registrado antes do redirect (target=_blank) | selecionada | servidor dedup 10s por sessão/anúncio (mata duplo-clique); admin/dev envia `internal:true` → `internal_clicks` |
+| Cliques de anúncio | `POST /api/ads/:id/click` | registrado antes do redirect (target=_blank), **só com consentimento** (PRD 02 RF6); clique mais rápido que o dwell dispara a impressão-irmã antes (mantém clicks ≤ impressions) | selecionada | servidor dedup 10s por sessão/anúncio (mata duplo-clique); admin/dev/prévia envia `internal:true` → `internal_clicks` |
 | CTR | derivado | cliques válidos ÷ impressões válidas × 100, por anúncio e médio | selecionada | — |
 | Melhor anúncio | derivado | maior CTR entre anúncios com impressão > 0 na janela; `—` sem dados | selecionada | — |
 | “sem dados no período” (ads) | `ad_daily_stats` | anúncio sem NENHUMA linha diária na janela (≠ zero real); `adHasAnyData=false` = coleta nunca começou (“Acumulando…”) | selecionada | — |
-| Termos buscados / Links externos / Newsletter | `behavior_events` (search/link_click/newsletter) | contagem; link externo = href fora do próprio domínio (delegação no corpo do artigo + links markdown) | selecionada | eventos internos não são gravados |
+| Termos buscados / Links externos / Newsletter | `behavior_events` (search/link_click/newsletter) | contagem; link externo = href http(s) de origin DIFERENTE, capturado por **listener delegado único de SITE INTEIRO** (rodapé/menu/blocos, não só o corpo do artigo — PRD 02 RF2); `mailto:`/`tel:`/âncoras e cliques em `[data-bee-ad]` NÃO contam; debounce 1s por href; newsletter dentro do gate (RF1) | selecionada | eventos internos não são gravados |
 
 ## Saúde da coleta (`GET /api/analytics/health`, admin)
 
@@ -181,6 +182,9 @@ como interno — diagnosticável por `internalByReason.configuredIp` desproporci
 - UTM da URL de entrada fica em sessionStorage até o aceite — não sai do
   dispositivo sem consentimento. `gclid`/`fbclid`: só a PRESENÇA é enviada
   (flag `paidClick`), nunca o ID.
+- **Todo** evento passa pelo mesmo gate (PRD 02): pageview, read, scroll, share,
+  category, search, link_click, **newsletter** (e-mail, dado pessoal) e
+  **impressão/clique de anúncio**. Não há mais fetch direto fora do SDK.
 - IPs não são gravados em `analytics_events` (o campo `_ip` do buffer é
   transiente, para retro-preencher geo, e não vai ao banco).
 
@@ -205,6 +209,9 @@ como interno — diagnosticável por `internalByReason.configuredIp` desproporci
 7. **Impressões de anúncio caíram após 08/07/2026** — é o número honesto
    (dwell de 1s + 1× por sessão). Comparações com o histórico anterior
    superestimado não são válidas. Totais all-time seguem no AdsManager.
+   **O PRD 02 (gate LGPD nas impressões) derruba de novo:** visitante que não
+   aceita o banner deixa de gerar impressão pública — some a assimetria "M
+   impressões / zero pageview". Continua sendo o número honesto.
 8. **Reparo histórico do PRD 04 (`ad_daily_stats`)** — o upsert antigo, sem índice
    único em `(ad_id, date)`, inflava a contagem diária ~quadraticamente (medido: de
    ~3× a ~27× por blog). O boot da imagem do PRD 04 faz, uma vez por banco: backup

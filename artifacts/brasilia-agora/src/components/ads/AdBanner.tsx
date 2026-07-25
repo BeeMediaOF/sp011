@@ -104,6 +104,7 @@ export default function AdBanner({
       <div className="w-full flex justify-center">
         <div
           ref={impressionRef}
+          data-bee-ad="1"
           className="relative w-full group"
           style={adId ? undefined : { aspectRatio }}
         >

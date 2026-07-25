@@ -29,7 +29,7 @@ export default function AdInFeed({ className = "" }: AdInFeedProps) {
   const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   return (
-    <div ref={impressionRef} className={`col-span-1 md:col-span-2 lg:col-span-1 ${className}`}>
+    <div ref={impressionRef} data-bee-ad="1" className={`col-span-1 md:col-span-2 lg:col-span-1 ${className}`}>
       {loading || !ad ? (
         <Placeholder />
       ) : (

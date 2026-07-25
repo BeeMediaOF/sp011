@@ -24,7 +24,7 @@ import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
 } from "../../lib/homeBlocks";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
-import { trackSearch } from "../../hooks/useAnalytics";
+import { trackSearch, trackNewsletter } from "../../hooks/useAnalytics";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
 import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
 
@@ -144,7 +144,7 @@ export function ImageBlock({ block, preview, contained = true }: {
     : body;
 
   return (
-    <section ref={adKey ? impressionRef : undefined}
+    <section ref={adKey ? impressionRef : undefined} data-bee-ad={adKey ? "1" : undefined}
       className={!contained ? "" : format === "full_width_image" ? "py-4" : "max-w-[1280px] mx-auto px-4 py-6"}>
       {inner}
     </section>
@@ -250,7 +250,7 @@ export function HtmlBlock({ block, preview, contained = true }: {
   }
   const body = <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: clean }} />;
   return (
-    <section ref={adKey ? impressionRef : undefined}
+    <section ref={adKey ? impressionRef : undefined} data-bee-ad={adKey ? "1" : undefined}
       className={contained ? "max-w-[1280px] mx-auto px-4 py-6" : ""}
       onClick={adKey ? (e) => {
         // Delegação: cobre o overlay E os <a> do próprio HTML sanitizado.
@@ -334,17 +334,6 @@ export function TickerBlock({ block, articles, preview, contained = true }: {
 }
 
 // ─── Newsletter ──────────────────────────────────────────────────────────────
-function getSessionId(): string {
-  try {
-    let id = sessionStorage.getItem("bee_session_id");
-    if (!id) {
-      id = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      sessionStorage.setItem("bee_session_id", id);
-    }
-    return id;
-  } catch { return "unknown"; }
-}
-
 export function NewsletterBlock({ block }: { block: HomeBlock }) {
   const { t, lang } = useT();
   const { settings } = useSite();
@@ -361,20 +350,15 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
   // Rótulo do botão configurável por bloco (mock Crédito.vc: "Quero receber").
   const btnLabel = (block.buttonLabel ?? "").trim() || t("newsletter.subscribe");
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     const v = email.trim();
     if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { setStatus("err"); return; }
-    setStatus("sending");
-    try {
-      await fetch("/api/analytics/behavior", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventType: "newsletter", value: v, sessionId: getSessionId() }),
-      });
-      setStatus("ok");
-      setEmail("");
-    } catch { setStatus("err"); }
+    // Dentro do gate LGPD (PRD 02 RF1): sem consentimento nada sai; admin vai
+    // internal:true (descartado no servidor). Fire-and-forget — "ok" imediato.
+    trackNewsletter(v);
+    setStatus("ok");
+    setEmail("");
   }
 
   const errMsg = status === "err" && (

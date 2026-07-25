@@ -25,7 +25,7 @@ export default function AdSidebar({ className = "" }: AdSidebarProps) {
 
   return (
     <div className={`hidden lg:flex flex-col gap-4 w-36 shrink-0 ${className}`}>
-      <div ref={impressionRef} className="sticky top-24">
+      <div ref={impressionRef} data-bee-ad="1" className="sticky top-24">
         {loading || !ad ? (
           <Placeholder />
         ) : (

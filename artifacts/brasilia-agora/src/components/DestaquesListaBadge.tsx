@@ -90,7 +90,7 @@ function AdSidebarInline() {
   const impressionRef = useAdImpression(!loading && ad ? ad.id : undefined);
 
   return (
-    <div ref={impressionRef} className="mt-6">
+    <div ref={impressionRef} data-bee-ad="1" className="mt-6">
       <p className="text-[9px] text-gray-300 mb-1 text-center tracking-wider uppercase">Publicidade</p>
       {!loading && ad && (
         <a

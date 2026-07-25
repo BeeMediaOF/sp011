@@ -25,7 +25,7 @@ export default function AdSlot({ size = "sm", className = "", sticky = false, ch
   if (loading || !ad) return null;
 
   return (
-    <div ref={impressionRef} className={`flex flex-col items-center ${sticky ? "sticky top-28" : ""} ${className}`}>
+    <div ref={impressionRef} data-bee-ad="1" className={`flex flex-col items-center ${sticky ? "sticky top-28" : ""} ${className}`}>
       <a href={ad.link} target="_blank" rel="noreferrer"
         onClick={() => trackClick(ad.id)}
         className={`block ${SIZE_STYLES[size]} rounded-lg border border-gray-100 overflow-hidden group relative`}

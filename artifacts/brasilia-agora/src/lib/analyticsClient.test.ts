@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseUtm, refHostOf, contentScrollPct, newMilestones, createDwellDecider } from "./analyticsClient";
+import {
+  parseUtm, refHostOf, contentScrollPct, newMilestones, createDwellDecider,
+  externalHrefOf, createLinkClickDebouncer, hasAdminPreviewParam, newSharePlatforms,
+} from "./analyticsClient";
 
 test("parseUtm: captura utm_* e presença de gclid/fbclid (o ID em si nunca sai)", () => {
   const u = parseUtm("?utm_source=nl&utm_medium=email&utm_campaign=julho");
@@ -45,6 +48,51 @@ test("newMilestones: só marcos novos que o % atual alcançou", () => {
   assert.deepEqual(newMilestones(100, new Set()), [25, 50, 75, 100]);
   assert.deepEqual(newMilestones(24, new Set()), []);
   assert.deepEqual(newMilestones(75, new Set([25, 50, 75])), []);
+});
+
+test("externalHrefOf: só http(s) de outro origin; mailto/tel/relativo/inválido = null (RF2)", () => {
+  const origin = "https://blog.com";
+  assert.equal(externalHrefOf("https://externo.com/x", origin), "https://externo.com/x");
+  assert.equal(externalHrefOf("http://externo.com/x", origin), "http://externo.com/x");
+  assert.equal(externalHrefOf("https://blog.com/artigo/1", origin), null); // mesmo origin
+  assert.equal(externalHrefOf("mailto:a@b.c", origin), null);
+  assert.equal(externalHrefOf("tel:+5561999", origin), null);
+  assert.equal(externalHrefOf("javascript:void(0)", origin), null);
+  assert.equal(externalHrefOf("/relativo", origin), null);       // sem protocolo → inválido p/ URL()
+  assert.equal(externalHrefOf("#hash", origin), null);
+  assert.equal(externalHrefOf("não é url", origin), null);
+  // prefixo enganoso: subdomínio .evil de outra origin CONTA (comparação de origin real, não string)
+  assert.equal(externalHrefOf("https://blog.com.evil.com/x", origin), "https://blog.com.evil.com/x");
+  // mesmo host, protocolo diferente → origins distintos → conta
+  assert.equal(externalHrefOf("http://blog.com/x", origin), "http://blog.com/x");
+});
+
+test("createLinkClickDebouncer: mesmo href <1s = 1×; >1s = conta; href diferente conta na hora (RF2)", () => {
+  let now = 0;
+  const d = createLinkClickDebouncer(1000, () => now);
+  assert.equal(d.shouldCount("https://a.com"), true);   // 1ª vez
+  now = 500;
+  assert.equal(d.shouldCount("https://a.com"), false);  // dentro de 1s do último contado
+  now = 700;
+  assert.equal(d.shouldCount("https://b.com"), true);   // href diferente conta imediatamente
+  now = 1000;
+  assert.equal(d.shouldCount("https://a.com"), true);   // 1000ms desde o último "a" contado (t=0)
+});
+
+test("hasAdminPreviewParam: só ?adminPreview=1; malformado não lança (RF5)", () => {
+  assert.equal(hasAdminPreviewParam("?adminPreview=1"), true);
+  assert.equal(hasAdminPreviewParam("?x=2&adminPreview=1&y=3"), true);
+  assert.equal(hasAdminPreviewParam("?adminPreview=0"), false);
+  assert.equal(hasAdminPreviewParam("?adminPreview=true"), false);
+  assert.equal(hasAdminPreviewParam(""), false);
+  assert.equal(hasAdminPreviewParam("?x=1"), false);
+});
+
+test("newSharePlatforms: plataforma nova = [plataforma]; repetida = [] (RF4)", () => {
+  assert.deepEqual(newSharePlatforms("facebook", new Set()), ["facebook"]);
+  assert.deepEqual(newSharePlatforms("facebook", new Set(["facebook"])), []);
+  assert.deepEqual(newSharePlatforms("copy", new Set(["facebook"])), ["copy"]);
+  assert.deepEqual(newSharePlatforms("copy", new Set(["facebook", "copy"])), []);
 });
 
 test("dwell de impressão: 1s CONTÍNUO — sair da tela antes zera o relógio", () => {

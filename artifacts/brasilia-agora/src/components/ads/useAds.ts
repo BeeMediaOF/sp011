@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { getSessionId } from "../../hooks/useAnalytics";
+import { getSessionId, isInternalContext } from "../../lib/trackingContext";
+import { getConsent } from "../LGPDConsent";
 
 export type AdSlotKey = "slot_01" | "slot_02" | "slot_03" | "slot_04" | "slot_05" | "slot_06" | "slot_07" | "slot_08" | "slot_09" | "slot_10" | "slot_11";
 
@@ -104,27 +105,25 @@ export function useAds() {
   return { ads, getSlot, getSlotAll, banners, sidebars, centrals, loading };
 }
 
-/** Admin logado (ou ambiente dev): antes SUPRIMIA o envio; agora envia com internal:true
- *  (alinhado ao SDK de pageview) — o servidor conta em internal_* e não polui o público
- *  (PRD 04 RF3). Consentimento LGPD/viewability/dedup por aba ficam no PRD 02. */
-function isInternalTraffic(): boolean {
-  if (import.meta.env.DEV) return true;
-  try {
-    return Boolean(localStorage.getItem("admin_token"));
-  } catch {
-    return false;
-  }
-}
-
 function trackBody(): string {
   return JSON.stringify({
     sessionId: getSessionId(),                                    // mesmo id do SDK
     path: typeof location !== "undefined" ? location.pathname : undefined,
-    internal: isInternalTraffic() || undefined,
+    // Admin/dev/prévia (?adminPreview=1) → internal:true: o servidor conta em
+    // internal_* e não polui o público (PRD 04 RF3); contexto único (RF7).
+    internal: isInternalContext() || undefined,
   });
 }
 
 export function trackClick(adId: string) {
+  // Gate LGPD (RF6): mesmo consentimento do pageview — sem aceite, nada sai.
+  if (getConsent() !== "accepted") return Promise.resolve();
+  // Clique mais rápido que o dwell de 1s da impressão: garante a impressão-irmã
+  // ANTES do clique (mantém clicks ≤ impressions por aba-sessão — RF6/PRD 11).
+  if (!impressionAlreadyCounted(adId)) {
+    markImpressionCounted(adId);
+    void trackImpression(adId);
+  }
   return fetch(`/api/ads/${adId}/click`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -133,6 +132,10 @@ export function trackClick(adId: string) {
 }
 
 export function trackImpression(adId: string) {
+  // Gate LGPD (RF6): visitante sem aceite não gera impressão pública — elimina a
+  // assimetria "M impressões / zero pageview". Impressões públicas VÃO CAIR (é o
+  // número honesto).
+  if (getConsent() !== "accepted") return Promise.resolve();
   return fetch(`/api/ads/${adId}/impression`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

@@ -364,7 +364,7 @@ export default function Header() {
   // ele divide a linha com o menu — precisa abraçar o conteúdo (shrink-0),
   // senão disputa metade da largura com o nav e um sobrepõe o outro.
   const headerBanner = headerBannerClean ? (
-    <div ref={headerBannerImpRef}
+    <div ref={headerBannerImpRef} data-bee-ad="1"
       className={`hidden lg:flex min-w-0 items-center justify-end relative ${menuBarStyle === "bar" ? "flex-1" : "shrink-0 ml-2"}`}
       style={{ minHeight: 48 }}>
       <div className="w-full min-w-0 flex items-center justify-end"
