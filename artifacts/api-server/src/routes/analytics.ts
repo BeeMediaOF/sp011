@@ -13,7 +13,7 @@ import {
   cleanStr, normalizeIp, isPrivateIp, planRequeue, capExcess,
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
-  compareTopCategories, dowOccurrences, pickPeakDow,
+  compareTopCategories, dowOccurrences, pickPeakDow, buildBehaviorStats,
   ANALYTICS_V2_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, bumpEndpoint, bumpInternalReason, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
@@ -747,34 +747,10 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     : null;
   const adHasAnyData = Boolean(((adHasAnyRes.rows?.[0] ?? {}) as { has?: boolean }).has);
 
-  // ── Behavior stats (janela) ───────────────────────────────────────────────
-  const searchTerms: Record<string, number> = {};
-  const linkDomains: Record<string, number> = {};
-  let newsletterSignups = 0;
-
-  for (const ev of behaviorRows) {
-    if (ev.eventType === "search" && ev.value) {
-      const term = ev.value.toLowerCase().trim();
-      searchTerms[term] = (searchTerms[term] ?? 0) + 1;
-    }
-    if (ev.eventType === "link_click" && ev.value) {
-      try {
-        const domain = new URL(ev.value).hostname.replace(/^www\./, "");
-        linkDomains[domain] = (linkDomains[domain] ?? 0) + 1;
-      } catch { /* invalid URL */ }
-    }
-    if (ev.eventType === "newsletter") newsletterSignups++;
-  }
-
-  const topSearchTerms = Object.entries(searchTerms)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 15)
-    .map(([term, count]) => ({ term, count }));
-
-  const topLinkDomains = Object.entries(linkDomains)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([domain, count]) => ({ domain, count }));
+  // ── Behavior stats (janela) — PRD 07: tops truncados + totais NÃO truncados ──
+  // Agregação extraída para função pura (testável); a query já exclui interno em
+  // SQL (PRD 03 RF3) e a função reforça (defesa em profundidade).
+  const behaviorStats = buildBehaviorStats(behaviorRows);
 
   const maxHourViews = Math.max(...agg.byHour);
   // PRD 06 RF-3: pico por dia da semana normalizado pelas ocorrências de cada dia
@@ -825,13 +801,8 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       bestAdName:       bestAd?.name ?? null,
       bestAdCtr:        bestAd?.ctr ?? 0,
     },
-    // Behavior analytics
-    behaviorStats: {
-      totalEvents:     behaviorRows.length,
-      newsletterSignups,
-      topSearchTerms,
-      topLinkDomains,
-    },
+    // Behavior analytics (PRD 07 — contrato aditivo: tops + totais + distintos)
+    behaviorStats,
   });
 });
 

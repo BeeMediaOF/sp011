@@ -597,3 +597,90 @@ export function checkClicksVsImpressions(
   const limit = impressions + 1;
   return { ok: clicks <= limit, limit };
 }
+
+// ─── Comportamento no site (PRD 07) ───────────────────────────────────────────
+// Buscas, cliques externos e newsletter agregados numa passada só: tops truncados
+// (exibição) E totais NÃO truncados no MESMO lugar — impossível o frontend somar
+// top-N e chamar de total (bug do item 24). Função pura → testável por node --test.
+
+export interface BehaviorRowLike {
+  eventType: string;
+  value: string | null;
+  isInternal?: boolean | null; // tolerante a linhas/consumidores pré-PRD 01
+}
+
+export interface BehaviorStats {
+  totalEvents: number;          // linhas NÃO-internas da janela, todos os tipos
+  newsletterSignups: number;    // não-internos; já era não-truncado (inalterado)
+  searchesTotal: number;        // total real de buscas válidas na janela
+  externalClicksTotal: number;  // total real de cliques externos válidos
+  searchTermsDistinct: number;  // nº de termos distintos na janela
+  linkDomainsDistinct: number;  // nº de domínios distintos na janela
+  topSearchTerms: { term: string; count: number }[];   // top-15
+  topLinkDomains: { domain: string; count: number }[]; // top-10
+}
+
+/**
+ * Agrega os eventos de comportamento de UMA janela (PRD 07 RF1). Regras de admissão
+ * ÚNICAS (valem para tops E totais → consistência por construção):
+ *  - interno (`isInternal === true`) fora de TUDO: defesa em profundidade — a query
+ *    já filtra em SQL (PRD 03 RF3), mas a função é correta sozinha e testável;
+ *    `undefined`/`null` contam como não-interno (coluna é NOT NULL DEFAULT false);
+ *  - busca válida: `search` com `value.trim()` não-vazio; termo = `value.toLowerCase().trim()`;
+ *  - clique externo válido: `link_click` com `value` http(s) E `URL.hostname` não-vazio;
+ *    domínio = hostname sem o prefixo literal `www.`;
+ *  - newsletter: conta por linha (independe de `value`).
+ * `mailto:`/`tel:`/URL inválida/termo só-espaços contam em `totalEvents` e em nada mais
+ * (linhas históricas NUNCA são reescritas — o filtro é só na leitura).
+ */
+export function buildBehaviorStats(rows: BehaviorRowLike[]): BehaviorStats {
+  const usable = rows.filter((r) => r.isInternal !== true);
+  const searchTerms: Record<string, number> = {};
+  const linkDomains: Record<string, number> = {};
+  let searchesTotal = 0;
+  let externalClicksTotal = 0;
+  let newsletterSignups = 0;
+
+  for (const ev of usable) {
+    if (ev.eventType === "search") {
+      const term = (ev.value ?? "").toLowerCase().trim();
+      if (term !== "") {
+        searchTerms[term] = (searchTerms[term] ?? 0) + 1;
+        searchesTotal++;
+      }
+    } else if (ev.eventType === "link_click") {
+      const raw = ev.value ?? "";
+      if (/^https?:\/\//i.test(raw)) {
+        try {
+          const host = new URL(raw).hostname.replace(/^www\./, "");
+          if (host !== "") {
+            linkDomains[host] = (linkDomains[host] ?? 0) + 1;
+            externalClicksTotal++;
+          }
+        } catch { /* URL inválida: fora de tops/totais, conta em totalEvents */ }
+      }
+    } else if (ev.eventType === "newsletter") {
+      newsletterSignups++;
+    }
+  }
+
+  const topSearchTerms = Object.entries(searchTerms)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 15)
+    .map(([term, count]) => ({ term, count }));
+  const topLinkDomains = Object.entries(linkDomains)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([domain, count]) => ({ domain, count }));
+
+  return {
+    totalEvents: usable.length,
+    newsletterSignups,
+    searchesTotal,
+    externalClicksTotal,
+    searchTermsDistinct: Object.keys(searchTerms).length,
+    linkDomainsDistinct: Object.keys(linkDomains).length,
+    topSearchTerms,
+    topLinkDomains,
+  };
+}
