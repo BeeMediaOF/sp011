@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  cleanStr, normalizeIp, isPrivateIp, parseInternalIps, pctChange,
+  cleanStr, normalizeIp, isPrivateIp, parseInternalIps, pctChange, clampIntParam,
   VALID_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
 } from "../src/lib/analyticsShared.ts";
 import { isRecentDuplicate } from "../src/lib/trafficGuard.ts";
@@ -57,4 +57,22 @@ test("pctChange: null sem base de comparação — nunca inventa 0%", () => {
   assert.equal(pctChange(90, 100), -10);
   assert.equal(pctChange(5, 0), null);
   assert.equal(pctChange(0, 0), null);
+});
+
+test("clampIntParam (PRD 09 RF4): default, clamp e truncamento — nunca erra", () => {
+  // ausente / não-numérico → default
+  assert.equal(clampIntParam(undefined, 10, 1, 50), 10);
+  assert.equal(clampIntParam(null, 10, 1, 50), 10);
+  assert.equal(clampIntParam("abc", 10, 1, 50), 10);
+  assert.equal(clampIntParam("", 10, 1, 50), 10);
+  assert.equal(clampIntParam(7, 10, 1, 50), 10); // só string é aceita (query string)
+  // negativo / zero → mínimo
+  assert.equal(clampIntParam("-5", 10, 1, 50), 1);
+  assert.equal(clampIntParam("0", 10, 1, 50), 1);
+  // acima do máximo → teto
+  assert.equal(clampIntParam("999", 10, 1, 50), 50);
+  // decimal → parseInt trunca, dentro do range
+  assert.equal(clampIntParam("3.7", 10, 1, 50), 3);
+  // válido dentro do range → passa
+  assert.equal(clampIntParam("25", 10, 1, 50), 25);
 });

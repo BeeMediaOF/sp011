@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { eq, count, sql } from "drizzle-orm";
-import { db, articlesTable, adsTable, usersTable, articleViewsTable, categoryViewsTable, analyticsEventsTable } from "@workspace/db";
+import { db, articlesTable, adsTable, usersTable, articleViewsTable, analyticsEventsTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { store } from "../lib/store.js";
 import { getPendingAnalyticsEvents } from "./analytics.js";
@@ -15,7 +15,6 @@ router.get("/", authMiddleware, async (_req, res) => {
     adCounts,
     userCounts,
     topArticleViews,
-    topCategoryViews,
     recentEvents,
   ] = await Promise.all([
     // Articles by status
@@ -41,15 +40,6 @@ router.get("/", authMiddleware, async (_req, res) => {
     })
       .from(articleViewsTable)
       .orderBy(sql`${articleViewsTable.views} DESC`)
-      .limit(10),
-
-    // Top category views
-    db.select({
-      category: categoryViewsTable.category,
-      views:    categoryViewsTable.views,
-    })
-      .from(categoryViewsTable)
-      .orderBy(sql`${categoryViewsTable.views} DESC`)
       .limit(10),
 
     // Recent analytics events (last 20)
@@ -101,7 +91,8 @@ router.get("/", authMiddleware, async (_req, res) => {
     totalUsers,
     activeUsers,
     topArticleViews: topArticleViews.map((r) => ({ id: r.articleId, title: r.title, views: r.views })),
-    topCategoryViews: topCategoryViews.map((r) => ({ category: r.category, views: r.views })),
+    // (PRD 09 RF5: campo de categorias mais vistas removido — zero consumidores no
+    // client; a tabela category_views e store.trackCategoryView permanecem — escrita intacta.)
     // Buffer em memória primeiro (eventos dos últimos ~30s ainda não persistidos),
     // depois os já gravados — sem isso a lista atrasava um ciclo de flush.
     recentAnalyticsEvents: [

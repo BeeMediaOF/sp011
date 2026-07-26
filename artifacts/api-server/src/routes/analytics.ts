@@ -14,6 +14,7 @@ import {
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
   compareTopCategories, dowOccurrences, pickPeakDow, buildBehaviorStats,
+  clampIntParam, DASHBOARD_API_CONTRACT_VERSION,
   ANALYTICS_V2_SINCE, PAID_RULE_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, bumpEndpoint, bumpInternalReason, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
@@ -21,6 +22,7 @@ import {
   evaluateHealthAlerts, AD_SANITY_MARGIN,
   type HealthAlertInput, type HealthAlertDto, type SkippedRule,
 } from "../lib/healthAlerts.js";
+import { StatsResponseCache, STATS_CACHE_TTL_MS } from "../lib/statsCache.js";
 import { detectInternalRequest } from "../lib/internalTraffic.js";
 
 const router = Router();
@@ -61,6 +63,11 @@ export interface AnalyticsEvent {
 const BUFFER_MAX = 500;
 let _buffer: AnalyticsEvent[] = [];
 let _flushing = false;
+
+// Cache de curta duração da resposta de /stats (PRD 09 RF2). 1 slot por processo
+// = por container = por blog; efêmero (zera no restart). Chave inclui o período E
+// o topArticlesLimit para nunca servir um recorte diferente do pedido.
+const STATS_CACHE = new StatsResponseCache<Record<string, unknown>>(STATS_CACHE_TTL_MS);
 
 function toRow(ev: AnalyticsEvent) {
   return {
@@ -554,7 +561,9 @@ router.get("/health", authMiddleware, async (_req, res) => {
     ];
   }
 
+  res.setHeader("Cache-Control", "private, no-store"); // PRD 09 RF3
   res.json({
+    contractVersion: DASHBOARD_API_CONTRACT_VERSION, // PRD 09 RF1
     ...snap,
     reliableSince: ANALYTICS_V2_SINCE,
     adsReliableSince,
@@ -574,6 +583,19 @@ router.get("/health", authMiddleware, async (_req, res) => {
 router.get("/stats", authMiddleware, requirePermission("analytics.view"), async (req, res) => {
   const now = Date.now();
   const win = resolvePeriod(req.query as { period?: unknown; from?: unknown; to?: unknown }, now);
+  // PRD 09 RF4: recorte parametrizável de topArticles (default 10 = comportamento
+  // atual byte-a-byte quando ausente; clamp [1,50] nunca erra).
+  const topArticlesLimit = clampIntParam((req.query as { topArticlesLimit?: unknown }).topArticlesLimit, 10, 1, 50);
+  // PRD 09 RF2: cache de curta duração. Chave inclui o recorte para nunca servir
+  // um payload com topArticles de tamanho diferente do pedido nesta janela.
+  const cacheKey = `${win.key}:${win.fromDay}:${win.toDay}:${topArticlesLimit}`;
+  const cachedStats = STATS_CACHE.get(cacheKey, now);
+  if (cachedStats) {
+    res.setHeader("Cache-Control", "private, no-store"); // PRD 09 RF3
+    res.setHeader("X-Cache", "HIT");
+    res.json(cachedStats);
+    return;
+  }
   const winFrom  = new Date(win.fromMs);
   const winTo    = new Date(win.toMs);
   const prevFrom = new Date(win.prevFromMs);
@@ -784,7 +806,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       };
     })
     .sort((a, b) => b.views - a.views)
-    .slice(0, 10);
+    .slice(0, topArticlesLimit); // PRD 09 RF4
 
   const publishedArticles = (await articleService.getArticles()).filter((a) => a.status === "published");
   const articleCountByCategory: Record<string, number> = {};
@@ -908,7 +930,8 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
   const dowOcc = dowOccurrences(win);
   const peakDowIdx = pickPeakDow(agg.byDow, dowOcc);
 
-  res.json({
+  const payload = {
+    contractVersion: DASHBOARD_API_CONTRACT_VERSION, // PRD 09 RF1
     period: { key: win.key, from: win.fromDay, to: win.toDay, label: win.label, days: win.days },
     totals: { today, week, month, allTime, window: agg.windowPv },
     engagement: { uniqueSessions, avgReadTime, bounceRate, readCompletions },
@@ -953,7 +976,12 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     },
     // Behavior analytics (PRD 07 — contrato aditivo: tops + totais + distintos)
     behaviorStats,
-  });
+  };
+
+  STATS_CACHE.set(cacheKey, payload, now); // PRD 09 RF2
+  res.setHeader("Cache-Control", "private, no-store"); // PRD 09 RF3
+  res.setHeader("X-Cache", "MISS");
+  res.json(payload);
 });
 
 export default router;

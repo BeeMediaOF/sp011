@@ -28,6 +28,13 @@ export const ANALYTICS_V2_SINCE = "2026-07-08";
  *  remap). Se o rollout escorregar de dia, ATUALIZAR antes do build. */
 export const PAID_RULE_SINCE = "2026-07-25";
 
+/** Versão do contrato HTTP do dashboard (PRD 09 RF1). Emitida em `/stats` e
+ *  `/health`. Só é sinalização/observabilidade — o client não recusa renderizar
+ *  por causa dela. Política: campo NOVO no payload não exige bump; campo
+ *  REMOVIDO/RENOMEADO/RETIPADO ou com SEMÂNTICA redefinida exige bump + registro
+ *  na tabela de versionamento do PRD 09 (§4) antes do commit. */
+export const DASHBOARD_API_CONTRACT_VERSION = 1;
+
 // ─── Validação de entrada ─────────────────────────────────────────────────────
 // O endpoint é público: tudo que chega é hostil até prova em contrário. Um único
 // valor fora do enum do Postgres faria o INSERT em lote falhar e travaria o
@@ -46,6 +53,15 @@ export const MAX_READ_SECONDS = 1800;
 
 export function cleanStr(v: unknown, max: number): string | undefined {
   return typeof v === "string" && v.length > 0 ? v.slice(0, max) : undefined;
+}
+
+/** Clampa um parâmetro inteiro de query string (PRD 09 RF4). Ausente/inválido cai
+ *  no default, nunca gera erro HTTP — mesmo contrato de resolvePeriod ("entrada
+ *  inválida NUNCA erra"). Decimal é truncado por parseInt ("3.7" → 3). */
+export function clampIntParam(raw: unknown, def: number, min: number, max: number): number {
+  const n = typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(n) || Number.isNaN(n)) return def;
+  return Math.min(max, Math.max(min, n));
 }
 
 export function normalizeIp(raw: string): string {
