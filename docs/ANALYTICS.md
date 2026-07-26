@@ -175,6 +175,41 @@ behavior, 60/min impressão, 30/min clique. ⚠️ **Risco de `internalIps` com 
 cadastrar um IP compartilhado (CGNAT, Wi-Fi público) marca TODO visitante atrás dele
 como interno — diagnosticável por `internalByReason.configuredIp` desproporcional.
 
+### Alertas automáticos (PRD 08)
+
+O `/health` avalia um catálogo de alertas no servidor e devolve `alerts` (sempre
+array; vazio = saudável, ordenado `critical` antes de `warning`, depois por `id`) e
+`alertsSkipped` (regras não avaliadas, com razão de máquina). **Decisão de escopo:**
+os contadores continuam em memória e são rotulados “desde o boot” (`bootAt` exibido
+no card) — NÃO são persistidos; todo alerta que precisa de durabilidade deriva do
+BANCO, então restart não o cega. **Princípio:** nenhum alerta dispara por volume
+pequeno — cada um exige inconsistência lógica ou mudança estrutural (blog novo com
+zero tráfego ⇒ “Nenhum alerta ativo”, e isso é sucesso). Motor puro em
+`api/lib/healthAlerts.ts` (`evaluateHealthAlerts`, alvo de `node --test`).
+
+Catálogo (regra EXATA → severidade):
+
+| id | Dispara quando | Sev. |
+|---|---|---|
+| `flush_failed` | `flushFailed > 0` (desde o boot) | critical |
+| `buffer_identity` | `abs(received − (flushedOk+flushFailed+buffered)) > 1000` (2×BUFFER_MAX) | warning |
+| `internal_privateip_dominant` | `received ≥ 30` E `privateIp ≥ 0.9 × received` (proxy mascarando IP) | critical |
+| `internal_share_shift` | 2 janelas ≥ 50 pageviews E `abs(%interno 7d − %interno 28d anteriores) ≥ 40` pts | warning |
+| `ad_sanity` | por (anúncio, dia): `impressions > max(pageviews_não_internos,1) × 1 × M` (M=`AD_SANITY_MARGIN`=3) | warning |
+| `ad_clicks_gt_impressions` | por (anúncio, dia): `clicks > impressions + 1` | critical |
+| `paid_without_campaign` | `0` campanhas ativas E `≥1` linha `referrer='pago'` pós-`PAID_RULE_SINCE` | critical |
+| `reserved_behavior_type` | `≥1` `behavior_events.event_type IN ('video_play','download')` em 30d (internos incluídos) | warning |
+
+As três regras de banco de sanidade só avaliam as **2 datas BRT mais recentes** e
+apenas `≥ adsReliableSince` (datas anteriores ao reparo do PRD 04 NUNCA entram). O
+motor CONTÍNUO/por-período dessas regras é o **PRD 11** — este endpoint é a
+superfície on-demand (avaliação ao abrir/atualizar o painel). Razões de skip:
+`prd03_pendente` (sem `internalByReason`), `prd04_reparo_pendente` (sem
+`adsReliableSince`), `prd05_pendente` (sem cadastro/`PAID_RULE_SINCE`), `db_error`
+(query falhou — nunca derruba o `/health`). As consultas de banco são memoizadas por
+**TTL de 60s** (o painel dá auto-refresh a cada 30s e pode haver N abas). Amostra
+insuficiente (`received < 30`, janelas `< 50`) é silêncio legítimo, não skip.
+
 ## LGPD / privacidade
 
 - Nada é enviado antes do aceite do banner (`bee_analytics_consent`).

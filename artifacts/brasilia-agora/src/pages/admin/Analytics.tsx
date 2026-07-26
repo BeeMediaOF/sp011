@@ -10,7 +10,7 @@ import {
   Eye, Users, Clock, TrendingDown, TrendingUp, ArrowUpRight,
   ArrowDownRight, FileText, Info, Smartphone, Monitor, Tablet,
   RefreshCw, Download, Megaphone, MousePointerClick, Search,
-  ExternalLink, BarChart2, Mail,
+  ExternalLink, BarChart2, Mail, AlertTriangle,
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAdminT, type AdminLang, type AdminTKey } from "../../lib/adminI18n";
@@ -72,11 +72,23 @@ interface Stats {
 }
 
 /** GET /api/analytics/health — contadores de coleta desde o boot do servidor. */
+interface HealthEndpointCounters {
+  received: number; droppedBot: number; droppedRate: number;
+  droppedInvalid: number; droppedDuplicate: number; flaggedInternal: number;
+}
+interface HealthAlert { id: string; severity: "critical" | "warning"; params: Record<string, number | string>; }
 interface Health {
   received: number; droppedBot: number; droppedRate: number; droppedInvalid: number;
   droppedDuplicate: number; flaggedInternal: number; flushedOk: number; flushFailed: number;
   buffered: number; lastEventAt: string | null; lastFlushAt: string | null;
   reliableSince: string; filters: string[];
+  // Aditivos do PRD 08 (opcionais — tolerantes a API antiga durante rollout parcial).
+  byEndpoint?: Record<"event" | "behavior" | "adImpression" | "adClick", HealthEndpointCounters>;
+  internalByReason?: { flag: number; configuredIp: number; privateIp: number };
+  alerts?: HealthAlert[];
+  alertsSkipped?: { id: string; reason: string }[];
+  adsReliableSince?: string | null;
+  bootAt?: string;
 }
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -139,6 +151,11 @@ const PERIOD_PRESETS: { key: PeriodKey; tk: AdminTKey }[] = [
 /** dd/mm/aaaa a partir de YYYY-MM-DD. */
 function fmtDayBr(d: string): string {
   return `${d.slice(8, 10)}/${d.slice(5, 7)}/${d.slice(0, 4)}`;
+}
+
+/** Interpola {param} numa mensagem de alerta (PRD 08). Placeholder sem valor fica literal. */
+function fillParams(msg: string, params: Record<string, number | string>): string {
+  return msg.replace(/\{(\w+)\}/g, (_m, k: string) => (k in params ? String(params[k]) : `{${k}}`));
 }
 
 const DEVICE_COLORS = ["#2563EB", "#22C55E", "#F97316"];
@@ -1341,6 +1358,29 @@ export default function Analytics() {
               <h2 className="text-xs font-bold text-[#0B2A66] uppercase tracking-wide">{t("an.collectionHealth")}</h2>
               <span className="text-[10px] text-slate-400">{t("an.collectionHealthSub")}</span>
             </div>
+            {/* Alertas automáticos (PRD 08) — no topo do card. Vazio = saudável (não ausência). */}
+            {health.alerts && (
+              health.alerts.length > 0 ? (
+                <div className="flex flex-col gap-1.5 mb-3">
+                  {health.alerts.map((a, i) => {
+                    const raw = t(`an.alert.${a.id}` as AdminTKey);
+                    const msg = raw ? fillParams(raw, a.params) : `${t("an.alertUnknown")} (${a.id})`;
+                    const crit = a.severity === "critical";
+                    return (
+                      <div
+                        key={`${a.id}-${i}`}
+                        className={`flex items-start gap-2 rounded-lg px-3 py-2 text-[11px] ${crit ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}
+                      >
+                        <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                        <span>{msg}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-[11px] text-emerald-600 mb-3">{t("an.alertNone")}</p>
+              )
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 text-center">
               {[
                 { label: t("an.hAccepted"), value: health.received, tip: t("an.hAcceptedTip") },
@@ -1356,15 +1396,82 @@ export default function Analytics() {
                 </div>
               ))}
             </div>
+            {/* Contadores por endpoint (PRD 03 → exibição PRD 08). Oculta se a API for antiga. */}
+            {health.byEndpoint && (
+              <div className="mt-3 overflow-x-auto">
+                <p className="text-[10px] font-semibold text-slate-500 mb-1">{t("an.hEndpointTable")}</p>
+                <table className="w-full text-[11px] text-right whitespace-nowrap">
+                  <thead>
+                    <tr className="text-slate-400">
+                      <th className="text-left font-medium py-1 pr-2">&nbsp;</th>
+                      <th className="font-medium px-2">{t("an.hAccepted")}</th>
+                      <th className="font-medium px-2">{t("an.hBots")}</th>
+                      <th className="font-medium px-2">{t("an.hRateLimit")}</th>
+                      <th className="font-medium px-2">{t("an.hInvalid")}</th>
+                      <th className="font-medium px-2">{t("an.hDuplicates")}</th>
+                      <th className="font-medium px-2">{t("an.hInternal")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {([
+                      ["event", "an.hEpEvent"],
+                      ["behavior", "an.hEpBehavior"],
+                      ["adImpression", "an.hEpAdImp"],
+                      ["adClick", "an.hEpAdClick"],
+                    ] as const).map(([epKey, labelKey]) => {
+                      const ep = health.byEndpoint![epKey];
+                      return (
+                        <tr key={epKey} className="border-t border-slate-100">
+                          <td className="text-left text-slate-500 py-1 pr-2">{t(labelKey)}</td>
+                          <td className="px-2 text-slate-700">{ep.received.toLocaleString(nloc)}</td>
+                          <td className="px-2 text-slate-500">{ep.droppedBot.toLocaleString(nloc)}</td>
+                          <td className="px-2 text-slate-500">{ep.droppedRate.toLocaleString(nloc)}</td>
+                          <td className="px-2 text-slate-500">{ep.droppedInvalid.toLocaleString(nloc)}</td>
+                          <td className="px-2 text-slate-500">{ep.droppedDuplicate.toLocaleString(nloc)}</td>
+                          <td className="px-2 text-slate-500">{ep.flaggedInternal.toLocaleString(nloc)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {health.internalByReason && (
+                  <p className="text-[10px] text-slate-400 mt-1.5">{fillParams(t("an.hByReason"), health.internalByReason)}</p>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-[11px] text-slate-400">
               <span>{t("an.hLastEvent")} {health.lastEventAt ? new Date(health.lastEventAt).toLocaleTimeString(nloc) : "—"}</span>
               <span>{t("an.hLastFlush")} {health.lastFlushAt ? new Date(health.lastFlushAt).toLocaleTimeString(nloc) : "—"}</span>
               <span>{t("an.hBuffered")} {health.buffered}</span>
+              {health.bootAt && (
+                <span>{t("an.hBootAt")} {new Date(health.bootAt).toLocaleString(nloc)}</span>
+              )}
               {health.flushFailed > 0 && (
                 <span className="text-red-500 font-semibold">{t("an.hFlushFailed")} {health.flushFailed}</span>
               )}
               <span className="font-medium text-slate-500">{t("an.hReliableSince")} {fmtDayBr(health.reliableSince)}</span>
+              {health.adsReliableSince !== undefined && (
+                <span className="font-medium text-slate-500">
+                  {health.adsReliableSince
+                    ? `${t("an.hAdsReliableSince")} ${fmtDayBr(health.adsReliableSince)}`
+                    : t("an.hAdsRepairPending")}
+                </span>
+              )}
+              {health.alertsSkipped && health.alertsSkipped.length > 0 && (
+                <span title={health.alertsSkipped.map((s) => `${s.id}: ${s.reason}`).join("\n")}>
+                  {fillParams(t("an.alertSkipped"), { count: health.alertsSkipped.length })}
+                </span>
+              )}
             </div>
+            {/* filters[] — antes buscado e descartado; agora renderizado (PRD 08 RF6). */}
+            {health.filters && health.filters.length > 0 && (
+              <details className="mt-2 text-[11px] text-slate-400">
+                <summary className="cursor-pointer select-none">{t("an.hFiltersTitle")}</summary>
+                <ul className="list-disc pl-5 mt-1 space-y-0.5">
+                  {health.filters.map((f, i) => <li key={i}>{f}</li>)}
+                </ul>
+              </details>
+            )}
           </div>
         )}
 

@@ -14,9 +14,13 @@ import {
   detectDevice, parseUa, classifyChannel,
   resolvePeriod, buildWindowAggregates, pctChange,
   compareTopCategories, dowOccurrences, pickPeakDow, buildBehaviorStats,
-  ANALYTICS_V2_SINCE, type EventLike, type PaidCampaign,
+  ANALYTICS_V2_SINCE, PAID_RULE_SINCE, type EventLike, type PaidCampaign,
 } from "../lib/analyticsShared.js";
 import { bumpHealth, bumpEndpoint, bumpInternalReason, noteEvent, noteFlush, healthSnapshot } from "../lib/analyticsHealth.js";
+import {
+  evaluateHealthAlerts, AD_SANITY_MARGIN,
+  type HealthAlertInput, type HealthAlertDto, type SkippedRule,
+} from "../lib/healthAlerts.js";
 import { detectInternalRequest } from "../lib/internalTraffic.js";
 
 const router = Router();
@@ -393,10 +397,118 @@ router.post("/behavior", async (req, res) => {
   }
 });
 
+// ─── Gatherer de alertas de saúde (PRD 08 RF4) ───────────────────────────────
+// Segmentos que dependem do BANCO (o resto do input vem dos contadores, frescos e
+// O(1)). Cada consulta é bounded (janelas de 2–35 dias) e tem try/catch próprio →
+// falha vira `db_error` no skipped, nunca derruba o /health. Memoizado por TTL de
+// 60s: o painel dá auto-refresh a cada 30s e pode haver N abas — o TTL corta o
+// custo sem tornar o alerta velho. 100% LEITURA (nenhum UPDATE/DELETE).
+const HEALTH_ALERT_TTL_MS = 60_000;
+interface HealthDbSegments {
+  internalShare: HealthAlertInput["internalShare"];
+  adDays: HealthAlertInput["adDays"];
+  paid: HealthAlertInput["paid"];
+  reservedBehaviorCount: HealthAlertInput["reservedBehaviorCount"];
+  /** Ids cuja query FALHOU (o motor usa razão-padrão do segmento; aqui reatribuímos db_error). */
+  dbErrorIds: string[];
+}
+let _healthDbCache: { at: number; seg: HealthDbSegments } | null = null;
+
+async function gatherHealthDbSegments(adsReliableSince: string | null): Promise<HealthDbSegments> {
+  const cached = _healthDbCache;
+  if (cached && Date.now() - cached.at < HEALTH_ALERT_TTL_MS) return cached.seg;
+
+  const now = Date.now();
+  const dbErrorIds: string[] = [];
+  const d7 = new Date(now - 7 * DAY);
+  const d35 = new Date(now - 35 * DAY);
+
+  // 1. internalShare — pageviews 35d: 7d recentes vs 28d anteriores (is_internal por FILTER).
+  let internalShare: HealthDbSegments["internalShare"] = null;
+  try {
+    const r = await db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE ts >= ${d7})::int                  AS recent_total,
+        count(*) FILTER (WHERE ts >= ${d7} AND is_internal)::int  AS recent_internal,
+        count(*) FILTER (WHERE ts <  ${d7})::int                  AS prior_total,
+        count(*) FILTER (WHERE ts <  ${d7} AND is_internal)::int  AS prior_internal
+      FROM analytics_events
+      WHERE type = 'pageview' AND ts >= ${d35}
+    `);
+    const row = (r.rows?.[0] ?? {}) as { recent_total?: number; recent_internal?: number; prior_total?: number; prior_internal?: number };
+    internalShare = {
+      recentTotal: row.recent_total ?? 0, recentInternal: row.recent_internal ?? 0,
+      priorTotal: row.prior_total ?? 0, priorInternal: row.prior_internal ?? 0,
+    };
+  } catch { internalShare = null; dbErrorIds.push("internal_share_shift"); }
+
+  // 2. adDays — sanidade só para os 2 dias BRT mais recentes E >= adsReliableSince
+  //    (datas anteriores ao reparo do PRD 04 NUNCA são avaliadas — CA8). Sem
+  //    adsReliableSince → segmento null + skip prd04_reparo_pendente (padrão do motor).
+  let adDays: HealthDbSegments["adDays"] = null;
+  if (adsReliableSince != null) {
+    try {
+      const todayKey = brtDayKey(now);
+      const yestKey  = brtDayKey(now - DAY);
+      const sinceYest = new Date(brtDayStartMs(yestKey));
+      const [adRes, pvRes] = await Promise.all([
+        db.execute(sql`
+          SELECT ad_id, date, impressions, clicks
+          FROM ad_daily_stats
+          WHERE date IN (${yestKey}, ${todayKey}) AND date >= ${adsReliableSince}
+        `),
+        db.execute(sql`
+          SELECT (ts AT TIME ZONE 'America/Sao_Paulo')::date::text AS day, count(*)::int AS pageviews
+          FROM analytics_events
+          WHERE type = 'pageview' AND is_internal = false AND ts >= ${sinceYest}
+          GROUP BY 1
+        `),
+      ]);
+      const pvMap = new Map<string, number>();
+      for (const p of (pvRes.rows ?? []) as { day?: string; pageviews?: number }[]) {
+        if (p.day) pvMap.set(p.day, p.pageviews ?? 0);
+      }
+      adDays = ((adRes.rows ?? []) as { ad_id?: string; date?: string; impressions?: number; clicks?: number }[]).map((a) => {
+        const date = String(a.date ?? "");
+        return { adId: String(a.ad_id ?? ""), date, impressions: a.impressions ?? 0, clicks: a.clicks ?? 0, pageviews: pvMap.get(date) ?? 0 };
+      });
+    } catch { adDays = null; dbErrorIds.push("ad_sanity", "ad_clicks_gt_impressions"); }
+  }
+
+  // 3. paid — campanhas ativas (memo do PRD 05) + linhas 'pago' pós-corte PAID_RULE_SINCE.
+  let paid: HealthDbSegments["paid"] = null;
+  try {
+    const cutoff = new Date(brtDayStartMs(PAID_RULE_SINCE));
+    const r = await db.execute(sql`
+      SELECT count(*)::int AS n
+      FROM analytics_events
+      WHERE referrer = 'pago' AND ts >= ${cutoff}
+    `);
+    const n = ((r.rows?.[0] ?? {}) as { n?: number }).n ?? 0;
+    paid = { activeCampaigns: activePaidCampaigns().length, paidLinesSinceRule: n };
+  } catch { paid = null; dbErrorIds.push("paid_without_campaign"); }
+
+  // 4. reservedBehaviorCount — video_play/download nos últimos 30 dias (internos INCLUÍDOS:
+  //    é anomalia de contrato, não métrica pública).
+  let reservedBehaviorCount: number | null = null;
+  try {
+    const r = await db.execute(sql`
+      SELECT count(*)::int AS n
+      FROM behavior_events
+      WHERE event_type IN ('video_play', 'download') AND ts >= ${new Date(now - 30 * DAY)}
+    `);
+    reservedBehaviorCount = ((r.rows?.[0] ?? {}) as { n?: number }).n ?? 0;
+  } catch { reservedBehaviorCount = null; dbErrorIds.push("reserved_behavior_type"); }
+
+  const seg: HealthDbSegments = { internalShare, adDays, paid, reservedBehaviorCount, dbErrorIds };
+  _healthDbCache = { at: Date.now(), seg };
+  return seg;
+}
+
 // ─── GET /api/analytics/health — saúde da coleta (admin) ─────────────────────
 router.get("/health", authMiddleware, async (_req, res) => {
-  // PRD 04 CA6: marcador "dados de anúncio confiáveis desde" (null = reparo ainda não
-  // rodou). Leitura direta com try/catch — endpoint de baixo tráfego. UI é o PRD 08.
+  // PRD 04 §7.3: marcador "dados de anúncio confiáveis desde" (null = reparo ainda
+  // não rodou). Leitura direta com try/catch — endpoint de baixo tráfego.
   let adsReliableSince: string | null = null;
   try {
     const [row] = await db
@@ -406,8 +518,44 @@ router.get("/health", authMiddleware, async (_req, res) => {
       .limit(1);
     adsReliableSince = row?.value ?? null;
   } catch { /* baixo tráfego — não derruba o /health */ }
+
+  const snap = healthSnapshot({ buffered: _buffer.length });
+
+  // Alertas automáticos (PRD 08). Gatherer nunca lança para o client: falha de
+  // banco vira db_error no skipped; falha total responde o shape atual + alerts [].
+  let alerts: HealthAlertDto[] = [];
+  let alertsSkipped: SkippedRule[] = [];
+  try {
+    const seg = await gatherHealthDbSegments(adsReliableSince);
+    const input: HealthAlertInput = {
+      counters: { received: snap.received, flushedOk: snap.flushedOk, flushFailed: snap.flushFailed, buffered: snap.buffered },
+      bufferIdentityTolerance: 2 * BUFFER_MAX, // 1000 = lote em voo + teto do PRD 03 RF6
+      internalByReason: snap.internalByReason ?? null,
+      internalShare: seg.internalShare,
+      adDays: seg.adDays,
+      adMargin: AD_SANITY_MARGIN,
+      paid: seg.paid,
+      reservedBehaviorCount: seg.reservedBehaviorCount,
+    };
+    const out = evaluateHealthAlerts(input);
+    alerts = out.alerts;
+    // Reatribui db_error às regras cuja query realmente falhou (o motor usa a razão
+    // -padrão do segmento — prd04/prd05 — que aqui não se aplica).
+    const errSet = new Set(seg.dbErrorIds);
+    alertsSkipped = out.skipped.map((s) => (errSet.has(s.id) ? { ...s, reason: "db_error" } : s));
+  } catch {
+    alerts = [];
+    alertsSkipped = [
+      { id: "internal_share_shift", reason: "db_error" },
+      { id: "ad_sanity", reason: "db_error" },
+      { id: "ad_clicks_gt_impressions", reason: "db_error" },
+      { id: "paid_without_campaign", reason: "db_error" },
+      { id: "reserved_behavior_type", reason: "db_error" },
+    ];
+  }
+
   res.json({
-    ...healthSnapshot({ buffered: _buffer.length }),
+    ...snap,
     reliableSince: ANALYTICS_V2_SINCE,
     adsReliableSince,
     filters: [
@@ -417,6 +565,8 @@ router.get("/health", authMiddleware, async (_req, res) => {
       "caminhos /admin",
       "tráfego interno marcado, nunca dropado (admin logado, dev, IPs configurados, rede privada) — event e behavior; ads: dimensão interna do PRD 04",
     ],
+    alerts,
+    alertsSkipped,
   });
 });
 
