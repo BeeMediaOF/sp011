@@ -9,9 +9,9 @@ import { logger } from "../lib/logger.js";
 import { isBotRequest, overRateLimit, isRecentDuplicate, INGEST_RATE_LIMITS } from "../lib/trafficGuard.js";
 import {
   DAY, brtDayKey, brtDayStartMs,
-  VALID_TYPES, BEHAVIOR_TYPES, SCROLL_MILESTONES, MAX_READ_SECONDS,
+  BEHAVIOR_TYPES, MAX_READ_SECONDS,
   cleanStr, normalizeIp, isPrivateIp, planRequeue, capExcess,
-  detectDevice, parseUa, classifyChannel,
+  detectDevice,
   resolvePeriod, buildWindowAggregates, pctChange,
   compareTopCategories, dowOccurrences, pickPeakDow, buildBehaviorStats,
   clampIntParam, DASHBOARD_API_CONTRACT_VERSION,
@@ -25,40 +25,16 @@ import {
 import { StatsResponseCache, STATS_CACHE_TTL_MS } from "../lib/statsCache.js";
 import { detectInternalRequest } from "../lib/internalTraffic.js";
 import { getSanityReport } from "../lib/sanityMonitor.js";
+import {
+  handleEvent, type AnalyticsEvent, type GeoResult, type EventHandlerDeps,
+} from "../lib/ingestHandlers.js";
+
+// PRD 12 RF2: o corpo do /event (control-flow) mora em lib/ingestHandlers.ts (módulo
+// SEM o setInterval de flush abaixo), para poder ser testado por node --test com deps
+// fake. Re-exportado aqui para não quebrar quem já importa o tipo desta rota.
+export type { AnalyticsEvent } from "../lib/ingestHandlers.js";
 
 const router = Router();
-
-export interface AnalyticsEvent {
-  type: "pageview" | "read" | "category" | "scroll" | "share";
-  path: string;
-  title?: string;
-  category?: string;
-  articleId?: string;
-  sessionId: string;
-  duration?: number;
-  device: "mobile" | "desktop" | "tablet";
-  ts: number;
-  ua?: string;
-  referrer?: string;
-  scrollDepth?: number;
-  platform?: string;
-  city?: string;
-  region?: string;
-  visitorId?: string;
-  utmSource?: string;
-  utmMedium?: string;
-  utmCampaign?: string;
-  refHost?: string;
-  /** Presença de click-id na linha first-touch (PRD 05); undefined = não first-touch. */
-  gclid?: boolean;
-  fbclid?: boolean;
-  isInternal?: boolean;
-  browser?: string;
-  os?: string;
-  /** IP normalizado, transiente (nunca vai para o banco) — permite retro-preencher
-   *  a geo de eventos ainda no buffer quando o lookup assíncrono resolve. */
-  _ip?: string;
-}
 
 // ─── In-memory buffer ─────────────────────────────────────────────────────────
 const BUFFER_MAX = 500;
@@ -190,7 +166,6 @@ function activePaidCampaigns(): PaidCampaign[] {
 // LIMITAÇÃO CONHECIDA (decisão registrada): plano grátis do ip-api é HTTP-only e
 // veta uso comercial. A agregação já é agnóstica de provedor (lê city/region das
 // linhas de evento) — trocar de provedor = trocar só esta função.
-interface GeoResult { city: string; region: string; country: string }
 const _geoCache = new Map<string, GeoResult | null>();
 const _geoPending = new Set<string>();
 
@@ -241,128 +216,36 @@ function lookupGeoAsync(ip: string): void {
 }
 
 // ─── POST /api/analytics/event ────────────────────────────────────────────────
+// PRD 12 RF2: control-flow em lib/ingestHandlers.ts (handleEvent), testável por
+// node --test com deps fake. Esta casca só liga os colaboradores REAIS (buffer, geo,
+// contadores, store) e traduz o resultado para a resposta HTTP — comportamento idêntico.
+// trust proxy (app.ts) já resolve o X-Forwarded-For do Caddy; ler o header na mão
+// pegaria o primeiro valor, que o cliente pode forjar — por isso usamos req.ip.
+const eventDeps: EventHandlerDeps = {
+  now: () => Date.now(),
+  overRateLimit,
+  isRecentDuplicate,
+  detectInternalRequest,
+  activePaidCampaigns,
+  bumpHealth,
+  bumpInternalReason,
+  noteEvent,
+  getCachedGeo: (ip) => _geoCache.get(ip),
+  bumpGeoViews,
+  lookupGeoAsync,
+  pushEvent,
+  trackCategoryView: (c) => store.trackCategoryView(c),
+  trackArticleView: (a, t) => store.trackArticleView(a, t),
+  onDebug: (info, msg) => logger.debug(info, msg),
+};
+
 router.post("/event", (req, res) => {
-  // Bots e flood: descarte silencioso — nunca falha para o cliente.
-  if (isBotRequest(req)) { bumpHealth("droppedBot"); res.json({ ok: true }); return; }
-  // trust proxy (app.ts) já resolve o X-Forwarded-For adicionado pelo Caddy;
-  // ler o header na mão pegaria o primeiro valor, que o cliente pode forjar.
-  const ip = normalizeIp(req.ip ?? "");
-  if (overRateLimit(`ev:${ip}`, INGEST_RATE_LIMITS.event)) { bumpHealth("droppedRate"); res.json({ ok: true }); return; }
-
-  const b = (req.body ?? {}) as Record<string, unknown>;
-
-  const type = typeof b["type"] === "string" && VALID_TYPES.has(b["type"] as string)
-    ? (b["type"] as AnalyticsEvent["type"])
-    : null;
-  const path      = cleanStr(b["path"], 500);
-  const sessionId = cleanStr(b["sessionId"], 100);
-  if (!type || !path || !sessionId) {
-    bumpHealth("droppedInvalid");
-    logger.debug({ reason: "payload" }, "analytics: evento descartado");
-    res.status(400).json({ ok: false });
-    return;
-  }
-  // Navegação no painel não é audiência do site (o cliente já filtra; defesa extra).
-  if (path.startsWith("/admin")) { bumpHealth("droppedInvalid"); res.json({ ok: true }); return; }
-
-  // F5 em sequência não é audiência nova: mesma sessão+página em <15s é descartada.
-  if (type === "pageview" && isRecentDuplicate(`pv:${sessionId}|${path}`, 15_000)) {
-    bumpHealth("droppedDuplicate");
-    logger.debug({ reason: "duplicate", path }, "analytics: evento descartado");
-    res.json({ ok: true });
-    return;
-  }
-  // PRD 03 RF2: F5/remount na página de categoria não é clique novo (o pageview já
-  // é dedupado — o evento `category` escapava). Chave `cat:` própria, mesma janela.
-  if (type === "category" && isRecentDuplicate(`cat:${sessionId}|${path}`, 15_000)) {
-    bumpHealth("droppedDuplicate");
-    res.json({ ok: true });
-    return;
-  }
-
-  // Tráfego interno: marcado e gravado (auditável), mas fora das métricas públicas.
-  // PRD 03 RF4: mesma tripla, agora com atribuição de razão (flag/configuredIp/privateIp).
-  const det = detectInternalRequest(b["internal"] === true, ip);
-  const isInternal = det.internal;
-  if (isInternal && det.reason) { bumpHealth("flaggedInternal"); bumpInternalReason(det.reason); }
-
-  const title     = cleanStr(b["title"], 300);
-  const category  = cleanStr(b["category"], 100);
-  const articleId = cleanStr(b["articleId"], 100);
-  const platform  = cleanStr(b["platform"], 50);
-  const visitorId = cleanStr(b["visitorId"], 64);
-
-  // Sinais crus de origem — quem classifica o canal é o servidor.
-  const utmSource   = cleanStr(b["utmSource"], 120);
-  const utmMedium   = cleanStr(b["utmMedium"], 120);
-  const utmCampaign = cleanStr(b["utmCampaign"], 120);
-  const refHost     = cleanStr(b["refHost"], 253)?.toLowerCase().replace(/^www\./, "");
-  const paidClick   = b["paidClick"] === true;                // legado (bundle antigo, fundido)
-  const gclid       = b["gclid"] === true;                    // presença de gclid (Google)
-  const fbclid      = b["fbclid"] === true;                   // presença de fbclid (Meta)
-  const legacyChannel = cleanStr(b["referrer"], 20); // bundle antigo: direto|busca|social|outro
-
-  // Canal só no pageview de entrada da sessão (first-touch); navegações internas
-  // não reenviam origem. `firstTouch` marca inclusive a entrada direta sem sinais.
-  const firstTouch = b["firstTouch"] === true ||
-    Boolean(refHost || utmSource || utmMedium || paidClick || gclid || fbclid || legacyChannel);
-  // PRD 05: "pago" só via campanha ativa cadastrada (activePaidCampaigns); gclid/fbclid
-  // órfãos caem em social/busca. O servidor continua sendo o único que classifica.
-  const referrer = firstTouch
-    ? (isInternal ? "interno" : classifyChannel(
-        { utmSource, utmMedium, utmCampaign, paidClick, gclid, fbclid, refHost, legacyChannel },
-        activePaidCampaigns(),
-        brtDayKey(Date.now()),
-      ))
-    : undefined;
-
-  const durationRaw = Number(b["duration"]);
-  const duration = Number.isFinite(durationRaw) && durationRaw > 0
-    ? Math.min(Math.round(durationRaw), MAX_READ_SECONDS)
-    : undefined;
-
-  const scrollRaw   = Number(b["scrollDepth"]);
-  const scrollDepth = SCROLL_MILESTONES.has(scrollRaw) ? scrollRaw : undefined;
-
-  const ua = String(req.headers["user-agent"] ?? "");
-  const { browser, os } = parseUa(ua);
-
-  const cachedGeo = _geoCache.get(ip);
-  if (type === "pageview" && !isInternal) {
-    if (cachedGeo) bumpGeoViews(cachedGeo);
-    else lookupGeoAsync(ip);
-  }
-
-  bumpHealth("received");
-  noteEvent();
-  pushEvent({
-    type, path, title, category, articleId, sessionId, duration,
-    device: detectDevice(ua),
-    ts: Date.now(),
-    ua,
-    referrer,
-    scrollDepth,
-    platform,
-    city:   cachedGeo?.city,
-    region: cachedGeo?.region,
-    visitorId,
-    utmSource, utmMedium, utmCampaign, refHost,
-    // Só grava click-id na linha first-touch (RF-4); demais/legado ficam NULL.
-    gclid:  firstTouch ? gclid : undefined,
-    fbclid: firstTouch ? fbclid : undefined,
-    isInternal,
-    browser, os,
-    _ip: isPrivateIp(ip) ? undefined : ip,
+  const out = handleEvent(eventDeps, {
+    ipRaw: req.ip ?? "",
+    ua: String(req.headers["user-agent"] ?? ""),
+    body: (req.body ?? {}) as Record<string, unknown>,
   });
-
-  // Contadores all-time (fallback de título / monitor) também não devem inflar
-  // com navegação interna.
-  if (!isInternal) {
-    if (type === "category" && category) store.trackCategoryView(category);
-    if (type === "pageview" && articleId && title) store.trackArticleView(articleId, title);
-  }
-
-  res.json({ ok: true });
+  res.status(out.status ?? 200).json(out.body);
 });
 
 // ─── POST /api/analytics/behavior — track search / link_click / newsletter ────

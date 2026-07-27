@@ -2,12 +2,12 @@ import { Router } from "express";
 import { eq, gte, isNull, or, and, sql } from "drizzle-orm";
 import sharp from "sharp";
 import { db, adsTable, adDailyStatsTable, parseTargetDevices } from "@workspace/db";
-import { isBotRequest, overRateLimit, createDedupWindow, INGEST_RATE_LIMITS } from "../lib/trafficGuard.js";
-import { cleanStr, normalizeIp, type InternalReason } from "../lib/analyticsShared.js";
+import { overRateLimit, createDedupWindow } from "../lib/trafficGuard.js";
 import { detectInternalRequest } from "../lib/internalTraffic.js";
-import { bumpEndpoint, bumpInternalReason, type IngestEndpointId } from "../lib/analyticsHealth.js";
+import { bumpEndpoint, bumpInternalReason } from "../lib/analyticsHealth.js";
 import { logger } from "../lib/logger.js";
 import { store } from "../lib/store.js";
+import { handleImpression, handleClick, type AdEventDeps } from "../lib/ingestHandlers.js";
 
 const router = Router();
 
@@ -18,20 +18,11 @@ const router = Router();
 const adImpDedup   = createDedupWindow({ windowMs: 30 * 60_000 }); // 30 min
 const adClickDedup = createDedupWindow({ windowMs: 10_000 });      // 10 s (mata double-fire)
 
-/** Contabiliza um evento de anúncio ACEITO (PRD 03 RF1): `received` sempre; se
- *  interno (PRD 04 RF3), soma `flaggedInternal` + a razão. Espelha o /event. */
-function noteAdAccept(ep: IngestEndpointId, det: { internal: boolean; reason: InternalReason | null }): void {
-  bumpEndpoint(ep, "received");
-  if (det.internal && det.reason) { bumpEndpoint(ep, "flaggedInternal"); bumpInternalReason(det.reason); }
-}
-
 // ─── Blocos "É uma propaganda" ────────────────────────────────────────────────
 // Blocos de imagem/HTML da home ou da lateral da notícia marcados isAd também
 // são inventário medido: chave `block:<id>`, contadores só em ad_daily_stats
 // (não existe linha na tabela ads). A validação é contra as settings — id
 // desconhecido/não marcado não vira métrica.
-const BLOCK_PREFIX = "block:";
-
 function findAdBlock(blockId: string): { visible: boolean } | null {
   const s = store.getSettings();
   // Pseudo-bloco: banner do cabeçalho (settings.headerBannerHtml) — também é
@@ -175,129 +166,65 @@ router.get("/", async (_req, res) => {
   res.json({ ads });
 });
 
-/** POST /api/ads/:id/click — registra clique (público) */
-router.post("/:id/click", async (req, res) => {
-  const id = req.params.id ?? "";
-
-  // Bots e flood não viram métrica de cobrança — descarte silencioso, agora contado.
-  if (isBotRequest(req)) { bumpEndpoint("adClick", "droppedBot"); res.json({ ok: true }); return; }
-  if (overRateLimit(`adclick:${req.ip ?? ""}`, INGEST_RATE_LIMITS.adClick)) {
-    bumpEndpoint("adClick", "droppedRate"); res.json({ ok: true }); return;
-  }
-
-  const b = (req.body ?? {}) as Record<string, unknown>;
-  const ip = normalizeIp(req.ip ?? "");
-  const sessionId = cleanStr(b["sessionId"], 100);
-  const det = detectInternalRequest(b["internal"] === true, ip);
-  const internal = det.internal;
-
-  // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 10s = duplo clique.
-  if (adClickDedup.hit(`adclick:${id}:${sessionId ?? `ip:${ip}`}`)) {
-    bumpEndpoint("adClick", "droppedDuplicate");
-    res.json({ ok: true });
-    return;
-  }
-
-  // Bloco da home marcado "É uma propaganda" — só o histórico diário.
-  if (id.startsWith(BLOCK_PREFIX)) {
-    const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
-    if (!blk || !blk.visible) {
-      bumpEndpoint("adClick", "droppedInvalid");
-      res.status(404).json({ ok: false, error: "Ad not found or inactive" });
-      return;
-    }
-    noteAdAccept("adClick", det);
-    void upsertDailyStat(id, "clicks", internal);
-    res.json({ ok: true, message: "Click tracked" });
-    return;
-  }
-
+// ─── Fiação de deps das rotas de anúncio (PRD 12 RF2) ─────────────────────────
+// O control-flow (bot/rate/dedup/interno/bloco/inativo/expirado) vive em
+// lib/ingestHandlers.ts, testável por node --test com estes colaboradores FAKE.
+// Aqui só ligamos os REAIS — o SELECT/UPDATE do drizzle é o "db" injetado.
+async function selectAd(id: string): Promise<{ active: boolean; expiresAt: Date | null } | undefined> {
   const [row] = await db
-    .select({ id: adsTable.id, active: adsTable.active })
+    .select({ active: adsTable.active, expiresAt: adsTable.expiresAt })
     .from(adsTable)
     .where(eq(adsTable.id, id))
     .limit(1);
+  return row;
+}
 
-  if (!row || !row.active) {
-    bumpEndpoint("adClick", "droppedInvalid");
-    res.status(404).json({ ok: false, error: "Ad not found or inactive" });
-    return;
-  }
+async function incrementAdAllTime(id: string, field: "impressions" | "clicks"): Promise<void> {
+  await db
+    .update(adsTable)
+    .set(field === "impressions"
+      ? { impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() }
+      : { clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
+    .where(eq(adsTable.id, id));
+}
 
-  // Interno (RF3) não incrementa o all-time público — só a coluna internal_*.
-  if (!internal) {
-    await db
-      .update(adsTable)
-      .set({ clicks: sql`${adsTable.clicks} + 1`, updatedAt: new Date() })
-      .where(eq(adsTable.id, id));
-  }
-  noteAdAccept("adClick", det);
+/** Deps comuns às duas rotas; só a janela de dedup difere (imp 30min vs clique 10s). */
+function makeAdDeps(dedup: { hit(key: string): boolean }): AdEventDeps {
+  return {
+    overRateLimit,
+    detectInternalRequest,
+    bumpEndpoint,
+    bumpInternalReason,
+    dedupHit: (key) => dedup.hit(key),
+    findAdBlock,
+    selectAd,
+    incrementAdAllTime,
+    upsertDailyStat,
+  };
+}
+const adImpDeps   = makeAdDeps(adImpDedup);
+const adClickDeps = makeAdDeps(adClickDedup);
 
-  void upsertDailyStat(id, "clicks", internal);
-
-  res.json({ ok: true, message: "Click tracked" });
+/** POST /api/ads/:id/click — registra clique (público) */
+router.post("/:id/click", async (req, res) => {
+  const out = await handleClick(adClickDeps, {
+    adId: req.params.id ?? "",
+    ipRaw: req.ip ?? "",
+    ua: String(req.headers["user-agent"] ?? ""),
+    body: (req.body ?? {}) as Record<string, unknown>,
+  });
+  res.status(out.status ?? 200).json(out.body);
 });
 
 /** POST /api/ads/:id/impression — registra impressão (público) */
 router.post("/:id/impression", async (req, res) => {
-  const id = req.params.id ?? "";
-
-  if (isBotRequest(req)) { bumpEndpoint("adImpression", "droppedBot"); res.json({ ok: true }); return; }
-  if (overRateLimit(`adimp:${req.ip ?? ""}`, INGEST_RATE_LIMITS.adImpression)) {
-    bumpEndpoint("adImpression", "droppedRate"); res.json({ ok: true }); return;
-  }
-
-  const b = (req.body ?? {}) as Record<string, unknown>;
-  const ip = normalizeIp(req.ip ?? "");
-  const sessionId = cleanStr(b["sessionId"], 100);
-  const det = detectInternalRequest(b["internal"] === true, ip);
-  const internal = det.internal;
-
-  // Dedup server-side (RF4): mesmo (sessão|ip, anúncio) em 30min = mesma visita.
-  if (adImpDedup.hit(`adimp:${id}:${sessionId ?? `ip:${ip}`}`)) {
-    bumpEndpoint("adImpression", "droppedDuplicate");
-    res.json({ ok: true });
-    return;
-  }
-
-  // Bloco da home marcado "É uma propaganda" — só bloco visível conta.
-  if (id.startsWith(BLOCK_PREFIX)) {
-    const blk = findAdBlock(id.slice(BLOCK_PREFIX.length));
-    if (blk && blk.visible) {
-      noteAdAccept("adImpression", det);
-      void upsertDailyStat(id, "impressions", internal);
-    } else {
-      bumpEndpoint("adImpression", "droppedInvalid");
-    }
-    res.json({ ok: true });
-    return;
-  }
-
-  // Só anúncio ativo e não expirado gera impressão (clique já checava active).
-  const [row] = await db
-    .select({ id: adsTable.id, active: adsTable.active, expiresAt: adsTable.expiresAt })
-    .from(adsTable)
-    .where(eq(adsTable.id, id))
-    .limit(1);
-
-  if (!row || !row.active || (row.expiresAt && row.expiresAt < new Date())) {
-    bumpEndpoint("adImpression", "droppedInvalid");
-    res.json({ ok: true });
-    return;
-  }
-
-  // Interno (RF3) não incrementa o all-time público — só a coluna internal_*.
-  if (!internal) {
-    await db
-      .update(adsTable)
-      .set({ impressions: sql`${adsTable.impressions} + 1`, updatedAt: new Date() })
-      .where(eq(adsTable.id, id));
-  }
-  noteAdAccept("adImpression", det);
-
-  void upsertDailyStat(id, "impressions", internal);
-
-  res.json({ ok: true });
+  const out = await handleImpression(adImpDeps, {
+    adId: req.params.id ?? "",
+    ipRaw: req.ip ?? "",
+    ua: String(req.headers["user-agent"] ?? ""),
+    body: (req.body ?? {}) as Record<string, unknown>,
+  });
+  res.status(out.status ?? 200).json(out.body);
 });
 
 export default router;

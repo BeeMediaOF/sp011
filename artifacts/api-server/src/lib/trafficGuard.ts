@@ -14,9 +14,14 @@ import type { Request } from "express";
 const BOT_RE =
   /googlebot|bingbot|yandex|baidu|duckduckbot|applebot|petalbot|slurp|crawler|spider|crawling|scrapy|curl\/|wget\/|python|httpclient|okhttp|axios\/|go-http|libwww|phantomjs|headless|lighthouse|pagespeed|gtmetrix|pingdom|uptimerobot|statuscake|semrush|ahrefs|mj12bot|dotbot|facebookexternalhit/i;
 
-export function isBotRequest(req: Request): boolean {
-  const ua = String(req.headers["user-agent"] ?? "");
+/** Decisão de bot a partir do user-agent cru (sem o objeto Request) — fonte única
+ *  usada por isBotRequest e pelos handlers extraídos (PRD 12 RF2/ingestHandlers). */
+export function isBotUa(ua: string): boolean {
   return ua.length === 0 || BOT_RE.test(ua);
+}
+
+export function isBotRequest(req: Request): boolean {
+  return isBotUa(String(req.headers["user-agent"] ?? ""));
 }
 
 /** Tetos por IP por minuto, por endpoint de ingest (PRD 03 RF7 — fonte única).

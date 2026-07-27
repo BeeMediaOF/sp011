@@ -1,8 +1,11 @@
 # Analytics — roteiro de validação manual
 
 Objetivo: comparar **evento bruto → linha no banco → número no painel** para
-cada métrica, num ambiente controlado. Rode após cada deploy que tocar o
-pipeline de analytics.
+cada métrica, num ambiente controlado. **Rode após CADA deploy que toque o
+pipeline de analytics** (é o gate do PRD 12): os §§1–11 são o roteiro clássico;
+os §§12–17 cobrem os itens corrigidos pela série de PRDs. O ambiente de
+validação de números públicos é **produção / IP externo** — em dev (ou IP
+privado) tudo vira `is_internal=true`, útil só para validar a MARCAÇÃO.
 
 > Preparação: janela anônima do navegador (sessão/visitante novos), SEM estar
 > logado no admin nessa janela (admin logado = tráfego interno, não conta).
@@ -113,6 +116,84 @@ Esperado: `{"ok":true}` mas NADA gravado (UA do curl é bot); `droppedBot` +1.
    se linhas forem realmente perdidas.
 4. Reinicie o container (SIGTERM): log “Analytics buffer drenado” e nenhum
    evento perdido.
+
+## 12. Anúncios: dedup + tráfego interno (PRD 04)
+
+1. Impressão viewável conta **1** (não N): abra a página com o anúncio ≥50%
+   visível por >1s → +1 em `ad_daily_stats.impressions` do dia BRT.
+2. **Dedup server-side**: recarregue/abra 2ª aba na MESMA sessão dentro de 30min →
+   NÃO conta de novo (`droppedDuplicate` da impressão no health); clique repetido
+   em <10s idem.
+3. **Zero par (ad_id, date) duplicado**:
+   ```sql
+   SELECT ad_id, date, count(*) FROM ad_daily_stats GROUP BY 1,2 HAVING count(*) > 1;
+   ```
+   Esperado: **0 linhas** (o upsert atômico colapsou tudo no par único).
+4. **Impressão interna** (`internal:true` ou IP interno) cai em
+   `ad_daily_stats.internal_impressions`/`internal_clicks`, NÃO nas colunas
+   públicas — e não incrementa o all-time de `ads`.
+5. `adsReliableSince` presente no `/api/analytics/health` (marcador do reparo).
+
+## 13. Canal "pago" só com campanha (PRD 05)
+
+1. Entrada com `fbclid`/`gclid` SEM campanha cadastrada → **NÃO** vira "pago"
+   (cai em social/busca/referência). Fontes de tráfego não mostra "Tráfego pago"
+   num blog sem campanha ativa.
+2. Cadastre uma campanha ativa (Configurações) casando o `utm_campaign` da
+   entrada → aí sim a linha é `referrer='pago'`.
+3. `paidCampaigns` é redigido do `/api/site` (nunca exposto ao público).
+
+## 14. Agregações (PRD 06)
+
+1. Top categorias não lidera com **zero acessos** (ordena por acessos DESC).
+2. Visitante **recorrente** não conta histórico interno (o EXISTS filtra
+   `is_internal=false`).
+3. Pico por dia da semana **normalizado** pelas ocorrências de cada dia na janela.
+
+## 15. Comportamento (PRD 07)
+
+1. "Buscas" / "Cliques externos" = **total** da janela, não a soma dos top-N.
+2. Newsletter passa pelo **gate de consentimento** LGPD (PRD 02) — sem consentir,
+   nenhuma request a `/api/analytics/behavior`.
+
+## 16. Saúde e sanidade (PRD 08 / PRD 11)
+
+1. Card Saúde mostra alertas quando há violação (ex.: `flush_failed`,
+   `paid_without_campaign`), com skips rotulados; blog novo saudável = `alerts: []`.
+2. `GET /api/analytics/sanity` (ou o campo `sanity` do `/health`) coerente com o
+   SQL espelho de cada regra (ex.: `sessions_lt_visitors`):
+   ```sql
+   SELECT count(DISTINCT session_id) AS sessoes,
+          count(DISTINCT visitor_id) FILTER (WHERE visitor_id IS NOT NULL) AS visitantes
+   FROM analytics_events
+   WHERE type='pageview' AND is_internal=false AND ts >= now() - interval '30 days';
+   ```
+   `visitantes > sessoes` ⇔ regra `sessions_lt_visitors` violada.
+
+## 17. Tráfego sintético (`scripts/analytics-synth.mjs`)
+
+Gera dezenas de eventos **marcados** (`synthtest-<runId>-…`, todos internos no
+`/event`) contra UM blog e imprime a limpeza. Prova evento → linha → contador →
+regra de sanidade, e que os cards **públicos não se mexem**. **NÃO** prova o
+número público de nenhum card (isso são os §§1–16 com navegador real).
+
+```bash
+RUN=$(date +%s)
+node scripts/analytics-synth.mjs --base https://SEUBLOG.midia.run --run-id "$RUN" \
+     --ad-id '<ID_DO_ANUNCIO_DE_TESTE>' --assert --admin-token '<BEARER>'
+```
+
+- **Marcação** — em `analytics_events`, `linhas_synth > 0` E `publicos_synth = 0`:
+  ```sql
+  SELECT count(*) AS linhas_synth,
+         count(*) FILTER (WHERE NOT is_internal) AS publicos_synth
+  FROM analytics_events WHERE session_id LIKE 'synthtest-%';
+  ```
+- **`--assert`** — nenhuma violação NOVA em `/sanity` vs o snapshot inicial.
+- **Limpeza (obrigatória, parte do teste)** — cole o bloco impresso pelo script
+  (ou `--cleanup-only --run-id "$RUN" --ad-id '<ID>'`); depois reconfira que as
+  contagens `synthtest-%` voltaram a **0**. O anúncio de teste (criado ativo no
+  admin) é removido no fim — nunca aponte impressão/clique para anúncio real.
 
 ## Conferência final
 
