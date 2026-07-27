@@ -54,3 +54,7 @@ artifacts/api-server/data/store.json
 .env
 .env.*
 !.env.example
+
+# Documentação e planejamento — manter em /docs
+/*.md
+!CLAUDE.md
