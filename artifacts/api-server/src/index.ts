@@ -6,6 +6,7 @@ import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { startScheduler } from "./lib/scheduler.js";
+import { startSanityMonitor } from "./lib/sanityMonitor.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
 import { migrateTwoFactorSecrets } from "./lib/migrateTwoFactorSecrets.js";
 import { ensureSchema } from "./lib/ensureSchema.js";
@@ -197,6 +198,10 @@ async function bootWithDb(): Promise<void> {
 
   // Start Instagram auto-posting scheduler (checks due automation every 5 min)
   startSocialAutomation();
+
+  // Malha de sanidade cross-metric (PRD 11): valida invariantes do dashboard a cada
+  // ~15min contra o banco do próprio blog. Depois do banco pronto (como o scheduler).
+  startSanityMonitor();
 
   /*
    * Pré-aquece o cache de imagens dos artigos mais recentes em background.

@@ -1,15 +1,22 @@
 /**
  * healthAlerts — motor puro de alertas de saúde da coleta (PRD 08).
  *
- * Contrato "zero imports" (mesmo padrão de analyticsShared.ts): é alvo direto de
+ * Contrato "sem I/O" (mesmo padrão de analyticsShared.ts): é alvo direto de
  * `node --test` e não conhece Express, Drizzle nem I/O. Recebe um input já montado
  * pelo gatherer do /health e é 100% LEITURA — nenhum UPDATE/DELETE em lugar algum.
+ * Importa APENAS os módulos puros irmãos (extensão .ts explícita p/ resolver no
+ * node --test): as fórmulas de anúncio vêm de analyticsShared (PRD 04) e a constante
+ * AD_SANITY_MARGIN de analyticsSanity (PRD 11) — UMA verdade no repo, nunca inline.
  *
  * Princípio (PRD 08): nenhum alerta dispara por "número pequeno" — blog novo com
  * zero tráfego tem `alerts: []`, e isso é sucesso. Todo alerta exige uma
  * INCONSISTÊNCIA lógica (identidade quebrada, invariante violada, dado impossível)
  * ou uma MUDANÇA estrutural, nunca volume absoluto.
  */
+import { checkAdSanity, checkClicksVsImpressions } from "./analyticsShared.ts";
+// Fonte ÚNICA da margem (declarada no PRD 11, re-exportada aqui p/ compatibilidade —
+// routes/analytics.ts importa AD_SANITY_MARGIN daqui). CA13: 1 declaração no repo.
+export { AD_SANITY_MARGIN } from "./analyticsSanity.ts";
 
 export interface HealthAlertDto {
   id: string;
@@ -47,9 +54,6 @@ export interface HealthAlertInput {
    *  null = query falhou (db_error). */
   reservedBehaviorCount?: number | null;
 }
-
-/** Reduzir para 1.5 quando o PRD 02 alinhar consentimento (PRD 04 RF6). */
-export const AD_SANITY_MARGIN = 3;
 
 export const HEALTH_ALERT_THRESHOLDS = {
   privateIpDominanceMinReceived: 30, // amostra mínima
@@ -117,16 +121,18 @@ export function evaluateHealthAlerts(input: HealthAlertInput): { alerts: HealthA
     skipped.push({ id: "ad_clicks_gt_impressions", reason: "prd04_reparo_pendente" });
   } else {
     for (const row of input.adDays) {
-      // S=1 pós-dedup do PRD 04; max(pageviews,1) mantém a regra avaliável em dia sem pageview.
-      const limit = Math.max(row.pageviews, 1) * 1 * input.adMargin;
-      if (row.impressions > limit) {
+      // Fórmulas do PRD 04 (analyticsShared) — nunca reimplementadas aqui (CA13).
+      // S=1 pós-dedup; max(pageviews,1) mantém a regra avaliável em dia sem pageview.
+      const ad = checkAdSanity(row.impressions, row.pageviews, 1, input.adMargin);
+      if (!ad.ok) {
         alerts.push({
           id: "ad_sanity", severity: "warning",
-          params: { adId: row.adId, date: row.date, impressions: row.impressions, limit },
+          params: { adId: row.adId, date: row.date, impressions: row.impressions, limit: ad.limit },
         });
       }
-      // +1 cobre o clique legítimo antes do dwell de 1s (PRD 04 RF6, regra irmã).
-      if (row.clicks > row.impressions + 1) {
+      // +1 (default do helper) cobre o clique legítimo antes do dwell de 1s.
+      const clk = checkClicksVsImpressions(row.clicks, row.impressions);
+      if (!clk.ok) {
         alerts.push({
           id: "ad_clicks_gt_impressions", severity: "critical",
           params: { adId: row.adId, date: row.date, clicks: row.clicks, impressions: row.impressions },

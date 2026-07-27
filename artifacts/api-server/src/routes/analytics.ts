@@ -24,6 +24,7 @@ import {
 } from "../lib/healthAlerts.js";
 import { StatsResponseCache, STATS_CACHE_TTL_MS } from "../lib/statsCache.js";
 import { detectInternalRequest } from "../lib/internalTraffic.js";
+import { getSanityReport } from "../lib/sanityMonitor.js";
 
 const router = Router();
 
@@ -576,6 +577,10 @@ router.get("/health", authMiddleware, async (_req, res) => {
     ],
     alerts,
     alertsSkipped,
+    // PRD 11 RF5: relatório da malha de sanidade cross-metric contínua (o motor roda
+    // a cada ~15min no boot; aqui é só leitura O(1) da memória). evaluatedAt=null
+    // enquanto o 1º ciclo não rodou (ou monitor desligado por SANITY_MONITOR_MS<=0).
+    sanity: getSanityReport(),
   });
 });
 

@@ -601,16 +601,19 @@ export function checkAdSanity(
 }
 
 /**
- * Regra irmã (PRD 04 RF6): `clicks_publicos(A,D) ≤ impressoes_publicas(A,D) + 1`.
- * O `+1` é folga TEÓRICA para o clique legítimo antes do dwell de 1s (nenhum caso
- * empírico na rede — os candidatos eram artefato da inflação, §9.6). Apertar para `≤`
- * estrito é decisão do PRD 11 após o reparo — não neste PRD.
+ * Regra irmã (PRD 04 RF6): `clicks_publicos(A,D) ≤ impressoes_publicas(A,D) + tolerance`.
+ * O `tolerance` (default 1) é folga TEÓRICA para o clique legítimo antes do dwell de 1s
+ * (nenhum caso empírico na rede — os candidatos eram artefato da inflação, §9.6).
+ * Apertar para `≤` estrito = passar `tolerance = 0`: decisão DELEGADA ao PRD 11
+ * (CLICK_TOLERANCE em analyticsSanity.ts), tomada quando o PRD 02 disparar impressão
+ * junto do clique. O default 1 preserva byte-a-byte todos os callers atuais.
  */
 export function checkClicksVsImpressions(
   clicks: number,
   impressions: number,
+  tolerance: number = 1,
 ): { ok: boolean; limit: number } {
-  const limit = impressions + 1;
+  const limit = impressions + tolerance;
   return { ok: clicks <= limit, limit };
 }
 

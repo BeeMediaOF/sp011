@@ -210,6 +210,66 @@ superfície on-demand (avaliação ao abrir/atualizar o painel). Razões de skip
 **TTL de 60s** (o painel dá auto-refresh a cada 30s e pode haver N abas). Amostra
 insuficiente (`received < 30`, janelas `< 50`) é silêncio legítimo, não skip.
 
+## Validação cross-metric contínua (PRD 11)
+
+Malha de invariantes que roda **continuamente em cada blog** (não só quando alguém
+abre o painel): um monitor de background avalia, a cada intervalo, um catálogo fechado
+de consistência lógica entre métricas. **Semântica: DETECTA e SINALIZA — nunca
+corrige o dado.** Um número inconsistente fica como está; a malha registra a violação
+e aponta o PRD dono da causa. 100% leitura das tabelas de métrica (a única escrita é
+o log da crítica, ver abaixo).
+
+- **Catálogo canônico** em `api/lib/analyticsSanity.ts` (`evaluateSanity`, função pura,
+  alvo de `node --test`). É o DONO das fórmulas; o motor on-demand do PRD 08
+  (`healthAlerts.ts`) consome as MESMAS fórmulas de anúncio
+  (`checkAdSanity`/`checkClicksVsImpressions` em `analyticsShared.ts`) e a MESMA
+  constante `AD_SANITY_MARGIN` (declarada aqui, re-exportada lá) — **uma verdade só**.
+- **Monitor** (`api/lib/sanityMonitor.ts`, montado no boot em `src/index.ts` ao lado
+  do `startScheduler`): primeira execução ~2 min após o boot, depois a cada
+  `SANITY_MONITOR_MS` (default `900000` = 15 min; `<=0` DESLIGA sem rebuild). Coleta
+  (`sanityCollect.ts`) reusa as agregações do `/stats` (`resolvePeriod` +
+  `buildWindowAggregates`) para validar EXATAMENTE o que o card mostra; janela 30 d
+  BRT. O relatório fica em memória (zera no restart) e é servido no campo `sanity` do
+  `GET /api/analytics/health` (autenticado) — `{ evaluatedAt, window, violations[],
+  skipped[], ruleStatus }`. `evaluatedAt: null` = ciclo ainda não rodou ou monitor
+  desligado (≠ "tudo são").
+
+Catálogo (regra EXATA → severidade; ids CANÔNICOS deste PRD):
+
+| id | Viola quando | Sev. | Item |
+|---|---|---|---|
+| `clicks_gt_impressions` | por (anúncio, dia): `!checkClicksVsImpressions(clicks, impressions)` ⇒ `clicks > impressions + CLICK_TOLERANCE` | critical | 4, 20 |
+| `impressions_gt_pageviews` | por (anúncio, dia): `!checkAdSanity(...)` ⇒ `impressions > max(pv,1) × slots × M` | warning (→ critical se `M ≤ 1.5`) | 4, 19–21 |
+| `paid_without_campaign` | `0` campanhas ativas E `≥1` linha `referrer='pago'` pós-`PAID_RULE_SINCE` | critical | 11 |
+| `sources_not_100` | soma reconstruída (`round(100·v/total)`) dos canais `> 0` fora de `100 ±1` | warning | 11 |
+| `category_gt_pageviews` | `sum(views/categoria) > pageviews_não_internos + CATEGORY_TOLERANCE` | warning | 3, 14 |
+| `sessions_lt_visitors` | `visitantes_únicos > sessões` (identidade lógica: `visitors ⊆ sessions`) | critical | 6, 7 |
+| `percent_over_100` | qualquer `%` exibido `> 100 + 0.5` (reconstruído com a base NAIVE `topCats[0]` — pega o estouro na origem antes do clamp do PRD 10) | warning | 3, 14 |
+
+- **Constantes** (com o marco que as vira): `CATEGORY_TOLERANCE=1`,
+  `PERCENT_CEILING=100.0`, `CLICK_TOLERANCE=1` e `AD_SANITY_MARGIN=3`. Quando o **PRD 02**
+  alinhar a admissão (impressão disparada no clique + gate de consentimento),
+  `CLICK_TOLERANCE→0` (regra `clicks > impressions` estrita — muda esta constante + o
+  default de `checkClicksVsImpressions`) e `AD_SANITY_MARGIN→1.5` (severidade de
+  `impressions_gt_pageviews` vira critical). São mudanças de CONSTANTE, não de lógica.
+- **Skip honesto**: regra cujo insumo depende de PRD não implantado fica em `skipped`,
+  nunca `violated` falso — `prd04_reparo_pendente` (sem `ads_reliable_since`),
+  `prd05_pendente` (sem cadastro/`PAID_RULE_SINCE`), `db_error` (query falhou). Blog
+  novo sem tráfego = `violations: []` — SUCESSO, não falta de dado (volume baixo não
+  é bug).
+- **Emissão sem correção silenciosa**: `critical` → `logSecurity`
+  (`eventType='analytics_sanity_violation'`, INSERT em `security_logs` — a fonte da
+  verdade; o webhook do `dispatchAlert` é bônus opt-in) **+** `logger.warn`; `warning`
+  → só `logger.warn`. Throttle próprio por `(rule, scope)` (`SANITY_ALERT_THROTTLE_MS`,
+  default 6 h) — o debounce do `dispatchAlert` (5 min por `(eventType, ip)`) NÃO serve
+  (todas colidiriam na mesma chave). ⚠️ `security_logs` **não** tem expurgo automático
+  (`dataRetention.ts` não a toca) — o throttle é o que limita o crescimento a
+  ~4 linhas/dia/violação.
+- **Mapa de ids PRD 08 ↔ PRD 11** (as mesmas regras batizadas diferente nas duas
+  superfícies): `ad_sanity` ≡ `impressions_gt_pageviews`; `ad_clicks_gt_impressions`
+  ≡ `clicks_gt_impressions`; `paid_without_campaign` (igual). O card de saúde (PRD 08)
+  usa os ids do PRD 08; o relatório contínuo (`sanity`) usa os ids canônicos deste PRD.
+
 ## LGPD / privacidade
 
 - Nada é enviado antes do aceite do banner (`bee_analytics_consent`).
