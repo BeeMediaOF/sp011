@@ -10,6 +10,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import { useAdminT, resolveAdminLang } from "../../lib/adminI18n";
+import { maxMetric, pctOfMax } from "../../lib/analyticsDisplay";
 
 const CAT_COLORS: Record<string, string> = {
   cidades:    "#2563EB",
@@ -340,8 +341,11 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-3">
                 {stats.topCategories.slice(0, 5).map((cat, i) => {
-                  const maxViews = stats.topCategories[0].views || 1;
-                  const pct = Math.round((cat.views / maxViews) * 100);
+                  // Base = maior `views` da lista inteira (PRD 10 RF3), não `[0]`.
+                  // Card rotulado "por visualizações" (dash.byViews) → base só de views,
+                  // sem clicks (semântica distinta do card do Analytics — preservada).
+                  const maxViews = maxMetric(stats.topCategories, (c) => c.views);
+                  const pct = Math.round(pctOfMax(cat.views, maxViews));
                   const color = catColor(cat.name, i);
                   return (
                     <div key={cat.name}>

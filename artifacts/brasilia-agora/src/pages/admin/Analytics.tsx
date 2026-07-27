@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Link } from "wouter";
 import { useAdminT, type AdminLang, type AdminTKey } from "../../lib/adminI18n";
+import { maxMetric, pctOfMax } from "../../lib/analyticsDisplay";
 
 interface AdStat {
   id: string; name: string; position: string; active: boolean;
@@ -39,7 +40,8 @@ interface Stats {
   dailyChart: { date: string; views: number }[];
   hourlyChart: { hour: number; views: number }[];
   peakHour?: number | null;
-  dayOfWeekChart?: { day: string; views: number }[];
+  // occurrences/avg são aditivos do PRD 06 RF-3 (opcionais — tolerantes a API antiga).
+  dayOfWeekChart?: { day: string; views: number; occurrences?: number; avg?: number | null }[];
   peakDay?: string | null;
   topArticles: { id: string; title: string; views: number; avgTime?: number }[];
   topCategories: { name: string; views: number; clicks: number; articles: number }[];
@@ -66,6 +68,9 @@ interface Stats {
   // Behavior analytics
   behaviorStats?: {
     totalEvents: number; newsletterSignups: number;
+    // Totais NÃO truncados servidos pelo PRD 07 (aditivos — ausentes em API antiga).
+    searchesTotal?: number; externalClicksTotal?: number;
+    searchTermsDistinct?: number; linkDomainsDistinct?: number;
     topSearchTerms: { term: string; count: number }[];
     topLinkDomains: { domain: string; count: number }[];
   };
@@ -364,7 +369,10 @@ export default function Analytics() {
   const totalRef = referrers.reduce((s, r) => s + r.value, 0) || 1;
 
   const topCats = stats.topCategories ?? [];
-  const maxCatViews = topCats[0] ? ((topCats[0].clicks || 0) + (topCats[0].views || 0)) || 1 : 1;
+  // Base = MAIOR atividade real da lista inteira (PRD 10 RF2). Nunca só o líder do
+  // array: o sort do endpoint tem fallback por nº de artigos e pode pôr categoria
+  // SEM acesso na posição 0 — isso fazia os chips dividirem por 1 e exibirem 300%/1500%.
+  const maxCatViews = maxMetric(topCats, (c) => (c.clicks || 0) + (c.views || 0));
 
   const topArts = stats.topArticles ?? [];
 
@@ -808,8 +816,7 @@ export default function Analytics() {
                 {topCats.slice(0, 6).map((cat, i) => {
                   const color = catColor(cat.name, i);
                   const totalActivity = (cat.clicks || 0) + (cat.views || 0);
-                  const maxActivity = topCats[0] ? ((topCats[0].clicks || 0) + (topCats[0].views || 0)) || 1 : 1;
-                  const pct = ((totalActivity / maxActivity) * 100).toFixed(1);
+                  const pct = pctOfMax(totalActivity, maxCatViews).toFixed(1);
                   const clicks = cat.clicks ?? 0;
                   const articles = cat.articles ?? 0;
                   return (
@@ -828,7 +835,7 @@ export default function Analytics() {
                         <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-md w-fit" style={{ backgroundColor: color + "22", color }}>{pct}%</span>
                       </div>
                       <div className="h-1 bg-slate-100 rounded-full overflow-hidden ml-4">
-                        <div className="h-full rounded-full" style={{ width: `${(totalActivity / maxCatViews) * 100}%`, background: color }} />
+                        <div className="h-full rounded-full" style={{ width: `${pctOfMax(totalActivity, maxCatViews)}%`, background: color }} />
                       </div>
                     </div>
                   );
@@ -968,11 +975,26 @@ export default function Analytics() {
           <div className="bg-white rounded-2xl p-6" style={{ boxShadow: CARD_SHADOW }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-sm font-semibold text-[#0B2A66]">{t("an.peakByWeekday")}</h2>
-              {stats.peakDay && (stats.dayOfWeekChart ?? []).some(d => d.views > 0) && (
-                <span className="text-[11px] font-semibold bg-red-50 text-[#E71D36] px-2 py-0.5 rounded-full">
-                  {t("an.peak")} {dow(stats.peakDay)}
-                </span>
-              )}
+              {stats.peakDay && (stats.dayOfWeekChart ?? []).some(d => d.views > 0) && (() => {
+                // PRD 06 elege o pico por média/ocorrência; a barra continua por soma
+                // bruta. Quando o dia eleito não é o de maior barra (só quando `avg`
+                // já vem do PRD 06), sinalizamos com "*" + tooltip — sem mudar a barra.
+                const dowData = stats.dayOfWeekChart ?? [];
+                const hasAvg = dowData.some(d => typeof d.avg === "number");
+                const maxViewsDay = dowData.reduce(
+                  (best, d) => (d.views > (best?.views ?? -1) ? d : best),
+                  dowData[0],
+                )?.day;
+                const divergent = hasAvg && maxViewsDay !== stats.peakDay;
+                return (
+                  <span
+                    className="text-[11px] font-semibold bg-red-50 text-[#E71D36] px-2 py-0.5 rounded-full"
+                    title={divergent ? t("an.peakByAvgTip") : undefined}
+                  >
+                    {t("an.peak")} {dow(stats.peakDay)}{divergent ? " *" : ""}
+                  </span>
+                );
+              })()}
             </div>
             {(stats.dayOfWeekChart ?? []).every(d => d.views === 0) ? (
               <EmptyState label={t("an.waitingData")} />
@@ -984,7 +1006,14 @@ export default function Analytics() {
                   <YAxis tick={{ fontSize: 10, fill: "#94A3B8" }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                   <Tooltip
                     contentStyle={{ fontSize: 12, borderRadius: 12, border: "1px solid #E2E8F0" }}
-                    formatter={(v: number) => [v, t("an.views")]}
+                    formatter={(v: number, _name, item: { payload?: { occurrences?: number; avg?: number | null } }) => {
+                      const occ = item?.payload?.occurrences;
+                      const avg = item?.payload?.avg;
+                      if (typeof occ === "number" && occ > 0 && typeof avg === "number") {
+                        return [`${v} (${t("an.avgPerOcc")}: ${avg})`, t("an.views")];
+                      }
+                      return [v, t("an.views")];
+                    }}
                   />
                   <Bar dataKey="views" radius={[4, 4, 0, 0]}>
                     {(stats.dayOfWeekChart ?? []).map((entry) => (
@@ -1019,7 +1048,7 @@ export default function Analytics() {
                     <div key={depth}>
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-medium text-slate-600">{labels[depth]}</span>
-                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString(nloc)} {t("an.sessions")}</span>
+                        <span className="text-xs font-semibold text-[#0F172A]">{count.toLocaleString(nloc)} {t("an.readDepthUnit")}</span>
                       </div>
                       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                         <div
@@ -1311,12 +1340,23 @@ export default function Analytics() {
                   },
                   {
                     label: t("an.searchesMade"),
-                    value: (stats.behaviorStats?.topSearchTerms.reduce((s, term) => s + term.count, 0) ?? 0).toLocaleString(nloc),
+                    // PRD 10 RF4: total real (PRD 07). Fallback p/ soma truncada quando
+                    // a API do blog ainda não tiver o PRD 07 (rollout parcial) — nunca crash.
+                    value: (
+                      stats.behaviorStats?.searchesTotal ??
+                      stats.behaviorStats?.topSearchTerms.reduce((s, term) => s + term.count, 0) ??
+                      0
+                    ).toLocaleString(nloc),
                     icon: Search, color: "#2563EB", bg: "#EEF4FF",
                   },
                   {
                     label: t("an.externalClicks"),
-                    value: (stats.behaviorStats?.topLinkDomains.reduce((s, d) => s + d.count, 0) ?? 0).toLocaleString(nloc),
+                    // PRD 10 RF4: idem — total real com fallback tolerante.
+                    value: (
+                      stats.behaviorStats?.externalClicksTotal ??
+                      stats.behaviorStats?.topLinkDomains.reduce((s, d) => s + d.count, 0) ??
+                      0
+                    ).toLocaleString(nloc),
                     icon: ExternalLink, color: "#16A34A", bg: "#ECFDF5",
                   },
                   {
