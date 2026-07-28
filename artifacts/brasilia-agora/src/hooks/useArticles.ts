@@ -141,6 +141,35 @@ export function useArticles() {
 // ─── Single-article cache (5 min TTL per slug/id) ────────────────────────────
 const _articleCache = new Map<string, { article: Article; at: number }>();
 const ARTICLE_TTL = 5 * 60_000;
+/* Teto de entradas. No navegador o cache morre com a aba, mas este módulo também
+   roda no processo de SSR (PRD-PERF-05), que fica de pé por semanas: sem teto,
+   cada artigo renderizado deixaria o corpo inteiro na memória do container `web`
+   para sempre. Map itera por ordem de inserção — descarta-se a mais antiga. */
+const ARTICLE_CACHE_MAX = 60;
+
+function rememberArticle(key: string, article: Article, at: number): void {
+  _articleCache.delete(key);
+  _articleCache.set(key, { article, at });
+  while (_articleCache.size > ARTICLE_CACHE_MAX) {
+    const oldest = _articleCache.keys().next().value;
+    if (oldest === undefined) break;
+    _articleCache.delete(oldest);
+  }
+}
+
+/**
+ * Semeia o cache do artigo único (SSR + hidratação) — o par de `seedArticles`
+ * para a rota /artigo/:slug. Grava sob a chave CRUA da URL (é ela que o
+ * `useArticle(slug)` procura no 1º render) e também sob o slug e o id do
+ * artigo, para que uma navegação SPA que chegue pelo outro identificador
+ * acerte o cache em vez de refazer o fetch.
+ */
+export function seedArticle(key: string, article: Article): void {
+  const at = Date.now();
+  for (const k of [key, article.slug, article.id]) {
+    if (k) rememberArticle(k, article, at);
+  }
+}
 
 export function useArticle(id: string) {
   const cached = _articleCache.get(id);
@@ -161,7 +190,7 @@ export function useArticle(id: string) {
       .then((r) => r.json())
       .then((data: { article?: Article }) => {
         if (data.article) {
-          _articleCache.set(id, { article: data.article, at: Date.now() });
+          rememberArticle(id, data.article, Date.now());
           setArticle(data.article);
         }
         setLoading(false);

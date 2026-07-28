@@ -2,13 +2,14 @@
 
 > Modo Planejamento (Fases 0 → 1 → 1.5 → 2). **Nenhum arquivo de código de
 > produção foi alterado** — escrita restrita a `performance-audit/`.
-> Última atualização: 2026-07-27.
+> Última atualização: 2026-07-28.
 
 ## Fase atual
 
-**FASE 3 — EXECUÇÃO. Onda 1 ENCERRADA** (2026-07-28): PRD-01, PRD-02 e PRD-06
-concluídos, validados em produção e propagados aos 8 blogs. Próximo: **onda 2**
-(PRD-04 e PRD-03, nesta ordem — ver "Leitura do Lighthouse" abaixo).
+**FASE 3 — EXECUÇÃO. Ondas 1 e 2 ENCERRADAS** (2026-07-28): PRD-01, PRD-02 e
+PRD-06 (onda 1) validados em produção e propagados aos 8 blogs; PRD-04 e PRD-03
+(onda 2) validados em produção no sp011, aguardando rollout. **Onda 3**: o
+PRD-05 está com o código entregue e falta medir em produção.
 
 ## Artefatos concluídos
 
@@ -58,9 +59,9 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 | 01 — payload da lista de artigos | 1 | M | — | **concluído e validado em prod** |
 | 02 — JS do caminho crítico | 1 | P | 01 (medição) | **concluído e validado em prod** |
 | 06 — llms.txt / robots.txt por blog | 1 | P | — | **concluído e validado em prod** |
-| 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | pendente |
-| 04 — CSS render-blocking | 2 | M/G | **02** | pendente |
-| 05 — SSR de artigo e categoria | 3 | G | **01** | pendente |
+| 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | **concluído e validado em prod** |
+| 04 — CSS render-blocking | 2 | M/G | **02** | **concluído e validado em prod** |
+| 05 — SSR de artigo e categoria | 3 | G | **01** | código entregue, **falta medir em prod** |
 
 ## PRD-PERF-01 — o que foi entregue (2026-07-28)
 
@@ -669,31 +670,162 @@ aquele viewport nunca usa.
   `startsWith(SITE_ASSET_PREFIX)` da guarda do `updateSettings` — o caminho em
   que uma URL derivada já causou incidente (`store.ts:870-878`).
 
+### Regressão reportada pelo usuário e corrigida (dcbca20)
+
+"Baixou a qualidade da imagem do cabeçalho" (KSports). Duas causas, uma delas
+conceitual:
+
+1. **Dimensionar logo por LARGURA é o erro.** A restrição de layout de uma logo
+   é a **altura** — o CSS fixa `style={{ height }}` e deixa a largura livre, que
+   sai da proporção e só o servidor conhece. A logo do KSports é 1080×300
+   (3,6:1) com `logoSize=120` → é desenhada com **432 px de largura**, e o PRD-03
+   servia `w=320`: o navegador ampliava. A rota passou a aceitar `h`, com
+   precedência sobre `w`, e Header/Footer pedem a altura que eles mesmos aplicam
+   (`srcSet` 2× no mesmo eixo). `w` continua valendo para favicon e byline, que
+   são quadrados e limitados pela caixa.
+2. **`q=82` + `effort:1` é perfil de FOTO.** Em arte com texto, borda dura,
+   gradiente e alfa, o lossy do WebP deixa ringing em volta das letras. Novo
+   perfil `artwork`: gera lossless e lossy q95/effort 4 e serve **o menor** —
+   quem ganha em bytes depende do conteúdo (lossless vence em logo chapada, o
+   lossy vence quando há gradiente, como no KSports).
+
+Medido localmente antes do deploy:
+
+| | exibida | servida antes | servida agora |
+|---|---|---|---|
+| KSports cabeçalho | 432×120 | 320 px (**upscale**) | 432 px · 15.346 B |
+| SP011 cabeçalho | 318×112 | 320 px | 318 px · 11.854 B |
+| SP011 rodapé | 114×40 | 320 px (2,8× maior que o preciso) | 114 px · **3.548 B** |
+
+O mesmo erro acontecia ao contrário no rodapé. Somando as duas logos, o sp011
+fica **menor que antes** (15.402 contra 21.546 B) e correto em nitidez. A chave
+de cache passou a codificar o eixo (`h ? -h : w`) e o literal `artwork`, para
+não reaproveitar o disco lossy antigo.
+
 ### Pendente para fechar o PRD-03
 
+- **Conferir a logo do KSports depois do deploy de `dcbca20`** — é o único juiz
+  da regressão acima.
 - **Troca de logo pelo admin** (`/admin/configuracoes`) refletindo no site em
   ≤90 s — é o gate que valida a guarda do `updateSettings` no fluxo real.
 - `LCP ≤ 2.000 ms` e `bytes de imagem na home ≤ 130 KB`: dependem de uma medição
   com a VPS ociosa.
 - Rollout aos 8 blogs.
 
+## PRD-PERF-05 — entregue (código), pendente de medição em produção
+
+O SSR existia só para `/`. Toda outra rota recebia o `index.html` com o `#root`
+vazio — daí FCP de 4,2 s e LCP de 5,5 s em artigo e categoria contra 2,5 s na
+home. Agora `/artigo/:slug` e as rotas de editoria também saem renderizadas.
+
+### O bloqueio que o PRD não previu
+
+`renderToString` **não espera Suspense**, e todas as páginas públicas eram
+`lazy()`. Pelo caminho natural, o SSR de artigo/editoria devolveria o
+`<PageSpinner/>` — a página inteira trocada por um spinner, servida como HTML
+final. Três saídas foram consideradas:
+
+| Saída | Por que não / por que sim |
+|---|---|
+| Render em duas passadas (renderizar, esperar o microtask, renderizar de novo) | A 1ª passada inicializa TODO lazy que alcança, inclusive `Toaster` e `LGPDConsent`. Se o import deles resolvesse a tempo, a 2ª passada emitiria markup que o cliente NÃO tem no 1º render (chunk ainda baixando) → mismatch. Resultado dependente de corrida de I/O: descartado. |
+| `import.meta.env.SSR` com import estático no ramo morto | Exigiria top-level await no App, que é compartilhado com o bundle do cliente. |
+| **Prop `pages` no App** (escolhida) | O `entry-server` importa `Artigo` e `CategoryArchivePage` de forma ESTÁTICA e injeta; o `Router` usa `pages?.X ?? X`. Determinístico, sem tocar em interno do React, e o bundle do cliente nunca vê o objeto — os chunks continuam sob demanda. |
+
+### Mudanças estruturais
+
+- **As 13 editorias de rota fixa deixaram de ser 13 arquivos de página de 3
+  linhas** (`src/pages/Politica.tsx` e cia, todos idênticos) e viraram a tabela
+  `FIXED_CATEGORIES` em `src/lib/categoryRoutes.ts`. O módulo é a fonte única de
+  três consumidores que **precisam concordar**: o App (monta as rotas e resolve
+  o `/:slug`), o middleware de SSR (decide o que renderizar no servidor) e o
+  `<title>` servido. Discordar ali é o servidor pintar uma página e o cliente
+  hidratar outra. O `vite.config.ts` importa o módulo — é TS puro, sem React.
+- `classifySsrPath` saiu do `vite.config.ts` para `src/lib/ssrRoutes.ts` **para
+  ter teste**: é a função que decide o que NUNCA vira HTML de servidor (o
+  painel, os assets, a API). Falso positivo ali não é lentidão, é o painel
+  vazando para o HTML público.
+- `ssrHomePlugin` → `ssrPlugin`, com tabela de rotas, cache LRU (teto de 200
+  entradas, TTL 30 s na home e 60 s no resto, chave incluindo o **host**) e um
+  `<head>` por rota (título/OG do artigo, `article:published_time`,
+  `article:section` e `<link rel="canonical">` self-referente nas três rotas).
+- `DynamicCategory` não busca mais `/api/site` por conta própria: lê o
+  `useSite`, que o SSR já semeou. Sai um round-trip e some o `null` do primeiro
+  quadro.
+- Seeds novos: `seedArticle` (artigo único) e `seedCategoryArchive` (página de
+  editoria — a lista dela vive num `useEffect`, que o `renderToString` não roda).
+
+### Defeitos encontrados no caminho (e corrigidos)
+
+- **`ArticleCard` sem `loading="lazy"`**: com o SSR da editoria, o React 19
+  emitiria um `<link rel=preload as=image>` para **cada um dos ~58 cards**,
+  todos disputando banda com a imagem do destaque (o LCP da página). Mesma
+  correção no avatar de assinatura do artigo.
+- **`Artigo.tsx` montava o JSON-LD com `BRAND.url`** quando não havia `window` —
+  o domínio do blog que buildou a imagem Docker. No SSR isso seria um
+  `<script type="ld+json">` diferente do que o cliente monta → mismatch. Novo
+  `pageOrigin()`, semeado com o origin da requisição. O `breadcrumbSchema`, que
+  ainda tinha `https://sbcagora.com.br` fixo nos 8 blogs, foi junto.
+- **`_articleCache` não tinha teto.** No navegador morre com a aba; no processo
+  de SSR, que fica de pé por semanas, cada artigo renderizado deixaria o corpo
+  inteiro na memória do container `web` para sempre. Teto de 60 entradas com
+  descarte da mais antiga.
+- **`useSite` não distinguia "settings do localStorage" de "settings
+  confirmadas"** (`_cacheAt = 0` no seed do boot). Sem isso, o `DynamicCategory`
+  novo responderia NotFound a uma editoria criada depois da última visita do
+  usuário. Campo `validated` no retorno do hook.
+
+### Decisões que valem registro
+
+- **Path com barra final não é renderizado no servidor** (`/futebol/` cai na
+  SPA). O wouter do cliente pode casar outra rota para ele, e servir a página
+  certa para uma URL que o cliente resolve de outro jeito é trocar lentidão por
+  hidratação quebrada.
+- **A editoria busca `/api/site` ANTES das listas.** Sem o menu não dá para
+  saber se o slug é editoria, e buscar as listas de um path qualquer daria a
+  bots um jeito barato de multiplicar consultas.
+- **Descrição por editoria não foi implementada** (o PRD pedia `<title>` e
+  description). O `<title>` sim — `Política — SP011`, escrito pelo SSR e
+  repetido pela página. A description continua a do portal: inventar texto
+  editorial em dois idiomas para 8 blogs de nichos diferentes é conteúdo, não
+  performance.
+- **`suppressHydrationWarning` no tempo relativo** dos cards de editoria (mesmo
+  padrão que a home já usava no hero e na TopBar): o HTML fica até 60 s em
+  cache, e "3 h atrás" vira outro texto nesse intervalo.
+- **O corpo do artigo é sanitizado por caminhos diferentes** nos dois lados
+  (regex no servidor, DOMPurify no cliente). O React não compara conteúdo de
+  `dangerouslySetInnerHTML` na hidratação, então não há mismatch — o DOM fica
+  com a versão do servidor, que remove as mesmas classes de perigo.
+
+### A medir em produção (nada aqui foi medido ainda)
+
+FCP/LCP em `/artigo/:slug` e numa editoria, TTFB frio e quente, `#root` vazio
+= 0 nas duas, `/admin/login` continuando vazio, slug inexistente devolvendo a
+SPA (não 500), memória do container após navegar ~50 artigos, e o console sem
+aviso de hidratação nas três rotas.
+
 ## Próxima ação
 
-1. **Verificação visual acumulada (PRD-04 + PRD-03)** — o gate que nenhum número
-   detecta: `/`, uma categoria, um artigo, `/contato`, e no painel
+1. **Deploy e medição do PRD-PERF-05** (`api` não muda; é só `web`), com os
+   comandos de verificação do PRD.
+2. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que
+   nenhum número detecta: `/`, uma categoria, um artigo, `/contato`, e no painel
    `/admin/login`, dashboard, configurações e o modo escuro. Do PRD-04 saíram 51
    componentes e 34 PNGs; do PRD-03, conferir que logo do cabeçalho, do rodapé,
-   avatar de assinatura e favicon aparecem **nítidos**, inclusive em tela 2×.
-2. **Troca de logo pelo admin** (gate do PRD-03, acima).
-3. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
+   avatar de assinatura e favicon aparecem **nítidos**, inclusive em tela 2×; do
+   PRD-05, que artigo e editoria continuam idênticos ao que eram (o SSR não pode
+   mudar layout) e que a navegação SPA segue instantânea.
+3. **Troca de logo pelo admin** (gate do PRD-03).
+4. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
    8 blogs e trouxe "The page loaded too slowly to finish within the time
-   limit". Agora há três mudanças grandes para medir juntas: CSS 29,6% menor,
-   62 KB tirados da frente do `<link>` e 243 KB de imagem de identidade a menos.
-4. **Rollout aos 8 blogs** (PRD-04 + PRD-03 na mesma imagem).
-5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
+   limit". Agora há quatro mudanças grandes para medir juntas: CSS 29,6% menor,
+   62 KB tirados da frente do `<link>`, 243 KB de imagem de identidade a menos e
+   o SSR de artigo/editoria.
+5. **Rollout aos 8 blogs** (PRD-04 + PRD-03 + PRD-05 na mesma imagem), com o
+   canário de 24 h que o PRD-05 pede.
+6. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
    "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
    propaga em ≤1 h.
-6. **PRD-PERF-05** (onda 3) e depois o `RELATORIO-FINAL.md`.
+7. `RELATORIO-FINAL.md`.
 
 ### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
 

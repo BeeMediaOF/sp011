@@ -104,7 +104,10 @@ export default function CategoryPage({
                     <div className="flex items-center gap-2 text-[11px] text-white/50">
                       <span>{bylineName}</span>
                       <span className="w-1 h-1 rounded-full bg-white/40" />
-                      <span>{art.time}</span>
+                      {/* Tempo relativo ("3 h atrás"): o HTML da editoria é
+                          cacheado por até 60s, então o texto do servidor pode
+                          já ter virado outro quando o cliente hidrata. */}
+                      <span suppressHydrationWarning>{art.time}</span>
                     </div>
                   </div>
                 </div>

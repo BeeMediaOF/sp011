@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { BRAND } from "../brand";
+import { pageOrigin } from "@/lib/pageOrigin";
 import { buildSrcSet, HERO_WIDTHS, siteAssetUrl, siteAssetSrcSet } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
 import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
@@ -174,8 +175,10 @@ export default function Artigo() {
     const ampUrl    = `${window.location.origin}/api/amp/artigos/${articleSlug}`;
     const title = article.title.replace(/<[^>]*>/g, "");
     const desc  = (article.subtitle || article.title).replace(/<[^>]*>/g, "").slice(0, 160);
-    // og:image deve ser URL absoluta — crawlers do Facebook/WhatsApp rejeitam URLs relativas
-    const rawImage = article.imageUrl || "/opengraph.jpg";
+    // og:image deve ser URL absoluta — crawlers do Facebook/WhatsApp rejeitam URLs
+    // relativas. Sem imagem no artigo, a OG das settings DESTE blog vem antes do
+    // /opengraph.jpg estático (que é o do blog que buildou a imagem Docker).
+    const rawImage = article.imageUrl || settings?.ogImageBase64 || "/opengraph.jpg";
     const image = rawImage.startsWith("http")
       ? rawImage
       : `${window.location.origin}${rawImage.startsWith("/") ? rawImage : `/${rawImage}`}`;
@@ -498,9 +501,10 @@ export default function Artigo() {
   /* Origin do PRÓPRIO blog. Estava fixo em sbcagora.com.br — domínio que não é de
      nenhum blog da rede — e ia parar no mainEntityOfPage do JSON-LD dos 8. (O
      <link rel="canonical"> do <head> nunca teve esse defeito: já usa o origin.)
-     A página de artigo não passa pelo SSR — só a home passa —, mas o guard mantém
-     o componente seguro caso isso mude. */
-  const origin = typeof window !== "undefined" ? window.location.origin : BRAND.url;
+     Desde o PRD-PERF-05 esta página TAMBÉM passa pelo SSR: no servidor o origin
+     vem da requisição (pageOrigin), senão o JSON-LD sairia com o domínio do blog
+     que buildou a imagem e mudaria na hidratação. */
+  const origin = pageOrigin();
 
   const canonicalUrl = article
     ? `${origin}/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
@@ -555,13 +559,13 @@ export default function Artigo() {
             "@type": "ListItem",
             position: 1,
             name: t("common.home"),
-            item: "https://sbcagora.com.br/",
+            item: `${origin}/`,
           },
           {
             "@type": "ListItem",
             position: 2,
             name: article.tag,
-            item: `https://sbcagora.com.br${categoryRoute(article.category)}`,
+            item: `${origin}${categoryRoute(article.category)}`,
           },
           {
             "@type": "ListItem",
@@ -662,6 +666,7 @@ export default function Artigo() {
                           alt={settings.bylineName || settings.siteName || "Portal"}
                           width={36}
                           height={36}
+                          loading="lazy"
                           decoding="async"
                           className="w-9 h-9 rounded-full object-cover shrink-0"
                         />

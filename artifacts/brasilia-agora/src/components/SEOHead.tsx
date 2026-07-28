@@ -121,6 +121,21 @@ export default function SEOHead() {
     };
   }, []);
 
+  /* Canonical sempre apontando para a URL atual. O SSR (PRD-PERF-05) passou a
+     servir <link rel="canonical"> no HTML de home/artigo/editoria; sem este
+     efeito, uma navegação SPA sairia da página mantendo o canonical da anterior.
+     A página de artigo sobrescreve depois (efeito dela roda em seguida) quando o
+     artigo tem canonicalUrl externa. */
+  useEffect(() => {
+    let link = document.head.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "canonical";
+      document.head.appendChild(link);
+    }
+    link.href = window.location.origin + location;
+  }, [location]);
+
   // ── Scripts de terceiros (pesados) → adiados para o idle, fora do TBT ────────
   useEffect(() => {
     if (!settings || isAdmin) return;

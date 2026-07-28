@@ -25,9 +25,15 @@ export default function ArticleCard({
     <Link href={`/artigo/${slug || id}`}>
       <div className="flex gap-5 group cursor-pointer py-5 border-b border-gray-100 last:border-0 hover:bg-gray-50 transition-colors">
         <div className="w-[110px] h-[80px] sm:w-[180px] sm:h-[120px] shrink-0 overflow-hidden relative rounded-sm">
+          {/* loading="lazy" não é só economia: com o SSR da editoria
+              (PRD-PERF-05) o React 19 emite um <link rel=preload as=image>
+              para toda <img> que NÃO seja lazy — seriam ~58 preloads
+              disputando banda com a imagem do destaque (o LCP da página). */}
           <img
             src={imageUrl}
             alt={title}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         </div>

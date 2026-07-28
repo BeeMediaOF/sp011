@@ -3,8 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NotFound from "@/pages/not-found";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
+import { useSite } from "@/hooks/useSite";
 import { useT } from "@/lib/i18n";
-import { lazy, Suspense, useState, useEffect } from "react";
+import { FIXED_CATEGORIES, resolveCategoryRoute } from "@/lib/categoryRoutes";
+import { lazy, Suspense, useEffect } from "react";
 
 /* ─── Eager — crítico para o carregamento inicial ─── */
 import Home from "@/pages/Home";
@@ -12,24 +14,23 @@ import { RequireAdmin, RequirePermission } from "@/pages/Admin";
 
 /* ─── Lazy — páginas públicas (carregam só quando navegadas) ─── */
 const Artigo           = lazy(() => import("@/pages/Artigo"));
-const Politica         = lazy(() => import("@/pages/Politica"));
-const Cidade           = lazy(() => import("@/pages/Cidade"));
-const Seguranca        = lazy(() => import("@/pages/Seguranca"));
-const Transporte       = lazy(() => import("@/pages/Transporte"));
-const Saude            = lazy(() => import("@/pages/Saude"));
-const Educacao         = lazy(() => import("@/pages/Educacao"));
-const Cultura          = lazy(() => import("@/pages/Cultura"));
-const Esportes         = lazy(() => import("@/pages/Esportes"));
-const Colunas          = lazy(() => import("@/pages/Colunas"));
-const Brasil           = lazy(() => import("@/pages/Brasil"));
-const Mundo            = lazy(() => import("@/pages/Mundo"));
-const Economia         = lazy(() => import("@/pages/Economia"));
-const Tecnologia       = lazy(() => import("@/pages/Tecnologia"));
 const Archive          = lazy(() => import("@/pages/Archive"));
 const Contato          = lazy(() => import("@/pages/Contato"));
 const Privacidade      = lazy(() => import("@/pages/Privacidade"));
 const Termos           = lazy(() => import("@/pages/Termos"));
 const CategoryArchivePage = lazy(() => import("@/pages/CategoryArchivePage"));
+
+/**
+ * Componentes que o SSR precisa ter RESOLVIDOS antes de renderizar
+ * (PRD-PERF-05). `renderToString` não espera Suspense: com o `lazy` do cliente
+ * a página de artigo/editoria sairia do servidor como o <PageSpinner/>. O
+ * entry-server importa os dois de forma estática e passa aqui; o bundle do
+ * cliente nunca vê este objeto e continua carregando os chunks sob demanda.
+ */
+export interface SsrPages {
+  Artigo: React.ComponentType;
+  CategoryArchivePage: React.ComponentType<{ category: string; slug: string; color: string }>;
+}
 
 /* ─── Lazy — UI não-crítica para o primeiro paint (carrega após o conteúdo) ─── */
 const Toaster = lazy(() => import("@/components/ui/toaster").then((m) => ({ default: m.Toaster })));
@@ -115,50 +116,23 @@ function PageSpinner() {
   );
 }
 
-const COLOR_PALETTE = [
-  "#0b3d91","#c8102e","#16a34a","#6b21a8","#0284c7",
-  "#b45309","#0d9488","#dc2626","#ea580c","#7c3aed",
-];
-
-function colorForSlug(slug: string): string {
-  let h = 0;
-  for (let i = 0; i < slug.length; i++) h = (h * 31 + slug.charCodeAt(i)) >>> 0;
-  return COLOR_PALETTE[h % COLOR_PALETTE.length]!;
-}
-
-interface MenuItemApi { label: string; path: string; visible?: boolean; children?: MenuItemApi[]; }
-
-function DynamicCategory() {
+/**
+ * Editoria de rota livre (`/:slug`): resolve o slug contra o menu do portal.
+ * O fetch próprio de /api/site saiu daqui (PRD-PERF-05) — as settings já estão
+ * no useSite (semeadas pelo SSR ou pelo cache), então a página não paga mais um
+ * round-trip nem renderiza `null` no primeiro quadro da hidratação.
+ */
+function DynamicCategory({ Page }: { Page: SsrPages["CategoryArchivePage"] }) {
   const { slug } = useParams<{ slug: string }>();
-  const [menuItem, setMenuItem] = useState<MenuItemApi | null | undefined>(undefined);
+  const { settings, validated } = useSite();
 
-  useEffect(() => {
-    if (!slug) { setMenuItem(null); return; }
-    // /api/site é público e já inclui os menuItems visíveis — /api/admin/menu
-    // exige token e devolvia 401 para visitantes anônimos (NotFound indevido).
-    fetch("/api/site")
-      .then((r) => r.json())
-      .then((d: { menuItems: MenuItemApi[] }) => {
-        // Procura o slug nos itens de topo e nos submenus (1 nível).
-        const flat = (d.menuItems ?? []).flatMap((m) => [m, ...(m.children ?? [])]);
-        const found = flat.find(
-          (m) => m.path === `/${slug}` || m.path.replace(/^\//, "") === slug
-        );
-        setMenuItem(found ?? null);
-      })
-      .catch(() => setMenuItem(null));
-  }, [slug]);
-
-  if (menuItem === undefined) return null;
-  if (!menuItem) return <NotFound />;
-
-  return (
-    <CategoryArchivePage
-      category={menuItem.label.toUpperCase()}
-      slug={slug ?? ""}
-      color={colorForSlug(slug ?? "")}
-    />
-  );
+  const route = resolveCategoryRoute(`/${slug ?? ""}`, settings?.menuItems);
+  if (route) return <Page category={route.label} slug={route.slug} color={route.color} />;
+  /* Menu ainda não confirmado (só o cache do localStorage, que pode ser anterior
+     à criação desta editoria) → nada na tela, nunca um "não encontrado" que
+     pisca e some. */
+  if (!validated) return null;
+  return <NotFound />;
 }
 
 function AnalyticsProvider() {
@@ -229,7 +203,11 @@ function BrokenImageFallback() {
   return null;
 }
 
-function Router() {
+function Router({ pages }: { pages?: SsrPages }) {
+  /* No SSR os dois componentes vêm resolvidos (ver SsrPages); no cliente são os
+     lazy de sempre. Mesmo elemento, mesma árvore — a hidratação casa. */
+  const ArtigoPage = pages?.Artigo ?? Artigo;
+  const CategoryPage = pages?.CategoryArchivePage ?? CategoryArchivePage;
   const [location] = useLocation();
   const isAdminArea =
     /^\/admin(\/|$)/.test(location) && location !== "/admin/login" && location !== "/admin/setup";
@@ -318,25 +296,19 @@ function Router() {
 
         {/* ── Public routes ── */}
         <Route path="/" component={Home} />
-        <Route path="/politica" component={Politica} />
-        <Route path="/cidade" component={Cidade} />
-        <Route path="/seguranca" component={Seguranca} />
-        <Route path="/transporte" component={Transporte} />
-        <Route path="/saude" component={Saude} />
-        <Route path="/educacao" component={Educacao} />
-        <Route path="/cultura" component={Cultura} />
-        <Route path="/esportes" component={Esportes} />
-        <Route path="/colunas" component={Colunas} />
-        <Route path="/brasil" component={Brasil} />
-        <Route path="/mundo" component={Mundo} />
-        <Route path="/economia" component={Economia} />
-        <Route path="/tecnologia" component={Tecnologia} />
-        <Route path="/artigo/:slug" component={Artigo} />
+        {/* Editorias de rota fixa: eram 13 arquivos de página de 3 linhas, hoje
+            saem da tabela que o middleware de SSR também lê (categoryRoutes). */}
+        {FIXED_CATEGORIES.map((c) => (
+          <Route key={c.path} path={c.path}>
+            <CategoryPage category={c.label} slug={c.slug} color={c.color} />
+          </Route>
+        ))}
+        <Route path="/artigo/:slug" component={ArtigoPage} />
         <Route path="/arquivo" component={Archive} />
         <Route path="/contato" component={Contato} />
         <Route path="/privacidade" component={Privacidade} />
         <Route path="/termos" component={Termos} />
-        <Route path="/:slug" component={DynamicCategory} />
+        <Route path="/:slug"><DynamicCategory Page={CategoryPage} /></Route>
         <Route component={NotFound} />
       </Switch>
   );
@@ -352,7 +324,7 @@ function Router() {
    eager de @radix-ui do site: sozinho ele colocava o vendor-radix no
    modulepreload de toda rota pública, onde nenhum tooltip existe. Passou para
    dentro do AdminShell (chunk lazy do painel) — ver PRD-PERF-02. */
-function App({ ssrPath }: { ssrPath?: string } = {}) {
+function App({ ssrPath, pages }: { ssrPath?: string; pages?: SsrPages } = {}) {
   return (
     <QueryClientProvider client={queryClient}>
       <WouterRouter ssrPath={ssrPath} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
@@ -361,7 +333,7 @@ function App({ ssrPath }: { ssrPath?: string } = {}) {
         <LangSync />
         <BrokenImageFallback />
         <SEOHead />
-        <Router />
+        <Router pages={pages} />
         <Suspense fallback={null}><LGPDConsent /></Suspense>
       </WouterRouter>
       <Suspense fallback={null}><Toaster /></Suspense>

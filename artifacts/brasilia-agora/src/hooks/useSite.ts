@@ -222,17 +222,24 @@ export function refreshSite(): void {
 export function useSite() {
   const [settings, setSettings] = useState<SiteSettings | null>(_cache);
   const [loading, setLoading] = useState(_cache === null);
+  /* `settings` pode vir do localStorage (seed do boot, _cacheAt = 0): serve para
+     pintar a identidade certa no 1º quadro, mas NÃO para decidir que algo não
+     existe. Quem responde "esta editoria não está no menu" (DynamicCategory)
+     precisa esperar um payload confirmado — de fetch ou do SSR. */
+  const [validated, setValidated] = useState(_cacheAt > 0);
 
   useEffect(() => {
     const subscriber = (s: SiteSettings) => {
       setSettings(s);
       setLoading(false);
+      setValidated(true);
     };
     _subscribers.add(subscriber);
 
     if (_cache) {
       setSettings(_cache);
       setLoading(false);
+      if (_cacheAt > 0) setValidated(true);
     }
 
     // Fetch if: no in-flight request AND (no cache or cache is stale)
@@ -244,6 +251,7 @@ export function useSite() {
       _fetch.then(() => {
         if (_cache) setSettings(_cache);
         setLoading(false);
+        setValidated(true);
       });
     }
 
@@ -251,5 +259,5 @@ export function useSite() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { settings, loading };
+  return { settings, loading, validated };
 }

@@ -1,5 +1,12 @@
 import { defineConfig, type Plugin } from "vite";
 import { BRAND } from "./src/brand";
+/* Os módulos abaixo são compartilhados com o app de propósito: o middleware de
+   SSR precisa concordar com o App sobre o que é página de editoria e sobre a URL
+   exata de cada lista — divergir aqui é renderizar no servidor uma página que o
+   cliente hidrata diferente. São TS puro, sem React nem browser. */
+import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } from "./src/lib/categoryRoutes";
+import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
+import { classifySsrPath } from "./src/lib/ssrRoutes";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -113,28 +120,70 @@ function metaFromSitePayload(s: Record<string, unknown>): SiteMeta | null {
   };
 }
 
+/** O que o <head> servido precisa carregar. Uma rota, um destes. */
+interface HeadFields {
+  lang: SiteLang;
+  /** Conteúdo do <title> (com o sufixo do portal, quando houver). */
+  title: string;
+  description: string;
+  siteName: string;
+  /** URL absoluta desta página — og:url. */
+  url: string;
+  /** URL absoluta da imagem OG. */
+  image: string;
+  ogType?: "website" | "article";
+  /** og:title/twitter:title quando diferem do <title> (artigo: sem o sufixo). */
+  socialTitle?: string;
+  /** Tags extras injetadas antes de </head> (canonical, article:*). */
+  extraTags?: readonly string[];
+}
+
 /**
- * Reescreve título/descrição/OG/Twitter do index.html buildado com a identidade
- * do blog dono do container (o template traz a marca de quem buildou a imagem).
+ * Reescreve título/descrição/OG/Twitter do index.html buildado. O template traz
+ * a marca de quem buildou a imagem Docker — a mesma imagem serve os 8 blogs —,
+ * então TODO HTML servido passa por aqui.
+ */
+function applyHead(html: string, f: HeadFields): string {
+  const social = f.socialTitle ?? f.title;
+  const out = html
+    .replace(/<html lang="[^"]*"/, `<html lang="${f.lang}"`)
+    .replace(/<title>[^<]*<\/title>/, `<title>${esc(f.title)}</title>`)
+    .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
+    .replace(/(<meta property="og:type" content=")[^"]*(")/, `$1${f.ogType ?? "website"}$2`)
+    .replace(/(<meta property="og:site_name" content=")[^"]*(")/, `$1${esc(f.siteName)}$2`)
+    .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${esc(f.url)}$2`)
+    .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(social)}$2`)
+    .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
+    .replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${esc(f.image)}$2`)
+    .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(social)}$2`)
+    .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
+    .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(f.image)}$2`);
+  const extra = f.extraTags ?? [];
+  if (extra.length === 0) return out;
+  // O `</head>` do template já vem indentado; as tags entram antes dele.
+  return out.replace("</head>", `${extra.join("\n    ")}\n  </head>`);
+}
+
+/**
+ * <head> com a identidade do blog (sem nada específico de rota).
  * `origin` = proto://host da requisição — og:url e og:image precisam ser absolutos.
  */
-function rewriteHeadMeta(html: string, meta: SiteMeta, origin: string, pathOnly: string): string {
-  const title = meta.tagline ? `${meta.siteName} — ${meta.tagline}` : meta.siteName;
-  const desc = meta.seoDescription;
-  const ogImage = `${origin}${meta.ogImagePath}`;
-  const url = `${origin}${pathOnly}`;
-  return html
-    .replace(/<html lang="[^"]*"/, `<html lang="${meta.lang}"`)
-    .replace(/<title>[^<]*<\/title>/, `<title>${esc(title)}</title>`)
-    .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
-    .replace(/(<meta property="og:site_name" content=")[^"]*(")/, `$1${esc(meta.siteName)}$2`)
-    .replace(/(<meta property="og:url" content=")[^"]*(")/, `$1${esc(url)}$2`)
-    .replace(/(<meta property="og:title" content=")[^"]*(")/, `$1${esc(title)}$2`)
-    .replace(/(<meta property="og:description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
-    .replace(/(<meta property="og:image" content=")[^"]*(")/, `$1${esc(ogImage)}$2`)
-    .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(title)}$2`)
-    .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(desc)}$2`)
-    .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(ogImage)}$2`);
+function rewriteHeadMeta(
+  html: string,
+  meta: SiteMeta,
+  origin: string,
+  pathOnly: string,
+  extraTags: readonly string[] = [],
+): string {
+  return applyHead(html, {
+    lang: meta.lang,
+    title: meta.tagline ? `${meta.siteName} — ${meta.tagline}` : meta.siteName,
+    description: meta.seoDescription,
+    siteName: meta.siteName,
+    url: `${origin}${pathOnly}`,
+    image: `${origin}${meta.ogImagePath}`,
+    extraTags,
+  });
 }
 
 function buildOgHtml(params: {
@@ -369,6 +418,8 @@ function isReadRequest(req: IncomingMessage): boolean {
 /* bfcache-friendly (sem no-store) + cache curto: repeat-nav instantâneo e
    restauração back/forward. Conteúdo público, staleness de ~30s aceitável. */
 const HOME_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=60";
+/* Artigo e editoria mudam menos que a home (a home reordena a cada publicação). */
+const PAGE_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=120";
 
 function sendHtml(res: ServerResponse, html: string, cacheControl: string): void {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -378,26 +429,52 @@ function sendHtml(res: ServerResponse, html: string, cacheControl: string): void
 }
 
 /**
- * ssrHomePlugin — SSR da home (apenas `/`) no servidor de preview (produção).
- * Renderiza o App no servidor (usando o bundle dist/server/entry-server.js gerado
- * por `vite build --ssr`), injeta o HTML no #root do template buildado e serializa
- * os dados em window.__SSR_DATA__. Assim o hero já vem pintado no HTML (LCP cedo)
- * e o cliente hidrata sem refazer o trabalho. Demais rotas → next() (SPA client).
+ * ssrPlugin — SSR de home, artigo e editoria no servidor de preview (produção).
+ * Renderiza o App no servidor (bundle dist/server/entry-server.js gerado por
+ * `vite build --ssr`), injeta o HTML no #root do template buildado e serializa os
+ * dados em window.__SSR_DATA__. Assim a imagem do topo já vem pintada no HTML
+ * (LCP cedo) e o cliente hidrata sem refazer o trabalho. Toda falha (API fora,
+ * artigo inexistente, exceção no render) → next(): cai no spaHeadPlugin e o
+ * visitante recebe a SPA de sempre, nunca um 500.
  * Só em preview (produção); o dev (`vite`) segue client-only.
  */
-function ssrHomePlugin(apiBase: string): Plugin {
+function ssrPlugin(apiBase: string): Plugin {
   const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
   const ssrEntry = path.resolve(import.meta.dirname, "dist/server/entry-server.js");
   let template: string | null = null;
   let renderFn: ((url: string, data: unknown) => string) | null = null;
 
-  /* Cache em memória do HTML já renderizado. Sem ele, CADA request a `/` paga
-     3 fetches de API + renderToString + serialize como TTFB — o que infla FCP e
-     LCP em TODA medição (PageSpeed recarrega a home várias vezes). A home não é
-     personalizada (mesmos articles/site/ads para todos), então servir um HTML
-     com até ~30s de idade é seguro e derruba o TTFB para ~0 nos hits seguintes. */
-  const HTML_TTL_MS = 30_000;
-  let htmlCache: { html: string; at: number } | null = null;
+  /* Cache em memória do HTML já renderizado. Sem ele, CADA request paga fetches
+     de API + renderToString + serialize como TTFB — o que infla FCP e LCP em TODA
+     medição (o PageSpeed recarrega a página várias vezes). Nada aqui é
+     personalizado (mesmos articles/site/ads para todos), então servir um HTML com
+     algumas dezenas de segundos de idade é seguro e derruba o TTFB para ~0 nos
+     hits seguintes.
+     A home era uma variável única; com artigo e editoria vira dicionário — e o
+     container `web` tem mem_limit de 768m. Daí o teto de entradas + LRU. */
+  const HOME_TTL_MS = 30_000;
+  const PAGE_TTL_MS = 60_000;
+  const CACHE_MAX_ENTRIES = 200;
+  const htmlCache = new Map<string, { html: string; at: number; ttl: number }>();
+
+  function cacheGet(key: string): string | null {
+    const hit = htmlCache.get(key);
+    if (!hit) return null;
+    if (Date.now() - hit.at >= hit.ttl) { htmlCache.delete(key); return null; }
+    htmlCache.delete(key); // reinsere no fim: Map itera por ordem de inserção
+    htmlCache.set(key, hit);
+    return hit.html;
+  }
+
+  function cacheSet(key: string, html: string, ttl: number): void {
+    htmlCache.delete(key);
+    htmlCache.set(key, { html, at: Date.now(), ttl });
+    while (htmlCache.size > CACHE_MAX_ENTRIES) {
+      const oldest = htmlCache.keys().next().value;
+      if (oldest === undefined) break;
+      htmlCache.delete(oldest);
+    }
+  }
 
   async function fetchJson(u: string): Promise<unknown> {
     try {
@@ -408,146 +485,293 @@ function ssrHomePlugin(apiBase: string): Plugin {
     }
   }
 
-  async function handleHome(
+  type Row = Record<string, unknown>;
+
+  /** Uma página de /api/articles, já sem os campos que o site não usa. */
+  async function fetchList(query: string): Promise<{ articles: Row[]; total: number }> {
+    const raw = (await fetchJson(`${apiBase}${query}`)) as { articles?: unknown[]; total?: number } | null;
+    const rows = Array.isArray(raw?.articles) ? (raw.articles as Row[]) : [];
+    const articles = rows.map((a) => { const copy = { ...a }; delete copy["keywords"]; return copy; });
+    return { articles, total: typeof raw?.total === "number" ? raw.total : articles.length };
+  }
+
+  /** Carrega o bundle de SSR e o template uma única vez por processo. */
+  async function ensureRuntime(): Promise<(url: string, data: unknown) => string> {
+    if (!renderFn) {
+      const mod = (await import(pathToFileURL(ssrEntry).href)) as {
+        render: (url: string, data: unknown) => string;
+      };
+      renderFn = mod.render;
+    }
+    if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
+    return renderFn;
+  }
+
+  /**
+   * Monta o documento final: #root preenchido, __SSR_DATA__ no fim do body e o
+   * <head> do blog.
+   *
+   * O JSON vai para o FIM do body, logo depois do #root — não no topo do <head>.
+   * Medido em produção (2026-07-28): eram 62.287 chars ANTES do <link> do CSS
+   * render-blocking, dos modulepreload e de todo o markup do SSR, num documento de
+   * 176 KB. Na banda do Lighthouse mobile (1,6 Mbps) isso são ~310 ms de atraso
+   * puro empurrando o FCP. Ler daqui é seguro porque o entry é
+   * <script type="module">, que é deferred por definição: só executa quando o
+   * parse termina, e a esta altura o script clássico do <head> já rodou.
+   * O que NÃO pode descer é o SINAL de "esta rota tem SSR": o boot inline do
+   * index.html roda no <head> e precisa dele para NÃO disparar o prefetch e o
+   * preload de LCP (que o SSR já dispensa). Daí os 26 B de __SSR__ no topo.
+   * Os dois replaces são amarrados de propósito: se a âncora do #root não casar,
+   * o SSR não entrou e o marcador também não deve entrar — senão o boot se
+   * calaria numa página que precisa dele.
+   */
+  function compose(appHtml: string, data: unknown, head: (html: string) => string): string {
+    const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
+    const withRoot = template!.replace(
+      '<div id="root"></div>',
+      `<div id="root">${appHtml}</div>\n    <script>window.__SSR_DATA__=${serialized}</script>`,
+    );
+    const html =
+      withRoot === template
+        ? withRoot
+        : withRoot.replace("<head>", `<head>\n    <script>window.__SSR__=1</script>`);
+    return head(html);
+  }
+
+  /** <head> quando o /api/site não deu nem o nome do portal: só o idioma. */
+  function langOnly(html: string, site: Row | null): string {
+    const lang = site?.["siteLanguage"] === "en" ? "en" : "pt-BR";
+    return html.replace(/<html lang="[^"]*"/, `<html lang="${lang}"`);
+  }
+
+  async function renderHome(origin: string): Promise<string | null> {
+    const render = await ensureRuntime();
+    const [a, s, d] = (await Promise.all([
+      // Pool de origem do SSR: 300 recentes bastam para os 22 blocos + o
+      // complemento por categoria abaixo (a rota é paginada — PRD-PERF-01).
+      fetchList("/api/articles?limit=300&offset=0&sort=recent"),
+      fetchJson(`${apiBase}/api/site`),
+      fetchJson(`${apiBase}/api/ads`),
+    ])) as [{ articles: Row[] }, unknown, { ads?: unknown[] } | null];
+
+    /* O /api/site publica os campos de imagem como URLs pequenas
+       (/api/site-asset/…) em vez de data URI — o __SSR_DATA__ pode levar as
+       settings inteiras sem inchar o HTML, e o header/rodapé do SSR já saem
+       com a logo certa (sem flash da marca default na hidratação). */
+    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
+       para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
+       inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
+       recentes — cobrem as seções quentes sem perda visível.
+       MEDIDO em produção (2026-07-28): 511 B por artigo no __SSR_DATA__. Subir
+       para 150 (como o PRD-PERF-01 previa) engordou o documento da home em
+       16,5 KB e o __SSR_DATA__ foi de 70.923 B para 86.921 B — o oposto do
+       objetivo. As editorias de baixo volume são cobertas pelo pool por
+       categoria abaixo, não pelo tamanho deste corte. */
+    const articles = a.articles
+      .slice()
+      .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime())
+      .slice(0, 100);
+    /* O corte acima é só "mais recentes": editoria de baixo volume (ex.: NFL,
+       e-sports) cujos artigos saíram do top-N sumia da home no público e
+       virava "EXEMPLO" no preview do admin. Completa o pool com até 8 artigos
+       por categoria referenciada pelos blocos visíveis.
+       A busca é POR CATEGORIA na API (e não uma varredura da lista-base):
+       desde o PRD-PERF-01 a lista vem paginada, então uma editoria sem nada
+       nos 300 recentes não seria alcançada por varredura. O filtro `category`
+       da rota é igualdade exata + fallback por tag — a MESMA regra do
+       getArticles da Home. */
+    const homeBlocks = site?.["homeBlocks"];
+    if (Array.isArray(homeBlocks)) {
+      const cats = new Set<string>();
+      for (const b of homeBlocks) {
+        if (!b || typeof b !== "object") continue;
+        const blk = b as Row;
+        if (blk["visible"] === false) continue;
+        const cat = typeof blk["category"] === "string" ? blk["category"].trim().toLowerCase() : "";
+        if (cat) cats.add(cat);
+      }
+      const pools = await Promise.all([...cats].map((cat) => fetchList(
+        `/api/articles?limit=8&offset=0&category=${encodeURIComponent(cat)}&sort=recent`,
+      )));
+      const have = new Set(articles.map((art) => String(art["id"])));
+      for (const pool of pools) {
+        for (const raw of pool.articles) {
+          const id = String(raw["id"]);
+          if (have.has(id)) continue;
+          have.add(id);
+          articles.push(raw);
+        }
+      }
+    }
+
+    const data = { articles, site, ads: d?.ads ?? [], origin };
+    const meta = site ? metaFromSitePayload(site) : null;
+    return compose(render("/", data), data, (html) =>
+      meta
+        ? rewriteHeadMeta(html, meta, origin, "/", [`<link rel="canonical" href="${esc(`${origin}/`)}">`])
+        : langOnly(html, site));
+  }
+
+  async function renderArticle(slug: string, origin: string): Promise<string | null> {
+    const render = await ensureRuntime();
+    const [detail, list, s, d] = (await Promise.all([
+      // Slug CRU, exatamente como o useArticle do cliente pede.
+      fetchJson(`${apiBase}/api/articles/${slug}`),
+      fetchList(articlesUrl({ limit: ARTICLES_TICKER_LIMIT, offset: 0, sort: "recent" })),
+      fetchJson(`${apiBase}/api/site`),
+      fetchJson(`${apiBase}/api/ads`),
+    ])) as [{ article?: Row } | null, { articles: Row[] }, unknown, { ads?: unknown[] } | null];
+
+    const article = detail?.article;
+    // Artigo inexistente/despublicado → SPA (que mostra "notícia não encontrada").
+    if (!article || typeof article["title"] !== "string") return null;
+
+    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    const data = {
+      articles: list.articles,
+      site,
+      ads: d?.ads ?? [],
+      origin,
+      article: { key: slug, article },
+    };
+
+    const meta = site ? metaFromSitePayload(site) : null;
+    const url = `${origin}/artigo/${String(article["slug"] ?? article["id"] ?? slug)}`;
+    return compose(render(`/artigo/${slug}`, data), data, (html) => {
+      if (!meta) return langOnly(html, site);
+      const title = stripHtml(String(article["title"] ?? ""));
+      // Mesmos recortes do <head> que a página aplica no cliente (Artigo.tsx):
+      // servidor e cliente não podem anunciar títulos diferentes.
+      const description = (stripHtml(String(article["subtitle"] ?? "")) || title).slice(0, 160);
+      const rawImage = typeof article["imageUrl"] === "string" ? article["imageUrl"] : "";
+      const image = rawImage.startsWith("http")
+        ? rawImage
+        : rawImage
+          ? `${origin}${rawImage.startsWith("/") ? rawImage : `/${rawImage}`}`
+          : `${origin}${meta.ogImagePath}`;
+      const canonical = typeof article["canonicalUrl"] === "string" && article["canonicalUrl"]
+        ? article["canonicalUrl"]
+        : url;
+      const extraTags = [`<link rel="canonical" href="${esc(canonical)}">`];
+      const publishedAt = String(article["publishedAt"] ?? "");
+      if (publishedAt) {
+        const iso = new Date(publishedAt);
+        if (!Number.isNaN(iso.getTime())) {
+          extraTags.push(`<meta property="article:published_time" content="${esc(iso.toISOString())}">`);
+        }
+      }
+      const section = String(article["category"] ?? "");
+      if (section) extraTags.push(`<meta property="article:section" content="${esc(section)}">`);
+      return applyHead(html, {
+        lang: meta.lang,
+        title: `${title} — ${meta.siteName}`,
+        socialTitle: title,
+        description,
+        siteName: meta.siteName,
+        url,
+        image,
+        ogType: "article",
+        extraTags,
+      });
+    });
+  }
+
+  async function renderCategory(pathOnly: string, origin: string): Promise<string | null> {
+    const render = await ensureRuntime();
+    // O /api/site vem ANTES do resto: sem ele não dá para saber se este slug é
+    // editoria, e buscar as listas de um path qualquer daria a bots um jeito
+    // barato de multiplicar consultas.
+    const s = await fetchJson(`${apiBase}/api/site`);
+    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    const route = resolveCategoryRoute(pathOnly, site?.["menuItems"] as MenuItemLike[] | undefined);
+    if (!route) return null;
+
+    const [list, top, recent, d] = (await Promise.all([
+      fetchList(articlesUrl({ category: route.slug, limit: ARTICLES_CATEGORY_LIMIT, sort: "recent" })),
+      // "Mais lidas" da sidebar é do SITE INTEIRO, não da editoria.
+      fetchList(articlesUrl({ limit: 5, sort: "views" })),
+      // Lista curta que o chrome (TopBar) lê via useArticles em rota não-home.
+      fetchList(articlesUrl({ limit: ARTICLES_TICKER_LIMIT, offset: 0, sort: "recent" })),
+      fetchJson(`${apiBase}/api/ads`),
+    ])) as [{ articles: Row[]; total: number }, { articles: Row[] }, { articles: Row[] }, { ads?: unknown[] } | null];
+
+    const data = {
+      articles: recent.articles,
+      site,
+      ads: d?.ads ?? [],
+      origin,
+      category: {
+        slug: route.slug,
+        articles: list.articles,
+        total: list.total,
+        mostRead: top.articles.map((a) => ({
+          id: String(a["id"]), slug: String(a["slug"] ?? a["id"]), title: String(a["title"] ?? ""),
+        })),
+      },
+    };
+
+    const meta = site ? metaFromSitePayload(site) : null;
+    return compose(render(route.path, data), data, (html) =>
+      meta
+        ? applyHead(html, {
+            lang: meta.lang,
+            title: categoryTitle(route.label, meta.siteName),
+            description: meta.seoDescription,
+            siteName: meta.siteName,
+            url: `${origin}${route.path}`,
+            image: `${origin}${meta.ogImagePath}`,
+            extraTags: [`<link rel="canonical" href="${esc(`${origin}${route.path}`)}">`],
+          })
+        : langOnly(html, site));
+  }
+
+  async function handleSsr(
     req: IncomingMessage,
     res: ServerResponse,
     next: () => void,
   ): Promise<void> {
-    const pathOnly = (req.url ?? "").split("?")[0];
-    if (!isReadRequest(req) || (pathOnly !== "/" && pathOnly !== "/index.html")) {
+    const pathOnly = (req.url ?? "").split("?")[0] ?? "";
+    const route = isReadRequest(req) ? classifySsrPath(pathOnly) : null;
+    if (!route) {
       next();
       return;
     }
-    // Hit do cache TTL → responde na hora, sem fetch/render (TTFB ~0).
-    const now = Date.now();
-    if (htmlCache && now - htmlCache.at < HTML_TTL_MS) {
-      sendHtml(res, htmlCache.html, HOME_CACHE_CONTROL);
+    const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+    const host = req.headers.host ?? BRAND.domain;
+    // O host entra na chave: og:url e canonical são absolutos, e um blog
+    // alcançável por dois nomes não pode receber o HTML do outro.
+    const cacheKey = `${host}|${route.key}`;
+    const ttl = route.kind === "home" ? HOME_TTL_MS : PAGE_TTL_MS;
+    const cacheControl = route.kind === "home" ? HOME_CACHE_CONTROL : PAGE_CACHE_CONTROL;
+
+    const cached = cacheGet(cacheKey);
+    if (cached !== null) {
+      sendHtml(res, cached, cacheControl);
       return;
     }
     try {
-      if (!renderFn) {
-        const mod = (await import(pathToFileURL(ssrEntry).href)) as {
-          render: (url: string, data: unknown) => string;
-        };
-        renderFn = mod.render;
+      const origin = `${proto}://${host}`;
+      const html =
+        route.kind === "home" ? await renderHome(origin)
+        : route.kind === "article" ? await renderArticle(route.slug, origin)
+        : await renderCategory(pathOnly, origin);
+      if (html === null) {
+        next();
+        return;
       }
-      if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
-
-      const [a, s, d] = (await Promise.all([
-        // Pool de origem do SSR: 300 recentes bastam para os 22 blocos + o
-        // complemento por categoria abaixo (a rota é paginada — PRD-PERF-01).
-        fetchJson(`${apiBase}/api/articles?limit=300&offset=0&sort=recent`),
-        fetchJson(`${apiBase}/api/site`),
-        fetchJson(`${apiBase}/api/ads`),
-      ])) as [{ articles?: unknown[] } | null, unknown, { ads?: unknown[] } | null];
-
-      /* O /api/site publica os campos de imagem como URLs pequenas
-         (/api/site-asset/…) em vez de data URI — o __SSR_DATA__ pode levar as
-         settings inteiras sem inchar o HTML, e o header/rodapé do SSR já saem
-         com a logo certa (sem flash da marca default na hidratação). */
-      const site: Record<string, unknown> | null =
-        (s && typeof s === "object") ? { ...(s as Record<string, unknown>) } : null;
-      /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
-         para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
-         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
-         recentes — cobrem as seções quentes sem perda visível.
-         MEDIDO em produção (2026-07-28): 511 B por artigo no __SSR_DATA__. Subir
-         para 150 (como o PRD-PERF-01 previa) engordou o documento da home em
-         16,5 KB e o __SSR_DATA__ foi de 70.923 B para 86.921 B — o oposto do
-         objetivo. As editorias de baixo volume são cobertas pelo pool por
-         categoria abaixo, não pelo tamanho deste corte. */
-      const rawArticles = (a && Array.isArray(a.articles)) ? (a.articles as Array<Record<string, unknown>>) : [];
-      const sorted = rawArticles
-        .map((art) => { const copy = { ...art }; delete copy["keywords"]; return copy; })
-        .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime());
-      const articles = sorted.slice(0, 100);
-      /* O corte acima é só "mais recentes": editoria de baixo volume (ex.: NFL,
-         e-sports) cujos artigos saíram do top-N sumia da home no público e
-         virava "EXEMPLO" no preview do admin. Completa o pool com até 8 artigos
-         por categoria referenciada pelos blocos visíveis.
-         A busca é POR CATEGORIA na API (e não uma varredura da lista-base):
-         desde o PRD-PERF-01 a lista vem paginada, então uma editoria sem nada
-         nos 300 recentes não seria alcançada por varredura. O filtro `category`
-         da rota é igualdade exata + fallback por tag — a MESMA regra do
-         getArticles da Home. */
-      const homeBlocks = site?.["homeBlocks"];
-      if (Array.isArray(homeBlocks)) {
-        const cats = new Set<string>();
-        for (const b of homeBlocks) {
-          if (!b || typeof b !== "object") continue;
-          const blk = b as Record<string, unknown>;
-          if (blk["visible"] === false) continue;
-          const cat = typeof blk["category"] === "string" ? blk["category"].trim().toLowerCase() : "";
-          if (cat) cats.add(cat);
-        }
-        const pools = (await Promise.all([...cats].map((cat) => fetchJson(
-          `${apiBase}/api/articles?limit=8&offset=0&category=${encodeURIComponent(cat)}&sort=recent`,
-        )))) as Array<{ articles?: unknown[] } | null>;
-        const have = new Set(articles.map((art) => String(art["id"])));
-        for (const pool of pools) {
-          if (!pool || !Array.isArray(pool.articles)) continue;
-          for (const raw of pool.articles as Array<Record<string, unknown>>) {
-            const id = String(raw["id"]);
-            if (have.has(id)) continue;
-            have.add(id);
-            const copy = { ...raw };
-            delete copy["keywords"];
-            articles.push(copy);
-          }
-        }
-      }
-
-      const data = { articles, site, ads: d?.ads ?? [] };
-
-      const appHtml = renderFn("/", data);
-      const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
-      /* O JSON vai para o FIM do body, logo depois do #root — não mais no topo do
-         <head>. Medido em produção (2026-07-28): eram 62.287 chars ANTES do <link>
-         do CSS render-blocking, dos modulepreload e de todo o markup do SSR, num
-         documento de 176 KB. Na banda do Lighthouse mobile (1,6 Mbps) isso são
-         ~310 ms de atraso puro empurrando o FCP. Ler daqui é seguro porque o entry
-         é <script type="module">, que é deferred por definição: só executa quando o
-         parse termina, e a esta altura o script clássico acima já rodou.
-         O que NÃO pode descer é o SINAL de "esta home tem SSR": o boot inline do
-         index.html roda no <head> e precisa dele para NÃO disparar o prefetch e o
-         preload de LCP (que o SSR já dispensa). Daí os 26 B de __SSR__ no topo.
-         Os dois replaces são amarrados de propósito: se a âncora do #root não
-         casar, o SSR não entrou e o marcador também não deve entrar — senão o boot
-         se calaria numa página que precisa dele. */
-      const withRoot = template.replace(
-        '<div id="root"></div>',
-        `<div id="root">${appHtml}</div>\n    <script>window.__SSR_DATA__=${serialized}</script>`,
-      );
-      let html =
-        withRoot === template
-          ? withRoot
-          : withRoot.replace("<head>", `<head>\n    <script>window.__SSR__=1</script>`);
-      // Título/descrição/OG do template são do blog que buildou a imagem
-      // compartilhada — reescreve com a identidade DESTE blog (o crawler do
-      // WhatsApp/Facebook lê a home daqui; sem isso o preview sai com a marca
-      // errada). Também ajusta <html lang> e og:url/og:image absolutos.
-      const meta = site ? metaFromSitePayload(site) : null;
-      if (meta) {
-        const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
-        const host = req.headers.host ?? BRAND.domain;
-        html = rewriteHeadMeta(html, meta, `${proto}://${host}`, "/");
-      } else {
-        const lang = site?.["siteLanguage"] === "en" ? "en" : "pt-BR";
-        html = html.replace(/<html lang="[^"]*"/, `<html lang="${lang}"`);
-      }
-
-      htmlCache = { html, at: now };
-      sendHtml(res, html, HOME_CACHE_CONTROL);
+      cacheSet(cacheKey, html, ttl);
+      sendHtml(res, html, cacheControl);
     } catch {
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
     }
   }
 
   return {
-    name: "ssr-home",
+    name: "ssr-routes",
     configurePreviewServer(server) {
       server.middlewares.use((req, res, next) => {
-        void handleHome(req, res, next);
+        void handleSsr(req, res, next);
       });
     },
   };
@@ -559,8 +783,10 @@ function ssrHomePlugin(apiBase: string): Plugin {
  * index.html buildado, cujo título/OG são do blog que gerou a imagem Docker
  * compartilhada — link compartilhado dessas páginas mostrava a marca errada.
  * Serve o mesmo index.html com o head reescrito pela identidade do blog
- * (API própria, cache de 5min). Registrar DEPOIS do ssrHomePlugin: a home
- * continua com SSR completo; aqui só passa o resto. Falha → index.html cru.
+ * (API própria, cache de 5min). Registrar DEPOIS do ssrPlugin: home, artigo e
+ * editoria saem renderizados de lá; aqui só passa o resto — e tudo o que o SSR
+ * recusou (artigo inexistente, slug que não é editoria, API fora).
+ * Falha → index.html cru.
  */
 function spaHeadPlugin(apiBase: string): Plugin {
   const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
@@ -655,21 +881,6 @@ const SEO_TEXT_STRINGS = {
   },
 } as const;
 
-/**
- * "POLÍTICA" -> "Política", "WORLD CUP" -> "World Cup", "E-SPORTS" -> "E-Sports";
- * rótulos que já têm minúsculas são respeitados. Os menuItems vêm em caixa alta
- * por decisão de layout do cabeçalho — em texto corrido isso vira grito.
- * Sigla = rótulo de UMA palavra com até 3 caracteres (NFL, F1, TV): fica intacto.
- * A regra é a palavra isolada, e não o tamanho do token, senão o "CUP" de
- * "WORLD CUP" também passaria por sigla ("World CUP").
- */
-function smartCase(label: string): string {
-  const s = label.trim();
-  if (s !== s.toUpperCase()) return s;
-  if (s.length <= 3 && !/[\s-]/.test(s)) return s;
-  return s.replace(/[^\s-]+/g, (w) => w.charAt(0) + w.slice(1).toLocaleLowerCase());
-}
-
 /** Extrai as seções internas e visíveis do menu (submenu de 1 nível achatado). */
 function seoLinksFromSite(site: Record<string, unknown>): SeoLink[] {
   const out: SeoLink[] = [];
@@ -754,7 +965,7 @@ function buildRobotsTxt(origin: string): string {
  * Agora saem das settings via /api/site, com cache de 1 h por (host, path).
  * O robots.txt não depende da API (só do Host), então continua correto mesmo
  * com a `api` do blog fora; o llms.txt cai para o estático neutro de `public/`.
- * Registrar antes do ssrHomePlugin: paths com extensão nunca chegam nele, mas a
+ * Registrar antes do ssrPlugin: paths com extensão nunca chegam nele, mas a
  * ordem explícita evita surpresa.
  */
 function seoTextPlugin(apiBase: string): Plugin {
@@ -821,7 +1032,7 @@ export default defineConfig({
     staticCachePlugin(),
     socialOgPlugin(process.env.API_URL ?? "http://localhost:8080"),
     seoTextPlugin(process.env.API_URL ?? "http://localhost:8080"),
-    ssrHomePlugin(process.env.API_URL ?? "http://localhost:8080"),
+    ssrPlugin(process.env.API_URL ?? "http://localhost:8080"),
     spaHeadPlugin(process.env.API_URL ?? "http://localhost:8080"),
     react(),
     tailwindcss(),
