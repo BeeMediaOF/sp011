@@ -6,9 +6,9 @@
 
 ## Fase atual
 
-**FASE 3 — EXECUÇÃO, ONDA 1.** Planejamento (Fases 0, 1, 1.5 e 2) entregue.
-**PRD-PERF-01 implementado** (2026-07-28) — código commitado, aguardando deploy
-na VPS e medição do "depois". Baseline do "antes" em `baseline-prd01.txt`.
+**FASE 3 — EXECUÇÃO. Onda 1 ENCERRADA** (2026-07-28): PRD-01, PRD-02 e PRD-06
+concluídos, validados em produção e propagados aos 8 blogs. Próximo: **onda 2**
+(PRD-04 e PRD-03, nesta ordem — ver "Leitura do Lighthouse" abaixo).
 
 ## Artefatos concluídos
 
@@ -388,12 +388,15 @@ Antes, os oito serviam `# SBC Agora` e `Sitemap: brasilia-agora.replit.app`.
 | — e o `robots.txt` continua íntegro | (não previsto no PRD) | os 2 `Sitemap:` presentes | ✅ |
 | `Content-Type` / `Cache-Control` | `text/plain; charset=utf-8` / `max-age=3600` | idem, em GET **e** HEAD | ✅ |
 | `typecheck` | verde | verde (pacote + `vite.config.ts` à parte) | ✅ |
-| Lighthouse: Agentic Browsing 3/3, SEO 100, BP 100 | sim | **não medido** | ⏳ |
+| Lighthouse: Agentic Browsing | 3/3 | **3/3** (era 2/3) | ✅ |
+| Lighthouse: SEO | 100, sem regressão pelo `Disallow: /admin` | **100** | ✅ |
+| Lighthouse: Best Practices | 100 | **96** | ⚠️ |
 
-**O ⏳ é honesto:** o Lighthouse não foi executado nesta sessão. O que se
-verificou foi a *conformidade de formato* que o audit cobra (título `#`, resumo
-`>`, links markdown com URL absoluta, recursos declarados) e a correção do
-`Sitemap:` morto. A nota 3/3 em si segue por confirmar.
+Lighthouse rodado pelo dono em `ksports.midia.run` logo após o deploy
+(ver seção abaixo). O **Agentic Browsing foi de 2/3 para 3/3** — era a métrica
+título do PRD — e o `Disallow: /admin`, que era o risco declarado, **não**
+derrubou o SEO. O Best Practices em 96 (o DoD pede 100) não tem causa conhecida
+ainda e não é atribuível a este PRD; entra como item aberto.
 
 ### Achado de conteúdo (não é código)
 
@@ -414,11 +417,82 @@ código); propaga em até 1 h pelo cache do plugin.
 Os três PRDs da onda 1 (01, 02 e 06) estão concluídos e validados em produção,
 com a imagem propagada aos 8 blogs.
 
+## Lighthouse em produção — ksports, 2026-07-28 (fim da onda 1)
+
+Rodado pelo dono em `https://ksports.midia.run/` logo após o deploy da onda 1.
+**É o novo ponto de referência da auditoria** — o Lighthouse do prompt mestre
+nunca foi reproduzido (§1.0 do `01-diagnostico.md`).
+
+| Categoria | Agora | DoD | |
+|---|---:|---:|:--:|
+| Performance (mobile) | **47** | ≥ 75 | ❌ |
+| Accessibility | **93** | ≥ 93 | ✅ (no limite) |
+| Best Practices | **96** | 100 | ⚠️ |
+| SEO | **100** | 100 | ✅ |
+| **Agentic Browsing** | **3/3** | 3/3 | ✅ |
+| CLS | **0** | 0 | ✅ |
+
+| Métrica | Agora | Referência do prompt mestre |
+|---|---:|---:|
+| FCP | 5,1 s | 6,4 s |
+| LCP | 9,2 s | 17,0 s |
+| Speed Index | 7,9 s | 14,1 s |
+| TBT | 450 ms | 500 ms |
+| Main-thread work | 7,8 s | 7,4 s |
+| JS execution time | 3,2 s | 3,1 s |
+| Unused CSS | **246 KiB** | **246 KiB** |
+| Unused JS | 63 KiB | 117 KiB |
+| Minify JS | 47 KiB | 66 KiB |
+| Image delivery | 411 KiB | 2.360 KiB |
+| Long tasks | 20 | 20 |
+
+**Três ressalvas antes de ler esses números como progresso:**
+
+1. **Blog diferente.** Toda a auditoria (inventário, diagnóstico, baselines,
+   medições dos PRDs 01/02) foi feita em `sp011.com.br`. Este Lighthouse é do
+   `ksports.midia.run`, que tem outro acervo, outras imagens e outro template.
+   A coluna "referência do prompt mestre" é **indicativa, não comparável**.
+2. **A própria execução avisou que está incompleta:** *"The page loaded too
+   slowly to finish within the time limit. Results may be incomplete."*
+3. **A VPS estava ocupada.** A medição saiu logo depois de `docker compose
+   build api web` + recriação de containers de 8 blogs, com o `ollama`
+   segurando ~13 GB. TTFB alto sob essa carga explica parte do FCP/Speed Index
+   — coerente com o insight "Document request latency". Uma nova execução com a
+   máquina ociosa é necessária antes de tratar 47 como o número real.
+
+**O que os dados dizem, apesar das ressalvas:**
+
+- **`Unused CSS` continua exatamente 246 KiB** — nenhum dos PRDs da onda 1
+  tocou nisso, e é a maior massa isolada que sobrou. Junto com
+  `Render-blocking requests — 2.150 ms`, aponta direto para o **PRD-04**.
+- `Unused JS` caiu de 117 para 63 KiB e `Minify JS` de 66 para 47 KiB —
+  consistente com o que o PRD-02 tirou do caminho crítico.
+- **Main-thread 7,8 s, JS execution 3,2 s e 20 long tasks praticamente não se
+  mexeram.** É esperado: o PRD-02 removeu *download e parse* de 458 KB, não
+  *execução*. Quem ataca execução é o PRD-05 (SSR das demais rotas) e a
+  redução de DOM ("Optimize DOM size" aparece nos insights).
+- `Image delivery` em 411 KiB é o escopo restante do **PRD-03**.
+- `Image elements do not have explicit width and height` **com CLS = 0**:
+  não está causando layout shift hoje, mas é fragilidade — o `LazyImage.tsx`
+  existe e nenhum bloco da home o usa (§8.6 do `ROADMAP.md`).
+
+### Onda 2, reordenada por este Lighthouse
+
+O `ROADMAP.md` colocava 03 e 04 na mesma onda sem ordem entre eles. Os dados
+desempatam: **PRD-04 primeiro** (2.150 ms de render-blocking + 246 KiB de CSS
+não usado, a maior economia isolada do relatório), **PRD-03 depois** (411 KiB
+de imagem). O 04 também é o que mais aproxima o FCP do alvo, e o FCP é o que
+ficou 84 ms fora do critério no PRD-02.
+
 ## Próxima ação
 
-1. **Onda 2: PRD-PERF-03** (imagens de identidade) e **PRD-PERF-04** (CSS
-   render-blocking, depende do 02, que já fechou).
-2. Levar junto as duas correções agendadas, ambas no serviço `web`:
+1. **Rodar o Lighthouse de novo com a VPS ociosa**, em `sp011.com.br` **e**
+   `ksports.midia.run`, para ter um número confiável antes de abrir a onda 2.
+2. **PRD-PERF-04** (CSS render-blocking) e, na sequência, **PRD-PERF-03**
+   (imagens de identidade).
+3. Investigar o **Best Practices 96** (o DoD pede 100) — causa desconhecida,
+   não atribuível a nenhum PRD da onda 1.
+4. Levar junto as duas correções agendadas, ambas no serviço `web`:
    - `pages/Artigo.tsx:176` — `BRAND.titleSuffix` ("SBC Agora") no
      `document.title` de toda página de artigo dos 8 blogs (ver acima);
    - `ssrHomePlugin` e `spaHeadPlugin` só tratam `GET` — um **HEAD** em `/` ou
