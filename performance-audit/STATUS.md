@@ -272,7 +272,7 @@ correta.
 | JS transfer na home | ≤ 200 KB | 208 KB | ⚠️ |
 | Soma das long tasks na home | ≤ 700 ms | 746–1.597 ms | ⚠️ |
 | FCP na home | ≤ 2.200 ms | 2.284 ms | ⚠️ |
-| Gráficos do admin desenham | sim | verificar no painel | ⏳ |
+| Gráficos do admin desenham | sim | sim (conferido no painel) | ✅ |
 | `typecheck` + `test` | verdes | 52 testes verdes | ✅ |
 
 Leitura honesta dos ⚠️:
@@ -352,11 +352,24 @@ dentro do hook ganha do estático. `BASE_PATH` é `/` em produção
 
 1. **Deploy do PRD-06** (`docker compose build web && up -d web`) e verificação
    por `curl` nos 4 domínios + caminho de falha com a `api` parada.
-2. Rollout de imagem para os 8 blogs (bump já feito no build do PRD-02 + canário
-   `resenhavip`), CLAUDE.md §6 — **pendente desde o PRD-02**.
-3. Conferir no painel que Dashboard e Analytics desenham os gráficos —
-   **pendente desde o PRD-02**, é o único critério que `curl` não verifica.
-4. Fechado o 06, a **onda 1 acaba**; começa a onda 2 (PRD-03 e PRD-04).
+2. Fechado o 06, a **onda 1 acaba**; começa a onda 2 (PRD-03 e PRD-04).
+
+O rollout do PRD-02 aos 8 blogs foi concluído em 2026-07-28: `vendor-charts: 0`
+no HTML público de ksports, esporteagora, oleysports, beeesportes e resenhavip,
+cada um devolvendo o próprio `siteName`. Os gráficos do painel (Pageviews,
+Tráfego ao longo do tempo, Dispositivos, Pico por hora, Pico por dia) foram
+conferidos desenhando — o `vendor-charts` continua chegando sob demanda no admin.
+
+### Achado fora de escopo (2026-07-28)
+
+`pages/Artigo.tsx:176` escreve `document.title = \`${title} — ${BRAND.titleSuffix}\``
+e `BRAND.titleSuffix` é a constante `"SBC Agora"`, embutida na imagem
+compartilhada. Resultado: a aba do navegador de **toda página de artigo dos 8
+blogs** diz "SBC Agora", e o Analytics grava o título assim (visível no card
+"Artigos com melhor desempenho" do KSports). É a mesma violação do CLAUDE.md §13
+que o PRD-06 corrigiu no `llms.txt`; o `SEOHead` da home já usa
+`settings.siteName` corretamente. Correção de uma linha, serviço `web`, mas fora
+do escopo do PRD-06 — decisão do dono sobre quando entra.
 
 ## Regras válidas para a Fase 3
 
