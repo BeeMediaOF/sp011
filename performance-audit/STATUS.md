@@ -369,7 +369,13 @@ blogs** diz "SBC Agora", e o Analytics grava o título assim (visível no card
 "Artigos com melhor desempenho" do KSports). É a mesma violação do CLAUDE.md §13
 que o PRD-06 corrigiu no `llms.txt`; o `SEOHead` da home já usa
 `settings.siteName` corretamente. Correção de uma linha, serviço `web`, mas fora
-do escopo do PRD-06 — decisão do dono sobre quando entra.
+do escopo do PRD-06.
+
+**Decidido em 2026-07-28:** o PRD-06 fecha limpo, sem esta correção; ela entra no
+**próximo PRD** (onda 2). Forma acertada: `settings.siteName` como fonte, com
+`BRAND.titleSuffix` sobrando só de fallback enquanto o `/api/site` não responde —
+o mesmo padrão do `SEOHead`. Só os registros **novos** do Analytics sairão com o
+nome certo; o histórico já gravado continua com "SBC Agora".
 
 ## Regras válidas para a Fase 3
 
