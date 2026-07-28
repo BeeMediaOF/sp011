@@ -476,6 +476,67 @@ nunca foi reproduzido (§1.0 do `01-diagnostico.md`).
   não está causando layout shift hoje, mas é fragilidade — o `LazyImage.tsx`
   existe e nenhum bloco da home o usa (§8.6 do `ROADMAP.md`).
 
+### Lighthouse do sp011 (mesma sessão) e o que a comparação revela
+
+| Categoria | sp011 | ksports |
+|---|---:|---:|
+| Performance | **42** | 47 |
+| Accessibility | 93 | 93 |
+| Best Practices | **100** | 96 |
+| SEO | 100 | 100 |
+| Agentic Browsing | **3/3** | **3/3** |
+
+Duas conclusões diretas:
+
+1. **O Best Practices 96 é do ksports, não da rede.** No sp011 é 100, com a
+   mesma imagem Docker. Some com o item "Best Practices = 100" da lista de
+   pendências de código: é conteúdo/terceiro do ksports (o relatório dele traz
+   o insight "3rd parties" — provável banner KBET).
+2. **Agentic Browsing 3/3 nos dois blogs** — o PRD-06 fechou a métrica.
+
+**TTFB não é o gargalo.** Medido dos dois domínios, 3 requisições seguidas:
+sp011 197 ms na primeira e 134/144 ms depois; ksports 639 ms na primeira e
+123/156 ms depois. O cache de HTML do `ssrHomePlugin` funciona (a diferença
+cold→warm do ksports é o render do SSR, ~500 ms), mas o documento chega em menos
+de 700 ms no pior caso. O FCP de 5 s está no que vem **depois** do primeiro byte.
+
+### Achado: o `__SSR_DATA__` é a PRIMEIRA coisa do `<head>`
+
+Medido no HTML servido por `https://sp011.com.br/` em 2026-07-28:
+
+| Elemento | Offset no documento |
+|---|---:|
+| `window.__SSR_DATA__` | **64** |
+| — tamanho do bloco | **62.287 chars** |
+| `rel="modulepreload"` | 68.301 |
+| `<link rel="stylesheet">` | 68.627 |
+| `</head>` | 68.699 |
+| `<div id="root">` | 68.720 |
+| documento total | 176.559 |
+
+`ssrHomePlugin` injeta o JSON com `.replace("<head>", …)`, ou seja **no topo
+absoluto do documento**. O navegador precisa baixar e parsear 62 KB de JSON
+antes de ver o `<link>` do CSS render-blocking, os `modulepreload` e o markup
+do SSR. Na banda do Lighthouse mobile (1,6 Mbps ≈ 200 KB/s) são **~310 ms de
+atraso puro** empurrando todo o resto para a direita, mais o parse com CPU 4×.
+É o insight "Document request latency — Est savings 114 KiB", e ataca
+diretamente o FCP, que é a métrica mais atrasada.
+
+**A correção é barata e segura:** mover o bloco para o fim do `<body>`, depois
+do `#root`. O entry é `<script type="module">`, e módulo é *deferred* por
+definição — só executa quando o parse do documento termina. Um `<script>`
+clássico inline em qualquer ponto anterior do documento já terá definido
+`window.__SSR_DATA__` a tempo. Ganho: o CSS e o markup do SSR passam a ser
+descobertos ~62 KB mais cedo, sem tirar nada do payload.
+
+**Por que as duas medições divergem tanto** (Playwright 2,28 s × Lighthouse
+5,1 s de FCP): o Lighthouse mobile usa *simulated throttling* (Lantern), que
+modela a cadeia de dependências com handshake por origem e é sistematicamente
+mais pessimista que o *applied throttling* do CDP que meu script usa. Os dois
+são válidos, mas **não são comparáveis em valor absoluto** — o script serve
+para antes/depois contra ele mesmo; o Lighthouse é quem responde ao DoD
+(Performance ≥ 75). Daqui para frente, todo PRD reporta os dois.
+
 ### Onda 2, reordenada por este Lighthouse
 
 O `ROADMAP.md` colocava 03 e 04 na mesma onda sem ordem entre eles. Os dados
@@ -486,24 +547,47 @@ ficou 84 ms fora do critério no PRD-02.
 
 ## Próxima ação
 
-1. **Rodar o Lighthouse de novo com a VPS ociosa**, em `sp011.com.br` **e**
-   `ksports.midia.run`, para ter um número confiável antes de abrir a onda 2.
+1. **Quick win antes do PRD-04:** mover o `__SSR_DATA__` do topo do `<head>`
+   para o fim do `<body>` (ver achado acima). Três linhas no `ssrHomePlugin`,
+   ataca o FCP — a métrica mais atrasada — sem tirar nada do payload.
 2. **PRD-PERF-04** (CSS render-blocking) e, na sequência, **PRD-PERF-03**
    (imagens de identidade).
-3. Investigar o **Best Practices 96** (o DoD pede 100) — causa desconhecida,
-   não atribuível a nenhum PRD da onda 1.
-4. Levar junto as duas correções agendadas, ambas no serviço `web`:
+3. Levar junto as duas correções agendadas, ambas no serviço `web`:
    - `pages/Artigo.tsx:176` — `BRAND.titleSuffix` ("SBC Agora") no
      `document.title` de toda página de artigo dos 8 blogs (ver acima);
    - `ssrHomePlugin` e `spaHeadPlugin` só tratam `GET` — um **HEAD** em `/` ou
      numa rota de categoria cai no `index.html` cru, com o `<head>` do blog que
      buildou a imagem. Mesma causa do defeito corrigido em `8cd8518`.
-3. Pendente de diagnóstico (fora da auditoria de performance do site): tempo de
-   build subiu. Suspeitos levantados — o `Dockerfile` do `web` faz `COPY . .`
-   **antes** do `pnpm install` (o do `api` já corrige isso desde `107134a`), e o
-   `RUN chown -R node:node /app` do `82f9dc8` (PRD-07, 2026-07-21) duplica o
-   `/app` inteiro numa camada. Falta a saída de `time docker compose build` e
-   `docker system df` para decidir entre limpeza de disco e Dockerfile.
+4. **Lentidão de build — diagnosticada** (medido na VPS em 2026-07-28; fora da
+   auditoria de performance do site, mas é o que atrasa cada deploy):
+
+   | Sinal | Valor | Leitura |
+   |---|---:|---|
+   | Disco `/` | 109 G de 387 G (29%) | **não é disco cheio** |
+   | Build cache do Docker | **71,09 GB** (39,35 recuperáveis) | acúmulo, não é a causa |
+   | Imagens | 46,17 GB (26,84 recuperáveis) | v53…v58 vivas; só a v58 em uso |
+   | `blog-api:v58` | **3,88 GB** | anormal p/ Node + Chromium |
+   | `blog-web:v58` | **2,47 GB** | anormal p/ um SPA estático |
+   | RAM | 23 Gi de 31 Gi usados · **7,8 Gi disponíveis** | apertado |
+   | **Swap** | **0 B** | sem rede de segurança |
+
+   Causa, em ordem de peso: (a) o `Dockerfile` do `web` faz `COPY . .` **antes**
+   do `pnpm install`, então **todo** build reinstala o monorepo inteiro — o do
+   `api` já corrige isso desde `107134a`, copiando só os manifestos primeiro;
+   (b) o `RUN chown -R node:node /app` de `82f9dc8` (PRD-07, 2026-07-21) toca
+   todos os arquivos do `/app` e, no overlayfs, **duplica o `/app` inteiro numa
+   camada** — explica os 3,88 GB / 2,47 GB e bate com a época em que a lentidão
+   começou; (c) `docker compose build api web` sobe dois builds simultâneos com
+   7,8 Gi livres e **swap zero**, com o `ollama` segurando ~13 GB.
+
+   Correções, da mais barata para a mais estrutural: `docker builder prune -f`
+   (~39 GB) e apagar as tags `blog-*:v53…v56`, mantendo v57 como rollback e v58
+   em uso (~25 GB); buildar um serviço por vez enquanto a RAM estiver assim; e,
+   o que resolve de fato, copiar os manifestos antes do `pnpm install` no
+   `Dockerfile` do `web` e trocar `RUN chown -R` por
+   `COPY --from=build --chown=node:node`, que embute o dono na própria cópia e
+   elimina a camada duplicada. **Nunca** `docker system prune --volumes`
+   (CLAUDE.md §13).
 
 O rollout do PRD-02 aos 8 blogs foi concluído em 2026-07-28: `vendor-charts: 0`
 no HTML público de ksports, esporteagora, oleysports, beeesportes e resenhavip,
