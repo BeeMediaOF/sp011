@@ -15,6 +15,7 @@ import { saveAdminThemeToStorage } from "../../lib/adminTheme";
 import { getAdminDarkMode, setAdminDarkMode } from "../../lib/adminDarkMode";
 import { useEditorPermissions, invalidatePermissionsCache } from "../../lib/permissionsCache";
 import { useAdminT } from "../../lib/adminI18n";
+import { TooltipProvider } from "../ui/tooltip";
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 // permKey: null  → admin-only, never shown to editors
@@ -583,13 +584,20 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [chrome, setChrome] = useState<ChromeState>({ title: "" });
   // Sem token não há chrome — RequireAuth/RequireAdmin redirecionam ao login.
   const hasToken = typeof window !== "undefined" && !!localStorage.getItem("admin_token");
-  if (!hasToken) return <>{children}</>;
+  /* O TooltipProvider mora aqui, e não no App.tsx: este arquivo é lazy e só
+     chega ao browser dentro do painel — no topo da árvore ele levava o
+     @radix-ui/react-tooltip para o bundle de entrada de toda rota pública
+     (PRD-PERF-02). Envolve os dois caminhos para que qualquer tooltip do admin
+     encontre o provider mesmo antes do chrome existir. */
+  if (!hasToken) return <TooltipProvider>{children}</TooltipProvider>;
   return (
-    <ChromeSetterContext.Provider value={setChrome}>
-      <AdminChrome title={chrome.title} topbarExtra={chrome.topbarExtra}>
-        <Suspense fallback={<ContentSpinner />}>{children}</Suspense>
-      </AdminChrome>
-    </ChromeSetterContext.Provider>
+    <TooltipProvider>
+      <ChromeSetterContext.Provider value={setChrome}>
+        <AdminChrome title={chrome.title} topbarExtra={chrome.topbarExtra}>
+          <Suspense fallback={<ContentSpinner />}>{children}</Suspense>
+        </AdminChrome>
+      </ChromeSetterContext.Provider>
+    </TooltipProvider>
   );
 }
 

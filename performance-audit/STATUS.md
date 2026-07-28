@@ -55,8 +55,8 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 
 | PRD | Onda | Esforço | Depende de | Estado |
 |---|:--:|:--:|---|---|
-| 01 — payload da lista de artigos | 1 | M | — | **implementado — validar em prod** |
-| 02 — JS do caminho crítico | 1 | P | 01 (medição) | pendente |
+| 01 — payload da lista de artigos | 1 | M | — | **concluído e validado em prod** |
+| 02 — JS do caminho crítico | 1 | P | 01 (medição) | **implementado — validar em prod** |
 | 06 — llms.txt / robots.txt por blog | 1 | P | — | pendente |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | pendente |
 | 04 — CSS render-blocking | 2 | M/G | **02** | pendente |
@@ -177,11 +177,51 @@ caminho crítico é JS e imagem, alvos dos PRDs 02 e 03:
 Ou seja: a medição confirmou o diagnóstico das Cadeias B e C antes mesmo de
 começarem os PRDs que as atacam.
 
+## PRD-PERF-02 — o que foi entregue (2026-07-28)
+
+Baseline do "antes" (produção, pós-PRD-01) em `baseline-prd02.txt`: 5 artefatos
+JS no `<head>` da home somando **1.082.315 B decoded**, dos quais `vendor-charts`
+403.228 B e `vendor-radix` 55.314 B — nenhum dos dois usado em rota pública.
+
+| Arquivo | Mudança |
+|---|---|
+| `artifacts/brasilia-agora/vite.config.ts` | regra nova, **primeira** do `manualChunks`: `clsx`, `tailwind-merge` e `class-variance-authority` viram `vendor-utils` |
+| `artifacts/brasilia-agora/src/App.tsx` | `TooltipProvider` sai do import eager e do topo da árvore |
+| `artifacts/brasilia-agora/src/components/admin/AdminLayout.tsx` | `TooltipProvider` passa a envolver o `AdminShell` (chunk lazy do painel), nos dois caminhos (com e sem token) |
+
+### Desvios deliberados em relação ao PRD
+
+1. **Item 2 (`experimentalMinChunkSize: 0`) não foi aplicado.** O PRD parte de
+   que o Vite/Rollup funde chunks abaixo de **500 B**. Verificado no pacote
+   instalado: o Vite **não** define a opção e o padrão do Rollup 4.60.3 é **1**
+   (`rollup/dist/shared/*.js`: `config.experimentalMinChunkSize ?? 1`) — a
+   heurística nunca foi a causa. O que resolve é o item 1: atribuição por
+   `manualChunks` é autoritativa, então `clsx` não pode mais cair no
+   `vendor-charts`. Fixar `0` seria um no-op com um comentário enganoso.
+2. **Item 3 aplicado na forma preferida, e o levantamento foi além do previsto.**
+   `grep` de `Tooltip` em todo o `src/`: os `Tooltip` de `Dashboard.tsx` e
+   `Analytics.tsx` são do **Recharts**, não do Radix; o único consumidor do
+   `ui/tooltip` é `ui/sidebar.tsx`, **que nenhum arquivo importa** (código morto,
+   e ele já tem `TooltipProvider` próprio). Ou seja: não existe um único tooltip
+   Radix vivo no app — o provider no `App.tsx` sustentava 55 KB de preload para
+   ninguém. Foi movido (e não removido) para o `AdminShell` porque
+   `Tooltip.Root` do Radix lança sem provider ancestral: qualquer tooltip futuro
+   nasce no painel, e lá o provider existe.
+3. Sem branch `perf/prd-02-js-critico` — commit direto na `main` (CLAUDE.md §18).
+
+Projeção do `<head>` após o build: `vendor-react` 223.391 + `vendor-query`
+24.608 + `vendor-utils` (poucos KB) + `vendor-icons` 38.355 + `index` ~337.000
+= **~628 KB decoded**, contra 1.082 KB. Confirmação só é possível após
+`docker compose build web` na VPS (CLAUDE.md §14).
+
+`pnpm run typecheck` limpo e `pnpm test` verde (52 testes) em `brasilia-agora`.
+
 ## Próxima ação
 
-1. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
-2. Início do **PRD-PERF-02** (JS do caminho crítico) — agora com evidência
-   quantificada de que ele vale 727 KB decoded por rota.
+1. Deploy do PRD-02 na VPS e verificação dos chunks no HTML servido
+   (`grep -c vendor-charts` = 0), medição do "depois" nas 3 rotas.
+2. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
+3. Depois: **PRD-PERF-06** (fecha a onda 1).
 
 ## Regras válidas para a Fase 3
 

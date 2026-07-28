@@ -1,6 +1,5 @@
 import { Switch, Route, Router as WouterRouter, useParams, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
@@ -349,21 +348,23 @@ function Router() {
   );
 }
 
+/* O <TooltipProvider> ficava aqui, no topo da árvore, e era o ÚNICO import
+   eager de @radix-ui do site: sozinho ele colocava o vendor-radix no
+   modulepreload de toda rota pública, onde nenhum tooltip existe. Passou para
+   dentro do AdminShell (chunk lazy do painel) — ver PRD-PERF-02. */
 function App({ ssrPath }: { ssrPath?: string } = {}) {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter ssrPath={ssrPath} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <AnalyticsProvider />
-          <ScrollToTop />
-          <LangSync />
-          <BrokenImageFallback />
-          <SEOHead />
-          <Router />
-          <Suspense fallback={null}><LGPDConsent /></Suspense>
-        </WouterRouter>
-        <Suspense fallback={null}><Toaster /></Suspense>
-      </TooltipProvider>
+      <WouterRouter ssrPath={ssrPath} base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <AnalyticsProvider />
+        <ScrollToTop />
+        <LangSync />
+        <BrokenImageFallback />
+        <SEOHead />
+        <Router />
+        <Suspense fallback={null}><LGPDConsent /></Suspense>
+      </WouterRouter>
+      <Suspense fallback={null}><Toaster /></Suspense>
     </QueryClientProvider>
   );
 }

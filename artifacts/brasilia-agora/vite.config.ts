@@ -621,6 +621,17 @@ export default defineConfig({
         /* Separa vendors pesados em chunks dedicados — o browser faz cache deles
            separadamente e só re-baixa quando a versão mudar. */
         manualChunks(id) {
+          /* Utilitários minúsculos usados por TODA a UI (cn = twMerge(clsx)).
+             Sem nome próprio eles caem no agrupamento automático do Rollup e já
+             foram parar DENTRO do vendor-charts — o entry público importava um
+             símbolo (clsx) e arrastava 403 KB de Recharts/d3 para o preload de
+             toda rota. A atribuição por manualChunks é autoritativa e impede
+             essa fusão. */
+          if (id.includes("node_modules/clsx") ||
+              id.includes("node_modules/tailwind-merge") ||
+              id.includes("node_modules/class-variance-authority")) {
+            return "vendor-utils";
+          }
           if (id.includes("node_modules/react") || id.includes("node_modules/react-dom") || id.includes("node_modules/scheduler")) {
             return "vendor-react";
           }

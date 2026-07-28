@@ -1,0 +1,30 @@
+PRD-PERF-02 — baseline do JS do caminho crítico
+Coletado em 2026-07-28, de https://sp011.com.br/ (produção, imagem v pós-PRD-01)
+
+## <head> servido na home
+
+<link rel="modulepreload" crossorigin href="/assets/vendor-react-gREd9mYW.js">
+<link rel="modulepreload" crossorigin href="/assets/vendor-query-BZ68cNsE.js">
+<link rel="modulepreload" crossorigin href="/assets/vendor-radix-Bc9VOEZP.js">
+<link rel="modulepreload" crossorigin href="/assets/vendor-charts-Dw77MGS9.js">
+<link rel="modulepreload" crossorigin href="/assets/vendor-icons-BvmIbyhD.js">
+<script type="module" crossorigin src="/assets/index-VcADTA_g.js">
+<link rel="stylesheet" crossorigin href="/assets/index-fUrkTkH3.css">
+
+## Tamanho decodificado de cada artefato do caminho crítico
+
+vendor-react-gREd9mYW.js           223.391 B
+vendor-query-BZ68cNsE.js            24.608 B
+vendor-radix-Bc9VOEZP.js            55.314 B   <- só o TooltipProvider do App.tsx
+vendor-charts-Dw77MGS9.js          403.228 B   <- só o clsx dentro do cn()
+vendor-icons-BvmIbyhD.js            38.355 B
+index-VcADTA_g.js                  337.419 B
+                                 ----------
+JS total (decoded)               1.082.315 B   (1.057 KB)
+index-fUrkTkH3.css                 197.597 B   (PRD-PERF-04)
+
+## Alvo do PRD
+
+vendor-charts e vendor-radix fora do <head> público; no lugar do primeiro entra
+um vendor-utils de poucos KB (clsx + tailwind-merge + class-variance-authority).
+Projeção: 223.391 + 24.608 + ~5.000 + 38.355 + ~337.000 = ~628 KB decoded.
