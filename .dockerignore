@@ -15,3 +15,17 @@ dist
 .replitignore
 README_DEPLOY_HOSTINGER.md
 TECHNICAL_OVERVIEW.md
+
+# Fora do contexto de build (medido em 2026-07-28: o contexto ia a 116 MB e é
+# transferido a CADA build, dos dois serviços).
+# ATENÇÃO: o alias "@assets" do vite.config.ts aponta para attached_assets. Hoje
+# NENHUM arquivo importa de "@assets/" — se algum passar a importar, este
+# ignore precisa sair, senão o build quebra só no Docker e não localmente.
+attached_assets
+screenshots
+*.zip
+
+# Auditorias e material de apoio: markdown e SQL que nenhum build lê.
+performance-audit
+analytics-audit
+security-audit

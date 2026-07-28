@@ -7,9 +7,32 @@
 FROM --platform=linux/amd64 node:24-bookworm-slim AS build
 RUN npm install -g pnpm@10.15.1
 WORKDIR /app
-COPY . .
+
+# 1) Só os manifestos do workspace (camada cacheável). Mesmo padrão do
+#    Dockerfile do api-server (107134a): com `COPY . .` antes do install, QUALQUER
+#    mudança de código invalidava a camada e o monorepo inteiro era reinstalado a
+#    cada build (61 s medidos na VPS em 2026-07-28).
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json ./
+COPY artifacts/api-server/package.json     artifacts/api-server/
+COPY artifacts/brasilia-agora/package.json artifacts/brasilia-agora/
+COPY artifacts/central-hub/package.json    artifacts/central-hub/
+COPY artifacts/central-web/package.json    artifacts/central-web/
+COPY artifacts/mockup-sandbox/package.json artifacts/mockup-sandbox/
+COPY lib/api-client-react/package.json     lib/api-client-react/
+COPY lib/api-spec/package.json             lib/api-spec/
+COPY lib/api-zod/package.json              lib/api-zod/
+COPY lib/central-db/package.json           lib/central-db/
+COPY lib/db/package.json                   lib/db/
+COPY lib/news-engine/package.json          lib/news-engine/
+COPY lib/social-template/package.json      lib/social-template/
+COPY scripts/package.json                  scripts/
+
+# 2) Dependências (cacheado enquanto os manifestos não mudarem).
 RUN pnpm install --frozen-lockfile
-# PORT e BASE_PATH são exigidos pelo vite.config.ts já no build.
+
+# 3) Código-fonte + build (só esta parte re-roda quando o código muda).
+#    PORT e BASE_PATH são exigidos pelo vite.config.ts já no build.
+COPY . .
 RUN BASE_PATH=/ PORT=3000 API_URL=http://api:8080 \
     pnpm --filter @workspace/sbc-agora run build
 
@@ -24,11 +47,13 @@ ENV API_URL=http://api:8080
 ENV TZ=America/Sao_Paulo
 RUN npm install -g pnpm@10.15.1
 WORKDIR /app
-COPY --from=build /app /app
+# PRD-07: non-root (uid 1000). Serve estático via vite preview, sem volume.
+# O dono vem embutido na própria cópia: um `RUN chown -R /app` depois toca todos
+# os arquivos e, no overlayfs, DUPLICA o /app inteiro numa camada nova — media
+# 650 s dos 827 s do build na VPS (2026-07-28) e inflava a imagem para 2,47 GB.
+COPY --from=build --chown=node:node /app /app
 WORKDIR /app/artifacts/brasilia-agora
 EXPOSE 3000
-# PRD-07: non-root (uid 1000). Serve estático via vite preview, sem volume.
-RUN chown -R node:node /app
 USER node
 # `serve` = vite preview --host 0.0.0.0 (lê PORT/BASE_PATH/API_URL do ambiente)
 CMD ["pnpm", "run", "serve"]

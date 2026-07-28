@@ -50,8 +50,11 @@ ENV PORT=8080
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 # Copia o workspace já buildado (inclui node_modules com sharp/playwright e os
-# pacotes externalizados pelo esbuild, resolvidos via symlinks do pnpm).
-COPY --from=build /app /app
+# pacotes externalizados pelo esbuild, resolvidos via symlinks do pnpm). O dono
+# vem embutido na cópia: um `RUN chown -R /app` depois toca todos os arquivos e,
+# no overlayfs, DUPLICA o /app inteiro numa camada nova (medido no web em
+# 2026-07-28: 650 s de build e a imagem inflada para 2,47 GB).
+COPY --from=build --chown=node:node /app /app
 # Copia o binário do Chromium baixado no build.
 COPY --from=build /ms-playwright /ms-playwright
 # Dependências de SO do Chromium + fontes (fallback e emoji).
@@ -66,6 +69,8 @@ EXPOSE 8080
 # reduzir o raio de escape (AP-11). /data (uploads + db-config.enc) e /app
 # precisam pertencer ao node. Volumes /data PREEXISTENTES (root) exigem um
 # `chown -R node:node /data` único na VPS ANTES do 1o up non-root.
-RUN mkdir -p /data && chown -R node:node /data /app
+# /app já veio com o dono certo do COPY --chown acima; aqui sobra só o /data,
+# que é um diretório vazio na imagem (o volume monta por cima em runtime).
+RUN mkdir -p /data && chown node:node /data
 USER node
 CMD ["node", "--enable-source-maps", "dist/index.mjs"]
