@@ -424,14 +424,18 @@ function ssrHomePlugin(apiBase: string): Plugin {
         (s && typeof s === "object") ? { ...(s as Record<string, unknown>) } : null;
       /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
          para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
-         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 150 mais
-         recentes — cobrem as seções quentes sem perda visível (eram 100 quando o
-         item da lista ainda carregava socialTitle/keywords). */
+         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
+         recentes — cobrem as seções quentes sem perda visível.
+         MEDIDO em produção (2026-07-28): 511 B por artigo no __SSR_DATA__. Subir
+         para 150 (como o PRD-PERF-01 previa) engordou o documento da home em
+         16,5 KB e o __SSR_DATA__ foi de 70.923 B para 86.921 B — o oposto do
+         objetivo. As editorias de baixo volume são cobertas pelo pool por
+         categoria abaixo, não pelo tamanho deste corte. */
       const rawArticles = (a && Array.isArray(a.articles)) ? (a.articles as Array<Record<string, unknown>>) : [];
       const sorted = rawArticles
         .map((art) => { const copy = { ...art }; delete copy["keywords"]; return copy; })
         .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime());
-      const articles = sorted.slice(0, 150);
+      const articles = sorted.slice(0, 100);
       /* O corte acima é só "mais recentes": editoria de baixo volume (ex.: NFL,
          e-sports) cujos artigos saíram do top-N sumia da home no público e
          virava "EXEMPLO" no preview do admin. Completa o pool com até 8 artigos

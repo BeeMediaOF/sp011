@@ -104,13 +104,49 @@ Verificado localmente: `typecheck` verde nos 2 pacotes · `api-server` 219 teste
 `brasilia-agora` 52 testes · build esbuild do `api-server` OK. Build do Vite só na
 VPS (CLAUDE.md §14).
 
+## PRD-PERF-01 — validação em produção (sp011, 2026-07-28)
+
+| Critério de aceite | Meta | Medido | |
+|---|---|---|:--:|
+| `/api/articles` sem params | ≤ 120.000 B | **103.085 B** (era 2.454.750) | ✅ |
+| `?limit=200` devolve 200 itens + `total` | 200 / total real | 200 · `total: 3155` | ✅ |
+| `?limit=30` (rotas não-home) | — | **15.414 B** | ✅ |
+| `?category=politica` só da categoria | sim | só `"category":"politica"` | ✅ |
+| `?offset=` pagina sem repetir | sim | páginas 0 e 2 disjuntas | ✅ |
+| `?q=` filtra | sim | só `economia` | ✅ |
+| Sem `socialTitle`/`keywords` na lista | 0 ocorrências | 0 | ✅ |
+| Home sem bloco em placeholder | 0 `EXEMPLO` | 0 | ✅ |
+| `__SSR_DATA__` | ≤ 45.000 B | **86.921 B** | ❌ |
+
+**O critério do `__SSR_DATA__` era aritmeticamente impossível.** O PRD mandava
+`slice(0, 150)` e exigia ≤ 45.000 B no mesmo documento — mas o item custa 511 B
+medidos, então só os artigos dão 76.666 B. Composição real do payload:
+`articles` 76.666 B + `site` 10.095 B + `ads` 2 B. Nem com 60 artigos o alvo
+seria alcançável, e a home precisa de ~60 itens só para as seções quentes.
+
+Correção aplicada: **`slice` de volta para 100** (o valor que já rodava em
+produção e cobre a home). Subir para 150 tinha engordado o documento da home de
+185.197 B para 201.730 B — o oposto do objetivo. As editorias de baixo volume
+não dependem desse corte: quem as cobre é o pool por categoria, que agora vem
+da API. Alvo substituído por um medido e defensável: **`__SSR_DATA__` ≤ 62.000 B
+e documento da home abaixo dos 185.197 B do baseline**.
+
+**`sort=views` devolveu tudo com `views: 0` — não é bug.** A tabela
+`article_views` do sp011 está VAZIA (0 linhas) desde o WIPE de analytics de
+2026-07-26. Com todo mundo empatado em 0, o desempate por data assume — que é
+exatamente a regra testada em `articlesList.test.ts`. Consequência (anterior a
+este PRD): todo bloco "Mais Lidas" da rede está, na prática, ordenando por
+recência até as visualizações voltarem a acumular.
+
 ## Próxima ação
 
-1. Deploy na VPS (`docker compose build api web && up -d api web`).
-2. Rodar os comandos de verificação do PRD-PERF-01 e o script de medição nas
-   3 rotas; comparar com `baseline-prd01.txt` e registrar aqui.
-3. Só então: rollout de imagem para os blogs replicados (canário `resenhavip`) e
-   início do **PRD-PERF-02**.
+1. Rebuild do `web` no sp011 com o `slice` corrigido e reconferir
+   `__SSR_DATA__` e o tamanho do documento.
+2. Medir as 3 rotas com o script (§6 do ROADMAP) e comparar com
+   `baseline-prd01.txt` — os números de campo (FCP/LCP/decoded/long task) ainda
+   não foram coletados no "depois".
+3. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
+4. Início do **PRD-PERF-02**.
 
 ## Regras válidas para a Fase 3
 
