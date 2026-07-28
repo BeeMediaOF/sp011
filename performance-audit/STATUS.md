@@ -138,15 +138,50 @@ exatamente a regra testada em `articlesList.test.ts`. Consequência (anterior a
 este PRD): todo bloco "Mais Lidas" da rede está, na prática, ordenando por
 recência até as visualizações voltarem a acumular.
 
+### Medição de campo — antes × depois (sp011, mesmo perfil)
+
+Chromium headless, mobile 412×823 DPR 1.75, 1,6 Mbps / 150 ms RTT / CPU 4×.
+Depois do `slice` corrigido. Home repetida 3× (spread de 8 ms no LCP — é sinal,
+não ruído).
+
+| Rota | FCP | LCP | Transfer | Decoded | Maior long task |
+|---|---|---|---|---|---|
+| `/` | 2.564 → **2.496** | 2.572 → **3.420** | 1.006 → 1.064 KB | 1.939 → 2.113 KB | 467 → 437 ms |
+| `/artigo/:slug` | 4.208 → **3.680** | 5.464 → **4.688** | 1.622 → **772 KB** | 4.196 → **1.715 KB** | — → 214 ms |
+| `/politica` | 4.208 → **3.676** | 5.660 → **4.196** | 1.490 → **663 KB** | 6.508 → **1.617 KB** | 900 → **263 ms** |
+
+| Critério de aceite (campo) | Meta | Medido | |
+|---|---|---|:--:|
+| `decoded` em `/politica` | ≤ 1.800 KB | 1.617 KB | ✅ |
+| `decoded` em `/artigo/:slug` | ≤ 1.500 KB | 1.715 KB | ❌ |
+| Maior long task em `/politica` | ≤ 300 ms | 263 ms | ✅ |
+| TBT (proxy: soma das long tasks em `/politica`) | ≤ 900 ms | 887 ms (era 2.229) | ✅ |
+| LCP em `/politica` | ≤ 3.800 ms | 4.196 ms | ❌ |
+| `__SSR_DATA__` | ≤ 62.000 B (alvo corrigido) | 61.780 B | ✅ |
+| Documento da home | < 185.197 B | 176.302 B | ✅ |
+
+**Os dois critérios não atingidos não dependem deste PRD** — o que sobrou no
+caminho crítico é JS e imagem, alvos dos PRDs 02 e 03:
+
+- Em `/artigo` e `/politica`, `initiatorType: "other"` (os chunks JS) responde
+  por **727 KB decoded** dos 1.715/1.617 KB restantes. É o `vendor-charts` de
+  403 KB no `modulepreload` — **PRD-PERF-02**.
+- A home **não era beneficiária deste PRD**: o SSR já a poupava dos 2,4 MB
+  (`fetch` nela soma 10 KB decoded). Seu LCP hoje é o hero, e a maior imagem
+  baixada é o **`byline-logo` com 81 KB** (PNG cru do `/api/site-asset`),
+  ocupando a banda até 5.576 ms enquanto o hero termina em 4.643 ms. Além
+  disso o `<head>` traz **3 preloads `as=image`** (logo, hero e footer-logo) —
+  a hoisting do React 19 descrita no diagnóstico, confirmada em produção.
+  Tudo isso é **PRD-PERF-03**.
+
+Ou seja: a medição confirmou o diagnóstico das Cadeias B e C antes mesmo de
+começarem os PRDs que as atacam.
+
 ## Próxima ação
 
-1. Rebuild do `web` no sp011 com o `slice` corrigido e reconferir
-   `__SSR_DATA__` e o tamanho do documento.
-2. Medir as 3 rotas com o script (§6 do ROADMAP) e comparar com
-   `baseline-prd01.txt` — os números de campo (FCP/LCP/decoded/long task) ainda
-   não foram coletados no "depois".
-3. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
-4. Início do **PRD-PERF-02**.
+1. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
+2. Início do **PRD-PERF-02** (JS do caminho crítico) — agora com evidência
+   quantificada de que ele vale 727 KB decoded por rota.
 
 ## Regras válidas para a Fase 3
 
