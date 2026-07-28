@@ -57,7 +57,7 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 |---|:--:|:--:|---|---|
 | 01 — payload da lista de artigos | 1 | M | — | **concluído e validado em prod** |
 | 02 — JS do caminho crítico | 1 | P | 01 (medição) | **concluído e validado em prod** |
-| 06 — llms.txt / robots.txt por blog | 1 | P | — | pendente |
+| 06 — llms.txt / robots.txt por blog | 1 | P | — | **implementado — aguardando deploy e verificação** |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | pendente |
 | 04 — CSS render-blocking | 2 | M/G | **02** | pendente |
 | 05 — SSR de artigo e categoria | 3 | G | **01** | pendente |
@@ -300,12 +300,63 @@ Sem erro de hidratação: console limpo (0 erros e 0 avisos) em `/`, `/politica`
 `/admin/login`, com a home renderizando 56 links de artigo e `/politica` 67 —
 invariante do CLAUDE.md §17 preservada.
 
+## PRD-PERF-06 — o que foi entregue (2026-07-28)
+
+Baseline em `baseline-prd06.txt`: os **três** domínios testados
+(sp011.com.br, ksports.midia.run, resenhavip.midia.run) serviam o **mesmo**
+arquivo, dizendo `# SBC Agora`, com editorias de outro portal e
+`Sitemap: https://brasilia-agora.replit.app/api/sitemap.xml` (host morto). O
+ksports, que é EN, recebia texto em pt-BR sobre o Grande ABC.
+
+| Arquivo | Mudança |
+|---|---|
+| `brasilia-agora/vite.config.ts` | **novo** `seoTextPlugin(apiBase)` + `SEO_TEXT_STRINGS` (pt-BR/EN), `smartCase`, `seoLinksFromSite`, `buildLlmsTxt`, `buildRobotsTxt`; registrado entre `socialOgPlugin` e `ssrHomePlugin` |
+| `brasilia-agora/public/llms.txt` | reescrito **neutro** — sem nome de portal, sem host (só o caminho de falha) |
+| `brasilia-agora/public/robots.txt` | reescrito neutro, com `Disallow: /admin`, sem linha `Sitemap:` (que exige host) |
+| `performance-audit/baseline-prd06.txt` | **novo** — o "antes" dos 3 domínios + identidade real de sp011/ksports |
+
+**Desvios do PRD, deliberados:**
+
+1. **O `robots.txt` não consulta a API.** O PRD tratava os dois arquivos como um
+   par ("qualquer falha → `next()`"), mas o `robots.txt` só depende do `Host` da
+   requisição. Mantê-lo independente significa que, com a `api` do blog fora do
+   ar, ele continua saindo **correto e com os dois `Sitemap:`** — em vez de cair
+   para um estático que, por não poder citar host, não tem `Sitemap:` nenhum. O
+   `llms.txt` (esse sim precisa de `siteName`/menu) mantém o `next()`.
+2. **Rótulos passam por `smartCase`.** Os `menuItems` vêm em CAIXA ALTA por
+   decisão de layout do cabeçalho; despejados em texto corrido viravam
+   `notícias de POLÍTICA`. A regra de sigla é *palavra isolada de até 3 letras*
+   (NFL, F1, TV ficam intactos) e **não** tamanho do token — a primeira versão
+   usava o token e produziu `World CUP` no ksports, corrigido antes do commit.
+3. **Só rotas internas viram "Seções".** Um menuItem apontando para fora
+   (`http…`) é link de terceiro, não seção do portal — é filtrado.
+4. **Sem branch** (CLAUDE.md §18): commit direto na `main`.
+
+**Validação local, contra o payload real de produção:** as funções puras foram
+extraídas do próprio `vite.config.ts` por recorte de código-fonte (zero
+duplicação) e executadas com `tsx` sobre o `/api/site` de sp011 e ksports. O
+`llms.txt` do sp011 saiu em pt-BR com as 9 editorias do menu atual; o do ksports
+saiu **em inglês** com World Cup/Football/Formula 1/NFL/E-Sports. Typecheck:
+`pnpm run typecheck` do pacote é verde, mas seu `tsconfig` cobre só `src/**` —
+o `vite.config.ts` foi checado à parte com `tsc` explícito (também verde).
+
+**Ordem dos middlewares (o risco real deste PRD):** é o primeiro plugin da casa
+que precisa **preemptar um arquivo estático existente**. Confirmado no dist do
+Vite 7.3.5 instalado (`chunks/config.js`): os hooks `configurePreviewServer`
+rodam na linha 35203 e o `viteAssetMiddleware` que serve o `distDir` só é
+registrado ~16 linhas depois — middleware adicionado com `server.middlewares.use()`
+dentro do hook ganha do estático. `BASE_PATH` é `/` em produção
+(`docker-compose.yml:63`), então o `baseMiddleware` não entra no caminho.
+
 ## Próxima ação
 
-1. Rollout de imagem para os 8 blogs (bump já feito no build do sp011 + canário
-   `resenhavip`), CLAUDE.md §6.
-2. Conferir no painel que Dashboard e Analytics desenham os gráficos.
-3. Depois: **PRD-PERF-06** (llms.txt/robots.txt por blog) fecha a onda 1.
+1. **Deploy do PRD-06** (`docker compose build web && up -d web`) e verificação
+   por `curl` nos 4 domínios + caminho de falha com a `api` parada.
+2. Rollout de imagem para os 8 blogs (bump já feito no build do PRD-02 + canário
+   `resenhavip`), CLAUDE.md §6 — **pendente desde o PRD-02**.
+3. Conferir no painel que Dashboard e Analytics desenham os gráficos —
+   **pendente desde o PRD-02**, é o único critério que `curl` não verifica.
+4. Fechado o 06, a **onda 1 acaba**; começa a onda 2 (PRD-03 e PRD-04).
 
 ## Regras válidas para a Fase 3
 

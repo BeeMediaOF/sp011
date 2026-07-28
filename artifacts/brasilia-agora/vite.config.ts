@@ -564,11 +564,223 @@ function spaHeadPlugin(apiBase: string): Plugin {
   };
 }
 
+/** Link de uma seção do portal no llms.txt (menu item interno e visível). */
+interface SeoLink {
+  label: string;
+  path: string;
+}
+
+/**
+ * Rótulos fixos do llms.txt nos dois idiomas de site (CLAUDE.md §15). Objeto
+ * local em vez do dicionário do app (`src/lib/i18n.ts`): aquele é de runtime do
+ * browser e traz ~700 chaves para resolver 12.
+ */
+const SEO_TEXT_STRINGS = {
+  "pt-BR": {
+    sections: "Seções",
+    resources: "Recursos",
+    homeDesc: "últimas notícias publicadas",
+    sectionDesc: (label: string) => `notícias de ${label}`,
+    intro: (siteName: string, labels: string, origin: string) =>
+      `${siteName} é um portal de notícias online. Editorias publicadas: ${labels}. ` +
+      `Cada reportagem fica em ${origin}/artigo/{slug}; o mapa do site abaixo lista todas as URLs publicadas.`,
+    introNoSections: (siteName: string, origin: string) =>
+      `${siteName} é um portal de notícias online. Cada reportagem fica em ${origin}/artigo/{slug}; ` +
+      `o mapa do site abaixo lista todas as URLs publicadas.`,
+    sitemap: "Mapa do site",
+    sitemapDesc: "índice completo de URLs publicadas",
+    newsSitemap: "Mapa de notícias",
+    newsSitemapDesc: "publicações das últimas 48 horas",
+    contact: "Contato",
+    contactDesc: "equipe editorial e canais de contato",
+    privacy: "Política de Privacidade",
+    terms: "Termos de Uso",
+  },
+  en: {
+    sections: "Sections",
+    resources: "Resources",
+    homeDesc: "latest published news",
+    sectionDesc: (label: string) => `${label} news`,
+    intro: (siteName: string, labels: string, origin: string) =>
+      `${siteName} is an online news portal. Sections published: ${labels}. ` +
+      `Every article lives at ${origin}/artigo/{slug}; the sitemap below lists all published URLs.`,
+    introNoSections: (siteName: string, origin: string) =>
+      `${siteName} is an online news portal. Every article lives at ${origin}/artigo/{slug}; ` +
+      `the sitemap below lists all published URLs.`,
+    sitemap: "Sitemap",
+    sitemapDesc: "complete index of published URLs",
+    newsSitemap: "News sitemap",
+    newsSitemapDesc: "articles from the last 48 hours",
+    contact: "Contact",
+    contactDesc: "editorial team and contact channels",
+    privacy: "Privacy Policy",
+    terms: "Terms of Use",
+  },
+} as const;
+
+/**
+ * "POLÍTICA" -> "Política", "WORLD CUP" -> "World Cup", "E-SPORTS" -> "E-Sports";
+ * rótulos que já têm minúsculas são respeitados. Os menuItems vêm em caixa alta
+ * por decisão de layout do cabeçalho — em texto corrido isso vira grito.
+ * Sigla = rótulo de UMA palavra com até 3 caracteres (NFL, F1, TV): fica intacto.
+ * A regra é a palavra isolada, e não o tamanho do token, senão o "CUP" de
+ * "WORLD CUP" também passaria por sigla ("World CUP").
+ */
+function smartCase(label: string): string {
+  const s = label.trim();
+  if (s !== s.toUpperCase()) return s;
+  if (s.length <= 3 && !/[\s-]/.test(s)) return s;
+  return s.replace(/[^\s-]+/g, (w) => w.charAt(0) + w.slice(1).toLocaleLowerCase());
+}
+
+/** Extrai as seções internas e visíveis do menu (submenu de 1 nível achatado). */
+function seoLinksFromSite(site: Record<string, unknown>): SeoLink[] {
+  const out: SeoLink[] = [];
+  const seen = new Set<string>();
+  const push = (raw: unknown): void => {
+    if (!raw || typeof raw !== "object") return;
+    const m = raw as Record<string, unknown>;
+    if (m["visible"] === false) return;
+    const label = typeof m["label"] === "string" ? m["label"].trim() : "";
+    const p = typeof m["path"] === "string" ? m["path"].trim() : "";
+    // Só rota interna: link externo do menu não é seção deste portal.
+    if (!label || !p.startsWith("/") || seen.has(p)) return;
+    seen.add(p);
+    out.push({ label: smartCase(label.replace(/[[\]]/g, "")), path: p });
+  };
+  const items = site["menuItems"];
+  if (!Array.isArray(items)) return out;
+  for (const item of items) {
+    push(item);
+    const children = (item as Record<string, unknown> | null)?.["children"];
+    if (Array.isArray(children)) for (const c of children) push(c);
+  }
+  return out;
+}
+
+/** llms.txt no formato recomendado: título, resumo em `>`, links markdown absolutos. */
+function buildLlmsTxt(meta: SiteMeta, links: SeoLink[], origin: string): string {
+  const T = SEO_TEXT_STRINGS[meta.lang];
+  const summary = meta.seoDescription.replace(/\s+/g, " ").trim();
+  const sections = links.filter((l) => l.path !== "/");
+  const intro = sections.length
+    ? T.intro(meta.siteName, sections.map((l) => l.label).join(", "), origin)
+    : T.introNoSections(meta.siteName, origin);
+  const lines = [
+    `# ${meta.siteName}`,
+    "",
+    `> ${summary}`,
+    "",
+    intro,
+    "",
+    `## ${T.sections}`,
+    "",
+  ];
+  for (const l of links) {
+    const desc = l.path === "/" ? T.homeDesc : T.sectionDesc(l.label);
+    lines.push(`- [${l.label}](${origin}${l.path}): ${desc}`);
+  }
+  lines.push(
+    "",
+    `## ${T.resources}`,
+    "",
+    `- [${T.sitemap}](${origin}/api/sitemap.xml): ${T.sitemapDesc}`,
+    `- [${T.newsSitemap}](${origin}/api/sitemap-news.xml): ${T.newsSitemapDesc}`,
+    `- [${T.contact}](${origin}/contato): ${T.contactDesc}`,
+    `- [${T.privacy}](${origin}/privacidade)`,
+    `- [${T.terms}](${origin}/termos)`,
+    "",
+  );
+  return lines.join("\n");
+}
+
+/** robots.txt do próprio host. Não depende da API — só do Host da requisição. */
+function buildRobotsTxt(origin: string): string {
+  return [
+    "User-agent: *",
+    "Allow: /",
+    // O painel nunca deveria ser rastreado (não bloqueia navegação humana).
+    "Disallow: /admin",
+    "Disallow: /admin/",
+    "",
+    `Sitemap: ${origin}/api/sitemap.xml`,
+    `Sitemap: ${origin}/api/sitemap-news.xml`,
+    "",
+  ].join("\n");
+}
+
+/**
+ * seoTextPlugin — serve /llms.txt e /robots.txt com a identidade DESTE blog.
+ * Os dois eram arquivos estáticos de `public/` buildados na imagem
+ * compartilhada: os 8 blogs anunciavam "SBC Agora" e um Sitemap em host morto
+ * (violação da invariante do CLAUDE.md §13 — nada por blog na imagem).
+ * Agora saem das settings via /api/site, com cache de 1 h por (host, path).
+ * O robots.txt não depende da API (só do Host), então continua correto mesmo
+ * com a `api` do blog fora; o llms.txt cai para o estático neutro de `public/`.
+ * Registrar antes do ssrHomePlugin: paths com extensão nunca chegam nele, mas a
+ * ordem explícita evita surpresa.
+ */
+function seoTextPlugin(apiBase: string): Plugin {
+  const TTL_MS = 60 * 60_000;
+  const cache = new Map<string, { body: string; at: number }>();
+
+  async function handleSeoText(
+    req: IncomingMessage,
+    res: ServerResponse,
+    next: () => void,
+  ): Promise<void> {
+    const pathOnly = (req.url ?? "").split("?")[0] ?? "";
+    if (req.method !== "GET" || (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
+      next();
+      return;
+    }
+    try {
+      const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+      const host = req.headers.host ?? BRAND.domain;
+      const origin = `${proto}://${host}`;
+      const key = `${host}|${pathOnly}`;
+      const now = Date.now();
+      const hit = cache.get(key);
+      let body = hit && now - hit.at < TTL_MS ? hit.body : null;
+      if (body === null) {
+        if (pathOnly === "/robots.txt") {
+          body = buildRobotsTxt(origin);
+        } else {
+          const r = await fetch(`${apiBase}/api/site`);
+          const site = r.ok ? ((await r.json()) as Record<string, unknown>) : null;
+          const meta = site ? metaFromSitePayload(site) : null;
+          if (!site || !meta) {
+            next(); // API fora / instalação incompleta → public/llms.txt neutro
+            return;
+          }
+          body = buildLlmsTxt(meta, seoLinksFromSite(site), origin);
+        }
+        cache.set(key, { body, at: now });
+      }
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.end(body);
+    } catch {
+      next();
+    }
+  }
+
+  return {
+    name: "seo-text-files",
+    configurePreviewServer(server) {
+      server.middlewares.use((req, res, next) => {
+        void handleSeoText(req, res, next);
+      });
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     staticCachePlugin(),
     socialOgPlugin(process.env.API_URL ?? "http://localhost:8080"),
+    seoTextPlugin(process.env.API_URL ?? "http://localhost:8080"),
     ssrHomePlugin(process.env.API_URL ?? "http://localhost:8080"),
     spaHeadPlugin(process.env.API_URL ?? "http://localhost:8080"),
     react(),

@@ -1,0 +1,47 @@
+PRD-PERF-06 — baseline de llms.txt e robots.txt
+Coletado em 2026-07-28, direto da produção (3 domínios).
+
+## O que os 3 blogs serviam (IDÊNTICO nos três — arquivo estático da imagem)
+
+$ curl -s https://sp011.com.br/llms.txt | head -3
+$ curl -s https://ksports.midia.run/llms.txt | head -3
+$ curl -s https://resenhavip.midia.run/llms.txt | head -3
+
+# SBC Agora
+
+SBC Agora é um portal de jornalismo independente focado na cobertura de São
+Bernardo do Campo e da região do Grande ABC. Publicamos notícias factuais,
+reportagens investigativas e colunas de opinião sobre política, cidade,
+segurança pública, transporte, saúde, educação, cultura, esportes, Brasil e
+mundo.
+
+$ curl -s https://<qualquer um dos 3>/robots.txt
+
+User-agent: *
+Allow: /
+
+Sitemap: https://brasilia-agora.replit.app/api/sitemap.xml
+
+## Leitura
+
+- Marca errada nos 8 blogs: nenhum deles é o "SBC Agora", e o ksports (EN)
+  recebia texto em pt-BR sobre o Grande ABC.
+- Editorias listadas (transporte, educacao, brasil...) não existem no menu de
+  nenhum blog atual — o arquivo é de outro portal, de outra época.
+- O `Sitemap:` aponta para host morto: os sitemaps reais são
+  /api/sitemap.xml e /api/sitemap-news.xml no próprio domínio.
+- Sem links markdown, sem URLs absolutas e sem bloco `>` de resumo — que é o
+  que a recomendação de llms.txt pede (Agentic Browsing 2/3 no Lighthouse).
+- Sem `Disallow: /admin`: o painel estava liberado para rastreio.
+
+## Identidade real de cada blog (de /api/site, para conferir o "depois")
+
+sp011   siteName=SP011    lang=pt-BR  tagline="Notícia. Agora. Sempre."
+        seoDescription="Informação com credibilidade sobre SP"
+        menu: HOME, POLÍTICA, ECONOMIA, MUNDO, CIDADE, ESPORTES, CULTURA,
+              SAÚDE, TECNOLOGIA, GERAL
+
+ksports siteName=KSports  lang=en     tagline="News. Now. Always."
+        seoDescription="" (cai para a tagline)
+        menu: HOME, WORLD CUP, FOOTBALL, VOLLEYBALL, TENNIS, FORMULA 1, NFL,
+              E-SPORTS, OTHERS

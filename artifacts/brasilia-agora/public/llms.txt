@@ -1,37 +1,22 @@
-# SBC Agora
+# Portal de notícias
 
-SBC Agora é um portal de jornalismo independente focado na cobertura de São Bernardo do Campo e da região do Grande ABC. Publicamos notícias factuais, reportagens investigativas e colunas de opinião sobre política, cidade, segurança pública, transporte, saúde, educação, cultura, esportes, Brasil e mundo.
+> Índice para agentes e modelos de linguagem. A versão completa deste arquivo,
+> com o nome do portal e as editorias publicadas, é servida dinamicamente pelo
+> site (seoTextPlugin em vite.config.ts).
 
-## Seções principais
+Este é o conteúdo de reserva, embutido na imagem compartilhada por todos os
+blogs da rede — por isso não cita nome de portal nem domínio. Todos os caminhos
+abaixo são relativos ao domínio que serviu este arquivo.
 
-- Homepage (últimas notícias): /
-- Política: /politica
-- Cidade: /cidade
-- Segurança: /seguranca
-- Transporte: /transporte
-- Saúde: /saude
-- Educação: /educacao
-- Cultura: /cultura
-- Esportes: /esportes
-- Brasil: /brasil
-- Mundo: /mundo
-- Colunas de opinião: /colunas
-- Arquivo: /arquivo
-- Contato / Equipe editorial: /contato
+## Recursos
+
+- /api/sitemap.xml: índice completo de URLs publicadas
+- /api/sitemap-news.xml: publicações das últimas 48 horas
+- /contato: equipe editorial e canais de contato
+- /privacidade: política de privacidade
+- /termos: termos de uso
 
 ## Artigos
 
-Cada artigo é acessível em `/artigo/{id}`, onde `id` é o identificador único da reportagem.
-A lista completa de artigos publicados está disponível em `/api/articles`.
-O mapa completo do site com todas as URLs publicadas está em `/api/sitemap.xml`.
-
-## Orientações para citação
-
-- Cite sempre a editoria (Política, Cidade, Saúde etc.) junto ao título e data de publicação.
-- Os artigos possuem autor, data de publicação e editoria claramente identificados.
-- O conteúdo editorial é separado do conteúdo opinativo (seção Colunas).
-- Para verificação de fatos ou informações editoriais, consulte a página /contato.
-
-## Frequência de atualização
-
-O portal é atualizado diariamente com novas reportagens. A homepage reflete as notícias mais recentes.
+Cada reportagem é acessível em /artigo/{slug}, com título, editoria, autor e
+data de publicação identificados.

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
-
-Sitemap: https://brasilia-agora.replit.app/api/sitemap.xml
+Disallow: /admin
+Disallow: /admin/
