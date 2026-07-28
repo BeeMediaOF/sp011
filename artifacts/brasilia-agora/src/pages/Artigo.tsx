@@ -121,6 +121,10 @@ export default function Artigo() {
 
   const { article, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
+  /* Identidade DESTE blog para título/OG/JSON-LD. A imagem Docker é a mesma nos 8
+     blogs (CLAUDE.md §13), então a constante BRAND só serve de reserva enquanto o
+     /api/site não respondeu — mesmo padrão do SEOHead. */
+  const siteName = settings?.siteName || BRAND.name;
   const { t, lang, tz } = useT();
   const { trackArticle, trackShare } = useAnalytics();
   // article.id (não o slug): pageview/read usam o id — com o slug seria
@@ -173,7 +177,7 @@ export default function Artigo() {
       ? rawImage
       : `${window.location.origin}${rawImage.startsWith("/") ? rawImage : `/${rawImage}`}`;
     const prevTitle = document.title;
-    document.title = `${title} — ${BRAND.titleSuffix}`;
+    document.title = `${title} — ${siteName}`;
 
     function setMeta(prop: string, content: string, isOg = false): HTMLMetaElement {
       const attr = isOg ? "property" : "name";
@@ -192,7 +196,7 @@ export default function Artigo() {
     setMeta("og:title", title, true);
     setMeta("og:description", desc, true);
     setMeta("og:url", canonical, true);
-    setMeta("og:site_name", BRAND.name, true);
+    setMeta("og:site_name", siteName, true);
     setMeta("og:image", image, true);
     setMeta("og:image:width", "1200", true);
     setMeta("og:image:height", "630", true);
@@ -252,8 +256,10 @@ export default function Artigo() {
       if (createdCanon && canonLink?.parentNode) canonLink.parentNode.removeChild(canonLink);
       hreflangLinks.forEach((el) => el.parentNode?.removeChild(el));
     };
+  // siteName nas deps: o /api/site costuma responder DEPOIS do artigo, e sem ele
+  // o título ficaria congelado no fallback BRAND até a próxima navegação.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [article?.id, lang]);
+  }, [article?.id, lang, siteName]);
 
   const showSkeleton = loading;
 
@@ -486,8 +492,15 @@ export default function Artigo() {
     return nodes;
   }
 
+  /* Origin do PRÓPRIO blog. Estava fixo em sbcagora.com.br — domínio que não é de
+     nenhum blog da rede — e ia parar no mainEntityOfPage do JSON-LD dos 8. (O
+     <link rel="canonical"> do <head> nunca teve esse defeito: já usa o origin.)
+     A página de artigo não passa pelo SSR — só a home passa —, mas o guard mantém
+     o componente seguro caso isso mude. */
+  const origin = typeof window !== "undefined" ? window.location.origin : BRAND.url;
+
   const canonicalUrl = article
-    ? `https://sbcagora.com.br/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
+    ? `${origin}/artigo/${(article as { id: string; slug?: string }).slug || article.id}`
     : null;
 
   // Assinatura visível: crédito explícito do artigo (ex.: "Por BeeSports",
@@ -511,14 +524,16 @@ export default function Artigo() {
         dateModified: article.publishedAt,
         author: {
           "@type": "Person",
-          name: article.author ?? BRAND.author,
+          // Mesma cadeia da assinatura visível do artigo (abaixo): o que o leitor
+          // lê e o que o buscador indexa não podem divergir.
+          name: explicitAuthor || settings?.bylineName || siteName,
         },
         publisher: {
           "@type": "Organization",
-          name: BRAND.name,
+          name: siteName,
           logo: {
             "@type": "ImageObject",
-            url: "https://sbcagora.com.br/favicon.jpg",
+            url: `${origin}/favicon.jpg`,
           },
         },
         mainEntityOfPage: {

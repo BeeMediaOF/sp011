@@ -351,6 +351,33 @@ function socialOgPlugin(apiBase: string): Plugin {
 }
 
 /**
+ * GET e HEAD pedem o MESMO recurso — crawler e monitor costumam mandar HEAD antes
+ * do GET. Com o guard só em "GET", o HEAD caía no next() e era respondido pelo
+ * estático: `index.html` cru, com o <head> do blog que buildou a imagem
+ * compartilhada. Mesma causa do defeito que 8cd8518 corrigiu no seoTextPlugin.
+ */
+function isReadRequest(req: IncomingMessage): boolean {
+  return req.method === "GET" || req.method === "HEAD";
+}
+
+/**
+ * Responde um HTML já montado. O Content-Length é explícito porque estes handlers
+ * também atendem HEAD: o Node zera o corpo de resposta a HEAD sozinho
+ * (`res._hasBody = false`), então o mesmo `end(html)` serve aos dois — mas sem o
+ * header o HEAD sairia sem anunciar tamanho nenhum.
+ */
+/* bfcache-friendly (sem no-store) + cache curto: repeat-nav instantâneo e
+   restauração back/forward. Conteúdo público, staleness de ~30s aceitável. */
+const HOME_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=60";
+
+function sendHtml(res: ServerResponse, html: string, cacheControl: string): void {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", cacheControl);
+  res.setHeader("Content-Length", String(Buffer.byteLength(html)));
+  res.end(html);
+}
+
+/**
  * ssrHomePlugin — SSR da home (apenas `/`) no servidor de preview (produção).
  * Renderiza o App no servidor (usando o bundle dist/server/entry-server.js gerado
  * por `vite build --ssr`), injeta o HTML no #root do template buildado e serializa
@@ -387,16 +414,14 @@ function ssrHomePlugin(apiBase: string): Plugin {
     next: () => void,
   ): Promise<void> {
     const pathOnly = (req.url ?? "").split("?")[0];
-    if (req.method !== "GET" || (pathOnly !== "/" && pathOnly !== "/index.html")) {
+    if (!isReadRequest(req) || (pathOnly !== "/" && pathOnly !== "/index.html")) {
       next();
       return;
     }
     // Hit do cache TTL → responde na hora, sem fetch/render (TTFB ~0).
     const now = Date.now();
     if (htmlCache && now - htmlCache.at < HTML_TTL_MS) {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
-      res.end(htmlCache.html);
+      sendHtml(res, htmlCache.html, HOME_CACHE_CONTROL);
       return;
     }
     try {
@@ -476,9 +501,27 @@ function ssrHomePlugin(apiBase: string): Plugin {
 
       const appHtml = renderFn("/", data);
       const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
-      let html = template
-        .replace("<head>", `<head>\n    <script>window.__SSR_DATA__=${serialized}</script>`)
-        .replace('<div id="root"></div>', `<div id="root">${appHtml}</div>`);
+      /* O JSON vai para o FIM do body, logo depois do #root — não mais no topo do
+         <head>. Medido em produção (2026-07-28): eram 62.287 chars ANTES do <link>
+         do CSS render-blocking, dos modulepreload e de todo o markup do SSR, num
+         documento de 176 KB. Na banda do Lighthouse mobile (1,6 Mbps) isso são
+         ~310 ms de atraso puro empurrando o FCP. Ler daqui é seguro porque o entry
+         é <script type="module">, que é deferred por definição: só executa quando o
+         parse termina, e a esta altura o script clássico acima já rodou.
+         O que NÃO pode descer é o SINAL de "esta home tem SSR": o boot inline do
+         index.html roda no <head> e precisa dele para NÃO disparar o prefetch e o
+         preload de LCP (que o SSR já dispensa). Daí os 26 B de __SSR__ no topo.
+         Os dois replaces são amarrados de propósito: se a âncora do #root não
+         casar, o SSR não entrou e o marcador também não deve entrar — senão o boot
+         se calaria numa página que precisa dele. */
+      const withRoot = template.replace(
+        '<div id="root"></div>',
+        `<div id="root">${appHtml}</div>\n    <script>window.__SSR_DATA__=${serialized}</script>`,
+      );
+      let html =
+        withRoot === template
+          ? withRoot
+          : withRoot.replace("<head>", `<head>\n    <script>window.__SSR__=1</script>`);
       // Título/descrição/OG do template são do blog que buildou a imagem
       // compartilhada — reescreve com a identidade DESTE blog (o crawler do
       // WhatsApp/Facebook lê a home daqui; sem isso o preview sai com a marca
@@ -494,11 +537,7 @@ function ssrHomePlugin(apiBase: string): Plugin {
       }
 
       htmlCache = { html, at: now };
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      // bfcache-friendly (sem no-store) + cache curto: repeat-nav instantâneo e
-      // restauração back/forward. Conteúdo público, staleness de ~30s aceitável.
-      res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=60");
-      res.end(html);
+      sendHtml(res, html, HOME_CACHE_CONTROL);
     } catch {
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
     }
@@ -536,7 +575,7 @@ function spaHeadPlugin(apiBase: string): Plugin {
     const pathOnly = (req.url ?? "").split("?")[0] ?? "";
     // Só rotas de página: com extensão (assets, /opengraph.jpg, /sw.js…) ou
     // /api/* seguem o fluxo normal do servidor estático.
-    if (req.method !== "GET" || pathOnly.startsWith("/api/") || /\.[a-zA-Z0-9]+$/.test(pathOnly)) {
+    if (!isReadRequest(req) || pathOnly.startsWith("/api/") || /\.[a-zA-Z0-9]+$/.test(pathOnly)) {
       next();
       return;
     }
@@ -546,9 +585,7 @@ function spaHeadPlugin(apiBase: string): Plugin {
       const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
       const host = req.headers.host ?? BRAND.domain;
       const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-cache, must-revalidate");
-      res.end(html);
+      sendHtml(res, html, "no-cache, must-revalidate");
     } catch {
       next();
     }
@@ -730,14 +767,7 @@ function seoTextPlugin(apiBase: string): Plugin {
     next: () => void,
   ): Promise<void> {
     const pathOnly = (req.url ?? "").split("?")[0] ?? "";
-    /* HEAD entra junto com GET: crawler e monitor costumam mandar HEAD antes do
-       GET, e com o guard só em "GET" o HEAD caía no next() e era respondido pelo
-       estático neutro de public/ — content-type/cache/Content-Length de um
-       arquivo, corpo de outro. O Node zera o corpo de resposta a HEAD sozinho
-       (`res._hasBody = false`), então o mesmo `end(body)` serve aos dois. */
-    const method = req.method ?? "";
-    if ((method !== "GET" && method !== "HEAD") ||
-        (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
+    if (!isReadRequest(req) || (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
       next();
       return;
     }
@@ -859,9 +889,6 @@ export default defineConfig({
           }
           if (id.includes("node_modules/@tanstack")) {
             return "vendor-query";
-          }
-          if (id.includes("node_modules/framer-motion")) {
-            return "vendor-motion";
           }
           if (id.includes("node_modules/recharts") || id.includes("node_modules/d3-")) {
             return "vendor-charts";

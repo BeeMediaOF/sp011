@@ -11,9 +11,11 @@
     <script>
       (function () {
         try {
-          // Home com SSR já injeta os dados (__SSR_DATA__) e o hero no HTML —
-          // dispensa o prefetch e o preload de LCP deste boot.
-          if (window.__SSR_DATA__) return;
+          // Home com SSR já injeta os dados e o hero no HTML — dispensa o
+          // prefetch e o preload de LCP deste boot. O sinal é __SSR__ e não
+          // __SSR_DATA__: os dados (~62 KB) foram para o fim do <body> para não
+          // atrasar o CSS render-blocking, e aqui, no <head>, ainda não existem.
+          if (window.__SSR__) return;
           var b = (window.__BOOT__ = {});
           var j = function (u) {
             return fetch(u, { credentials: "same-origin" })
