@@ -730,7 +730,14 @@ function seoTextPlugin(apiBase: string): Plugin {
     next: () => void,
   ): Promise<void> {
     const pathOnly = (req.url ?? "").split("?")[0] ?? "";
-    if (req.method !== "GET" || (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
+    /* HEAD entra junto com GET: crawler e monitor costumam mandar HEAD antes do
+       GET, e com o guard só em "GET" o HEAD caía no next() e era respondido pelo
+       estático neutro de public/ — content-type/cache/Content-Length de um
+       arquivo, corpo de outro. O Node zera o corpo de resposta a HEAD sozinho
+       (`res._hasBody = false`), então o mesmo `end(body)` serve aos dois. */
+    const method = req.method ?? "";
+    if ((method !== "GET" && method !== "HEAD") ||
+        (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
       next();
       return;
     }
@@ -759,6 +766,9 @@ function seoTextPlugin(apiBase: string): Plugin {
       }
       res.setHeader("Content-Type", "text/plain; charset=utf-8");
       res.setHeader("Cache-Control", "public, max-age=3600");
+      // Explícito para que o HEAD anuncie o tamanho do corpo REAL (o dinâmico),
+      // e não fique sem Content-Length por não escrever corpo nenhum.
+      res.setHeader("Content-Length", String(Buffer.byteLength(body)));
       res.end(body);
     } catch {
       next();
