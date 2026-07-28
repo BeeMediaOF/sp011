@@ -164,3 +164,30 @@ test("geo em cache → bumpGeoViews em vez de lookup", () => {
   assert.equal(rec.geoLookups.length, 0);
   assert.deepEqual(out, { body: { ok: true } });
 });
+
+test("hosting (geo de data center/Meta em cache) → is_internal=true, razão 'hosting', sem geo", () => {
+  const { deps, rec } = makeDeps({ getCachedGeo: () => ({ city: "Luleå", region: "Norrbotten", country: "SE", hosting: true }) });
+  const out = handleEvent(deps, {
+    ipRaw: "57.144.0.1", ua: UA,
+    body: { type: "pageview", path: "/", sessionId: "s", firstTouch: true, refHost: "facebook.com" },
+  });
+  assert.deepEqual(out, { body: { ok: true } });
+  assert.equal(rec.pushed.length, 1);
+  const ev = rec.pushed[0]!;
+  assert.equal(ev.isInternal, true);
+  assert.equal(ev.referrer, "interno");            // interno vence a classificação (§17)
+  assert.deepEqual(rec.internalReasons, ["hosting"]);
+  assert.ok(rec.health.includes("flaggedInternal"));
+  assert.ok(rec.health.includes("received"));
+  assert.equal(rec.geoBumps, 0);                   // hosting NÃO conta em geo
+  assert.equal(rec.geoLookups.length, 0);          // já em cache
+});
+
+test("flag interna (admin) tem precedência sobre hosting na razão", () => {
+  const { deps, rec } = makeDeps({
+    detectInternalRequest: () => ({ internal: true, reason: "flag" }),
+    getCachedGeo: () => ({ city: "Fort Worth", region: "Texas", country: "US", hosting: true }),
+  });
+  handleEvent(deps, { ipRaw: "57.144.0.1", ua: UA, body: { type: "pageview", path: "/", sessionId: "s" } });
+  assert.deepEqual(rec.internalReasons, ["flag"]); // det.reason vence (hostingHit só quando !det.internal)
+});

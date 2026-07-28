@@ -87,7 +87,9 @@ export function parseInternalIps(raw?: string): string[] {
 }
 
 // ─── Detecção de tráfego interno (PRD 03 RF4 — tripla canônica) ───────────────
-export type InternalReason = "flag" | "configuredIp" | "privateIp";
+// "hosting" (rede de data center/Meta por ASN) NÃO vem de detectInternal — é derivado
+// do geo assíncrono e atribuído no lookupGeoAsync (ver isHostingNetwork).
+export type InternalReason = "flag" | "configuredIp" | "privateIp" | "hosting";
 
 /**
  * Tripla canônica de detecção de tráfego interno (mesma semântica do /event).
@@ -103,6 +105,23 @@ export function detectInternal(
   if (configured.has(ip)) return { internal: true, reason: "configuredIp" };
   if (isPrivateIp(ip)) return { internal: true, reason: "privateIp" };
   return { internal: false, reason: null };
+}
+
+/**
+ * Rede de data center / scanner de link (anti-bot por ASN). O scanner de link do
+ * Facebook/Meta é um navegador HEADLESS: renderiza JS e dispara read/scroll → fura o
+ * filtro de sessão engajada. Ele sai de IPs da Meta (AS32934). Detecta pelo campo
+ * `as`/org do ip-api (free) e pela flag `hosting` (quando o provedor a devolve).
+ * Conservadora: casa Meta e X/Twitter explicitamente + qualquer hosting sinalizado —
+ * NUNCA um ISP residencial/móvel. O chamador (lookupGeoAsync) marca esses eventos como
+ * is_internal (razão "hosting"), fora das métricas públicas.
+ */
+export function isHostingNetwork(asField?: string, hostingFlag?: boolean): boolean {
+  if (hostingFlag === true) return true;
+  const s = (asField ?? "").toLowerCase();
+  if (s.length === 0) return false;
+  // AS32934 = Meta/Facebook (o scanner do caso); AS13414 = Twitter/X.
+  return /\bas32934\b/.test(s) || s.includes("facebook") || s.includes("meta platforms") || /\bas13414\b/.test(s);
 }
 
 // ─── Dispositivo / navegador / SO (parse próprio, sem dependência) ────────────

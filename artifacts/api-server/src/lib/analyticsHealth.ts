@@ -46,7 +46,9 @@ const byEndpoint: Record<IngestEndpointId, EndpointCounters> = {
 };
 
 /** Razão da marcação interna (PRD 03 RF4 — precisão do item 25), agregado global. */
-const internalByReason: Record<InternalReason, number> = { flag: 0, configuredIp: 0, privateIp: 0 };
+const internalByReason: Record<InternalReason, number> = {
+  flag: 0, configuredIp: 0, privateIp: 0, hosting: 0,
+};
 
 const bootAt = Date.now();
 let lastEventAt: number | null = null;

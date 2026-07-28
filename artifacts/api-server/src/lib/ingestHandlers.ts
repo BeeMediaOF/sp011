@@ -58,7 +58,7 @@ export interface AnalyticsEvent {
   _ip?: string;
 }
 
-export interface GeoResult { city: string; region: string; country: string }
+export interface GeoResult { city: string; region: string; country: string; hosting?: boolean }
 
 /** Descritor de resposta HTTP (a casca faz `res.status(out.status ?? 200).json(out.body)`). */
 export interface HandlerResult { status?: number; body: unknown }
@@ -128,9 +128,15 @@ export function handleEvent(deps: EventHandlerDeps, input: EventHandlerInput): H
   }
 
   // Tráfego interno: marcado e gravado (auditável), mas fora das métricas públicas.
+  // Rede de data center/Meta (scanner de link) também é interna — razão "hosting", vinda
+  // do geo por IP: já cacheado → síncrono aqui; IP novo → retro-marcado quando o lookup
+  // resolve (lookupGeoAsync). Buscamos o geo cacheado UMA vez (reusado na seção de geo).
   const det = deps.detectInternalRequest(b["internal"] === true, ip);
-  const isInternal = det.internal;
-  if (isInternal && det.reason) { deps.bumpHealth("flaggedInternal"); deps.bumpInternalReason(det.reason); }
+  const cachedGeo = deps.getCachedGeo(ip);
+  const hostingHit = !det.internal && cachedGeo?.hosting === true;
+  const isInternal = det.internal || hostingHit;
+  const internalReason: InternalReason | null = det.reason ?? (hostingHit ? "hosting" : null);
+  if (isInternal && internalReason) { deps.bumpHealth("flaggedInternal"); deps.bumpInternalReason(internalReason); }
 
   const title     = cleanStr(b["title"], 300);
   const category  = cleanStr(b["category"], 100);
@@ -173,7 +179,8 @@ export function handleEvent(deps: EventHandlerDeps, input: EventHandlerInput): H
 
   const { browser, os } = parseUa(input.ua);
 
-  const cachedGeo = deps.getCachedGeo(ip);
+  // cachedGeo já foi lido acima (para a decisão de hosting). Pageview de hosting/interno
+  // não conta geo; IP novo dispara o lookup assíncrono (que retro-marca se for hosting).
   if (type === "pageview" && !isInternal) {
     if (cachedGeo) deps.bumpGeoViews(cachedGeo);
     else deps.lookupGeoAsync(ip);

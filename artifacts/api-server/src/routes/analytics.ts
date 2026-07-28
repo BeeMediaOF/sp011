@@ -10,7 +10,7 @@ import { isBotRequest, overRateLimit, isRecentDuplicate, INGEST_RATE_LIMITS } fr
 import {
   DAY, brtDayKey, brtDayStartMs,
   BEHAVIOR_TYPES, MAX_READ_SECONDS,
-  cleanStr, normalizeIp, isPrivateIp, planRequeue, capExcess,
+  cleanStr, normalizeIp, isPrivateIp, isHostingNetwork, planRequeue, capExcess,
   detectDevice,
   resolvePeriod, buildWindowAggregates, pctChange,
   compareTopCategories, dowOccurrences, pickPeakDow, buildBehaviorStats,
@@ -191,19 +191,36 @@ function lookupGeoAsync(ip: string): void {
   if (_geoCache.has(ip) || _geoPending.has(ip)) return;
 
   _geoPending.add(ip);
-  fetch(`http://ip-api.com/json/${normalizeIp(ip)}?fields=status,city,regionName,countryCode&lang=pt-BR`, {
+  fetch(`http://ip-api.com/json/${normalizeIp(ip)}?fields=status,city,regionName,countryCode,as,hosting&lang=pt-BR`, {
     signal: AbortSignal.timeout(3000),
   })
     .then(async (r) => {
       if (!r.ok) return;
-      const d = await r.json() as { status: string; city?: string; regionName?: string; countryCode?: string };
+      const d = await r.json() as { status: string; city?: string; regionName?: string; countryCode?: string; as?: string; hosting?: boolean };
       if (d.status !== "success" || !d.city) return;
+      const hosting = isHostingNetwork(d.as, d.hosting);
       const geo: GeoResult = {
         city:    d.city,
         region:  d.regionName ?? "",
         country: d.countryCode ?? "BR",
+        hosting,
       };
       _geoCache.set(ip, geo);
+      if (hosting) {
+        // Rede de data center / scanner de link (ex.: Meta AS32934). NÃO conta em geo_stats
+        // nem nas métricas públicas: retro-marca TODOS os eventos deste IP ainda no buffer
+        // como internos (razão "hosting") — pega o pageview E os read/scroll do scanner
+        // headless, que furavam o filtro de sessão engajada. Eventos já flushados não são
+        // reescritos (some na janela de 30d) — corrida aceita (buffer flusha a cada 30s).
+        for (const ev of _buffer) {
+          if (ev._ip === ip && !ev.isInternal) {
+            ev.isInternal = true;
+            bumpHealth("flaggedInternal");
+            bumpInternalReason("hosting");
+          }
+        }
+        return;
+      }
       bumpGeoViews(geo); // conta o pageview que originou o lookup
       // Retro-preenche eventos deste IP ainda no buffer (o 1º pageview de um IP
       // chegava sem cidade porque o lookup é assíncrono).
@@ -456,7 +473,7 @@ router.get("/health", authMiddleware, async (_req, res) => {
       "rate limit por IP: 120/min event, 30/min behavior, 60/min impressão, 30/min clique",
       "duplicado: pageview e category (mesma sessão+página em <15s); impressão/clique: dedup do PRD 04",
       "caminhos /admin",
-      "tráfego interno marcado, nunca dropado (admin logado, dev, IPs configurados, rede privada) — event e behavior; ads: dimensão interna do PRD 04",
+      "tráfego interno marcado, nunca dropado (admin logado, dev, IPs configurados, rede privada, rede de data center/Meta por ASN) — event e behavior; ads: dimensão interna do PRD 04",
     ],
     alerts,
     alertsSkipped,

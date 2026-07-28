@@ -29,7 +29,7 @@ test("flushedOk/flushFailed são de buffer, não têm coluna por endpoint", () =
   assert.ok(!("flushFailed" in snap.byEndpoint.event));
 });
 
-test("bumpInternalReason + shape do snapshot (byEndpoint 4×6, internalByReason 3, legados intactos)", () => {
+test("bumpInternalReason + shape do snapshot (byEndpoint 4×6, internalByReason 4, legados intactos)", () => {
   const before = healthSnapshot({ buffered: 0 });
   bumpInternalReason("privateIp");
   const snap = healthSnapshot({ buffered: 7 });
@@ -37,7 +37,7 @@ test("bumpInternalReason + shape do snapshot (byEndpoint 4×6, internalByReason 
 
   assert.deepEqual(Object.keys(snap.byEndpoint).sort(), ["adClick", "adImpression", "behavior", "event"]);
   assert.equal(Object.keys(snap.byEndpoint.event).length, 6);
-  assert.deepEqual(Object.keys(snap.internalByReason).sort(), ["configuredIp", "flag", "privateIp"]);
+  assert.deepEqual(Object.keys(snap.internalByReason).sort(), ["configuredIp", "flag", "hosting", "privateIp"]);
 
   for (const k of ["received", "droppedBot", "droppedRate", "droppedInvalid", "droppedDuplicate",
     "flaggedInternal", "flushedOk", "flushFailed", "buffered", "bootAt", "uptimeSeconds"]) {

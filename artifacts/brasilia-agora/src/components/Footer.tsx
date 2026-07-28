@@ -157,7 +157,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              {logoColorSrc ? <img src={siteAssetUrl(logoColorSrc, 320)} srcSet={siteAssetSrcSet(logoColorSrc, 320)} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+              {logoColorSrc ? <img src={siteAssetUrl(logoColorSrc, { h: logoH })} srcSet={siteAssetSrcSet(logoColorSrc, { h: logoH })} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -225,7 +225,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            {logoSrc ? <img src={siteAssetUrl(logoSrc, 320)} srcSet={siteAssetSrcSet(logoSrc, 320)} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+            {logoSrc ? <img src={siteAssetUrl(logoSrc, { h: logoH })} srcSet={siteAssetSrcSet(logoSrc, { h: logoH })} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}

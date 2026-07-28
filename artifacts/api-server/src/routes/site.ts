@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { SITE_ASSET_FIELDS, store } from "../lib/store.js";
 import {
-  cacheKey, memGet, resolveImage, MAX_WIDTH, MAX_Q, DEFAULT_Q,
+  cacheKey, memGet, resolveImage, MAX_WIDTH,
   type ImageFormat,
 } from "../lib/imageTransform.js";
 
@@ -12,10 +12,10 @@ const router = Router();
  *  conteúdo (?v=) em vez do data URI, então o browser cacheia como immutable
  *  e o JSON das settings fica pequeno.
  *
- *  Com `w`, redimensiona e converte para WebP/AVIF pelo MESMO pipeline do
- *  /api/image (`lib/imageTransform.ts`: cache em memória + disco e coalescing).
- *  Sem `w`, a resposta continua byte-idêntica à de antes — qualquer URL antiga
- *  em cache de navegador segue válida. */
+ *  Com `w`, redimensiona e converte para WebP LOSSLESS pelo MESMO pipeline do
+ *  /api/image (`lib/imageTransform.ts`: cache em memória + disco e coalescing),
+ *  no perfil `artwork`. Sem `w`, a resposta continua byte-idêntica à de antes —
+ *  qualquer URL antiga em cache de navegador segue válida. */
 router.get("/site-asset/:key", async (req, res) => {
   const field = SITE_ASSET_FIELDS[req.params.key as keyof typeof SITE_ASSET_FIELDS];
   const value = field ? store.getSettings()[field] : undefined;
@@ -24,9 +24,11 @@ router.get("/site-asset/:key", async (req, res) => {
 
   const mimeIn = m[1]!;
   const rawW = req.query["w"];
+  const rawH = req.query["h"];
   // SVG é vetor: escala sozinho no navegador e já é pequeno. Passar pelo sharp
   // só rasterizaria — perde a qualidade em telas 2x e costuma AUMENTAR o peso.
-  const wants = typeof rawW === "string" && mimeIn !== "image/svg+xml";
+  const wants =
+    (typeof rawW === "string" || typeof rawH === "string") && mimeIn !== "image/svg+xml";
 
   if (!wants) {
     res.setHeader("Content-Type", mimeIn);
@@ -35,20 +37,28 @@ router.get("/site-asset/:key", async (req, res) => {
     return;
   }
 
-  const w = Math.min(Math.max(parseInt(rawW, 10) || 0, 1), MAX_WIDTH);
-  const rawQ = req.query["q"];
-  const q = Math.min(
-    Math.max(parseInt(typeof rawQ === "string" ? rawQ : `${DEFAULT_Q}`, 10) || DEFAULT_Q, 1),
-    MAX_Q,
-  );
-  const rawF = req.query["f"];
-  const fmt: ImageFormat = typeof rawF === "string" && rawF === "avif" ? "avif" : "webp";
+  /* `h` tem precedência: altura é a restrição de layout de uma logo (o CSS fixa
+     `style={{ height }}` e deixa a largura livre), e só o servidor conhece a
+     proporção para derivar a largura. `w` continua valendo para favicon e byline,
+     que são quadrados e limitados pela caixa. */
+  const h = typeof rawH === "string"
+    ? Math.min(Math.max(parseInt(rawH, 10) || 0, 1), MAX_WIDTH)
+    : undefined;
+  const w = typeof rawW === "string"
+    ? Math.min(Math.max(parseInt(rawW, 10) || 0, 1), MAX_WIDTH)
+    : MAX_WIDTH;
 
-  /* A identidade do cache é o CONTEÚDO, não o `?v=` da query: assim uma URL
-     montada à mão sem `v` nunca serve a logo antiga, e trocar a imagem no admin
-     invalida sozinho. `v` continua na URL publicada só para furar o cache do
-     navegador, que é onde `immutable` morde. */
-  const key = cacheKey(`site-asset:${req.params.key}:${value as string}`, w, q, fmt);
+  /* Perfil `artwork` (ver imageTransform.ts): compara WebP lossless com lossy
+     q95/effort 4 e serve o menor. O perfil de foto — q82, effort 1 — deixava
+     ringing visível em volta das letras da logo (KSports, 2026-07-28).
+     `q`/`f` não entram na conta: o perfil decide os dois. O literal "artwork" e
+     o `h` entram na chave para NÃO reaproveitar o que o cache em disco gravou no
+     modo antigo. */
+  const fmt: ImageFormat = "webp";
+  const key = cacheKey(
+    `site-asset:artwork:${req.params.key}:${value as string}`,
+    h ? -h : w, 100, fmt,
+  );
   const etag = `"${key.slice(0, 16)}"`;
   if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
 
@@ -56,7 +66,7 @@ router.get("/site-asset/:key", async (req, res) => {
   let processed: Buffer;
   try {
     processed = memHit ?? (await resolveImage(
-      key, async () => Buffer.from(m[2]!, "base64"), w, q, fmt,
+      key, async () => Buffer.from(m[2]!, "base64"), w, 100, fmt, "artwork", h,
     ));
   } catch (err) {
     // Falha do sharp (formato exótico, imagem corrompida) não pode deixar o site
@@ -69,7 +79,7 @@ router.get("/site-asset/:key", async (req, res) => {
   }
 
   res
-    .set("Content-Type", fmt === "avif" ? "image/avif" : "image/webp")
+    .set("Content-Type", "image/webp")
     .set("Cache-Control", "public, max-age=31536000, immutable")
     .set("ETag", etag)
     .set("X-Image-Cache", memHit ? "MEM" : "MISS")

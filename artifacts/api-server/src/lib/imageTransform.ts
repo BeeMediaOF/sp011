@@ -88,18 +88,54 @@ async function diskWrite(key: string, buf: Buffer): Promise<void> {
 export const MAX_INPUT_PIXELS = 50_000_000;
 const SHARP_TIMEOUT_S = 15;
 
+/**
+ * Perfil de compressão. `photo` é o das imagens editoriais: lossy barato, porque
+ * são milhares de imagens diferentes e o custo de CPU por request importa.
+ *
+ * `artwork` é para LOGO e arte de identidade — texto, bordas duras, gradiente e
+ * canal alfa. Nesse conteúdo o lossy do WebP produz ringing em volta das letras
+ * e sujeira nas bordas, visível a olho nu mesmo em q=82 (regressão observada na
+ * logo do KSports em 2026-07-28). São poucos arquivos, cacheados como immutable
+ * e transformados uma única vez, então lossless + effort alto é barato: paga-se
+ * CPU uma vez e o resultado é pixel-idêntico ao PNG de origem, ainda muito menor
+ * que ele por causa do resize.
+ */
+export type ImageProfile = "photo" | "artwork";
+
 export async function transformImage(
   raw: Buffer,
   w: number,
   q: number,
   fmt: ImageFormat,
+  profile: ImageProfile = "photo",
+  h?: number,
 ): Promise<Buffer> {
   // limitInputPixels + timeout: um input acima do cap (ou que trava a decodificação)
   // faz o sharp LANÇAR — tratado a montante (proxy → placeholder; upload GET →
   // streaming cru), sem derrubar o processo.
+  //
+  // Por ALTURA quando `h` vem: é a restrição de layout de uma logo — o CSS fixa
+  // `style={{ height }}` e deixa a largura livre. Dimensionar logo por largura
+  // exige saber a proporção, que só o servidor conhece: a do KSports é 1080x300
+  // (3,6:1) e, exibida a 120 px de altura, ocupa 432 px — pedir w=320 fazia o
+  // navegador dar UPSCALE e borrava a marca (observado em 2026-07-28).
   const pipeline = sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
-    .resize({ width: w, withoutEnlargement: true })
+    .resize(h ? { height: h, withoutEnlargement: true } : { width: w, withoutEnlargement: true })
     .timeout({ seconds: SHARP_TIMEOUT_S });
+  if (profile === "artwork") {
+    /* Lossless e lossy q95/effort 4, servindo o MENOR. Em arte de identidade os
+       dois são visualmente indistinguíveis do original nesse nível, mas qual
+       vence em bytes depende do conteúdo: lossless ganha em logo chapada de
+       poucas cores, o lossy ganha quando há gradiente (a do KSports tem). Custa
+       duas passadas de sharp uma única vez — o resultado é cacheado como
+       immutable em memória e disco. AVIF fica de fora: no lossless costuma sair
+       maior que o WebP nesse tipo de arte. */
+    const [lossless, lossy] = await Promise.all([
+      pipeline.clone().webp({ lossless: true, effort: 4 }).toBuffer(),
+      pipeline.clone().webp({ quality: 95, effort: 4 }).toBuffer(),
+    ]);
+    return lossless.length <= lossy.length ? lossless : lossy;
+  }
   if (fmt === "avif") {
     return pipeline.avif({ quality: q, effort: 1 }).toBuffer();
   }
@@ -121,6 +157,8 @@ export async function resolveImage(
   w: number,
   q: number,
   fmt: ImageFormat,
+  profile: ImageProfile = "photo",
+  h?: number,
 ): Promise<Buffer> {
   // 1. Mem
   const memHit = memGet(key);
@@ -139,7 +177,7 @@ export async function resolveImage(
   if (!pending) {
     pending = (async () => {
       const raw = await produceRaw();
-      return transformImage(raw, w, q, fmt);
+      return transformImage(raw, w, q, fmt, profile, h);
     })()
       .then((buf) => {
         memSet(key, buf);

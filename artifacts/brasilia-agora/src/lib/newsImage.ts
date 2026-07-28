@@ -133,32 +133,56 @@ export function metroResize(src: string, w: number, h?: number): string {
 
 const SITE_ASSET_PREFIX = "/api/site-asset/";
 
+/** Como dimensionar um asset de identidade na entrega. */
+export type SiteAssetSize =
+  /** Caixa quadrada (favicon, avatar de assinatura): a largura limita. */
+  | { w: number }
+  /**
+   * Logo: o CSS fixa `style={{ height }}` e deixa a largura livre, então a
+   * ALTURA é a restrição real. Pedir por largura exigiria saber a proporção da
+   * imagem, que só o servidor conhece — a logo do KSports é 1080x300 e, exibida
+   * a 120 px de altura, ocupa 432 px; um `w=320` fazia o navegador dar upscale
+   * e borrava a marca.
+   */
+  | { h: number };
+
 /**
- * Acrescenta `&w=` a uma URL `/api/site-asset/…`, de onde vêm as logos e o
+ * Acrescenta `&w=`/`&h=` a uma URL `/api/site-asset/…`, de onde vêm as logos e o
  * avatar de assinatura. Devolve a entrada INALTERADA para qualquer outra coisa:
  * o mesmo campo das settings ainda chega como data URI quando o payload vem do
  * localStorage antigo ou de um blog que não passou pelo /api/site novo, e um
  * `&w=` colado num `data:` quebraria a imagem.
  *
- * Substitui um `w` que já esteja na URL — o backend publica um `w` padrão por
- * campo, e o componente sabe melhor que largura precisa (1x vs 2x).
+ * Substitui `w`/`h` que já estejam na URL — o backend publica um padrão por
+ * campo, e o componente sabe melhor que tamanho precisa (1x vs 2x).
  */
-export function siteAssetUrl(src: string, w: number): string {
+export function siteAssetUrl(src: string, size: SiteAssetSize | number): string {
   if (!src.startsWith(SITE_ASSET_PREFIX)) return src;
+  const spec = typeof size === "number" ? { w: size } : size;
   const [path, query = ""] = src.split("?");
-  const params = query.split("&").filter((p) => p && !p.startsWith("w="));
-  params.push(`w=${w}`);
+  const params = query
+    .split("&")
+    .filter((p) => p && !p.startsWith("w=") && !p.startsWith("h="));
+  params.push("w" in spec ? `w=${spec.w}` : `h=${spec.h}`);
   return `${path}?${params.join("&")}`;
 }
 
+/** Dobra a dimensão pedida, preservando o eixo (largura ou altura). */
+function double(size: SiteAssetSize | number): SiteAssetSize {
+  const spec = typeof size === "number" ? { w: size } : size;
+  return "w" in spec ? { w: spec.w * 2 } : { h: spec.h * 2 };
+}
+
 /**
- * `srcSet` 1x/2x para um asset de identidade. Tela 2x recebe o dobro da largura
- * — sem isso a logo, agora entregue no tamanho de exibição, sairia serrilhada
- * em retina.
+ * `srcSet` 1x/2x para um asset de identidade. Tela 2x recebe o dobro — sem isso
+ * a logo, agora entregue no tamanho de exibição, sairia serrilhada em retina.
  */
-export function siteAssetSrcSet(src: string, w: number): string | undefined {
+export function siteAssetSrcSet(
+  src: string,
+  size: SiteAssetSize | number,
+): string | undefined {
   if (!src.startsWith(SITE_ASSET_PREFIX)) return undefined;
-  return `${siteAssetUrl(src, w)} 1x, ${siteAssetUrl(src, w * 2)} 2x`;
+  return `${siteAssetUrl(src, size)} 1x, ${siteAssetUrl(src, double(size))} 2x`;
 }
 
 /** Larguras para cards de notícia (thumbnails e destaques médios). */

@@ -181,7 +181,8 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
         className={`fixed top-0 left-0 z-50 h-full w-[84%] max-w-[330px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-2 px-4 h-14 border-b border-gray-200 shrink-0">
-          {logoSrc ? <img src={siteAssetUrl(logoSrc, 320)} srcSet={siteAssetSrcSet(logoSrc, 320)} alt={siteName} loading="lazy" decoding="async" className="h-7 w-auto object-contain" /> : <span className="h-7" />}
+          {/* h-7 = 28 px de altura (menu lateral do mobile). */}
+          {logoSrc ? <img src={siteAssetUrl(logoSrc, { h: 28 })} srcSet={siteAssetSrcSet(logoSrc, { h: 28 })} alt={siteName} loading="lazy" decoding="async" className="h-7 w-auto object-contain" /> : <span className="h-7" />}
           <button onClick={onClose} aria-label={t("menu.close")} className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
             <X size={22} />
           </button>
@@ -276,10 +277,10 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
           parser a descobre de imediato. Vale duplamente porque são DUAS <img>
           (mobile e desktop): com logo mobile configurada, uma delas está sempre
           em display:none, e preload não respeita media query. */}
-      <img src={siteAssetUrl(mobileSrc, 320)} srcSet={siteAssetSrcSet(mobileSrc, 320)} alt={alt} style={{ height: mh }}
+      <img src={siteAssetUrl(mobileSrc, { h: mh })} srcSet={siteAssetSrcSet(mobileSrc, { h: mh })} alt={alt} style={{ height: mh }}
         loading="lazy" decoding="async"
         className={`lg:hidden w-auto max-w-full object-contain block ${centered ? "" : "object-left"}`} />
-      <img src={siteAssetUrl(desktopSrc, 320)} srcSet={siteAssetSrcSet(desktopSrc, 320)} alt={alt} style={{ height }}
+      <img src={siteAssetUrl(desktopSrc, { h: height })} srcSet={siteAssetSrcSet(desktopSrc, { h: height })} alt={alt} style={{ height }}
         loading="lazy" decoding="async"
         className="hidden lg:block w-auto object-contain" />
     </>

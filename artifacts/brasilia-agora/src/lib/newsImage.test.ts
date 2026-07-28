@@ -24,6 +24,24 @@ test("siteAssetUrl: substitui o w que o backend ja publicou", () => {
   assert.equal(siteAssetUrl("/api/site-asset/logo?v=abc&w=320", 640).match(/w=/g)?.length, 1);
 });
 
+test("siteAssetUrl: h troca o eixo e nao deixa w para tras", () => {
+  /* Logo é dimensionada por ALTURA: o CSS fixa style={{ height }} e a largura
+     sai da proporção, que só o servidor conhece. Se o w publicado sobrevivesse
+     junto do h, o sharp receberia os dois e distorceria/cortaria a marca. */
+  const url = siteAssetUrl("/api/site-asset/logo?v=abc&w=320", { h: 120 });
+  assert.equal(url, "/api/site-asset/logo?v=abc&h=120");
+  assert.equal(url.includes("w="), false);
+  // e o caminho inverso também limpa
+  assert.equal(siteAssetUrl("/api/site-asset/logo?v=abc&h=120", { w: 64 }), "/api/site-asset/logo?v=abc&w=64");
+});
+
+test("siteAssetSrcSet: dobra preservando o eixo pedido", () => {
+  assert.equal(
+    siteAssetSrcSet("/api/site-asset/logo?v=abc", { h: 120 }),
+    "/api/site-asset/logo?v=abc&h=120 1x, /api/site-asset/logo?v=abc&h=240 2x",
+  );
+});
+
 test("siteAssetUrl: preserva o ?v= (e o cache-buster da troca de logo no admin)", () => {
   assert.ok(siteAssetUrl(ASSET, 64).includes("v=15f61d3a53"));
 });
