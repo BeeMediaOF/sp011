@@ -57,7 +57,7 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 |---|:--:|:--:|---|---|
 | 01 — payload da lista de artigos | 1 | M | — | **concluído e validado em prod** |
 | 02 — JS do caminho crítico | 1 | P | 01 (medição) | **concluído e validado em prod** |
-| 06 — llms.txt / robots.txt por blog | 1 | P | — | **implementado — aguardando deploy e verificação** |
+| 06 — llms.txt / robots.txt por blog | 1 | P | — | **concluído e validado em prod** |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | pendente |
 | 04 — CSS render-blocking | 2 | M/G | **02** | pendente |
 | 05 — SSR de artigo e categoria | 3 | G | **01** | pendente |
@@ -348,11 +348,88 @@ registrado ~16 linhas depois — middleware adicionado com `server.middlewares.u
 dentro do hook ganha do estático. `BASE_PATH` é `/` em produção
 (`docker-compose.yml:63`), então o `baseMiddleware` não entra no caminho.
 
+## PRD-PERF-06 — validação em produção (2026-07-28)
+
+Deploy feito com bump de imagem e propagado aos 8 blogs.
+
+**Defeito encontrado PELA verificação, corrigido antes de propagar** (`8cd8518`):
+o `curl -sI` do roteiro devolvia `text/plain` + `no-cache` enquanto o GET
+devolvia `text/plain; charset=utf-8` + `public, max-age=3600`. O guard era
+`req.method !== "GET"`, então **HEAD caía no `next()`** e era respondido pelo
+estático neutro — metadados de um arquivo, corpo de outro, `Content-Length`
+errado. Crawler e monitor costumam mandar HEAD antes do GET. Depois da correção,
+GET e HEAD batem byte a byte (`content-length: 1362` nos dois).
+
+### Os 8 blogs, cada um anunciando a si mesmo
+
+| Blog | `# título` do llms.txt | `Sitemap:` |
+|---|---|---|
+| sp011 | `# SP011` | sp011.com.br ✅ |
+| ksports | `# KSports` (**em inglês**) | ksports.midia.run ✅ |
+| esporteagora | `# Esporte Agora` | esporteagora.midia.run ✅ |
+| resenhavip | `# Resenha Vip` | resenhavip.midia.run ✅ |
+| oleysports | `# OleySports` | oleysports.midia.run ✅ |
+| beeesportes | `# BeeEsportes` | beeesportes.midia.run ✅ |
+| pontofarma | `# Ponto Farma` | pontofarma.midia.run ✅ |
+| creditovc | `# Crédito.vc` | creditovc.midia.run ✅ |
+
+Antes, os oito serviam `# SBC Agora` e `Sitemap: brasilia-agora.replit.app`.
+
+### Critérios de aceite
+
+| Critério | Alvo | Medido | |
+|---|---|---|:--:|
+| `llms.txt` abre com o nome do próprio blog | 4 blogs | **8 de 8** | ✅ |
+| Bloco `>` de resumo + links markdown absolutos | sim | sim | ✅ |
+| `Sitemap:` do próprio host | sim | 8 de 8 | ✅ |
+| — e respondem 200 | sim | 200/200 (sp011) | ✅ |
+| `ksports` em inglês | sim | World Cup/Football/NFL/E-Sports | ✅ |
+| Com a `api` parada, `/llms.txt` responde 200 | sim | 200, `# Portal de notícias` | ✅ |
+| — e o `robots.txt` continua íntegro | (não previsto no PRD) | os 2 `Sitemap:` presentes | ✅ |
+| `Content-Type` / `Cache-Control` | `text/plain; charset=utf-8` / `max-age=3600` | idem, em GET **e** HEAD | ✅ |
+| `typecheck` | verde | verde (pacote + `vite.config.ts` à parte) | ✅ |
+| Lighthouse: Agentic Browsing 3/3, SEO 100, BP 100 | sim | **não medido** | ⏳ |
+
+**O ⏳ é honesto:** o Lighthouse não foi executado nesta sessão. O que se
+verificou foi a *conformidade de formato* que o audit cobra (título `#`, resumo
+`>`, links markdown com URL absoluta, recursos declarados) e a correção do
+`Sitemap:` morto. A nota 3/3 em si segue por confirmar.
+
+### Achado de conteúdo (não é código)
+
+**Seis dos oito blogs servem o mesmo resumo `>`: "Notícia. Agora. Sempre."** —
+esporteagora, resenhavip, oleysports, beeesportes, pontofarma e creditovc. O
+`seoDescription` deles está vazio e o plugin cai para a `tagline`, que é a do
+sp011 replicada. Nos dois últimos está factualmente errado: pelo CLAUDE.md §4 a
+tagline do PontoFarma é "conteúdo que gera resultado" (B2B farmacêutico) e a do
+Crédito.vc é "Educação financeira para a vida real" — nenhum é portal
+esportivo. O bloco `>` é a linha que um LLM lê para saber o que o portal é, e
+seis domínios repetindo a mesma frase reforçam o problema de conteúdo duplicado
+já registrado no CLAUDE.md §9/§19.3. **Correção é no admin, sem deploy:**
+Configurações → `seoDescription` por blog (tem precedência sobre a tagline no
+código); propaga em até 1 h pelo cache do plugin.
+
+## Onda 1 — encerrada
+
+Os três PRDs da onda 1 (01, 02 e 06) estão concluídos e validados em produção,
+com a imagem propagada aos 8 blogs.
+
 ## Próxima ação
 
-1. **Deploy do PRD-06** (`docker compose build web && up -d web`) e verificação
-   por `curl` nos 4 domínios + caminho de falha com a `api` parada.
-2. Fechado o 06, a **onda 1 acaba**; começa a onda 2 (PRD-03 e PRD-04).
+1. **Onda 2: PRD-PERF-03** (imagens de identidade) e **PRD-PERF-04** (CSS
+   render-blocking, depende do 02, que já fechou).
+2. Levar junto as duas correções agendadas, ambas no serviço `web`:
+   - `pages/Artigo.tsx:176` — `BRAND.titleSuffix` ("SBC Agora") no
+     `document.title` de toda página de artigo dos 8 blogs (ver acima);
+   - `ssrHomePlugin` e `spaHeadPlugin` só tratam `GET` — um **HEAD** em `/` ou
+     numa rota de categoria cai no `index.html` cru, com o `<head>` do blog que
+     buildou a imagem. Mesma causa do defeito corrigido em `8cd8518`.
+3. Pendente de diagnóstico (fora da auditoria de performance do site): tempo de
+   build subiu. Suspeitos levantados — o `Dockerfile` do `web` faz `COPY . .`
+   **antes** do `pnpm install` (o do `api` já corrige isso desde `107134a`), e o
+   `RUN chown -R node:node /app` do `82f9dc8` (PRD-07, 2026-07-21) duplica o
+   `/app` inteiro numa camada. Falta a saída de `time docker compose build` e
+   `docker system df` para decidir entre limpeza de disco e Dockerfile.
 
 O rollout do PRD-02 aos 8 blogs foi concluído em 2026-07-28: `vendor-charts: 0`
 no HTML público de ksports, esporteagora, oleysports, beeesportes e resenhavip,
