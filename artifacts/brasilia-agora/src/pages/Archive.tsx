@@ -8,6 +8,9 @@ import { Search, Calendar } from "lucide-react";
 import { useCategories, categoryColor } from "../hooks/useCategories";
 import { safeTitleHtml } from "@/lib/sanitize";
 import { useT, formatShortDate } from "../lib/i18n";
+import { articlesUrl, ARTICLES_LIST_LIMIT } from "../lib/articlesQuery";
+
+interface ArticlesPage { articles?: Article[]; total?: number }
 
 function imgFallback(url: string, placeholderText: string) {
   return url || `https://placehold.co/400x260/e5e7eb/9ca3af?text=${placeholderText}`;
@@ -78,6 +81,8 @@ export default function Archive() {
   const { t } = useT();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [location] = useLocation();
   const initialQ = new URLSearchParams(location.split("?")[1] ?? "").get("q") ?? "";
   const [filter, setFilter] = useState(initialQ);
@@ -86,11 +91,35 @@ export default function Archive() {
   const { categories } = useCategories();
 
   useEffect(() => {
-    fetch("/api/articles")
+    fetch(articlesUrl({ limit: ARTICLES_LIST_LIMIT, offset: 0, sort: "recent" }))
       .then((r) => r.json())
-      .then((d) => { setArticles(d.articles ?? []); setLoading(false); })
+      .then((d: ArticlesPage) => {
+        setArticles(d.articles ?? []);
+        setTotal(d.total ?? (d.articles ?? []).length);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
+
+  /* A lista vem paginada (PRD-PERF-01) — o /arquivo é a porta de entrada do
+     acervo antigo, então precisa poder ir além da primeira página. A busca por
+     texto continua client-side, sobre o que já foi carregado. */
+  function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    fetch(articlesUrl({ limit: ARTICLES_LIST_LIMIT, offset: articles.length, sort: "recent" }))
+      .then((r) => r.json())
+      .then((d: ArticlesPage) => {
+        const next = d.articles ?? [];
+        setArticles((prev) => {
+          const seen = new Set(prev.map((a) => a.id));
+          return [...prev, ...next.filter((a) => !seen.has(a.id))];
+        });
+        if (typeof d.total === "number") setTotal(d.total);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }
 
   const filtered = articles.filter((a) => {
     const matchText = !filter ||
@@ -272,6 +301,18 @@ export default function Archive() {
                     </div>
                   </section>
                 ))}
+
+                {articles.length < total && (
+                  <button
+                    onClick={loadMore}
+                    disabled={loadingMore}
+                    className="w-full py-3 border border-gray-300 text-[#1a1a1a] font-bold text-[11px] uppercase tracking-wider hover:bg-[#1a1a1a] hover:text-white transition-colors disabled:opacity-50"
+                  >
+                    {loadingMore
+                      ? t("common.loadingDots")
+                      : `${t("category.loadMore")} (${articles.length}/${total})`}
+                  </button>
+                )}
 
               </div>
 

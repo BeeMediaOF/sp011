@@ -20,7 +20,13 @@
               .then(function (r) { return r.ok ? r.json() : null; })
               .catch(function () { return null; });
           };
-          b.articles = j("/api/articles");
+          var isHome = location.pathname === "/" || location.pathname === "";
+          /* A lista é paginada (PRD-PERF-01): a home usa todos os blocos, o resto
+             do site só lê o topo (ticker/sidebar). Os literais e a ORDEM das
+             chaves espelham src/lib/articlesQuery.ts — a URL precisa sair
+             byte-idêntica à do useArticles, senão o hook baixa tudo de novo em
+             vez de acertar o cache HTTP. */
+          b.articles = j("/api/articles?limit=" + (isHome ? 200 : 30) + "&offset=0&sort=recent");
           b.site = j("/api/site");
           b.ads = j("/api/ads");
 
@@ -31,7 +37,6 @@
              o navegador baixa exatamente o mesmo recurso (zero download duplicado).
              Os valores espelham HERO_WIDTHS, o sizes do FeaturedCard e PROXY_HOSTS
              de src/lib/newsImage.ts — manter em sincronia se aqueles mudarem. */
-          var isHome = location.pathname === "/" || location.pathname === "";
           if (isHome) {
             var WIDTHS = [480, 768, 1024, 1280];
             var SIZES = "(max-width: 1024px) 100vw, (max-width: 1280px) 33vw, 427px";

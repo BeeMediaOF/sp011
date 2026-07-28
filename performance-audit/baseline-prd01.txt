@@ -1,0 +1,17 @@
+=== BASELINE PRD-PERF-01 — 2026-07-28T02:12:16Z ===
+
+--- sp011.com.br
+  /api/articles           : 2454750 bytes (gzip off)
+  /api/articles (gzip)    : 832734 bytes
+  itens na lista         : 3109
+  __SSR_DATA__ (bytes)   : 70923
+--- ksports.midia.run
+  /api/articles           : 985121 bytes (gzip off)
+  /api/articles (gzip)    : 324439 bytes
+  itens na lista         : 1385
+  __SSR_DATA__ (bytes)   : 74550
+--- resenhavip.midia.run
+  /api/articles           : 371199 bytes (gzip off)
+  /api/articles (gzip)    : 122313 bytes
+  itens na lista         : 513
+  __SSR_DATA__ (bytes)   : 79510

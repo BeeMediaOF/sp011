@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../../lib/adminApi";
+import { articlesUrl } from "../../lib/articlesQuery";
 import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, type TemplateMenuItem } from "../../lib/homeBlocks";
@@ -1364,7 +1365,8 @@ export default function HomeBlocksManager() {
   const [previewArticleSlug, setPreviewArticleSlug] = useState<string | null>(null);
   useEffect(() => {
     if (tab !== "article" || previewArticleSlug !== null) return;
-    fetch("/api/articles")
+    // Só o mais recente interessa aqui — a lista é paginada (PRD-PERF-01).
+    fetch(articlesUrl({ limit: 1, sort: "recent" }))
       .then((r) => r.json())
       .then((d: { articles?: { slug?: string; id: string }[] }) => {
         const a = d.articles?.[0];

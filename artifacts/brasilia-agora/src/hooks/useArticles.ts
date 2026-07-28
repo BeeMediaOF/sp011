@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { articlesUrl, listLimitForRoute } from "../lib/articlesQuery";
 
 export interface Article {
   id: string;
@@ -56,15 +57,38 @@ function takeBoot(key: string): Promise<unknown> | null {
   return p;
 }
 
+function publishedTime(a: Article): number {
+  const t = new Date(a.publishedAt).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Mescla uma página de "mais recentes" no cache existente.
+ *
+ * A lista virou paginada (PRD-PERF-01) e o SSR semeia, além dos recentes, um pool
+ * por categoria para as editorias de baixo volume (vite.config.ts). Um refetch de
+ * 200 recentes que simplesmente SUBSTITUÍSSE o cache apagaria esse pool e blocos
+ * da home cairiam em placeholder. Regra: dentro da janela coberta pela página
+ * nova ela é a verdade (artigo despublicado some); item mais antigo que o corte
+ * da página só ficou de fora por limite — permanece.
+ */
+function mergeRecent(prev: Article[] | null, next: Article[]): Article[] {
+  if (!prev || prev.length === 0 || next.length === 0) return next;
+  const oldest = next.reduce((min, a) => Math.min(min, publishedTime(a)), Infinity);
+  const ids = new Set(next.map((a) => a.id));
+  const extras = prev.filter((a) => !ids.has(a.id) && publishedTime(a) < oldest);
+  return extras.length > 0 ? [...next, ...extras] : next;
+}
+
 async function doFetch() {
   try {
     let data = (await takeBoot("articles")) as { articles?: Article[] } | null;
     if (!data) {
-      const r = await fetch("/api/articles");
+      const r = await fetch(articlesUrl({ limit: listLimitForRoute(), offset: 0, sort: "recent" }));
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       data = await r.json() as { articles: Article[] };
     }
-    _cache = data.articles ?? [];
+    _cache = mergeRecent(_cache, data.articles ?? []);
     _cacheAt = Date.now();
     notifySubscribers();
   } catch { /* keep stale cache on error */ } finally {

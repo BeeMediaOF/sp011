@@ -13,6 +13,7 @@ import {
   Bot, Zap, Gauge,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
+import { articlesUrl } from "../../lib/articlesQuery";
 import { useAdminT, type AdminTKey } from "../../lib/adminI18n";
 import { useCan } from "../../lib/permissionsCache";
 import {
@@ -142,7 +143,6 @@ interface QueueItem {
 interface ArticleOption {
   id: string;
   title: string;
-  socialTitle?: string;
   category: string;
   imageUrl?: string;
   subtitle?: string;
@@ -1173,6 +1173,8 @@ export default function SocialMedia() {
   // Artigo real p/ preview WYSIWYG dentro do canvas
   const [editorArticles,   setEditorArticles]   = useState<ArticleOption[]>([]);
   const [previewArticleId, setPreviewArticleId] = useState<string>("");
+  /** socialTitle do artigo selecionado, buscado sob demanda (ver canvasArticle). */
+  const [socialTitleById,  setSocialTitleById]  = useState<Record<string, string>>({});
 
   // Preview "real" (render server-side via Playwright)
   const [previewUrl,     setPreviewUrl]     = useState<string | null>(null);
@@ -1266,13 +1268,29 @@ export default function SocialMedia() {
 
   const fetchEditorArticles = useCallback(async () => {
     try {
-      const data = (await fetch("/api/articles?limit=200&status=published").then((r) => r.json())) as
+      const data = (await fetch(articlesUrl({ limit: 200, sort: "recent" })).then((r) => r.json())) as
         | { articles?: ArticleOption[] }
         | ArticleOption[];
       const list = Array.isArray(data) ? data : (data.articles ?? []);
       setEditorArticles(list as ArticleOption[]);
     } catch { setEditorArticles([]); }
   }, []);
+
+  /* O socialTitle saiu da lista pública (PRD-PERF-01) — busca o artigo completo
+     só quando um é selecionado para a prévia do canvas. Memoizado por id. */
+  useEffect(() => {
+    const id = previewArticleId;
+    if (!id || id in socialTitleById) return;
+    let cancelled = false;
+    fetch(`/api/articles/${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((d: { article?: { socialTitle?: string } }) => {
+        if (cancelled) return;
+        setSocialTitleById((prev) => ({ ...prev, [id]: d.article?.socialTitle ?? "" }));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [previewArticleId, socialTitleById]);
 
   const fetchSocialConfig = useCallback(async () => {
     try {
@@ -1916,7 +1934,7 @@ export default function SocialMedia() {
 
   async function openQueueModal() {
     try {
-      const data = (await fetch("/api/articles?limit=200&status=published").then((r) => r.json())) as { articles?: ArticleOption[] } | ArticleOption[];
+      const data = (await fetch(articlesUrl({ limit: 200, sort: "recent" })).then((r) => r.json())) as { articles?: ArticleOption[] } | ArticleOption[];
       const list = Array.isArray(data) ? data : (data.articles ?? []);
       setArticles(list as ArticleOption[]);
     } catch { setArticles([]); }
@@ -2135,10 +2153,14 @@ export default function SocialMedia() {
     category: t("soc.sampleCategory"), author: t("soc.sampleAuthor"), imageUrl: "",
   };
   const selectedPreviewArticle = editorArticles.find((a) => a.id === previewArticleId);
+  /* socialTitle não vem mais na LISTA pública (PRD-PERF-01: eram ~62 B por item
+     em toda página do site). Busca o artigo completo só do selecionado, para o
+     canvas continuar mostrando o mesmo título compacto do render server-side. */
+  const previewSocialTitle = socialTitleById[previewArticleId];
   const canvasArticle: ArticleData = selectedPreviewArticle
     ? {
         // Canvas usa o título compacto da IA (igual ao render server-side) p/ WYSIWYG.
-        title: selectedPreviewArticle.socialTitle || selectedPreviewArticle.title,
+        title: previewSocialTitle || selectedPreviewArticle.title,
         category: selectedPreviewArticle.category,
         subtitle: selectedPreviewArticle.subtitle,
         author: selectedPreviewArticle.author,

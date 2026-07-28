@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { articleService } from "../lib/articleService.js";
+import { parseArticleListParams, selectArticles } from "../lib/articlesList.js";
 import { store } from "../lib/store.js";
 
 const router = Router();
@@ -55,29 +56,46 @@ router.get("/categories", async (_req, res) => {
   res.json({ categories });
 });
 
-/** GET /api/articles — list published articles (public) */
-router.get("/", async (_req, res) => {
+/** GET /api/articles — list published articles (public).
+ *
+ *  Params ADITIVOS (nenhum obrigatório): `limit` (1–1000 ou `all`, padrão 200),
+ *  `offset`, `category` (slug, igualdade exata + fallback por tag), `q` (busca em
+ *  título/categoria) e `sort` (`recent` | `views`). Devolve
+ *  `{ articles, total, limit, offset }` — `articles` continua sendo a chave.
+ *
+ *  Sem limite (até o PRD-PERF-01) esta rota devolvia o acervo inteiro — 2,4 MB no
+ *  sp011 — no caminho crítico de TODA rota sem SSR. `socialTitle` e `keywords`
+ *  saíram do payload da lista: só o admin e o /api/articles/:id os consomem. */
+router.get("/", async (req, res) => {
+  const params = parseArticleListParams(req.query as Record<string, unknown>);
   // Views rastreadas pelo analytics (pageview) — usadas pelos blocos "Mais lidas".
   const views = store.getArticleViews();
-  const articles = (await articleService.getArticles())
-    .filter((a) => a.status === "published")
-    .map((a) => ({
-      id: a.id,
-      slug: a.slug || a.id,
-      title: a.title,
-      socialTitle: a.socialTitle,
-      subtitle: a.subtitle,
-      category: a.category,
-      tag: a.tag,
-      imageUrl: a.imageUrl,
-      author: a.author,
-      publishedAt: a.publishedAt,
-      keywords: a.keywords,
-      readingMinutes: a.readingMinutes,
-      views: views[a.id]?.views ?? 0,
-    }));
+  const viewsOf = (id: string) => views[id]?.views ?? 0;
+
+  const published = (await articleService.getArticles())
+    .filter((a) => a.status === "published");
+  const { page, total } = selectArticles(published, params, viewsOf);
+
+  const articles = page.map((a) => ({
+    id: a.id,
+    slug: a.slug || a.id,
+    title: a.title,
+    subtitle: a.subtitle,
+    category: a.category,
+    tag: a.tag,
+    imageUrl: a.imageUrl,
+    author: a.author,
+    publishedAt: a.publishedAt,
+    readingMinutes: a.readingMinutes,
+    views: viewsOf(a.id),
+  }));
   res.setHeader("Cache-Control", "public, max-age=30, s-maxage=30, stale-while-revalidate=300");
-  res.json({ articles });
+  res.json({
+    articles,
+    total,
+    limit: Number.isFinite(params.limit) ? params.limit : total,
+    offset: params.offset,
+  });
 });
 
 /** GET /api/articles/:id — single article (public) */

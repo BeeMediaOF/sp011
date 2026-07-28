@@ -189,10 +189,29 @@ Todas as rotas vivem sob o prefixo `/api`. Auth via `Authorization: Bearer <toke
 
 | Método | Rota | Descrição |
 |--------|------|-----------|
-| GET | `/articles` | Lista artigos publicados (com filtros: category, limit, offset, q) |
+| GET | `/articles` | Lista **paginada** de artigos publicados |
 | GET | `/articles/categories` | Contagem por categoria |
 | GET | `/articles/:id` | Artigo por ID ou slug |
 | GET | `/articles/:id/relacionados` | Artigos relacionados |
+
+`GET /api/articles` aceita parâmetros **aditivos** (nenhum obrigatório; valor
+inválido cai no default) e devolve `{ articles, total, limit, offset }` —
+`total` é a contagem depois dos filtros e antes do corte:
+
+| Param | Valores | Default | Semântica |
+|---|---|---|---|
+| `limit` | 1–1000 ou `all` | **200** | Tamanho da página. `all` é válvula de escape para depuração/scripts — nenhum código do frontend usa |
+| `offset` | inteiro ≥ 0 | 0 | Paginação ("Carregar mais" do `/arquivo` e das páginas de editoria) |
+| `category` | slug | — | Igualdade **exata**, case-insensitive; fallback por `tag` slugificada quando `category` está vazia (artigos legados) |
+| `q` | texto | — | `includes` case-insensitive em `title` **ou** `category` |
+| `sort` | `recent` \| `views` | `recent` | Ordenação aplicada **antes** do corte; `views` desempata por data |
+
+A lista **não** inclui `socialTitle` nem `keywords` (só `/articles/:id` e o admin
+os consomem). Até o PRD-PERF-01 a rota devolvia o acervo inteiro sem limite —
+2,4 MB no sp011, no caminho crítico de toda rota sem SSR. A seleção fica em
+`src/lib/articlesList.ts` (testada em `test/articlesList.test.ts`); o frontend
+monta as URLs por `src/lib/articlesQuery.ts`, cuja ordem de chaves é fixa para
+casar byte a byte com o prefetch inline do `index.html`.
 
 ### Configurações do Portal (`/api/admin`)
 

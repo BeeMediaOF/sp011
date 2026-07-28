@@ -409,7 +409,9 @@ function ssrHomePlugin(apiBase: string): Plugin {
       if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
 
       const [a, s, d] = (await Promise.all([
-        fetchJson(`${apiBase}/api/articles`),
+        // Pool de origem do SSR: 300 recentes bastam para os 22 blocos + o
+        // complemento por categoria abaixo (a rota é paginada — PRD-PERF-01).
+        fetchJson(`${apiBase}/api/articles?limit=300&offset=0&sort=recent`),
         fetchJson(`${apiBase}/api/site`),
         fetchJson(`${apiBase}/api/ads`),
       ])) as [{ articles?: unknown[] } | null, unknown, { ads?: unknown[] } | null];
@@ -422,21 +424,25 @@ function ssrHomePlugin(apiBase: string): Plugin {
         (s && typeof s === "object") ? { ...(s as Record<string, unknown>) } : null;
       /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
          para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
-         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
-         recentes — cobrem as seções quentes sem perda visível. */
+         inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 150 mais
+         recentes — cobrem as seções quentes sem perda visível (eram 100 quando o
+         item da lista ainda carregava socialTitle/keywords). */
       const rawArticles = (a && Array.isArray(a.articles)) ? (a.articles as Array<Record<string, unknown>>) : [];
       const sorted = rawArticles
         .map((art) => { const copy = { ...art }; delete copy["keywords"]; return copy; })
         .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime());
-      const articles = sorted.slice(0, 100);
+      const articles = sorted.slice(0, 150);
       /* O corte acima é só "mais recentes": editoria de baixo volume (ex.: NFL,
-         e-sports) cujos artigos saíram do top-100 sumia da home no público e
+         e-sports) cujos artigos saíram do top-N sumia da home no público e
          virava "EXEMPLO" no preview do admin. Completa o pool com até 8 artigos
-         por categoria referenciada pelos blocos visíveis — mesmo critério de
-         match do getArticles da Home (includes, case-insensitive). */
+         por categoria referenciada pelos blocos visíveis.
+         A busca é POR CATEGORIA na API (e não uma varredura da lista-base):
+         desde o PRD-PERF-01 a lista vem paginada, então uma editoria sem nada
+         nos 300 recentes não seria alcançada por varredura. O filtro `category`
+         da rota é igualdade exata + fallback por tag — a MESMA regra do
+         getArticles da Home. */
       const homeBlocks = site?.["homeBlocks"];
       if (Array.isArray(homeBlocks)) {
-        const have = new Set(articles.map((art) => String(art["id"])));
         const cats = new Set<string>();
         for (const b of homeBlocks) {
           if (!b || typeof b !== "object") continue;
@@ -445,14 +451,19 @@ function ssrHomePlugin(apiBase: string): Plugin {
           const cat = typeof blk["category"] === "string" ? blk["category"].trim().toLowerCase() : "";
           if (cat) cats.add(cat);
         }
-        for (const cat of cats) {
-          let covered = 0;
-          for (const art of sorted) {
-            if (covered >= 8) break;
-            if (!String(art["category"] ?? "").toLowerCase().includes(cat)) continue;
-            covered++;
-            const id = String(art["id"]);
-            if (!have.has(id)) { have.add(id); articles.push(art); }
+        const pools = (await Promise.all([...cats].map((cat) => fetchJson(
+          `${apiBase}/api/articles?limit=8&offset=0&category=${encodeURIComponent(cat)}&sort=recent`,
+        )))) as Array<{ articles?: unknown[] } | null>;
+        const have = new Set(articles.map((art) => String(art["id"])));
+        for (const pool of pools) {
+          if (!pool || !Array.isArray(pool.articles)) continue;
+          for (const raw of pool.articles as Array<Record<string, unknown>>) {
+            const id = String(raw["id"]);
+            if (have.has(id)) continue;
+            have.add(id);
+            const copy = { ...raw };
+            delete copy["keywords"];
+            articles.push(copy);
           }
         }
       }

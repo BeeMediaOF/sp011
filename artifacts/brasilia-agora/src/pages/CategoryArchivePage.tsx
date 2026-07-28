@@ -7,6 +7,7 @@ import type { Article as CategoryArticle, MostReadItem } from "../components/Cat
 import type { Article as ApiArticle } from "../lib/adminApi";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useT, relativeTimeOrDate } from "../lib/i18n";
+import { articlesUrl, ARTICLES_CATEGORY_LIMIT } from "../lib/articlesQuery";
 
 interface Props {
   category: string;
@@ -14,12 +15,32 @@ interface Props {
   color: string;
 }
 
+interface ArticlesPage { articles?: ApiArticle[]; total?: number }
+
 export default function CategoryArchivePage({ category, slug, color }: Props) {
   const [articles, setArticles] = useState<CategoryArticle[]>([]);
   const [mostRead, setMostRead] = useState<MostReadItem[]>([]);
   const [loading, setLoading]   = useState(true);
+  const [total, setTotal]       = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const { trackCategory } = useAnalytics();
   const { t, lang, tz } = useT();
+
+  /* Mapeamento do payload da API para o shape do CategoryPage. Fora do efeito
+     para o "Carregar mais" reusar exatamente a mesma conversão. */
+  const toCard = React.useCallback((a: ApiArticle): CategoryArticle => ({
+    id:       a.id,
+    slug:     a.slug || a.id,
+    title:    a.title,
+    subtitle: a.subtitle,
+    time:     relativeTimeOrDate(a.publishedAt, lang, tz),
+    imageUrl: a.imageUrl || `https://placehold.co/640x380/e5e7eb/9ca3af?text=${t("category.imgNone")}`,
+    tag:      a.tag || category,
+    tagColor: color,
+    author:   a.author,
+  // t é recriada a cada render; lang/tz/category/color são estáveis e bastam.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [category, color, lang, tz]);
 
   // Track category view when user lands on this page
   useEffect(() => {
@@ -28,47 +49,53 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
   }, [slug]);
 
   useEffect(() => {
-    fetch("/api/articles")
-      .then((r) => r.json())
-      .then((d: { articles: ApiArticle[] }) => {
-        const filtered = (d.articles ?? [])
-          .filter((a) => {
-            // Igualdade EXATA: includes() fazia /futebol listar futebol-americano.
-            // Fallback por tag (artigos legados sem category) compara slugificado.
-            const cat = (a.category ?? "").trim().toLowerCase();
-            const tag = (a.tag ?? "").trim().toLowerCase().replace(/\s+/g, "-");
-            return cat === slug || (cat === "" && tag === slug);
-          })
-          .sort((a, b) =>
-            new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-          )
-          .map((a): CategoryArticle => ({
-            id:       a.id,
-            slug:     a.slug || a.id,
-            title:    a.title,
-            subtitle: a.subtitle,
-            time:     relativeTimeOrDate(a.publishedAt, lang, tz),
-            imageUrl: a.imageUrl || `https://placehold.co/640x380/e5e7eb/9ca3af?text=${t("category.imgNone")}`,
-            tag:      a.tag || category,
-            tagColor: color,
-            author:   a.author,
-          }));
-        setArticles(filtered);
-        // Mais lidas REAIS do site inteiro (por views), para a sidebar
-        const top = [...(d.articles ?? [])]
-          .sort((a, b) =>
-            ((b as ApiArticle & { views?: number }).views ?? 0) -
-            ((a as ApiArticle & { views?: number }).views ?? 0))
-          .slice(0, 5)
-          .map((a): MostReadItem => ({ id: a.id, slug: a.slug || a.id, title: a.title }));
-        setMostRead(top);
+    /* Dois pedidos enxutos em vez de baixar (e parsear DUAS vezes) o acervo
+       inteiro: o filtro por categoria — igualdade exata + fallback por tag para
+       artigos legados — e a ordenação agora são do servidor (PRD-PERF-01). */
+    let cancelled = false;
+    setLoading(true);
+    Promise.all([
+      fetch(articlesUrl({ category: slug, limit: ARTICLES_CATEGORY_LIMIT, sort: "recent" }))
+        .then((r) => r.json()) as Promise<ArticlesPage>,
+      // "Mais lidas" da sidebar continua sendo do SITE INTEIRO, não da categoria.
+      fetch(articlesUrl({ limit: 5, sort: "views" }))
+        .then((r) => r.json()) as Promise<ArticlesPage>,
+    ])
+      .then(([list, top]) => {
+        if (cancelled) return;
+        setArticles((list.articles ?? []).map(toCard));
+        setTotal(list.total ?? (list.articles ?? []).length);
+        setMostRead((top.articles ?? [])
+          .map((a): MostReadItem => ({ id: a.id, slug: a.slug || a.id, title: a.title })));
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  // t é recriada a cada render (deixá-la nas deps loopar ia o fetch); lang/tz
-  // são strings estáveis e já forçam o refetch quando o idioma/fuso muda.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug, category, color, lang, tz]);
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [slug, toCard]);
+
+  /* A lista da categoria vem paginada (PRD-PERF-01) — sem isto, o acervo antigo
+     ficaria inalcançável a partir da página de editoria. O botão já existia no
+     CategoryPage, mas sem handler: não fazia nada. */
+  function loadMore() {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    fetch(articlesUrl({
+      category: slug, limit: ARTICLES_CATEGORY_LIMIT, offset: articles.length, sort: "recent",
+    }))
+      .then((r) => r.json())
+      .then((d: ArticlesPage) => {
+        const next = (d.articles ?? []).map(toCard);
+        // Concatena ignorando ids já presentes (artigo novo publicado entre as
+        // páginas desloca o offset e reapareceria duplicado).
+        setArticles((prev) => {
+          const seen = new Set(prev.map((a) => a.id));
+          return [...prev, ...next.filter((a) => !seen.has(a.id))];
+        });
+        if (typeof d.total === "number") setTotal(d.total);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingMore(false));
+  }
 
   const placeholder: CategoryArticle = {
     id:       "__placeholder__",
@@ -98,6 +125,9 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
             articles={rest}
             featuredArticle={featured}
             mostRead={mostRead}
+            onLoadMore={loadMore}
+            hasMore={articles.length < total}
+            loadingMore={loadingMore}
           />
         )}
       </main>

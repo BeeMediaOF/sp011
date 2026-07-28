@@ -34,6 +34,11 @@ interface CategoryPageProps {
   featuredArticle2?: Article;
   /** Mais lidas REAIS do site (por views). Vazio → cai nas recentes da categoria. */
   mostRead?: MostReadItem[];
+  /** Busca a próxima página da categoria. Sem handler, o botão "Carregar mais"
+   *  não é renderizado (antes ele existia sempre e não fazia nada). */
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }
 
 export default function CategoryPage({
@@ -43,6 +48,9 @@ export default function CategoryPage({
   featuredArticle,
   featuredArticle2,
   mostRead,
+  onLoadMore,
+  hasMore,
+  loadingMore,
 }: CategoryPageProps) {
   const { settings } = useSite();
   const { t } = useT();
@@ -126,9 +134,15 @@ export default function CategoryPage({
                   <ArticleCard key={article.id} {...article} />
                 ))}
               </div>
-              <button className="w-full mt-8 py-3 border border-gray-300 text-[#1a2448] font-bold text-sm hover:bg-[#1a2448] hover:text-white transition-colors">
-                {t("category.loadMore")}
-              </button>
+              {onLoadMore && hasMore && (
+                <button
+                  onClick={onLoadMore}
+                  disabled={loadingMore}
+                  className="w-full mt-8 py-3 border border-gray-300 text-[#1a2448] font-bold text-sm hover:bg-[#1a2448] hover:text-white transition-colors disabled:opacity-50"
+                >
+                  {loadingMore ? t("common.loadingDots") : t("category.loadMore")}
+                </button>
+              )}
             </div>
 
             {/* Right: Sidebar */}
