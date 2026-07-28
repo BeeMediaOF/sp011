@@ -545,21 +545,126 @@ não usado, a maior economia isolada do relatório), **PRD-03 depois** (411 KiB
 de imagem). O 04 também é o que mais aproxima o FCP do alvo, e o FCP é o que
 ficou 84 ms fora do critério no PRD-02.
 
+## PRD-PERF-04 — entregue (b54892c), medido em produção em 2026-07-28
+
+Entregue junto o quick win do `__SSR_DATA__` e as duas correções que a onda 1
+tinha agendado (todas no serviço `web`, conforme decidido).
+
+### Medição em produção (sp011, imagem v59)
+
+| Métrica | Antes | Depois | Meta do PRD |
+|---|---:|---:|---:|
+| CSS público bruto | 197.597 | **139.097** (−29,6%) | ≤ 95.000 ❌ |
+| CSS público gzip | 30.674 | **22.449** (−26,8%) | ≤ 17.000 ❌ |
+| Offset do `<link rel=stylesheet>` | 68.633 | **6.584** | — ✅ |
+| Arquivos em `components/ui/` | 55 | **4** | ≤ 20 ✅ |
+| `window.__SSR__` no topo | — | presente | ✅ |
+| `HEAD /` | `index.html` cru | **200 text/html** | ✅ |
+
+### O fecho transitivo era 4, não 13
+
+O PRD listava 13 `ui/*` importados. Aquela contagem somava as arestas
+**internas** de `components/ui/` (um wrapper importando outro). Os pontos de
+entrada reais são quatro: `toaster` (App.tsx), `toast` (hooks/use-toast),
+`card` (pages/not-found) e `tooltip` (components/admin/AdminLayout). Os outros
+51 saíram, junto de 39 dependências que ficaram sem nenhum importador e de
+34 PNGs órfãos (44,7 MB — todo `.png` com par `.webp` tinha zero importadores).
+
+### Item 3 medido e NÃO aplicado — o critério de 95 KB é inatingível neste PRD
+
+O PRD manda medir antes de escolher a técnica. Como o build do Vite não roda no
+Windows, a medição foi feita sobre o CSS **servido em produção**, cruzando cada
+regra com as classes que aparecem só em `pages/admin`+`components/admin`, só no
+resto, ou nos dois (2,2% do arquivo ficou sem classificar):
+
+| Origem | Bytes | % |
+|---|---:|---:|
+| Só no público | 55.336 | 39,8% |
+| Compartilhado público + admin | 30.397 | 21,9% |
+| Infra do Tailwind (`@property`, `:root`, preflight, `@font-face`, keyframes) | 24.699 | 17,8% |
+| **Só no admin** | **24.911** | **17,9%** |
+
+Separar o `admin.css` por `@source` (item 3) levaria o CSS público a
+**~110.400 B**, ainda **15 KB acima da meta**. Em gzip a diferença é de ~4 KB —
+cerca de 20 ms na banda do Lighthouse mobile, contra os ~310 ms que o quick win
+do `__SSR_DATA__` já entregou. Não paga o custo: dois arquivos de CSS, risco de
+classe perdida no admin (`Login.tsx` e `Setup.tsx` não passam pelo `AdminShell`)
+e 14 rotas × 2 blogs de verificação visual.
+
+**A hipótese do PRD estava parcialmente certa.** Ele supunha (confiança média
+declarada) que "a maior fatia dos 197 KB vem das telas admin + dos `ui/*`
+mortos". Os `ui/*` mortos eram de fato a maior fatia — 58,5 KB, já cortados. As
+telas admin são só 24,9 KB. O piso do CSS público é **~110 KB** (85,7 KB de
+classes que o site público realmente usa + 24,7 KB de infra do Tailwind), então
+**≤ 95.000 B não é alcançável sem redesenhar o site** — e "não redesenhar nada,
+este PRD é byte-neutro visualmente" é regra explícita do próprio PRD.
+
+Registrado como **critério revisado por evidência**, não como falha silenciosa.
+Se o item 3 for desejado depois por outro motivo (o admin cresce e o público não
+deve pagar por ele), o caminho está escrito no PRD e continua válido.
+
+### Nota de método
+
+O primeiro cruzamento deu 99,3% "sem classe" — o parser tratava cada
+`@layer utilities{…}` minificado como uma regra única. Depois de corrigir, ainda
+sobravam 20 KB órfãos porque o extrator incluía aspas no charset e
+`className="sr-only"` virava o token `"sr-only"`. Os dois vieses foram
+corrigidos antes de tirar qualquer conclusão; os números da tabela são do
+parser corrigido.
+
 ## Próxima ação
 
-1. **Quick win antes do PRD-04:** mover o `__SSR_DATA__` do topo do `<head>`
-   para o fim do `<body>` (ver achado acima). Três linhas no `ssrHomePlugin`,
-   ataca o FCP — a métrica mais atrasada — sem tirar nada do payload.
-2. **PRD-PERF-04** (CSS render-blocking) e, na sequência, **PRD-PERF-03**
-   (imagens de identidade).
-3. Levar junto as duas correções agendadas, ambas no serviço `web`:
-   - `pages/Artigo.tsx:176` — `BRAND.titleSuffix` ("SBC Agora") no
-     `document.title` de toda página de artigo dos 8 blogs (ver acima);
-   - `ssrHomePlugin` e `spaHeadPlugin` só tratam `GET` — um **HEAD** em `/` ou
-     numa rota de categoria cai no `index.html` cru, com o `<head>` do blog que
-     buildou a imagem. Mesma causa do defeito corrigido em `8cd8518`.
-4. **Lentidão de build — diagnosticada** (medido na VPS em 2026-07-28; fora da
-   auditoria de performance do site, mas é o que atrasa cada deploy):
+1. **Verificação visual do PRD-04** (o gate deste PRD — nenhum número detecta
+   classe perdida): `/`, uma categoria, um artigo, `/contato`, e no painel
+   `/admin/login`, dashboard, configurações e o modo escuro. 51 componentes e
+   34 PNGs saíram; o typecheck garante import, não pixel.
+2. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
+   8 blogs e trouxe "The page loaded too slowly to finish within the time
+   limit". Com o CSS 29,6% menor e 62 KB tirados da frente do `<link>`, o
+   número de `Render-blocking requests` (2.150 ms) é o que diz se a onda 2 vai
+   para imagens ou para execução de JS.
+3. **PRD-PERF-03** (imagens de identidade, 411 KiB no relatório) — maior massa
+   isolada que sobrou depois do CSS.
+4. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
+   "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
+   propaga em ≤1 h.
+5. **PRD-PERF-05** (onda 3) e depois o `RELATORIO-FINAL.md`.
+
+### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
+
+Medido na VPS em 2026-07-28. Fora da auditoria de performance do site, mas é o
+que atrasava cada deploy. O build do `web` (v59) levou **827 s**:
+
+| Etapa | Tempo |
+|---|---:|
+| `RUN chown -R node:node /app` | **650,7 s** (79% do build) |
+| `RUN pnpm install --frozen-lockfile` | 61,2 s |
+| `COPY --from=build /app /app` | 42,7 s |
+| `RUN … run build` (o Vite de verdade) | 21,1 s |
+
+O `chown -R` toca todos os arquivos do `/app` e, no overlayfs, **duplica o
+`/app` inteiro numa camada nova** — explica também os 2,47 GB da `blog-web:v58`
+e os 3,88 GB da `blog-api:v58`. Entrou em `82f9dc8` (PRD-07, 2026-07-21), que é
+exatamente quando a lentidão começou.
+
+Corrigido nos dois Dockerfiles: `COPY --from=build --chown=node:node`, que
+embute o dono na cópia que já acontecia, sem camada extra. No `api-server`
+sobrou o `chown` do `/data`, diretório vazio na imagem — a regra do PRD-07 sobre
+volume **preexistente** na VPS não muda. O `Dockerfile` do `web` também passou a
+copiar os manifestos antes do `pnpm install`, como o do `api` faz desde
+`107134a`. E o `.dockerignore` tirou `attached_assets` (78 MB, só estava no
+contexto pelo alias `@assets`, do qual nenhum arquivo importa), `screenshots`,
+`*.zip` e os diretórios de auditoria — o contexto era 116 MB transferidos a cada
+build dos dois serviços.
+
+Contexto de infra que continua valendo: disco em 109 G de 387 G (29%, **não é
+disco cheio**), build cache 71,09 GB, imagens 46,17 GB com v53…v58 vivas, RAM
+23 Gi de 31 Gi com **swap 0 B** e o `ollama` segurando ~13 GB. Limpeza segura:
+`docker builder prune -f` e apagar as tags `blog-*:v53…v56`, mantendo v57 de
+rollback. **Nunca** `docker system prune --volumes` (CLAUDE.md §13).
+
+<!-- diagnóstico original, mantido para histórico -->
+<details><summary>Sinais coletados antes da correção</summary>
 
    | Sinal | Valor | Leitura |
    |---|---:|---|
@@ -589,6 +694,8 @@ ficou 84 ms fora do critério no PRD-02.
    elimina a camada duplicada. **Nunca** `docker system prune --volumes`
    (CLAUDE.md §13).
 
+</details>
+
 O rollout do PRD-02 aos 8 blogs foi concluído em 2026-07-28: `vendor-charts: 0`
 no HTML público de ksports, esporteagora, oleysports, beeesportes e resenhavip,
 cada um devolvendo o próprio `siteName`. Os gráficos do painel (Pageviews,
@@ -611,6 +718,13 @@ do escopo do PRD-06.
 `BRAND.titleSuffix` sobrando só de fallback enquanto o `/api/site` não responde —
 o mesmo padrão do `SEOHead`. Só os registros **novos** do Analytics sairão com o
 nome certo; o histórico já gravado continua com "SBC Agora".
+
+**Corrigido em `b54892c`** (PRD-04), junto com dois irmãos que apareceram no
+mesmo arquivo: o `og:site_name` também usava `BRAND.name`, e o
+`mainEntityOfPage` do JSON-LD apontava para `https://sbcagora.com.br` **fixo** —
+domínio que não é de nenhum blog da rede — em todos os 8. Agora usa o origin do
+próprio blog. O `<link rel="canonical">` do `<head>` nunca teve esse defeito
+(sempre usou o origin), então o dano ficou contido ao structured data.
 
 ## Regras válidas para a Fase 3
 
