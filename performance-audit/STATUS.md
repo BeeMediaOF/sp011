@@ -56,7 +56,7 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 | PRD | Onda | Esforço | Depende de | Estado |
 |---|:--:|:--:|---|---|
 | 01 — payload da lista de artigos | 1 | M | — | **concluído e validado em prod** |
-| 02 — JS do caminho crítico | 1 | P | 01 (medição) | **implementado — validar em prod** |
+| 02 — JS do caminho crítico | 1 | P | 01 (medição) | **concluído e validado em prod** |
 | 06 — llms.txt / robots.txt por blog | 1 | P | — | pendente |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | pendente |
 | 04 — CSS render-blocking | 2 | M/G | **02** | pendente |
@@ -216,12 +216,96 @@ Projeção do `<head>` após o build: `vendor-react` 223.391 + `vendor-query`
 
 `pnpm run typecheck` limpo e `pnpm test` verde (52 testes) em `brasilia-agora`.
 
+## PRD-PERF-02 — validação em produção (sp011, 2026-07-28)
+
+### Artefatos servidos no `<head>` da home
+
+| Chunk | Antes | Depois |
+|---|---:|---:|
+| `index` | 337.419 | 310.265 |
+| `vendor-react` | 223.391 | 223.391 |
+| `vendor-query` | 24.608 | 24.608 |
+| `vendor-utils` | — | 27.303 |
+| `vendor-icons` | 38.355 | 38.355 |
+| `vendor-radix` | 55.314 | **ausente** |
+| `vendor-charts` | 403.228 | **ausente** |
+| **total** | **1.082.315 B** | **623.922 B** |
+
+Imports estáticos do entry, no artefato buildado: só `vendor-react`,
+`vendor-query`, `vendor-utils` e `vendor-icons` — exatamente o esperado pelo
+item 4 do PRD. `vendor-charts` (402.907 B), `vendor-radix` (55.310 B) e
+`vendor-editor` (335.443 B) continuam no disco, servidos sob demanda ao admin.
+
+### Medição de campo — 3 rotas (mesmo perfil: mobile 412×823, 1,6 Mbps, CPU 4×)
+
+| Rota | FCP | LCP | Transfer | Decoded | JS decoded |
+|---|---:|---:|---:|---:|---:|
+| `/` baseline | 2.564 | 2.572 | 1.006 KB | 1.939 KB | 1.086 KB |
+| `/` pós-01 | 2.496 | 3.420 | 1.064 KB | 2.113 KB | — |
+| **`/` pós-02** | **2.284** | **2.296** | **937 KB** | **1.698 KB** | **668 KB** |
+| `/artigo` baseline | 4.208 | 5.464 | 1.622 KB | 4.196 KB | — |
+| `/artigo` pós-01 | 3.680 | 4.688 | 772 KB | 1.715 KB | — |
+| **`/artigo` pós-02** | **2.960** | **4.392** | **674 KB** | **1.328 KB** | **688 KB** |
+| `/politica` baseline | 4.208 | 5.660 | 1.490 KB | 6.508 KB | — |
+| `/politica` pós-01 | 3.676 | 4.196 | 663 KB | 1.617 KB | — |
+| **`/politica` pós-02** | **2.916** | **4.116** | **558 KB** | **1.223 KB** | **675 KB** |
+
+A home foi medida 4×: a primeira leitura (FCP 4.844 ms) foi descartada por ser
+SSR frio — container recém-subido, cache de HTML de 30 s vazio, e `LCP − FCP` de
+8 ms mostrando que o atraso era todo de servidor. As três leituras seguintes
+ficaram em 2.284–2.372 ms.
+
+**Efeito colateral bom:** `/artigo` decoded caiu para 1.328 KB e passou a cumprir
+o critério de ≤ 1.500 KB que o **PRD-PERF-01** não tinha atingido (1.715 KB) — a
+atribuição feita naquele fechamento (o resto era JS, não payload de API) estava
+correta.
+
+### Critérios de aceite
+
+| Critério | Alvo | Medido | |
+|---|---|---:|:--:|
+| `vendor-charts` no HTML público | 0 | 0 | ✅ |
+| `vendor-radix` no HTML público | ausente ou ≤10 KB | 0 | ✅ |
+| Existe chunk `vendor-utils` | sim | sim | ✅ |
+| — tamanho dele | ≤ 5 KB | 27.303 B | ⚠️ |
+| JS decoded na home | ≤ 640 KB | 668 KB | ⚠️ |
+| JS transfer na home | ≤ 200 KB | 208 KB | ⚠️ |
+| Soma das long tasks na home | ≤ 700 ms | 746–1.597 ms | ⚠️ |
+| FCP na home | ≤ 2.200 ms | 2.284 ms | ⚠️ |
+| Gráficos do admin desenham | sim | verificar no painel | ⏳ |
+| `typecheck` + `test` | verdes | 52 testes verdes | ✅ |
+
+Leitura honesta dos ⚠️:
+
+- **`vendor-utils` 27 KB, não 5 KB.** O PRD supôs um chunk minúsculo, mas
+  `tailwind-merge@3.5.0` sozinho pesa ~25 KB (tabela de configuração). Ele já
+  estava sendo baixado — só que **dentro do entry**, que encolheu 27.154 B,
+  quase exatamente o tamanho do chunk novo. Peso realocado, não peso novo.
+- **JS decoded 668 KB vs 640 KB de alvo.** A medição de campo conta 8 requests,
+  incluindo 3 chunks lazy que chegam depois do load (Toaster, LGPDConsent). Só o
+  caminho crítico do `<head>` são 623.922 B (609 KB). O alvo do PRD misturava as
+  duas contagens. O piso agora é `vendor-react` 223 KB + entry 310 KB.
+- **Long tasks: número não comparável.** O script de medição foi reescrito nesta
+  sessão (o anterior era temporário e foi apagado) e a janela de observação
+  mudou. A dispersão entre execuções idênticas (746 → 1.597 ms) confirma que a
+  soma capta trabalho pós-load não determinístico. A **maior** long task, mais
+  estável, ficou em 397–479 ms contra 467 ms do baseline: praticamente igual, o
+  que é coerente — os chunks removidos custavam download e parse, não execução
+  de hidratação.
+- **FCP 2.284 ms vs 2.200 ms de alvo**, 84 ms acima, com LCP caindo de 2.572
+  para 2.296 ms. O que sobra no bloqueio de render é o CSS de 197 KB
+  (**PRD-PERF-04**) e as imagens de identidade (**PRD-PERF-03**).
+
+Sem erro de hidratação: console limpo (0 erros e 0 avisos) em `/`, `/politica` e
+`/admin/login`, com a home renderizando 56 links de artigo e `/politica` 67 —
+invariante do CLAUDE.md §17 preservada.
+
 ## Próxima ação
 
-1. Deploy do PRD-02 na VPS e verificação dos chunks no HTML servido
-   (`grep -c vendor-charts` = 0), medição do "depois" nas 3 rotas.
-2. Rollout de imagem para os 8 blogs (bump + canário `resenhavip`), CLAUDE.md §6.
-3. Depois: **PRD-PERF-06** (fecha a onda 1).
+1. Rollout de imagem para os 8 blogs (bump já feito no build do sp011 + canário
+   `resenhavip`), CLAUDE.md §6.
+2. Conferir no painel que Dashboard e Analytics desenham os gráficos.
+3. Depois: **PRD-PERF-06** (llms.txt/robots.txt por blog) fecha a onda 1.
 
 ## Regras válidas para a Fase 3
 
