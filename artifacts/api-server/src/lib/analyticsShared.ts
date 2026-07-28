@@ -407,11 +407,45 @@ export interface WindowAggregates {
 }
 
 /**
+ * Sessão engajada (anti-scanner de link): conjunto de sessões que produziram algum
+ * evento ALÉM do 1º pageview de entrada, na janela [fromMs, toMs). Regra: tem ≥1 evento
+ * não-pageview (read/scroll/category/share) OU ≥2 pageviews. O scanner de link (data
+ * center do Facebook/Meta e afins) carrega a página 1× e some — dispara exatamente 1
+ * pageview e nada mais → NÃO engajada → fora das métricas públicas. Sem heurística de
+ * UA/IP: zero falso-positivo estrutural em leitor real (que dispara read por tempo na
+ * página, ou scroll, ou navega para a 2ª página). DEVE espelhar byte-a-byte a subconsulta
+ * `engagedSub` das queries SQL do /stats (routes/analytics.ts): mesma HAVING.
+ */
+export function computeEngagedSessions(rows: EventLike[], win: { fromMs: number; toMs: number }): Set<string> {
+  const pvCount: Record<string, number> = {};
+  const otherCount: Record<string, number> = {};
+  for (const ev of rows) {
+    if (ev.ts < win.fromMs || ev.ts >= win.toMs) continue;
+    if (ev.type === "pageview") pvCount[ev.sessionId] = (pvCount[ev.sessionId] ?? 0) + 1;
+    else otherCount[ev.sessionId] = (otherCount[ev.sessionId] ?? 0) + 1;
+  }
+  const engaged = new Set<string>();
+  for (const sid of new Set([...Object.keys(pvCount), ...Object.keys(otherCount)])) {
+    if ((otherCount[sid] ?? 0) > 0 || (pvCount[sid] ?? 0) >= 2) engaged.add(sid);
+  }
+  return engaged;
+}
+
+/**
  * Um passe sobre os eventos da janela (linhas do banco + buffer em memória).
  * Espera receber SÓ eventos não-internos dentro de [fromMs, toMs) — ainda assim
  * descarta o que estiver fora, por defesa.
+ *
+ * `opts.engagedOnly` (default false → comportamento byte-idêntico; o monitor de sanidade
+ * e os testes existentes ficam no cru): quando true, sessões não-engajadas (1 pageview
+ * de entrada e nada mais, típico do scanner de link) são excluídas de TODAS as agregações.
  */
-export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; toMs: number }): WindowAggregates {
+export function buildWindowAggregates(
+  rows: EventLike[],
+  win: { fromMs: number; toMs: number },
+  opts?: { engagedOnly?: boolean },
+): WindowAggregates {
+  const engaged = opts?.engagedOnly ? computeEngagedSessions(rows, win) : null;
   const byDay: Record<string, number> = {};
   for (let t = win.fromMs; t < win.toMs; t += DAY) byDay[brtDayKey(t)] = 0;
 
@@ -435,6 +469,7 @@ export function buildWindowAggregates(rows: EventLike[], win: { fromMs: number; 
 
   for (const ev of rows) {
     if (ev.ts < win.fromMs || ev.ts >= win.toMs) continue;
+    if (engaged && !engaged.has(ev.sessionId)) continue; // anti-scanner (opts.engagedOnly)
 
     if (ev.type === "pageview") {
       windowPv++;

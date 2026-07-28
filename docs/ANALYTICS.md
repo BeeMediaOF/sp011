@@ -99,6 +99,18 @@ referenciam artigo/categoria/anúncio por id textual e sobrevivem à exclusão d
 | IP na lista de Configurações → “IPs internos (Analytics)” | servidor (`settings.internalIps`) | idem |
 | IP privado/loopback (dev local, health checks) | servidor | idem |
 | Sem consentimento LGPD | cliente | nada é enviado — **inclusive newsletter e impressão/clique de anúncio** (PRD 02 RF1/RF6); visitor_id nem existe |
+| Sessão NÃO engajada (1 pageview de entrada e nada mais) | servidor, só na **leitura** do `/stats` (`computeEngagedSessions`/`engagedSub`) | fora das métricas públicas da **janela** (Fontes, Localização, Dispositivos, pageviews da janela, sessões, visitantes, tendências) — a linha NÃO é apagada nem marcada, é só ignorada na agregação |
+
+**Sessão engajada (anti-scanner de link):** o scanner de link do Facebook/Meta (e
+crawlers de UA-de-navegador que passam pelo filtro de bot) carrega a página **1 vez e
+some** — 1 pageview e nenhum outro evento. Uma sessão só entra nas métricas públicas da
+janela se for **engajada**: teve ≥2 pageviews OU ≥1 evento não-pageview (`read`/`scroll`/
+`category`/`share`). Sem heurística de UA/IP (zero falso-positivo em leitor real, que
+dispara `read` por tempo na página ou `scroll`). É filtro de **leitura** (nada é apagado);
+espelhado entre a função pura `computeEngagedSessions` e a subconsulta `engagedSub` do
+`/stats`. Os totais FIXOS do Dashboard (hoje/semana/mês/all-time) permanecem **crus** de
+propósito (contadores de volume) — divergência esperada entre Dashboard (mês cru) e
+Analytics (30 dias engajado). O monitor de sanidade (PRD 11) e o `/health` seguem no cru.
 
 Tráfego interno é **marcado, não apagado** (`is_internal=true`) — auditável via
 SQL, tanto em `analytics_events` quanto em `behavior_events` (PRD 03 fechou a

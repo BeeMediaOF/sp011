@@ -498,6 +498,19 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
   const d30 = new Date(now - 30 * DAY);
   const d60 = new Date(now - 60 * DAY);
 
+  // Sessão engajada (anti-scanner de link): subconsulta que espelha byte-a-byte a
+  // computeEngagedSessions do analyticsShared. Só entra nas métricas públicas a sessão
+  // com >1 evento OU algum evento não-pageview — o scanner do Facebook/Meta (1 pageview
+  // e some) fica de fora, sem heurística de UA/IP. Os totais FIXOS do Dashboard
+  // (today/week/month/allTime) permanecem crus de propósito (contadores de volume).
+  const engagedSub = (from: Date, to: Date) => sql`
+    SELECT session_id FROM analytics_events
+    WHERE is_internal = false AND ts >= ${from} AND ts < ${to}
+    GROUP BY session_id
+    HAVING count(*) FILTER (WHERE type <> 'pageview') > 0
+        OR count(*) FILTER (WHERE type = 'pageview') >= 2
+  `;
+
   const [
     dbRows, totalsRes, prevAggRes, prevReadRes, prevBounceRes,
     geoAggRes, browserOsRes, visitorsRes,
@@ -547,6 +560,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
         count(DISTINCT visitor_id) FILTER (WHERE type = 'pageview' AND visitor_id IS NOT NULL)::int AS visitors
       FROM analytics_events
       WHERE ts >= ${prevFrom} AND ts < ${prevTo} AND is_internal = false
+        AND session_id IN (${engagedSub(prevFrom, prevTo)})
     `),
     // Tempo médio anterior com a MESMA regra da janela atual: MAX cumulativo por
     // sessão+página (heartbeats são idempotentes), depois média.
@@ -557,6 +571,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
         FROM analytics_events
         WHERE type = 'read' AND duration > 0 AND is_internal = false
           AND ts >= ${prevFrom} AND ts < ${prevTo}
+          AND session_id IN (${engagedSub(prevFrom, prevTo)})
         GROUP BY session_id, path
       ) t
     `),
@@ -567,6 +582,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
         FROM analytics_events
         WHERE type = 'pageview' AND is_internal = false
           AND ts >= ${prevFrom} AND ts < ${prevTo}
+          AND session_id IN (${engagedSub(prevFrom, prevTo)})
         GROUP BY session_id
       ) s
     `),
@@ -577,6 +593,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       FROM analytics_events
       WHERE type = 'pageview' AND is_internal = false
         AND ts >= ${winFrom} AND ts < ${winTo}
+        AND session_id IN (${engagedSub(winFrom, winTo)})
       GROUP BY 1, 2
     `),
     db.execute(sql`
@@ -584,6 +601,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
       FROM analytics_events
       WHERE type = 'pageview' AND is_internal = false
         AND ts >= ${winFrom} AND ts < ${winTo}
+        AND session_id IN (${engagedSub(winFrom, winTo)})
       GROUP BY 1, 2
     `),
     // Visitantes únicos + recorrentes (recorrente = tem evento ANTES da janela).
@@ -593,6 +611,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
         FROM analytics_events
         WHERE type = 'pageview' AND is_internal = false AND visitor_id IS NOT NULL
           AND ts >= ${winFrom} AND ts < ${winTo}
+          AND session_id IN (${engagedSub(winFrom, winTo)})
       )
       SELECT
         (SELECT count(*) FROM win_visitors)::int AS uniq,
@@ -625,7 +644,9 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     ...dbRows.map((r) => ({ ...r, ts: r.ts.getTime() })),
     ..._buffer.filter((ev) => !ev.isInternal),
   ];
-  const agg = buildWindowAggregates(rows, win);
+  // engagedOnly: exclui o scanner de link (1 pageview e some) de TODAS as métricas
+  // públicas da janela — espelha o engagedSub das queries SQL acima.
+  const agg = buildWindowAggregates(rows, win, { engagedOnly: true });
 
   // ── Derivados de engajamento ──────────────────────────────────────────────
   const uniqueSessions = Object.keys(agg.sessionPageviews).length;

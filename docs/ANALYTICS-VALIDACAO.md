@@ -195,6 +195,38 @@ node scripts/analytics-synth.mjs --base https://SEUBLOG.midia.run --run-id "$RUN
   contagens `synthtest-%` voltaram a **0**. O anúncio de teste (criado ativo no
   admin) é removido no fim — nunca aponte impressão/clique para anúncio real.
 
+## 18. Sessão engajada (anti-scanner de link)
+
+O scanner do Facebook/Meta (data center — cidades tipo Luleå/Fort Worth com UA de
+navegador) carrega a página 1× e some: 1 pageview, nenhum outro evento. Ele NÃO deve
+aparecer nas métricas públicas da **janela** (Fontes de tráfego, Localização,
+Dispositivos, pageviews da janela, Sessões, Visitantes).
+
+1. **Sessões da janela e se engajam** (espelho de `computeEngagedSessions`/`engagedSub`):
+   ```sql
+   SELECT session_id,
+          count(*) FILTER (WHERE type = 'pageview')  AS pv,
+          count(*) FILTER (WHERE type <> 'pageview') AS outros,
+          (count(*) FILTER (WHERE type <> 'pageview') > 0
+             OR count(*) FILTER (WHERE type = 'pageview') >= 2) AS engajada
+   FROM analytics_events
+   WHERE is_internal = false AND ts >= now() - interval '30 days'
+   GROUP BY 1 ORDER BY engajada, pv DESC;
+   ```
+   Uma sessão `engajada=f` (1 pageview, `outros=0`) é o scanner: **não** entra em
+   nenhum card da janela.
+2. **`totals.window` do `/stats` = soma dos pageviews das sessões engajadas** (não de
+   todas). Conferência: a soma de `pv` das linhas `engajada=t` acima bate com
+   `payload.totals.window`.
+3. **Fontes de tráfego**: um blog cujo único "social" era o scanner do Facebook passa a
+   mostrar Redes Sociais **sem** essas linhas; idem Localização (some Luleå/Fort Worth de
+   data center) e Dispositivos.
+4. **Leitor real permanece**: uma sessão com pageview + `scroll`/`read` (ou 2 pageviews)
+   continua contando — inclusive um bounce legítimo (1 pageview + 1 `read` = engajada).
+5. **Dashboard fica no cru**: `totals.today/week/month/allTime` NÃO são filtrados (são
+   contadores de volume) — é esperado o Dashboard (mês cru) divergir do Analytics
+   (30 dias engajado). O `/health` e a malha de sanidade (PRD 11) também seguem no cru.
+
 ## Conferência final
 
 Para cada item: o número no PAINEL = agregação do `/stats` = linhas em
