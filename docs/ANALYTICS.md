@@ -98,6 +98,7 @@ referenciam artigo/categoria/anúncio por id textual e sobrevivem à exclusão d
 | Ambiente dev (`import.meta.env.DEV`) | cliente | idem |
 | IP na lista de Configurações → “IPs internos (Analytics)” | servidor (`settings.internalIps`) | idem |
 | IP privado/loopback (dev local, health checks) | servidor | idem |
+| IP de rede de **data center/Meta** por ASN (scanner de link headless, ex.: `AS32934`) | servidor (`isHostingNetwork` no lookup de geo, assíncrono) | marcado `is_internal=true`, razão `hosting`; retro-marca os eventos daquele IP ainda no buffer (pega o pageview E os read/scroll do scanner) |
 | Sem consentimento LGPD | cliente | nada é enviado — **inclusive newsletter e impressão/clique de anúncio** (PRD 02 RF1/RF6); visitor_id nem existe |
 | Sessão NÃO engajada (1 pageview de entrada e nada mais) | servidor, só na **leitura** do `/stats` (`computeEngagedSessions`/`engagedSub`) | fora das métricas públicas da **janela** (Fontes, Localização, Dispositivos, pageviews da janela, sessões, visitantes, tendências) — a linha NÃO é apagada nem marcada, é só ignorada na agregação |
 

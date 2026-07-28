@@ -227,6 +227,30 @@ Dispositivos, pageviews da janela, Sessões, Visitantes).
    contadores de volume) — é esperado o Dashboard (mês cru) divergir do Analytics
    (30 dias engajado). O `/health` e a malha de sanidade (PRD 11) também seguem no cru.
 
+## 19. Rede de data center / scanner de link por ASN (razão `hosting`)
+
+Complementa a §18: o scanner de link do Facebook/Meta que **renderiza JS** (headless)
+dispara `read`/`scroll` e passa por "engajado" — o filtro de sessão engajada NÃO o pega.
+Ele é marcado como interno pelo **ASN** do IP (o geo assíncrono pede `as`/`hosting` ao
+ip-api; `isHostingNetwork` casa `AS32934`/Meta e a flag `hosting`).
+
+1. Dispare o scanner (poste/reabra o link no Facebook). Em ≤1min, os eventos do IP da
+   Meta devem entrar `is_internal=true`:
+   ```sql
+   SELECT city, referrer, is_internal, count(*)
+   FROM analytics_events
+   WHERE ts >= now() - interval '1 hour'
+   GROUP BY 1, 2, 3 ORDER BY 1;
+   ```
+   Esperado: linhas de cidade de data center (Luleå/Fort Worth/…) com `is_internal=t`.
+2. `GET /api/analytics/health` → `internalByReason.hosting > 0`.
+3. `/stats?period=30d`: `topCities` sem Luleå/Fort Worth e `referrerChart.social` cai
+   (o scanner saiu do público).
+4. Corrida do flush: eventos já gravados ANTES do lookup resolver não são reescritos
+   (o retro-fill só toca o buffer). Como o geo resolve em ~1–3s e o cache é por IP, na
+   prática todos os eventos do scanner são marcados; historicamente já gravados somem na
+   janela de 30d. Um leitor real (ISP residencial/móvel) NUNCA casa `isHostingNetwork`.
+
 ## Conferência final
 
 Para cada item: o número no PAINEL = agregação do `/stats` = linhas em
