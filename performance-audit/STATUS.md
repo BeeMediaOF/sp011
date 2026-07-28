@@ -612,23 +612,88 @@ sobravam 20 KB órfãos porque o extrator incluía aspas no charset e
 corrigidos antes de tirar qualquer conclusão; os números da tabela são do
 parser corrigido.
 
+## PRD-PERF-03 — entregue (cdca546 + 5ca2795), medido em produção em 2026-07-28
+
+### Medição em produção (sp011), nas larguras que o site realmente pede
+
+| Asset | Antes | Depois | Corte |
+|---|---:|---:|---:|
+| `logo` (w=320) | 81.530 PNG | **10.570** WebP | −87,0% |
+| `footer-logo` (w=320) | 69.534 PNG | **10.976** WebP | −84,2% |
+| `byline-logo` (w=32) | 82.957 PNG | **402** WebP | −99,5% |
+| `favicon` (w=64) | 33.166 PNG | **1.620** WebP | −95,1% |
+| **Total** | **267.187** | **23.568** | **−91,2%** (meta ≤ 26.000 ✅) |
+
+| Outro critério | Resultado |
+|---|---|
+| `content_type` com `w` | `image/webp` ✅ |
+| `If-None-Match` | **304** ✅ |
+| Preloads `as=image` no `<head>` | 3 → **1**, e é o do hero (`/api/image?url=…`) ✅ |
+| `og-image` | continua **sem** `w` (crawler recebe 1200×630) ✅ |
+
+O `byline-logo` é o caso extremo e explica o tamanho do ganho: um PNG de
+1080×1080 com 82.957 B para desenhar um círculo de 16 px, referenciado **13
+vezes** no HTML da home.
+
+### Contradição interna do PRD, resolvida a favor do critério
+
+O item 3 do PRD dizia que o preload da logo do **cabeçalho** "é aceitável" depois
+do resize; o critério de aceite pedia exatamente **1** preload, o do hero. A
+primeira medição deu 2 — o rodapé saiu, o cabeçalho ficou.
+
+O critério está certo e o item 3 não: a logo já está no HTML do SSR no topo do
+`<body>`, então o parser a descobre de imediato — o preload adianta poucos ms e
+em troca disputa banda com a imagem do LCP. `loading="lazy"` numa imagem **dentro
+da viewport** não atrasa nada (o navegador busca imagem lazy visível assim que
+calcula o layout); o efeito útil é só impedir o hoisting do React 19. Vale
+duplamente porque o `HeaderLogo` tem **duas** `<img>` (mobile e desktop): num
+blog com logo mobile configurada, uma delas está sempre em `display:none`, e
+**preload não respeita media query** — seriam 2 preloads, um de um recurso que
+aquele viewport nunca usa.
+
+### Decisões de implementação que valem registro
+
+- **Sem `w`, a resposta é byte-idêntica à anterior** — qualquer URL antiga em
+  cache de navegador continua válida.
+- **A identidade do cache é o conteúdo do data URI, não o `?v=` da query.** Uma
+  URL montada à mão sem `v` nunca serve a logo antiga, e a troca no admin
+  invalida sozinha.
+- **SVG não passa pelo sharp**: rasterizar vetor perde qualidade em 2× e costuma
+  aumentar o peso.
+- **Falha do sharp cai para o binário cru**, em vez de deixar o site sem logo.
+- O helper `siteAssetUrl`/`siteAssetSrcSet` devolve a entrada **inalterada** para
+  data URI, URL externa e caminho estático — o mesmo campo ainda chega como data
+  URI em blog não migrado ou `localStorage` antigo, e um `&w=` colado num `data:`
+  quebraria a imagem.
+- Teste novo cobre explicitamente que a URL derivada continua casando com
+  `startsWith(SITE_ASSET_PREFIX)` da guarda do `updateSettings` — o caminho em
+  que uma URL derivada já causou incidente (`store.ts:870-878`).
+
+### Pendente para fechar o PRD-03
+
+- **Troca de logo pelo admin** (`/admin/configuracoes`) refletindo no site em
+  ≤90 s — é o gate que valida a guarda do `updateSettings` no fluxo real.
+- `LCP ≤ 2.000 ms` e `bytes de imagem na home ≤ 130 KB`: dependem de uma medição
+  com a VPS ociosa.
+- Rollout aos 8 blogs.
+
 ## Próxima ação
 
-1. **Verificação visual do PRD-04** (o gate deste PRD — nenhum número detecta
-   classe perdida): `/`, uma categoria, um artigo, `/contato`, e no painel
-   `/admin/login`, dashboard, configurações e o modo escuro. 51 componentes e
-   34 PNGs saíram; o typecheck garante import, não pixel.
-2. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
+1. **Verificação visual acumulada (PRD-04 + PRD-03)** — o gate que nenhum número
+   detecta: `/`, uma categoria, um artigo, `/contato`, e no painel
+   `/admin/login`, dashboard, configurações e o modo escuro. Do PRD-04 saíram 51
+   componentes e 34 PNGs; do PRD-03, conferir que logo do cabeçalho, do rodapé,
+   avatar de assinatura e favicon aparecem **nítidos**, inclusive em tela 2×.
+2. **Troca de logo pelo admin** (gate do PRD-03, acima).
+3. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
    8 blogs e trouxe "The page loaded too slowly to finish within the time
-   limit". Com o CSS 29,6% menor e 62 KB tirados da frente do `<link>`, o
-   número de `Render-blocking requests` (2.150 ms) é o que diz se a onda 2 vai
-   para imagens ou para execução de JS.
-3. **PRD-PERF-03** (imagens de identidade, 411 KiB no relatório) — maior massa
-   isolada que sobrou depois do CSS.
-4. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
+   limit". Agora há três mudanças grandes para medir juntas: CSS 29,6% menor,
+   62 KB tirados da frente do `<link>` e 243 KB de imagem de identidade a menos.
+4. **Rollout aos 8 blogs** (PRD-04 + PRD-03 na mesma imagem).
+5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
    "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
    propaga em ≤1 h.
-5. **PRD-PERF-05** (onda 3) e depois o `RELATORIO-FINAL.md`.
+6. **PRD-PERF-05** (onda 3) e depois o `RELATORIO-FINAL.md`.
 
 ### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
 
