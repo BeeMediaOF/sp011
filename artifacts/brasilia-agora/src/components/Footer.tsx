@@ -7,6 +7,7 @@ import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
 import { trackNewsletter } from "../hooks/useAnalytics";
+import { siteAssetUrl, siteAssetSrcSet } from "../lib/newsImage";
 import {
   resolveFooterConfig, type FooterLink, type FooterSocialKey, type ResolvedFooter,
 } from "../lib/footerConfig";
@@ -156,7 +157,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              {logoColorSrc ? <img src={logoColorSrc} alt={settings?.siteName || ""} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+              {logoColorSrc ? <img src={siteAssetUrl(logoColorSrc, 320)} srcSet={siteAssetSrcSet(logoColorSrc, 320)} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -224,7 +225,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            {logoSrc ? <img src={logoSrc} alt={settings?.siteName || ""} style={{ height: logoH }} className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+            {logoSrc ? <img src={siteAssetUrl(logoSrc, 320)} srcSet={siteAssetSrcSet(logoSrc, 320)} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}

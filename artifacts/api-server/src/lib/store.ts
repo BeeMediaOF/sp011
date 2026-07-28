@@ -817,6 +817,20 @@ export const SITE_ASSET_FIELDS = {
 
 export const SITE_ASSET_PREFIX = "/api/site-asset/";
 
+/**
+ * Largura de entrega por asset. As logos são subidas no admin no tamanho que o
+ * usuário tiver à mão — a do cabeçalho do sp011 era um PNG de 818x288 (81 KB)
+ * exibido com 48 px de altura, e o avatar de assinatura um 1080x1080 (83 KB)
+ * exibido em 16x16. O valor aqui é a largura 1x; o frontend pede 2x no srcSet.
+ * `og-image` fica FORA de propósito: o Open Graph exige 1200x630 e quem consome
+ * é crawler de rede social, não o navegador do leitor.
+ */
+const SITE_ASSET_WIDTH: Partial<Record<keyof typeof SITE_ASSET_FIELDS, number>> = {
+  "logo": 320, "logo-mobile": 320, "footer-logo": 320,
+  "byline-logo": 64, "favicon": 64,
+  "admin-logo": 320, "login-logo": 320,
+};
+
 // Memo do hash por campo — o data URI só muda quando o admin troca a imagem.
 const _assetUrlMemo = new Map<string, { src: string; url: string }>();
 
@@ -825,7 +839,10 @@ function assetUrl(key: string, value: string): string {
   const memo = _assetUrlMemo.get(key);
   if (memo && memo.src === value) return memo.url;
   const hash = createHash("sha1").update(value).digest("hex").slice(0, 10);
-  const url = `${SITE_ASSET_PREFIX}${key}?v=${hash}`;
+  const w = SITE_ASSET_WIDTH[key as keyof typeof SITE_ASSET_FIELDS];
+  // ?v= primeiro: a guarda do updateSettings casa por startsWith(PREFIX) e o
+  // frontend acrescenta &w= por cima — a ordem mantém as duas coisas estáveis.
+  const url = `${SITE_ASSET_PREFIX}${key}?v=${hash}${w ? `&w=${w}` : ""}`;
   _assetUrlMemo.set(key, { src: value, url });
   return url;
 }

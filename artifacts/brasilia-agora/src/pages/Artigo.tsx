@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { BRAND } from "../brand";
-import { buildSrcSet, HERO_WIDTHS } from "@/lib/newsImage";
+import { buildSrcSet, HERO_WIDTHS, siteAssetUrl, siteAssetSrcSet } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
 import { useAnalytics, useScrollDepth } from "../hooks/useAnalytics";
 import { FaFacebook, FaTwitter, FaWhatsapp, FaLink } from "react-icons/fa";
@@ -125,6 +125,9 @@ export default function Artigo() {
      blogs (CLAUDE.md §13), então a constante BRAND só serve de reserva enquanto o
      /api/site não respondeu — mesmo padrão do SEOHead. */
   const siteName = settings?.siteName || BRAND.name;
+  /* Mesma cascata do byline dos cards (NewsCard/HeroSection/SectionBlockFeatured). */
+  const bylineAvatar =
+    settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
   const { t, lang, tz } = useT();
   const { trackArticle, trackShare } = useAnalytics();
   // article.id (não o slug): pageview/read usam o id — com o slug seria
@@ -654,8 +657,12 @@ export default function Artigo() {
                           favicon padrão embutido (/favicon.jpg) antes das settings. */}
                       {settings ? (
                         <img
-                          src={settings.bylineLogoBase64 || settings.logoBase64 || settings.faviconBase64 || "/favicon.jpg"}
+                          src={siteAssetUrl(bylineAvatar, 48)}
+                          srcSet={siteAssetSrcSet(bylineAvatar, 48)}
                           alt={settings.bylineName || settings.siteName || "Portal"}
+                          width={36}
+                          height={36}
+                          decoding="async"
                           className="w-9 h-9 rounded-full object-cover shrink-0"
                         />
                       ) : (

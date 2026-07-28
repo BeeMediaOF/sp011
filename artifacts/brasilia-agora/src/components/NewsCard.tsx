@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
-import { buildSrcSet, CARD_WIDTHS } from "@/lib/newsImage";
+import { buildSrcSet, CARD_WIDTHS, siteAssetUrl, siteAssetSrcSet } from "@/lib/newsImage";
 import { safeTitleHtml } from "@/lib/sanitize";
 
 interface NewsCardProps {
@@ -56,7 +56,7 @@ export default function NewsCard({ id, slug, title, summary, image, chapeu, chap
         {summary}
       </p>
       <div className="flex items-center gap-2 text-[11px] text-gray-600 mt-2">
-        <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0" loading="lazy" />
+        <img src={siteAssetUrl(bylineLogo, 32)} srcSet={siteAssetSrcSet(bylineLogo, 32)} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0" loading="lazy" />
         <span className="font-medium text-gray-600">{bylineName}</span>
         <span className="w-1 h-1 rounded-full bg-gray-300" />
         <span>{time}</span>

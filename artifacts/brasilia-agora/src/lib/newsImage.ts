@@ -131,6 +131,36 @@ export function metroResize(src: string, w: number, h?: number): string {
   return proxyUrl(src, w);
 }
 
+const SITE_ASSET_PREFIX = "/api/site-asset/";
+
+/**
+ * Acrescenta `&w=` a uma URL `/api/site-asset/…`, de onde vêm as logos e o
+ * avatar de assinatura. Devolve a entrada INALTERADA para qualquer outra coisa:
+ * o mesmo campo das settings ainda chega como data URI quando o payload vem do
+ * localStorage antigo ou de um blog que não passou pelo /api/site novo, e um
+ * `&w=` colado num `data:` quebraria a imagem.
+ *
+ * Substitui um `w` que já esteja na URL — o backend publica um `w` padrão por
+ * campo, e o componente sabe melhor que largura precisa (1x vs 2x).
+ */
+export function siteAssetUrl(src: string, w: number): string {
+  if (!src.startsWith(SITE_ASSET_PREFIX)) return src;
+  const [path, query = ""] = src.split("?");
+  const params = query.split("&").filter((p) => p && !p.startsWith("w="));
+  params.push(`w=${w}`);
+  return `${path}?${params.join("&")}`;
+}
+
+/**
+ * `srcSet` 1x/2x para um asset de identidade. Tela 2x recebe o dobro da largura
+ * — sem isso a logo, agora entregue no tamanho de exibição, sairia serrilhada
+ * em retina.
+ */
+export function siteAssetSrcSet(src: string, w: number): string | undefined {
+  if (!src.startsWith(SITE_ASSET_PREFIX)) return undefined;
+  return `${siteAssetUrl(src, w)} 1x, ${siteAssetUrl(src, w * 2)} 2x`;
+}
+
 /** Larguras para cards de notícia (thumbnails e destaques médios). */
 export const CARD_WIDTHS = [320, 480, 640, 960];
 

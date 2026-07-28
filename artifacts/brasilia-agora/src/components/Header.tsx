@@ -10,6 +10,7 @@ import { safeLinkUrl } from "../lib/homeBlocks";
 import { useAdImpression, trackClick } from "./ads/useAds";
 import PushSubscribeButton from "./PushSubscribeButton";
 import logoImg from "../assets/images/logo_sbc_agora.png";
+import { siteAssetUrl, siteAssetSrcSet } from "../lib/newsImage";
 
 const FALLBACK_NAV: NavEntry[] = [
   { label: "HOME",       path: "/" },
@@ -180,7 +181,7 @@ function MobileNav({ open, onClose, navItems, isActive, activeColor, logoSrc, si
         className={`fixed top-0 left-0 z-50 h-full w-[84%] max-w-[330px] bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-out ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         <div className="flex items-center justify-between gap-2 px-4 h-14 border-b border-gray-200 shrink-0">
-          {logoSrc ? <img src={logoSrc} alt={siteName} className="h-7 w-auto object-contain" /> : <span className="h-7" />}
+          {logoSrc ? <img src={siteAssetUrl(logoSrc, 320)} srcSet={siteAssetSrcSet(logoSrc, 320)} alt={siteName} loading="lazy" decoding="async" className="h-7 w-auto object-contain" /> : <span className="h-7" />}
           <button onClick={onClose} aria-label={t("menu.close")} className="p-2 -mr-2 text-gray-500 hover:text-gray-900 rounded-lg transition-colors">
             <X size={22} />
           </button>
@@ -267,9 +268,12 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
   // estilos standard/compact, centrada no estilo centered.
   return (
     <>
-      <img src={mobileSrc} alt={alt} style={{ height: mh }}
+      {/* Sem loading="lazy" de propósito: é a única imagem do cabeçalho na dobra,
+          e o preload que o React 19 emite para ela é desejável — depois do
+          resize do /api/site-asset ela pesa ~6 KB, não os 81 KB de antes. */}
+      <img src={siteAssetUrl(mobileSrc, 320)} srcSet={siteAssetSrcSet(mobileSrc, 320)} alt={alt} style={{ height: mh }}
         className={`lg:hidden w-auto max-w-full object-contain block ${centered ? "" : "object-left"}`} />
-      <img src={desktopSrc} alt={alt} style={{ height }}
+      <img src={siteAssetUrl(desktopSrc, 320)} srcSet={siteAssetSrcSet(desktopSrc, 320)} alt={alt} style={{ height }}
         className="hidden lg:block w-auto object-contain" />
     </>
   );

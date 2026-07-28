@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useArticles } from "../hooks/useArticles";
 import { useSite } from "../hooks/useSite";
 import { useT, relativeTime } from "../lib/i18n";
-import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import { buildSrcSet, HERO_WIDTHS, CARD_WIDTHS, THUMB_WIDTHS, siteAssetUrl, siteAssetSrcSet } from "@/lib/newsImage";
 import heroImg        from "../assets/images/hero.webp";
 import trafficImg     from "../assets/images/traffic.webp";
 import policeImg      from "../assets/images/police.webp";
@@ -111,7 +111,7 @@ function FeaturedCard({
           dangerouslySetInnerHTML={{ __html: safeTitleHtml(item.title) }}
         />
         <div className="flex items-center gap-2 text-[11px] text-white/60">
-          <img src={bylineLogo} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
+          <img src={siteAssetUrl(bylineLogo, 32)} srcSet={siteAssetSrcSet(bylineLogo, 32)} alt={bylineName} width={16} height={16} className="w-4 h-4 rounded-full object-cover shrink-0 opacity-80" loading="lazy" />
           <span className="font-medium">{bylineName}</span>
           <span className="w-1 h-1 rounded-full bg-white/40" />
           <span suppressHydrationWarning>{item.time}</span>
