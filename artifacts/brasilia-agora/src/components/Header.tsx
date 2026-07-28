@@ -268,12 +268,19 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
   // estilos standard/compact, centrada no estilo centered.
   return (
     <>
-      {/* Sem loading="lazy" de propósito: é a única imagem do cabeçalho na dobra,
-          e o preload que o React 19 emite para ela é desejável — depois do
-          resize do /api/site-asset ela pesa ~6 KB, não os 81 KB de antes. */}
+      {/* loading="lazy" aqui NÃO atrasa: a logo está dentro da viewport, e o
+          navegador busca imagem lazy visível assim que calcula o layout. O que o
+          atributo faz é impedir o React 19 de hoistear <link rel=preload as=image>
+          para ela. Sem isso a logo disputa banda com a imagem do LCP por um ganho
+          de poucos ms — ela já está no HTML do SSR no topo do <body>, então o
+          parser a descobre de imediato. Vale duplamente porque são DUAS <img>
+          (mobile e desktop): com logo mobile configurada, uma delas está sempre
+          em display:none, e preload não respeita media query. */}
       <img src={siteAssetUrl(mobileSrc, 320)} srcSet={siteAssetSrcSet(mobileSrc, 320)} alt={alt} style={{ height: mh }}
+        loading="lazy" decoding="async"
         className={`lg:hidden w-auto max-w-full object-contain block ${centered ? "" : "object-left"}`} />
       <img src={siteAssetUrl(desktopSrc, 320)} srcSet={siteAssetSrcSet(desktopSrc, 320)} alt={alt} style={{ height }}
+        loading="lazy" decoding="async"
         className="hidden lg:block w-auto object-contain" />
     </>
   );
