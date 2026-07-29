@@ -6,7 +6,7 @@ import { BRAND } from "./src/brand";
    cliente hidrata diferente. São TS puro, sem React nem browser. */
 import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } from "./src/lib/categoryRoutes";
 import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
-import { classifySsrPath } from "./src/lib/ssrRoutes";
+import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -455,15 +455,22 @@ function ssrPlugin(apiBase: string): Plugin {
   const HOME_TTL_MS = 30_000;
   const PAGE_TTL_MS = 60_000;
   const CACHE_MAX_ENTRIES = 200;
+  /* Idade a partir da qual o HTML velho deixa de ser servido: aí o visitante
+     espera a renderização mesmo. Só acontece em rota que ninguém pede há 10 min. */
+  const STALE_MAX_MS = 10 * 60_000;
   const htmlCache = new Map<string, { html: string; at: number; ttl: number }>();
+  /** Chaves com revalidação em andamento — impede N renders simultâneos da mesma rota. */
+  const revalidating = new Set<string>();
 
-  function cacheGet(key: string): string | null {
+  /** Entrada utilizável (mesmo vencida) e se ela já passou do TTL. */
+  function cacheLookup(key: string): { html: string; stale: boolean } | null {
     const hit = htmlCache.get(key);
     if (!hit) return null;
-    if (Date.now() - hit.at >= hit.ttl) { htmlCache.delete(key); return null; }
+    const age = Date.now() - hit.at;
+    if (age >= STALE_MAX_MS) { htmlCache.delete(key); return null; }
     htmlCache.delete(key); // reinsere no fim: Map itera por ordem de inserção
     htmlCache.set(key, hit);
-    return hit.html;
+    return { html: hit.html, stale: age >= hit.ttl };
   }
 
   function cacheSet(key: string, html: string, ttl: number): void {
@@ -726,6 +733,35 @@ function ssrPlugin(apiBase: string): Plugin {
         : langOnly(html, site));
   }
 
+  function renderRoute(route: SsrRoute, pathOnly: string, origin: string): Promise<string | null> {
+    return route.kind === "home" ? renderHome(origin)
+      : route.kind === "article" ? renderArticle(route.slug, origin)
+      : renderCategory(pathOnly, origin);
+  }
+
+  /**
+   * stale-while-revalidate DO SERVIDOR. O header de mesmo nome só vale para
+   * cache compartilhado e navegador; na origem, alguém sempre pagava a
+   * renderização quando o TTL vencia. Medido em produção (2026-07-29): 505 ms,
+   * 2.792 ms e 311 ms de servidor em três misses da home — a cada 30 s um
+   * visitante levava isso na cara. Agora ele recebe o HTML vencido na hora e a
+   * renderização acontece atrás; `revalidating` impede que N requisições
+   * simultâneas disparem N renders da mesma rota.
+   */
+  function revalidate(key: string, ttl: number, route: SsrRoute, pathOnly: string, origin: string): void {
+    if (revalidating.has(key)) return;
+    revalidating.add(key);
+    renderRoute(route, pathOnly, origin)
+      .then((html) => {
+        // null = a rota deixou de existir (artigo despublicado): tira do cache
+        // para a próxima requisição cair na SPA em vez de servir o velho.
+        if (html === null) htmlCache.delete(key);
+        else cacheSet(key, html, ttl);
+      })
+      .catch(() => { /* mantém o que está em cache até o STALE_MAX_MS */ })
+      .finally(() => { revalidating.delete(key); });
+  }
+
   async function handleSsr(
     req: IncomingMessage,
     res: ServerResponse,
@@ -744,18 +780,16 @@ function ssrPlugin(apiBase: string): Plugin {
     const cacheKey = `${host}|${route.key}`;
     const ttl = route.kind === "home" ? HOME_TTL_MS : PAGE_TTL_MS;
     const cacheControl = route.kind === "home" ? HOME_CACHE_CONTROL : PAGE_CACHE_CONTROL;
+    const origin = `${proto}://${host}`;
 
-    const cached = cacheGet(cacheKey);
-    if (cached !== null) {
-      sendHtml(res, cached, cacheControl);
+    const cached = cacheLookup(cacheKey);
+    if (cached) {
+      sendHtml(res, cached.html, cacheControl);
+      if (cached.stale) revalidate(cacheKey, ttl, route, pathOnly, origin);
       return;
     }
     try {
-      const origin = `${proto}://${host}`;
-      const html =
-        route.kind === "home" ? await renderHome(origin)
-        : route.kind === "article" ? await renderArticle(route.slug, origin)
-        : await renderCategory(pathOnly, origin);
+      const html = await renderRoute(route, pathOnly, origin);
       if (html === null) {
         next();
         return;
