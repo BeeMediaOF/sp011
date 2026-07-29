@@ -102,6 +102,14 @@ const report = [];
 for (const url of urls) {
   const runs = [];
   const problems = [];
+  /* Aquece o cache de HTML do servidor. A 1ª leitura de uma rota com SSR paga
+     os fetches de API + renderToString e não representa o visitante; sem isto
+     ela entra na amostra e puxa a mediana (foi o que aconteceu na 1ª medição do
+     PRD-05: uma leitura de 3.720 ms contra 2.396 e 2.516). O caminho frio é
+     medido à parte, por curl, onde dá para separar handshake de servidor. */
+  try {
+    await fetch(url, { headers: { "user-agent": "medir-campo/warmup" } });
+  } catch { /* API fora: as leituras vão mostrar */ }
   for (let i = 0; i < REPS; i++) {
     const context = await browser.newContext({
       viewport: { width: 412, height: 823 },
