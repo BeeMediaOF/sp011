@@ -39,15 +39,37 @@ const THROTTLE = {
 };
 const CPU_RATE = 4;
 
+/**
+ * Instalado ANTES da navegação (addInitScript). LCP e CLS não saem por
+ * `getEntriesByType` — só por PerformanceObserver; pedi-los pelo caminho errado
+ * devolve lista vazia E imprime "Deprecated API for given entry type" no
+ * console, o que ainda por cima contamina o gate de hidratação deste relatório.
+ */
+function observeWebVitals() {
+  window.__lcp = 0;
+  window.__cls = 0;
+  try {
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) {
+        window.__lcp = Math.max(window.__lcp, e.renderTime || e.loadTime || e.startTime);
+      }
+    }).observe({ type: "largest-contentful-paint", buffered: true });
+    new PerformanceObserver((l) => {
+      // Só deslocamento não provocado por interação conta para o CLS.
+      for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
+    }).observe({ type: "layout-shift", buffered: true });
+  } catch { /* navegador sem suporte: fica 0 */ }
+}
+
 /** Coletado DENTRO da página, depois do load + um respiro para o LCP fechar. */
 function collect() {
   return new Promise((resolve) => {
-    const out = { fcp: 0, lcp: 0, transfer: 0, decoded: 0, jsDecoded: 0, requests: 0 };
+    const out = { fcp: 0, transfer: 0, decoded: 0, jsDecoded: 0, requests: 0 };
+    out.lcp = Math.round(window.__lcp ?? 0);
+    out.cls = Math.round((window.__cls ?? 0) * 1000) / 1000;
     for (const e of performance.getEntriesByType("paint")) {
       if (e.name === "first-contentful-paint") out.fcp = Math.round(e.startTime);
     }
-    const lcps = performance.getEntriesByType("largest-contentful-paint");
-    if (lcps.length > 0) out.lcp = Math.round(lcps[lcps.length - 1].startTime);
     for (const r of performance.getEntriesByType("resource")) {
       out.requests++;
       out.transfer += r.transferSize || 0;
@@ -91,6 +113,7 @@ for (const url of urls) {
         "Chrome/124.0.0.0 Mobile Safari/537.36",
     });
     const page = await context.newPage();
+    await page.addInitScript(observeWebVitals);
     /* Erro/aviso de console é o gate de hidratação do PRD-05: o React em
        produção loga o #418/#423 minificado quando descarta o HTML do servidor. */
     page.on("console", (m) => {
@@ -116,13 +139,14 @@ await browser.close();
 
 console.log(`\nperfil: 412x823 DPR1.75 · ${Math.round(THROTTLE.downloadThroughput * 8 / 1024)} kbps · ` +
   `RTT ${THROTTLE.latency} ms · CPU ${CPU_RATE}x · ${REPS} execuções (mediana)\n`);
-console.log("rota                                       FCP     LCP    TTFB    load  transfer  decoded   reqs");
+console.log("rota                                       FCP     LCP    TTFB    load     CLS  transfer  decoded   reqs");
 for (const { url, runs } of report) {
   const p = (k) => median(runs.map((r) => r[k] ?? 0));
   const path = new URL(url).pathname.slice(0, 40).padEnd(40);
   console.log(
     `${path} ${String(p("fcp")).padStart(6)}  ${String(p("lcp")).padStart(6)}  ` +
     `${String(p("ttfb")).padStart(5)}  ${String(p("load")).padStart(6)}  ` +
+    `${String(p("cls")).padStart(6)}  ` +
     `${kb(p("transfer")).padStart(8)}  ${kb(p("decoded")).padStart(8)}  ${String(p("requests")).padStart(4)}`,
   );
 }
