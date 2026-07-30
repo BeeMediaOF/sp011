@@ -798,6 +798,16 @@ final. Três saídas foram consideradas:
 
 ## PRD-PERF-05 — validação em produção (sp011, 2026-07-29)
 
+> ⚠️ **Ressalva de condição de medição.** Conferido DEPOIS de medir: o serviço
+> `ollama` estava em **1576% de CPU** (a máquina inteira — reescrita de notícia
+> em curso), com todo o resto da stack somando menos de 26%. Os números de FCP,
+> LCP e `load` abaixo foram tomados com a VPS saturada e são **pessimistas**; a
+> dispersão entre leituras idênticas (o mesmo artigo dando 2.004 e 3.112 ms de
+> FCP) e o pico de 2.792 ms de TTFB são a assinatura típica de contenção de CPU.
+> Os critérios estruturais (`#root`, console, memória, CLS, 404) não dependem de
+> carga e valem como estão. **As 4 metas marcadas ❌ precisam ser remedidas com
+> o `central-api` parado antes de virarem conclusão.**
+
 ### Critérios de aceite
 
 | Critério | Meta | Medido | |
