@@ -61,7 +61,7 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 | 06 — llms.txt / robots.txt por blog | 1 | P | — | **concluído e validado em prod** |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | **concluído e validado em prod** |
 | 04 — CSS render-blocking | 2 | M/G | **02** | **concluído e validado em prod** |
-| 05 — SSR de artigo e categoria | 3 | G | **01** | código entregue, **falta medir em prod** |
+| 05 — SSR de artigo e categoria | 3 | G | **01** | **validado em prod**; 4 metas de FCP/LCP não atingidas, com causa medida |
 
 ## PRD-PERF-01 — o que foi entregue (2026-07-28)
 
@@ -796,35 +796,129 @@ final. Três saídas foram consideradas:
   `dangerouslySetInnerHTML` na hidratação, então não há mismatch — o DOM fica
   com a versão do servidor, que remove as mesmas classes de perigo.
 
-### A medir em produção (nada aqui foi medido ainda)
+## PRD-PERF-05 — validação em produção (sp011, 2026-07-29)
 
-FCP/LCP em `/artigo/:slug` e numa editoria, TTFB frio e quente, `#root` vazio
-= 0 nas duas, `/admin/login` continuando vazio, slug inexistente devolvendo a
-SPA (não 500), memória do container após navegar ~50 artigos, e o console sem
-aviso de hidratação nas três rotas.
+### Critérios de aceite
+
+| Critério | Meta | Medido | |
+|---|---|---|:--:|
+| `#root` vazio em `/artigo/:slug` | 0 | **0** | ✅ |
+| `#root` vazio na editoria | 0 | **0** | ✅ |
+| `/admin/login` continua client-only | 1 | **1** | ✅ |
+| Slug inexistente e rota inventada | não 500 | **200** (SPA) | ✅ |
+| HEAD no artigo | 200 sem corpo | **200 · 0 B** | ✅ |
+| TTFB quente | ≤ 200 ms | **3–5 ms de servidor** | ✅ |
+| Memória do `web` após 50 artigos | ≤ 400 MB | 197,9 → **212,6 MiB** | ✅ |
+| Console sem aviso de hidratação | 0 | **limpo nas 3 rotas** | ✅ |
+| CLS | 0 | **0,002** nas 3 | ✅ |
+| LCP `/artigo/:slug` | ≤ 2.900 ms | **2.884 ms** | ✅ |
+| FCP `/artigo/:slug` | ≤ 2.100 ms | 2.884 ms | ❌ |
+| FCP `/politica` | ≤ 2.200 ms | 3.192 ms | ❌ |
+| LCP `/politica` | ≤ 3.000 ms | 3.800 ms | ❌ |
+| `load` em `/artigo` (proxy de Speed Index) | ≤ 2.600 ms | 3.610 ms | ❌ |
+
+### Medição de campo (mesmo perfil do baseline, mediana de 5)
+
+| Rota | FCP | LCP | transfer | decoded | reqs |
+|---|---:|---:|---:|---:|---:|
+| `/` baseline | 2.564 | 2.572 | 1.006 KB | 1.939 KB | — |
+| **`/` agora** | **2.412** | **2.412** | **704 KB** | **1.417 KB** | 31 |
+| `/artigo` baseline | 4.208 | 5.464 | 1.622 KB | 4.196 KB | — |
+| `/artigo` pós-02 | 2.960 | 4.392 | 674 KB | 1.328 KB | — |
+| **`/artigo` agora** | **2.884** | **2.884** | **448 KB** | **1.097 KB** | 19 |
+| `/politica` baseline | 4.208 | 5.660 | 1.490 KB | 6.508 KB | — |
+| `/politica` pós-02 | 2.916 | 4.116 | 558 KB | 1.223 KB | — |
+| **`/politica` agora** | 3.192 | **3.800** | **431 KB** | **1.139 KB** | 25 |
+
+**No artigo, FCP e LCP colaram em 2.884 ms**: o maior elemento passou a pintar
+junto com o primeiro, que é exatamente o que o SSR existe para fazer. Contra o
+baseline, LCP −47%.
+
+### O FCP da editoria PIOROU, e o motivo está medido
+
+`/politica` foi de 2.916 para 3.192 ms de FCP (+276 ms) enquanto o LCP caía de
+4.116 para 3.800. A causa é o tamanho do documento — `/arquivo`, única rota
+pública sem SSR, serviu de controle:
+
+| Rota | bruto | gzip |
+|---|---:|---:|
+| `/arquivo` (sem SSR) | 6.673 | 2.642 |
+| `/politica` (com SSR) | 162.668 | **35.153** |
+| `/artigo` | 73.732 | 19.912 |
+| `/` | 178.845 | 35.857 |
+
+O SSR da editoria acrescentou **32,5 KB gzip** ao documento. A 1,6 Mbps
+(~200 KB/s) são ~163 ms de download disputando o caminho crítico com o CSS que
+bloqueia a renderização — a mesma ordem de grandeza dos 276 ms perdidos. É uma
+troca real: **−316 ms de LCP por +276 ms de FCP**. Vale a pena porque LCP é
+Core Web Vital e FCP não, mas não é o ganho limpo que o PRD previa.
+
+O documento da editoria se divide em ~100 KB de markup (58 cards a ~1,7 KB) e
+~58 KB de `__SSR_DATA__` (60 artigos da lista + 30 recentes + 5 mais lidas +
+settings). Reduções possíveis, em ordem de retorno:
+
+1. **SSR só da dobra** (2 destaques + ~8 cards) e o resto buscado depois de
+   hidratar: cortaria ~80 KB brutos / ~18 KB gzip, ~90 ms de FCP. Muda
+   comportamento (a lista completa chega ~1 s depois) — **fora do escopo do
+   PRD-05, decisão do dono**.
+2. Não semear os 30 recentes quando `showTopBar` está desligado — nada mais na
+   página de editoria lê `useArticles`. ~15 KB brutos, sem mudar nada visível.
+3. Enxugar os campos do seed para os 8 que o `toCard` usa (fora `category`,
+   `views`, `readingMinutes`): ~10% do JSON.
+
+### stale-while-revalidate do servidor (1dbdfc0) — o pior número da auditoria
+
+Medido ANTES: três misses seguidos da home custaram **505 ms, 2.792 ms e
+311 ms** de tempo de servidor. O header `stale-while-revalidate` que já
+mandávamos só vale para cache compartilhado e navegador; na origem, a cada 30 s
+um visitante pagava a renderização inteira (300 artigos + pool por categoria +
+100 cards). Artigo e editoria custavam ~300 ms no miss.
+
+Depois de servir o HTML vencido na hora e revalidar atrás:
+
+| | antes | depois |
+|---|---:|---:|
+| pós-TTL 1 | 708 ms | **192 ms** |
+| pós-TTL 2 | **2.892 ms** | **181 ms** |
+| pós-TTL 3 | 602 ms | **183 ms** |
+
+(valores de relógio, ~100 ms deles handshake TLS + RTT — o `curl` sai da VPS e
+volta pelo Caddy.) A cauda sumiu.
+
+### Nota de método
+
+O medidor de campo agora é versionado (`performance-audit/medir-campo.mjs`,
+commits 3ed176e/8c14c25/a0d361f). Dois defeitos dele foram corrigidos durante
+esta medição e valem registro porque contaminariam qualquer série futura:
+`getEntriesByType("largest-contentful-paint")` devolve lista vazia no Chrome (a
+primeira leitura saiu com LCP = 0 nas três rotas) **e** imprime "Deprecated API
+for given entry type" no console — justamente o gate de hidratação que o
+relatório existe para checar. E a primeira leitura de uma rota com SSR paga o
+cache frio: sem aquecimento ela entrava na amostra (3.720 ms contra 2.396 e
+2.516 na home) e puxava a mediana.
 
 ## Próxima ação
 
-1. **Deploy e medição do PRD-PERF-05** (`api` não muda; é só `web`), com os
-   comandos de verificação do PRD.
-2. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que
+1. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que
    nenhum número detecta: `/`, uma categoria, um artigo, `/contato`, e no painel
    `/admin/login`, dashboard, configurações e o modo escuro. Do PRD-04 saíram 51
    componentes e 34 PNGs; do PRD-03, conferir que logo do cabeçalho, do rodapé,
    avatar de assinatura e favicon aparecem **nítidos**, inclusive em tela 2×; do
    PRD-05, que artigo e editoria continuam idênticos ao que eram (o SSR não pode
    mudar layout) e que a navegação SPA segue instantânea.
-3. **Troca de logo pelo admin** (gate do PRD-03).
-4. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
+2. **Troca de logo pelo admin** (gate do PRD-03).
+3. **Lighthouse novo com a VPS ociosa.** O anterior rodou durante o rollout dos
    8 blogs e trouxe "The page loaded too slowly to finish within the time
    limit". Agora há quatro mudanças grandes para medir juntas: CSS 29,6% menor,
    62 KB tirados da frente do `<link>`, 243 KB de imagem de identidade a menos e
    o SSR de artigo/editoria.
-5. **Rollout aos 8 blogs** (PRD-04 + PRD-03 + PRD-05 na mesma imagem), com o
+4. **Rollout aos 8 blogs** (PRD-04 + PRD-03 + PRD-05 na mesma imagem), com o
    canário de 24 h que o PRD-05 pede.
-6. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
+5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
    "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
    propaga em ≤1 h.
+6. Decidir sobre o **SSR só da dobra na editoria** (ver PRD-05 acima): é o que
+   falta para o FCP daquela rota, e muda comportamento.
 7. `RELATORIO-FINAL.md`.
 
 ### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
