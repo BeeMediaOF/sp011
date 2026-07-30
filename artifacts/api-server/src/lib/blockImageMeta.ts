@@ -16,7 +16,7 @@ import sharp from "sharp";
 // Extensão .ts explícita (e não .js) nos imports de VALOR porque este módulo tem
 // teste: o `node --test` resolve o especificador literal, e só o import de TIPO
 // some na compilação. Mesmo padrão de ingestHandlers.ts (CLAUDE.md §14).
-import { loadRawBuffer } from "./uploadsFile.ts";
+import { readLocalBuffer } from "./uploadsFile.ts";
 import { logger } from "./logger.ts";
 import type { HomeBlock } from "./store.js";
 
@@ -40,9 +40,11 @@ async function dimensionsOf(filename: string): Promise<{ width: number; height: 
   if (cached !== undefined) return cached;
   let result: { width: number; height: number } | null = null;
   try {
-    const raw = await loadRawBuffer(filename);
+    // Disco local apenas: ver readLocalBuffer. O /api/site não pode ficar preso
+    // num timeout de rede por causa de uma otimização de layout.
+    const raw = readLocalBuffer(filename);
     if (raw) {
-      const meta = await sharp(raw.buffer).metadata();
+      const meta = await sharp(raw).metadata();
       if (meta.width && meta.height) result = { width: meta.width, height: meta.height };
     }
   } catch (err) {

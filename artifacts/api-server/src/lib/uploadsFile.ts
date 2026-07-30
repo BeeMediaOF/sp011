@@ -55,6 +55,17 @@ function contentTypeOf(filename: string): string {
 }
 
 /**
+ * Só o disco local — NUNCA a rede. Para quem não pode esperar: o fallback de
+ * Storage tem timeout de 30 s, e num caminho crítico (o /api/site, que toda
+ * página busca) isso não é lentidão, é indisponibilidade. Arquivo legado que só
+ * existe no bucket devolve null e o chamador segue sem ele.
+ */
+export function readLocalBuffer(filename: string): Buffer | null {
+  const localPath = join(LOCAL_UPLOADS_DIR, filename);
+  return existsSync(localPath) ? readFileSync(localPath) : null;
+}
+
+/**
  * Carrega o arquivo inteiro em memória (disco local → fallback Supabase Storage).
  * Usado pelo caminho de transformação (sharp precisa do buffer completo).
  */
