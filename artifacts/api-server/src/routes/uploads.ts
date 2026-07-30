@@ -25,14 +25,14 @@ import { Router } from "express";
 import multer from "multer";
 import sharp from "sharp";
 import { randomUUID } from "crypto";
-import { extname, join, dirname } from "path";
-import { fileURLToPath } from "url";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { extname, join } from "path";
+import { existsSync, writeFileSync } from "fs";
 import { Readable } from "stream";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { logger } from "../lib/logger.js";
+import { LOCAL_UPLOADS_DIR, storageEnv, objectUrl, loadRawBuffer } from "../lib/uploadsFile.js";
 import {
   cacheKey,
   memGet,
@@ -66,39 +66,12 @@ async function imageDimensionsOk(buffer: Buffer, res: import("express").Response
   }
 }
 
-const isProd = process.env["NODE_ENV"] === "production";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-// Armazenamento primário. Produção: /data/uploads (volume api_data — sobrevive
-// a rebuilds do container). Dev: pasta local do pacote. UPLOADS_DIR sobrepõe.
-const LOCAL_UPLOADS_DIR =
-  process.env["UPLOADS_DIR"] ?? (isProd ? "/data/uploads" : join(__dirname, "../../data/uploads"));
-if (!existsSync(LOCAL_UPLOADS_DIR)) mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
-
-// ── Supabase Storage (REST API) — apenas leitura de arquivos legados ──────────
-const STORAGE_PREFIX = "uploads"; // objects stored at <bucket>/uploads/<filename>
-
-// Lido sob demanda (não no import): quando a conexão vem do arquivo do
-// assistente de instalação, o boot injeta SUPABASE_URL/SERVICE_ROLE_KEY em
-// process.env DEPOIS deste módulo carregar. A env explícita continua mandando.
-function storageEnv(): { url: string; key: string; bucket: string; configured: boolean } {
-  const url = (process.env["SUPABASE_URL"] ?? "").replace(/\/+$/, "");
-  const key = process.env["SUPABASE_SERVICE_ROLE_KEY"] ?? "";
-  const bucket = process.env["SUPABASE_STORAGE_BUCKET"] ?? "uploads";
-  return { url, key, bucket, configured: !!(url && key) };
-}
-
 /** Log de boot: onde os uploads são gravados — chamado após resolver a conexão. */
 export function logUploadsStorage(): void {
   logger.info(
     { dir: LOCAL_UPLOADS_DIR, legacyFallback: storageEnv().configured },
     "Uploads em disco local (Supabase Storage apenas como fallback de leitura de legados)",
   );
-}
-
-function objectUrl(filename: string): string {
-  const { url, bucket } = storageEnv();
-  return `${url}/storage/v1/object/${bucket}/${STORAGE_PREFIX}/${encodeURIComponent(filename)}`;
 }
 
 async function storageDownload(
@@ -116,42 +89,6 @@ async function storageDownload(
   } catch {
     return null;
   }
-}
-
-/**
- * Carrega o arquivo inteiro em memória (disco local → fallback Supabase Storage).
- * Usado pelo caminho de transformação (sharp precisa do buffer completo).
- */
-async function loadRawBuffer(
-  filename: string,
-): Promise<{ buffer: Buffer; contentType: string } | null> {
-  const localPath = join(LOCAL_UPLOADS_DIR, filename);
-  if (existsSync(localPath)) {
-    const ext = extname(filename).toLowerCase();
-    const contentType =
-      ext === ".png" ? "image/png" :
-      ext === ".webp" ? "image/webp" :
-      ext === ".avif" ? "image/avif" :
-      ext === ".gif" ? "image/gif" :
-      (ext === ".jpg" || ext === ".jpeg") ? "image/jpeg" :
-      "application/octet-stream";
-    return { buffer: readFileSync(localPath), contentType };
-  }
-  if (storageEnv().configured) {
-    try {
-      const res = await fetch(objectUrl(filename), {
-        headers: { Authorization: `Bearer ${storageEnv().key}` },
-        signal: AbortSignal.timeout(30_000),
-      });
-      if (res.ok) {
-        const contentType = res.headers.get("content-type") ?? "application/octet-stream";
-        return { buffer: Buffer.from(await res.arrayBuffer()), contentType };
-      }
-    } catch {
-      // legado indisponível — segue para o 404
-    }
-  }
-  return null;
 }
 
 // Formatos estáticos que valem a pena reprocessar para WebP/AVIF.

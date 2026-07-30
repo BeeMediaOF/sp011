@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { SITE_ASSET_FIELDS, store } from "../lib/store.js";
+import { withBlockImageDimensions } from "../lib/blockImageMeta.js";
 import {
   cacheKey, memGet, resolveImage, MAX_WIDTH,
   type ImageFormat,
@@ -87,7 +88,7 @@ router.get("/site-asset/:key", async (req, res) => {
 });
 
 /** GET /api/site — site settings + menu items (public, sensitive keys excluded) */
-router.get("/site", (_req, res) => {
+router.get("/site", async (_req, res) => {
   const settings = { ...store.getPublicSettings() };
   // Templates de home são material do painel (aba Templates) — fora do payload público.
   delete settings.homeTemplates;
@@ -95,6 +96,11 @@ router.get("/site", (_req, res) => {
   delete settings.internalIps;
   // Campanhas pagas são configuração interna de Analytics (PRD 05) — não ao público.
   delete settings.paidCampaigns;
+  /* Blocos de imagem saem com as dimensões nativas para o site reservar a caixa
+     (ver blockImageMeta.ts — CLS de 0,945 medido no esporteagora sem isto). A
+     leitura é cacheada por nome de arquivo; falha devolve o bloco intacto. */
+  settings.homeBlocks = await withBlockImageDimensions(settings.homeBlocks);
+  settings.articleSidebarBlocks = await withBlockImageDimensions(settings.articleSidebarBlocks);
   const menuItems = store.getMenuItems()
     .filter((m) => m.visible)
     .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));

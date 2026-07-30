@@ -24,6 +24,7 @@ import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
 } from "../../lib/homeBlocks";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
+import { proxyUrl, buildSrcSet } from "../../lib/newsImage";
 import { trackSearch, trackNewsletter } from "../../hooks/useAnalytics";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
 import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
@@ -83,6 +84,10 @@ function SectionHeading({ title, color }: { title: string; color: string }) {
 }
 
 // ─── Imagem ──────────────────────────────────────────────────────────────────
+/** Larguras servidas do bloco de imagem: cobre a coluna estreita da lateral
+ *  (320) até a faixa full-width do desktop 2× (o container é max-w-1280). */
+const BLOCK_IMAGE_WIDTHS = [320, 640, 970, 1280];
+
 export function ImageBlock({ block, preview, contained = true }: {
   block: HomeBlock; preview?: boolean;
   /** false = sem o wrapper de página (uso na lateral da notícia/zonas). */
@@ -101,8 +106,20 @@ export function ImageBlock({ block, preview, contained = true }: {
   const caption = (block.caption ?? "").trim();
   const format = block.format ?? "full_width_image";
 
+  /* A imagem do bloco é subida pelo painel e ia CRUA para o navegador. Medido no
+     esporteagora em 2026-07-30: um PNG de 1.697 KiB (1366×1152) para um espaço
+     de 665×561 — sozinho, o elemento de LCP da home, 15,0 s. O /api/uploads já
+     redimensiona e converte para WebP; faltava pedir.
+     width/height vêm do /api/site (blockImageMeta.ts): sem eles o `h-auto` deixa
+     a imagem com altura zero até chegar, e o que está abaixo dela pula — era
+     CLS de 0,945 naquela home. Com os dois atributos o navegador deduz a
+     proporção e reserva a caixa desde o HTML do SSR. */
   const img = (
-    <img src={src} alt={caption || block.name} loading="lazy" decoding="async"
+    <img src={proxyUrl(src, BLOCK_IMAGE_WIDTHS[BLOCK_IMAGE_WIDTHS.length - 1]!)}
+      srcSet={buildSrcSet(src, BLOCK_IMAGE_WIDTHS) || undefined}
+      sizes={contained ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 1024px) 100vw, 320px"}
+      alt={caption || block.name} loading="lazy" decoding="async"
+      width={block.imageWidth} height={block.imageHeight}
       className={`w-full h-auto object-cover ${format === "full_width_image" ? "" : "rounded-xl"}`} />
   );
 

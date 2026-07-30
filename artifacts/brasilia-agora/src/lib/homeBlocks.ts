@@ -39,6 +39,11 @@ export interface HomeBlock {
   itemsLimit?: number;
   /** Bloco de imagem: URL da imagem (upload ou externa). */
   imageUrl?: string;
+  /** Dimensões nativas da imagem, preenchidas pelo /api/site (não editáveis no
+   *  painel). Servem para o `<img>` reservar a caixa e não deslocar o layout
+   *  quando a imagem chega — ver api-server/src/lib/blockImageMeta.ts. */
+  imageWidth?: number;
+  imageHeight?: number;
   /** Link de destino ao clicar (imagem/banner). */
   linkUrl?: string;
   /** Legenda da imagem ou texto auxiliar (ex.: chamada da newsletter). */

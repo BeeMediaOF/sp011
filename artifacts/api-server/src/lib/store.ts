@@ -105,6 +105,10 @@ export interface HomeBlock {
   blockType?: string;
   format?: string; source?: string; itemsLimit?: number;
   imageUrl?: string; linkUrl?: string; caption?: string;
+  /** Dimensões nativas da imagem do bloco. NÃO são editáveis no painel: o
+   *  /api/site preenche lendo o arquivo (ver blockImageMeta.ts), para o site
+   *  reservar a caixa e não deslocar o layout quando a imagem chega. */
+  imageWidth?: number; imageHeight?: number;
   videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
   /** Bloco de imagem/HTML marcado "É uma propaganda" — mede impressão/clique
    *  sob a chave block:<id> (ad_daily_stats) e entra nas métricas de anúncios. */
