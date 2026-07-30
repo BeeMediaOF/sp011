@@ -920,6 +920,65 @@ relatório existe para checar. E a primeira leitura de uma rota com SSR paga o
 cache frio: sem aquecimento ela entrava na amostra (3.720 ms contra 2.396 e
 2.516 na home) e puxava a mediana.
 
+## Achado fora dos PRDs: bloco de imagem servia a imagem crua (4cd391b)
+
+Veio de um PageSpeed do **esporteagora** em 2026-07-30: desempenho **48** num
+blog cujo FCP era 1,2 s. O mesmo código, na mesma imagem Docker, dava **99** no
+oleysports. A diferença não era código — era o que o operador subiu pelo painel:
+
+| Banner (bloco de imagem da home) | peso | exibido | real |
+|---|---:|---:|---:|
+| `anuncie-lateral-16e026e7.png` | **1.697 KiB** | 665×561 | 1366×1152 |
+| `anuncie-faixa-ad6bf104.png` | 728 KiB | 665×87 | 2172×284 |
+| `imagem-f20e6788.png` | 417 KiB | 665×53 | 2172×172 |
+
+2,84 MB de 3,74 MB da página, e o lateral era o elemento de LCP: **15,0 s**.
+Os anúncios da TABELA de anúncios nunca tiveram esse problema (`/api/ads/:id/image`
+já serve WebP de 960 px) — por isso o oleysports passou ileso.
+
+**Mas o código deixou o conteúdo causar esse estrago**, e isso é defeito nosso:
+
+1. O `ImageBlock` renderizava `<img src={block.imageUrl}>`. O `/api/uploads` já
+   redimensiona e converte para WebP desde sempre; faltava pedir. Medido depois
+   da correção, no mesmo arquivo: **1.737.247 B cru → 110.742 B** na largura que
+   o celular escolhe (−93,6%).
+2. Sem `width`/`height`, o `h-auto` deixava a imagem com altura zero até chegar
+   e tudo abaixo pulava: **CLS 0,945**, dos quais 0,605 só do rodapé. As
+   dimensões nativas passaram a vir no `/api/site` (`lib/blockImageMeta.ts`,
+   leitura cacheada por nome de arquivo — o nome do upload carrega hash de
+   conteúdo, então nome igual = bytes iguais). Sem campo novo no painel, sem
+   migração, e vale para os blocos que já existem.
+
+Depois (PageSpeed no mesmo blog, e medição de campo com a VPS ociosa):
+
+| | antes | depois |
+|---|---:|---:|
+| Desempenho (PSI) | 48 | **62** |
+| LCP (PSI) | 15,0 s | **3,2 s** |
+| CLS (PSI) | 0,945 | **0** |
+| CLS (campo, home e artigo) | — | **0** |
+| FCP / LCP de campo, home | — | 1.400 / 3.280 ms |
+| FCP / LCP de campo, artigo | — | 1.416 / 2.232 ms |
+
+### O gargalo mudou de lugar: agora é thread principal
+
+O PSI depois da correção acusa **TBT 2.210 ms**, 5,7 s de trabalho na thread
+principal e 20 tarefas longas. **A comparação com os 110 ms de antes não vale**:
+com 4,2 MB de imagem a página ficava presa na rede e o JS rodava escondido atrás
+do download; tirada a rede da frente, o custo de JS aparece na janela medida. Ele
+sempre esteve ali.
+
+É o único item grande que a auditoria não tocou: o PRD-02 cortou BYTES de JS, não
+o TRABALHO de hidratação (22 blocos e ~100 cards reconciliados de uma vez, com a
+CPU 4× estrangulada). Merece PRD próprio.
+
+### O #418/#419 do esporteagora não se reproduz
+
+Aquele PageSpeed acusou erro de hidratação no console; o blog estava numa imagem
+anterior. Depois do rollout para a v68, **dez execuções (5 na home, 5 no artigo)
+saíram com console limpo**. Fica registrado como não reproduzível — não como
+resolvido, porque não sei qual mudança o matou.
+
 ## Próxima ação
 
 1. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que
@@ -940,14 +999,16 @@ cache frio: sem aquecimento ela entrava na amostra (3.720 ms contra 2.396 e
 5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
    "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
    propaga em ≤1 h.
-6. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
+6. **Hidratação na thread principal** (TBT 2.210 ms no esporteagora): o único
+   item grande que a auditoria não tocou. Candidato a PRD-07.
+7. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
    (1576% de CPU) enquanto a central reescreve, e isso é latência real para
    visitante real nos 8 blogs ao mesmo tempo. Nenhum PRD cobre isso.
-7. **502 e CLS 0,014 em `/politica`** (achado da medição limpa): imagem legada
+8. **502 e CLS 0,014 em `/politica`** (achado da medição limpa): imagem legada
    que provavelmente só existe no Supabase Storage, cuja cota de egress estourou
    em julho — a imagem falha, o `BrokenImageFallback` troca pelo placeholder e a
    troca desloca o layout. As outras rotas ficaram em CLS 0,002.
-8. `RELATORIO-FINAL.md`.
+9. `RELATORIO-FINAL.md`.
 
 ### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
 
