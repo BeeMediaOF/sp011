@@ -179,6 +179,27 @@ async function fetchOriginRaw(url: string): Promise<Buffer> {
   return body;
 }
 
+/**
+ * Uma re-tentativa em falha TRANSITÓRIA. A capa re-hospedada na central
+ * (`central.midia.run/api/news/image/*`) é servida pelo central-api, um Node
+ * single-thread que engasga por instantes sob carga (enxurrada do
+ * `facebookexternalhit` + fila de IA) → o Caddy devolve um 502 pontual. Sem
+ * retry, um engasgo de ~1 s virava placeholder cacheado (imagem "sumida").
+ * NÃO retenta erro PERMANENTE (4xx, não-imagem, URL inválida) — só 5xx/rede.
+ */
+async function fetchOriginWithRetry(url: string): Promise<Buffer> {
+  try {
+    return await fetchOriginRaw(url);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const permanent =
+      /^origin_error:4\d\d$/.test(msg) || msg === "not_an_image" || msg === "invalid_url";
+    if (permanent) throw err;
+    await new Promise((r) => setTimeout(r, 250));
+    return await fetchOriginRaw(url);
+  }
+}
+
 // ── Warm cache (chamado no startup para pré-aquecer artigos recentes) ─────────
 /**
  * Pré-aquece o cache de imagens para as URLs fornecidas.
@@ -273,7 +294,7 @@ router.get("/image", imageRateLimit, async (req, res) => {
 
   let processed: Buffer;
   try {
-    processed = memHit ?? (await resolveImage(key, () => fetchOriginRaw(rawUrl), w, q, fmt));
+    processed = memHit ?? (await resolveImage(key, () => fetchOriginWithRetry(rawUrl), w, q, fmt));
   } catch (err) {
     req.log.warn({ err, url: rawUrl }, "image-proxy: fetch/process failed — serving placeholder");
     // Return a neutral placeholder instead of a 502, so the browser never
@@ -282,7 +303,10 @@ router.get("/image", imageRateLimit, async (req, res) => {
       const placeholder = await getPlaceholder();
       res
         .set("Content-Type", "image/webp")
-        .set("Cache-Control", "public, max-age=300")
+        // TTL curto (60s, não 5min): a falha aqui costuma ser um engasgo
+        // transitório do upstream — a próxima requisição tem que re-tentar a
+        // imagem de verdade logo, não ficar 5 min presa no placeholder.
+        .set("Cache-Control", "public, max-age=60")
         .set("X-Image-Cache", "PLACEHOLDER")
         .end(placeholder);
     } catch {
