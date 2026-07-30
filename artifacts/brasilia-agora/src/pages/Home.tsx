@@ -77,26 +77,10 @@ function sortByViews(list: SectionArticle[]): SectionArticle[] {
   return [...list].sort((a, b) => (b.views ?? 0) - (a.views ?? 0));
 }
 
-function useArticlesByCategory(category: string): SectionArticle[] {
-  const { articles } = useArticles();
-  const { lang, tz } = useT();
-  // Igualdade EXATA de slug ("" = curinga): includes() fazia "futebol" casar
-  // "futebol-americano" e vazava artigo para a seção errada.
-  const want = category.trim().toLowerCase();
-  return articles
-    .filter((a) => want === "" || (a.category ?? "").trim().toLowerCase() === want)
-    .map((a) => ({
-      id: a.id,
-      slug: a.slug || a.id,
-      title: a.title,
-      summary: a.subtitle,
-      image: a.imageUrl || "",
-      chapeu: a.tag || category.toUpperCase(),
-      author: a.author,
-      time: formatDayMonth(a.publishedAt, lang, tz),
-      readingMinutes: a.readingMinutes,
-    }));
-}
+/* Havia aqui um `useArticlesByCategory` — uma segunda cópia, sem uso desde a
+   migração para os blocos, do mesmo mapeamento que o `getArticles` do Home faz.
+   Removido junto com a otimização do PRD-PERF-07 para não sobrar uma versão
+   lenta esperando para ser reintroduzida por engano. */
 
 // ─── Extra layout components ──────────────────────────────────────────────────
 function SectionBlockTrio({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
@@ -820,12 +804,35 @@ export default function Home() {
 
   const visibleBlocks = isAdminPreview ? previewBlocks : baseBlocks.filter((b) => b.visible);
 
+  /**
+   * Cache das listas já mapeadas, por categoria pedida (PRD-PERF-07).
+   *
+   * `getArticles` é chamada por CADA bloco durante o render, e percorre a lista
+   * inteira — 200 artigos, formatando a data de todos, inclusive dos que o bloco
+   * descarta logo em seguida ao fatiar 3–6. Com os 22 blocos do template de
+   * portal isso dava ~4.400 formatações de data por render (677 ms de CPU de
+   * desktop; ~2,7 s no celular do PageSpeed), repetidas a cada re-render — a
+   * hidratação, a chegada do /api/site e a do /api/articles são três.
+   *
+   * Guardar o resultado por categoria transforma "uma passada por bloco" em "uma
+   * passada por categoria distinta", e o `useMemo` faz os re-renders custarem
+   * zero. Só se invalida quando muda algo que altera a saída (a lista, o idioma
+   * ou o fuso) — `cat` continua sendo a chave porque o `chapeu` de quem não tem
+   * `tag` deriva dela.
+   */
+  const articlesByCat = React.useMemo(
+    () => new Map<string, SectionArticle[]>(),
+    [articles, lang, tz],
+  );
+
   function getArticles(cat: string): SectionArticle[] {
+    const cached = articlesByCat.get(cat);
+    if (cached) return cached;
     // Igualdade EXATA de slug ("" = curinga p/ latest/most_read): includes()
     // fazia "futebol" casar "futebol-americano" — artigo na seção errada em
     // TODOS os blocos da home (CSR e SSR).
     const want = cat.trim().toLowerCase();
-    return articles
+    const list = articles
       .filter((a) => want === "" || (a.category ?? "").trim().toLowerCase() === want)
       .map((a) => ({
         id: a.id,
@@ -839,6 +846,8 @@ export default function Home() {
         views: a.views,
         readingMinutes: a.readingMinutes,
       }));
+    articlesByCat.set(cat, list);
+    return list;
   }
 
   function handlePreviewDragStart(idx: number) {

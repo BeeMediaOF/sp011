@@ -234,28 +234,67 @@ export function useT(): { t: (key: TKey) => string; lang: Lang; tz: string } {
 
 type DateInput = string | number | Date;
 
+/**
+ * Cache dos Intl.DateTimeFormat por (estilo, idioma, fuso).
+ *
+ * `date.toLocaleDateString(lang, opts)` CONSTRÓI um Intl.DateTimeFormat a cada
+ * chamada, e a construção é a parte cara — formatar depois é quase de graça.
+ * A home chama isto uma vez por card de cada bloco: medido em 2026-07-30,
+ * 4.400 formatações (22 blocos x 200 artigos) custavam **677 ms de CPU de
+ * desktop por render** — ~2,7 s no celular do PageSpeed, que roda com CPU 4x
+ * mais lenta. Era a maior fatia do TBT de 2.210 ms do esporteagora. Com o
+ * formatador reaproveitado as mesmas 4.400 caem para 24 ms (28x).
+ *
+ * A saída é byte-idêntica: `toLocaleDateString` é especificado como construir um
+ * DateTimeFormat com estas mesmas opções e chamar `format`. O teste
+ * `i18n.test.ts` compara as duas implementações em 4 fusos x 2 idiomas — é ele
+ * que garante que a hidratação continua casando com o HTML do SSR.
+ */
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatDate(
+  style: string,
+  d: DateInput,
+  lang: Lang,
+  tz: string,
+  opts: Intl.DateTimeFormatOptions,
+): string {
+  const date = new Date(d);
+  // Data inválida (publishedAt corrompido): Intl.format LANÇA RangeError, mas
+  // toLocaleDateString devolve "Invalid Date". Mantém-se o comportamento antigo
+  // — um artigo com data ruim não pode derrubar a home inteira.
+  if (!Number.isFinite(date.getTime())) return date.toLocaleDateString(lang, { ...opts, timeZone: tz });
+  const key = `${style}|${lang}|${tz}`;
+  let fmt = dateFormatters.get(key);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat(lang, { ...opts, timeZone: tz });
+    dateFormatters.set(key, fmt);
+  }
+  return fmt.format(date);
+}
+
 /** dd/mm/aaaa (pt) · m/d/yyyy (en) — substitui `toLocaleDateString("pt-BR")`. */
 export function formatShortDate(d: DateInput, lang: Lang, tz: string): string {
-  return new Date(d).toLocaleDateString(lang, { timeZone: tz });
+  return formatDate("short", d, lang, tz, {});
 }
 
 /** "7 de jul." (pt) · "Jul 7" (en) — cards de seção da home/relacionadas. */
 export function formatDayMonth(d: DateInput, lang: Lang, tz: string): string {
-  return new Date(d).toLocaleDateString(lang, { day: "numeric", month: "short", timeZone: tz });
+  return formatDate("dayMonth", d, lang, tz, { day: "numeric", month: "short" });
 }
 
 /** "segunda-feira, 7 de julho de 2026" — data por extenso da TopBar. */
 export function formatLongDate(d: DateInput, lang: Lang, tz: string): string {
-  return new Date(d).toLocaleDateString(lang, {
-    weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: tz,
+  return formatDate("long", d, lang, tz, {
+    weekday: "long", day: "numeric", month: "long", year: "numeric",
   });
 }
 
 /** "7 de julho de 2026, 14:30" — byline do artigo. */
 export function formatDateTime(d: DateInput, lang: Lang, tz: string): string {
-  return new Date(d).toLocaleDateString(lang, {
+  return formatDate("dateTime", d, lang, tz, {
     day: "numeric", month: "long", year: "numeric",
-    hour: "2-digit", minute: "2-digit", timeZone: tz,
+    hour: "2-digit", minute: "2-digit",
   });
 }
 

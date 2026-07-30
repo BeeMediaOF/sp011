@@ -48,6 +48,8 @@ const CPU_RATE = 4;
 function observeWebVitals() {
   window.__lcp = 0;
   window.__cls = 0;
+  window.__tasks = [];
+  window.__scripts = {};
   try {
     new PerformanceObserver((l) => {
       for (const e of l.getEntries()) {
@@ -58,6 +60,24 @@ function observeWebVitals() {
       // Só deslocamento não provocado por interação conta para o CLS.
       for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value;
     }).observe({ type: "layout-shift", buffered: true });
+    // Tarefas longas (>50 ms): é delas que sai o TBT, o número que mede o custo
+    // de HIDRATAR. O PRD-PERF-02 cortou BYTES de JavaScript; TBT mede TRABALHO,
+    // que é coisa diferente — um bundle pequeno pode travar a thread do mesmo
+    // jeito. Guardar a duração de cada uma (e não só a soma) permite ver se o
+    // problema é uma tarefa monolítica ou muitas pequenas.
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) window.__tasks.push({ start: e.startTime, dur: e.duration });
+    }).observe({ type: "longtask", buffered: true });
+    // Atribuição por script (Chrome 123+): diz QUAL arquivo e QUAL função
+    // gastaram o tempo. Sem isto sobra adivinhação sobre bundle minificado.
+    new PerformanceObserver((l) => {
+      for (const e of l.getEntries()) {
+        for (const s of e.scripts ?? []) {
+          const nome = `${(s.sourceURL || "?").split("/").pop()}:${s.sourceFunctionName || "(anônima)"}`;
+          window.__scripts[nome] = (window.__scripts[nome] ?? 0) + s.duration;
+        }
+      }
+    }).observe({ type: "long-animation-frame", buffered: true });
   } catch { /* navegador sem suporte: fica 0 */ }
 }
 
@@ -83,6 +103,15 @@ function collect() {
       out.ttfb = Math.round(nav.responseStart);
       out.load = Math.round(nav.loadEventEnd);
     }
+    /* TBT: soma do que passa de 50 ms em cada tarefa longa iniciada depois do
+       FCP. NÃO é idêntico ao do Lighthouse (que fecha a janela na TTI e usa o
+       próprio traçado); serve para comparar ESTA série com ela mesma ao longo
+       da auditoria, e não para bater com o número do PageSpeed. */
+    const tarefas = (window.__tasks ?? []).filter((t) => t.start >= out.fcp);
+    out.tbt = Math.round(tarefas.reduce((s, t) => s + Math.max(0, t.dur - 50), 0));
+    out.longTasks = tarefas.length;
+    out.maiorTask = Math.round(tarefas.reduce((m, t) => Math.max(m, t.dur), 0));
+    out.scripts = window.__scripts ?? {};
     resolve(out);
   });
 }
@@ -147,20 +176,33 @@ await browser.close();
 
 console.log(`\nperfil: 412x823 DPR1.75 · ${Math.round(THROTTLE.downloadThroughput * 8 / 1024)} kbps · ` +
   `RTT ${THROTTLE.latency} ms · CPU ${CPU_RATE}x · ${REPS} execuções (mediana)\n`);
-console.log("rota                                       FCP     LCP    TTFB    load     CLS  transfer  decoded   reqs");
+console.log("rota                            FCP     LCP    TTFB     CLS     TBT  tarefas  maior  transfer   reqs");
 for (const { url, runs } of report) {
   const p = (k) => median(runs.map((r) => r[k] ?? 0));
-  const path = new URL(url).pathname.slice(0, 40).padEnd(40);
+  const path = new URL(url).pathname.slice(0, 29).padEnd(29);
   console.log(
     `${path} ${String(p("fcp")).padStart(6)}  ${String(p("lcp")).padStart(6)}  ` +
-    `${String(p("ttfb")).padStart(5)}  ${String(p("load")).padStart(6)}  ` +
-    `${String(p("cls")).padStart(6)}  ` +
-    `${kb(p("transfer")).padStart(8)}  ${kb(p("decoded")).padStart(8)}  ${String(p("requests")).padStart(4)}`,
+    `${String(p("ttfb")).padStart(5)}  ${String(p("cls")).padStart(6)}  ` +
+    `${String(p("tbt")).padStart(6)}  ${String(p("longTasks")).padStart(7)}  ` +
+    `${String(p("maiorTask")).padStart(5)}  ${kb(p("transfer")).padStart(8)}  ${String(p("requests")).padStart(4)}`,
   );
 }
-console.log("\nleituras individuais (FCP/LCP):");
+console.log("\nleituras individuais (FCP/LCP/TBT):");
 for (const { url, runs } of report) {
-  console.log(`  ${new URL(url).pathname}: ${runs.map((r) => `${r.fcp}/${r.lcp}`).join("  ")}`);
+  console.log(`  ${new URL(url).pathname}: ${runs.map((r) => `${r.fcp}/${r.lcp}/${r.tbt}`).join("  ")}`);
+}
+
+/* Quem gastou a thread. Vazio = Chromium sem long-animation-frame (< 123);
+   os tempos de TBT acima continuam válidos, só falta o "de quem é a culpa". */
+console.log("\nmaiores consumidores da thread principal (soma das execuções, ms):");
+for (const { url, runs } of report) {
+  const total = {};
+  for (const r of runs) for (const [k, v] of Object.entries(r.scripts ?? {})) {
+    total[k] = (total[k] ?? 0) + v / runs.length;
+  }
+  const top = Object.entries(total).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  console.log(`  ${new URL(url).pathname}: ${top.length === 0 ? "(sem atribuição neste Chromium)" : ""}`);
+  for (const [nome, ms] of top) console.log(`      ${String(Math.round(ms)).padStart(6)} ms  ${nome}`);
 }
 console.log("\nconsole (esperado: vazio):");
 for (const { url, problems } of report) {

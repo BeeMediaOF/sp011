@@ -979,6 +979,70 @@ anterior. Depois do rollout para a v68, **dez execuções (5 na home, 5 no artig
 saíram com console limpo**. Fica registrado como não reproduzível — não como
 resolvido, porque não sei qual mudança o matou.
 
+## PRD-PERF-07 — hidratação: a home formatava 4.400 datas por render
+
+O TBT de 2.210 ms tinha uma causa única e mensurável, encontrada lendo o código
+antes de instrumentar: **a home construía um `Intl.DateTimeFormat` por card**.
+
+`formatDayMonth` chamava `date.toLocaleDateString(lang, opts)`, e essa API
+CONSTRÓI um formatador a cada chamada — a construção é a parte cara, formatar
+depois é quase de graça. Pior: `getArticles(cat)` é chamada por **cada bloco**
+durante o render e percorre a lista **inteira** (200 artigos, o
+`ARTICLES_LIST_LIMIT` da home), formatando a data de todos, inclusive dos que o
+bloco descarta em seguida ao fatiar 3–6 itens. Com os 22 blocos do template de
+portal: **4.400 formatações por render**.
+
+Medido com `node` (CPU de desktop, sem estrangulamento):
+
+| | 4.400 formatações |
+|---|---:|
+| `toLocaleDateString(lang, opts)` — como estava | **677 ms** |
+| `Intl.DateTimeFormat` cacheado | 24 ms |
+| cacheado **e** uma passada por categoria | **0,5 ms** |
+
+677 ms de CPU de desktop viram ~2,7 s no celular do PageSpeed, que roda com a CPU
+4× mais lenta — sozinho, isso cobre o TBT inteiro. E não acontecia uma vez: a
+home re-renderiza na hidratação, quando o `/api/site` volta (`refreshSite`) e
+quando o `/api/articles` resolve. Três vezes.
+
+O mesmo custo era pago **no servidor**, a cada render do SSR da home.
+
+### O que mudou
+
+- `lib/i18n.ts`: os quatro formatadores passam por um cache de
+  `Intl.DateTimeFormat` por (estilo, idioma, fuso). Vale para o site inteiro —
+  byline do artigo, arquivo, editoria e a data por extenso da TopBar.
+- `pages/Home.tsx`: `getArticles` memoriza a lista já mapeada por categoria
+  (`useMemo` em `[articles, lang, tz]`). "Uma passada por bloco" virou "uma
+  passada por categoria distinta", e re-render passou a custar zero.
+- Removido o `useArticlesByCategory`, cópia sem uso do mesmo mapeamento — uma
+  segunda versão lenta esperando para ser reintroduzida por engano.
+
+### Por que a saída não pode ter mudado
+
+Trocar formatador de data num app com SSR é exatamente o tipo de mudança que
+quebra hidratação em silêncio: basta um caractere diferente entre servidor e
+cliente para o React descartar o HTML do SSR (#418) e o LCP voltar ao que era
+antes do PRD-05. `src/lib/i18n.test.ts` compara a implementação nova com a
+antiga em **384 combinações** (4 estilos × 2 idiomas × 4 fusos × 6 datas,
+incluindo virada de dia e de ano) e exige igualdade byte a byte.
+
+Uma diferença real existe e está tratada: `Intl.format` **lança** `RangeError`
+em data inválida, enquanto `toLocaleDateString` devolve `"Invalid Date"`. Um
+`publishedAt` corrompido no banco derrubaria a home inteira. O caminho de data
+inválida continua no comportamento antigo, com teste próprio.
+
+### O medidor passou a medir TBT
+
+`medir-campo.mjs` só media FCP/LCP/CLS — não media o número que este PRD precisa
+derrubar. Ganhou observador de `longtask` (TBT, contagem e maior tarefa) e de
+`long-animation-frame`, que atribui o tempo a **arquivo e função** e evita
+adivinhação sobre bundle minificado. O TBT daqui não é o do Lighthouse (janela e
+traçado diferentes): serve para comparar esta série com ela mesma.
+
+**Pendente:** medição em produção. O ganho de 677 ms → 0,5 ms é de bancada; o que
+vale é o TBT de campo depois do deploy.
+
 ## Próxima ação
 
 1. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que
@@ -1002,8 +1066,9 @@ resolvido, porque não sei qual mudança o matou.
 5. Preencher `tagline` e `seoDescription` por blog no admin. Confirmado no
    rollout: o creditovc, portal de educação financeira, publica
    `"tagline":"Notícia. Agora. Sempre."`. Sem deploy, propaga em ≤1 h.
-6. **Hidratação na thread principal** (TBT 2.210 ms no esporteagora): o único
-   item grande que a auditoria não tocou. Candidato a PRD-07.
+6. ~~Hidratação na thread principal~~ — **causa encontrada e corrigida**
+   (PRD-PERF-07 acima): 4.400 construções de `Intl.DateTimeFormat` por render.
+   Falta **medir em produção** o TBT depois do deploy, com a VPS ociosa.
 7. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
    (1576% de CPU) enquanto a central reescreve, e isso é latência real para
    visitante real nos 8 blogs ao mesmo tempo. Nenhum PRD cobre isso.
