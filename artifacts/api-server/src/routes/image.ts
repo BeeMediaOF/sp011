@@ -131,10 +131,19 @@ const DEFAULT_FETCH_HEADERS: Record<string, string> = {
 // ── Fallback placeholder ──────────────────────────────────────────────────────
 // Returned (as WebP) when the upstream image cannot be fetched, so the browser
 // never gets a broken-image box or a 502 error.
+//
+// NEUTRO de propósito: esta imagem é servida pela MESMA imagem Docker em TODA a
+// rede de blogs (ksports EN, esporteagora/oley/resenha PT…). Qualquer marca ou
+// texto de idioma aqui vaza para o blog errado — o hardcode antigo "SBC Agora"
+// aparecia como capa de artigos sem imagem em blogs que não são o SBC Agora.
+// Só um ícone de "foto" cinza, sem palavra nenhuma → correto em qualquer blog.
 const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="450" viewBox="0 0 800 450">
-  <rect width="800" height="450" fill="#f3f4f6"/>
-  <text x="400" y="210" font-family="system-ui,sans-serif" font-size="28" fill="#9ca3af" text-anchor="middle">SBC Agora</text>
-  <text x="400" y="250" font-family="system-ui,sans-serif" font-size="16" fill="#d1d5db" text-anchor="middle">Imagem indisponível</text>
+  <rect width="800" height="450" fill="#eef1f5"/>
+  <g fill="none" stroke="#c3ccd8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="322" y="168" width="156" height="114" rx="12"/>
+    <circle cx="358" cy="200" r="12" fill="#c3ccd8" stroke="none"/>
+    <path d="M330 274 L384 220 L412 246 L444 210 L470 246 L470 274 Z" fill="#c3ccd8" stroke="none"/>
+  </g>
 </svg>`;
 
 let _placeholderWebP: Buffer | null = null;
