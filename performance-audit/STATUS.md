@@ -61,7 +61,7 @@ Brasil. Detalhes e consequências em `01-diagnostico.md` §1.0.
 | 06 — llms.txt / robots.txt por blog | 1 | P | — | **concluído e validado em prod** |
 | 03 — imagens de identidade e preloads | 2 | M | 01, 02 (medição) | **concluído e validado em prod** |
 | 04 — CSS render-blocking | 2 | M/G | **02** | **concluído e validado em prod** |
-| 05 — SSR de artigo e categoria | 3 | G | **01** | **validado em prod**; 4 metas de FCP/LCP não atingidas, com causa medida |
+| 05 — SSR de artigo e categoria | 3 | G | **01** | **concluído e validado em prod** (todas as metas) |
 
 ## PRD-PERF-01 — o que foi entregue (2026-07-28)
 
@@ -798,15 +798,12 @@ final. Três saídas foram consideradas:
 
 ## PRD-PERF-05 — validação em produção (sp011, 2026-07-29)
 
-> ⚠️ **Ressalva de condição de medição.** Conferido DEPOIS de medir: o serviço
-> `ollama` estava em **1576% de CPU** (a máquina inteira — reescrita de notícia
-> em curso), com todo o resto da stack somando menos de 26%. Os números de FCP,
-> LCP e `load` abaixo foram tomados com a VPS saturada e são **pessimistas**; a
-> dispersão entre leituras idênticas (o mesmo artigo dando 2.004 e 3.112 ms de
-> FCP) e o pico de 2.792 ms de TTFB são a assinatura típica de contenção de CPU.
-> Os critérios estruturais (`#root`, console, memória, CLS, 404) não dependem de
-> carga e valem como estão. **As 4 metas marcadas ❌ precisam ser remedidas com
-> o `central-api` parado antes de virarem conclusão.**
+> **Duas medições, e a diferença entre elas é a lição.** A primeira rodou com o
+> `ollama` em **1576% de CPU** — a máquina inteira, reescrevendo notícia — e
+> reprovou 4 metas de FCP/LCP. A segunda, com o `central-api` parado e o load
+> average abaixo de 1, aprovou todas com folga. **Nenhum número de tempo desta
+> auditoria vale sem conferir `docker stats` antes**; os critérios estruturais
+> (`#root`, console, memória, 404) não dependem de carga.
 
 ### Critérios de aceite
 
@@ -821,33 +818,49 @@ final. Três saídas foram consideradas:
 | Memória do `web` após 50 artigos | ≤ 400 MB | 197,9 → **212,6 MiB** | ✅ |
 | Console sem aviso de hidratação | 0 | **limpo nas 3 rotas** | ✅ |
 | CLS | 0 | **0,002** nas 3 | ✅ |
-| LCP `/artigo/:slug` | ≤ 2.900 ms | **2.884 ms** | ✅ |
-| FCP `/artigo/:slug` | ≤ 2.100 ms | 2.884 ms | ❌ |
-| FCP `/politica` | ≤ 2.200 ms | 3.192 ms | ❌ |
-| LCP `/politica` | ≤ 3.000 ms | 3.800 ms | ❌ |
-| `load` em `/artigo` (proxy de Speed Index) | ≤ 2.600 ms | 3.610 ms | ❌ |
+| FCP `/artigo/:slug` | ≤ 2.100 ms | **1.312 ms** | ✅ |
+| LCP `/artigo/:slug` | ≤ 2.900 ms | **1.312 ms** | ✅ |
+| FCP `/politica` | ≤ 2.200 ms | **1.360 ms** | ✅ |
+| LCP `/politica` | ≤ 3.000 ms | **1.360 ms** | ✅ |
+| `load` em `/artigo` (proxy de Speed Index) | ≤ 2.600 ms | **2.336 ms** | ✅ |
+
+Tempos da medição com a VPS ociosa (a saturada está na tabela seguinte).
 
 ### Medição de campo (mesmo perfil do baseline, mediana de 5)
+
+Com a VPS ociosa (`central-api` parado, load average 0,54):
 
 | Rota | FCP | LCP | transfer | decoded | reqs |
 |---|---:|---:|---:|---:|---:|
 | `/` baseline | 2.564 | 2.572 | 1.006 KB | 1.939 KB | — |
-| **`/` agora** | **2.412** | **2.412** | **704 KB** | **1.417 KB** | 31 |
+| **`/` agora** | **1.332** | **1.332** | **527 KB** | **1.240 KB** | 31 |
 | `/artigo` baseline | 4.208 | 5.464 | 1.622 KB | 4.196 KB | — |
 | `/artigo` pós-02 | 2.960 | 4.392 | 674 KB | 1.328 KB | — |
-| **`/artigo` agora** | **2.884** | **2.884** | **448 KB** | **1.097 KB** | 19 |
+| **`/artigo` agora** | **1.312** | **1.312** | **425 KB** | **1.069 KB** | 19 |
 | `/politica` baseline | 4.208 | 5.660 | 1.490 KB | 6.508 KB | — |
 | `/politica` pós-02 | 2.916 | 4.116 | 558 KB | 1.223 KB | — |
-| **`/politica` agora** | 3.192 | **3.800** | **431 KB** | **1.139 KB** | 25 |
+| **`/politica` agora** | **1.360** | **1.360** | **431 KB** | **1.139 KB** | 25 |
 
-**No artigo, FCP e LCP colaram em 2.884 ms**: o maior elemento passou a pintar
-junto com o primeiro, que é exatamente o que o SSR existe para fazer. Contra o
-baseline, LCP −47%.
+**FCP e LCP colaram nas três rotas**: o maior elemento passa a pintar junto com
+o primeiro, que é exatamente o que o SSR existe para fazer. Contra o baseline,
+LCP −76% no artigo e −76% na editoria. TTFB de 10 ms.
 
-### O FCP da editoria PIOROU, e o motivo está medido
+A dispersão também sumiu: cinco leituras do artigo entre **1.308 e 1.316 ms**,
+contra 2.004–3.112 na medição saturada. Aquilo era contenção de CPU, não o site.
 
-`/politica` foi de 2.916 para 3.192 ms de FCP (+276 ms) enquanto o LCP caía de
-4.116 para 3.800. A causa é o tamanho do documento — `/arquivo`, única rota
+### A mesma medição com o Ollama comendo a máquina (1576% de CPU)
+
+| Rota | FCP | LCP | transfer | decoded |
+|---|---:|---:|---:|---:|
+| `/` | 2.412 | 2.412 | 704 KB | 1.417 KB |
+| `/artigo` | 2.884 | 2.884 | 448 KB | 1.097 KB |
+| `/politica` | 3.192 | 3.800 | 431 KB | 1.139 KB |
+
+Fica registrado por dois motivos. Primeiro, é o custo REAL para o visitante
+sempre que a central reescreve — e isso atinge os 8 blogs ao mesmo tempo, não
+só quem está sendo medido. Segundo, sob saturação o SSR da editoria chega a
+custar FCP: `/politica` foi de 2.916 (pós-02) para 3.192 ms enquanto o LCP caiu
+de 4.116 para 3.800. A causa é o tamanho do documento — `/arquivo`, única rota
 pública sem SSR, serviu de controle:
 
 | Rota | bruto | gzip |
@@ -859,9 +872,9 @@ pública sem SSR, serviu de controle:
 
 O SSR da editoria acrescentou **32,5 KB gzip** ao documento. A 1,6 Mbps
 (~200 KB/s) são ~163 ms de download disputando o caminho crítico com o CSS que
-bloqueia a renderização — a mesma ordem de grandeza dos 276 ms perdidos. É uma
-troca real: **−316 ms de LCP por +276 ms de FCP**. Vale a pena porque LCP é
-Core Web Vital e FCP não, mas não é o ganho limpo que o PRD previa.
+bloqueia a renderização — a mesma ordem de grandeza dos 276 ms perdidos. Com a
+máquina ociosa esse custo desaparece na medição (1.360 ms de FCP), mas ele
+existe: é banda, e reaparece em conexão ruim de visitante real.
 
 O documento da editoria se divide em ~100 KB de markup (58 cards a ~1,7 KB) e
 ~58 KB de `__SSR_DATA__` (60 artigos da lista + 30 recentes + 5 mais lidas +
@@ -927,9 +940,14 @@ cache frio: sem aquecimento ela entrava na amostra (3.720 ms contra 2.396 e
 5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
    "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
    propaga em ≤1 h.
-6. Decidir sobre o **SSR só da dobra na editoria** (ver PRD-05 acima): é o que
-   falta para o FCP daquela rota, e muda comportamento.
-7. `RELATORIO-FINAL.md`.
+6. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
+   (1576% de CPU) enquanto a central reescreve, e isso é latência real para
+   visitante real nos 8 blogs ao mesmo tempo. Nenhum PRD cobre isso.
+7. **502 e CLS 0,014 em `/politica`** (achado da medição limpa): imagem legada
+   que provavelmente só existe no Supabase Storage, cuja cota de egress estourou
+   em julho — a imagem falha, o `BrokenImageFallback` troca pelo placeholder e a
+   troca desloca o layout. As outras rotas ficaram em CLS 0,002.
+8. `RELATORIO-FINAL.md`.
 
 ### Lentidão de build — diagnosticada e CORRIGIDA (9c25560)
 
