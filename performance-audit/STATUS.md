@@ -994,11 +994,14 @@ resolvido, porque não sei qual mudança o matou.
    limit". Agora há quatro mudanças grandes para medir juntas: CSS 29,6% menor,
    62 KB tirados da frente do `<link>`, 243 KB de imagem de identidade a menos e
    o SSR de artigo/editoria.
-4. **Rollout aos 8 blogs** (PRD-04 + PRD-03 + PRD-05 na mesma imagem), com o
-   canário de 24 h que o PRD-05 pede.
-5. Preencher o `seoDescription` por blog no admin (6 dos 8 compartilham
-   "Notícia. Agora. Sempre."; errado para pontofarma e creditovc). Sem deploy,
-   propaga em ≤1 h.
+4. ~~Rollout aos 8 blogs~~ — **CONCLUÍDO em 2026-07-30**. Canário no resenhavip
+   e depois os demais; os 8 domínios devolvem cada um o próprio `siteName` (o
+   diagnóstico de mistura de blogs) e o `/api/site` ficou entre 31 e 102 ms em
+   todos — a leitura de dimensões de imagem não custou nada no caminho crítico.
+   `credito.vc` não é da rede: o blog atende em `creditovc.midia.run`.
+5. Preencher `tagline` e `seoDescription` por blog no admin. Confirmado no
+   rollout: o creditovc, portal de educação financeira, publica
+   `"tagline":"Notícia. Agora. Sempre."`. Sem deploy, propaga em ≤1 h.
 6. **Hidratação na thread principal** (TBT 2.210 ms no esporteagora): o único
    item grande que a auditoria não tocou. Candidato a PRD-07.
 7. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
