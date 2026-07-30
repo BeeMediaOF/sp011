@@ -211,6 +211,10 @@ services:
       - ./caddy/sites:/etc/caddy/sites:ro   # 1 arquivo .caddy por blog replicado
       - caddy_data:/data       # certificados Let's Encrypt (persistente)
       - caddy_config:/config
+      # Capas re-hospedadas da central servidas ESTÁTICAS pelo Caddy (bypass do
+      # central-api) — mesmo volume que o central-api monta em /data, aqui só
+      # leitura. news-images fica em /srv/central/news-images. Ver Caddyfile.
+      - central_data:/srv/central:ro
     depends_on:
       - web
       - api
