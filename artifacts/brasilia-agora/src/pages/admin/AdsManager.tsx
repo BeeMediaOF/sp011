@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useLayoutEffect, useState, useRef, useMemo } from "react";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Ad } from "../../lib/adminApi";
 import { useCan } from "../../lib/permissionsCache";
@@ -110,10 +110,31 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
  *  Só admin: sem impacto no bundle/critical path do site público. */
 // Caixa 2:1 (128×64) — proporção de banner, boa p/ propagandas horizontais.
 const THUMB_BOX_W = 128;
-/** Largura natural de banner: o HTML lê essa largura e monta o layout HORIZONTAL
- *  correto (leaderboard/banner do cabeçalho não ficam amassados); depois reduz
- *  por scale p/ caber na caixa. */
-const THUMB_RENDER_W = 728;
+const THUMB_BOX_H = 64;
+
+/** Prévia de HTML que se AJUSTA ao conteúdo: mede o tamanho natural (fit-content,
+ *  até 728px) e reduz por scale p/ CABER inteiro na caixa (contain), centralizado
+ *  pelo flex do pai + transform-origin center. Assim tanto um banner largo
+ *  (leaderboard) quanto um botão pequeno (banner do cabeçalho) ficam proporcionais
+ *  — sem amassar num render fixo nem sumir num canto. Admin-only, client-only. */
+function HtmlThumb({ clean }: { clean: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const w = el.offsetWidth || 1;
+    const h = el.offsetHeight || 1;
+    const s = Math.min(THUMB_BOX_W / w, THUMB_BOX_H / h, 1);
+    setScale(s > 0 && Number.isFinite(s) ? s : 0.2);
+  }, [clean]);
+  return (
+    <div ref={ref} className="pointer-events-none select-none origin-center"
+      style={{ width: "fit-content", maxWidth: 728, transform: scale ? `scale(${scale})` : undefined, opacity: scale ? 1 : 0 }}
+      dangerouslySetInnerHTML={{ __html: clean }} />
+  );
+}
+
 function AdThumb({ image, html, base64 }: { image?: string; html?: string; base64?: string }) {
   const box = "w-32 h-16 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center relative";
   const src = base64 || (image ?? "").trim();
@@ -128,13 +149,7 @@ function AdThumb({ image, html, base64 }: { image?: string; html?: string; base6
   }
   const clean = html ? sanitizeArticleHtml(html) : "";
   if (clean) {
-    return (
-      <div className={box} title="Prévia do HTML">
-        <div className="pointer-events-none select-none absolute top-0 left-0 origin-top-left"
-          style={{ width: THUMB_RENDER_W, transform: `scale(${THUMB_BOX_W / THUMB_RENDER_W})` }}
-          dangerouslySetInnerHTML={{ __html: clean }} />
-      </div>
-    );
+    return <div className={box} title="Prévia do HTML"><HtmlThumb clean={clean} /></div>;
   }
   return <div className={box}><ImageIcon size={16} className="text-gray-300" /></div>;
 }
