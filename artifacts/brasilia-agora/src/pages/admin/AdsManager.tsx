@@ -108,26 +108,30 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 /** Sempre um preview ao lado do nome — inclusive para propaganda em HTML, que é
  *  renderizada (sanitizada) e reduzida por transform:scale dentro da caixa.
  *  Só admin: sem impacto no bundle/critical path do site público. */
+// Caixa 2:1 (128×64) — proporção de banner, boa p/ propagandas horizontais.
+const THUMB_BOX_W = 128;
+/** Largura natural de banner: o HTML lê essa largura e monta o layout HORIZONTAL
+ *  correto (leaderboard/banner do cabeçalho não ficam amassados); depois reduz
+ *  por scale p/ caber na caixa. */
+const THUMB_RENDER_W = 728;
 function AdThumb({ image, html, base64 }: { image?: string; html?: string; base64?: string }) {
-  const box = "w-24 h-14 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center relative";
-  if (base64) {
-    return <div className={box}><img src={base64} alt="" className="w-full h-full object-cover" /></div>;
-  }
-  const src = (image ?? "").trim();
+  const box = "w-32 h-16 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center relative";
+  const src = base64 || (image ?? "").trim();
   if (src) {
+    // object-contain: mostra o banner INTEIRO (horizontal não é cortado nas laterais).
     return (
       <div className={box}>
-        <img src={proxyUrl(src, 240)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+        <img src={base64 ? src : proxyUrl(src, 320)} alt="" loading="lazy" decoding="async"
+          className="max-w-full max-h-full object-contain" />
       </div>
     );
   }
   const clean = html ? sanitizeArticleHtml(html) : "";
   if (clean) {
-    // 300px de largura natural reduzidos p/ ~96px (w-24) → prévia do canto do banner.
     return (
       <div className={box} title="Prévia do HTML">
         <div className="pointer-events-none select-none absolute top-0 left-0 origin-top-left"
-          style={{ width: 300, transform: "scale(0.32)" }}
+          style={{ width: THUMB_RENDER_W, transform: `scale(${THUMB_BOX_W / THUMB_RENDER_W})` }}
           dangerouslySetInnerHTML={{ __html: clean }} />
       </div>
     );
