@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
-import { Search, Menu, X, House, ChevronDown } from "lucide-react";
+import { Menu, X, House, ChevronDown } from "lucide-react";
 import { useSite } from "../hooks/useSite";
+import HeaderSearch from "./HeaderSearch";
 import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
@@ -300,21 +301,15 @@ export default function Header() {
   const logoMobileSrc = settings ? (settings.logoMobileBase64 || logoSrc) : "";
   const [location]              = useLocation();
   const [menuOpen, setMenu]       = useState(false);
-  const [searchOpen, setSearch]   = useState(false);
-  const [searchQuery, setSearchQ] = useState("");
 
   const [, navigate] = useLocation();
 
-  function submitSearch(q: string) {
-    if (!q.trim()) return;
-    trackSearch(q.trim());
-    setSearch(false);
-    setSearchQ("");
-    navigate(`/arquivo?q=${encodeURIComponent(q.trim())}`);
-  }
-
-  function handleSearchKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") submitSearch(searchQuery);
+  // Dispara a busca (rastreio + navegação); o HeaderSearch fecha/limpa sozinho.
+  function runSearch(q: string) {
+    const v = q.trim();
+    if (!v) return;
+    trackSearch(v);
+    navigate(`/arquivo?q=${encodeURIComponent(v)}`);
   }
 
   const style = settings?.headerStyle ?? "standard";
@@ -413,27 +408,7 @@ export default function Header() {
           })}
         </nav>
         <div className="flex items-center pl-2 shrink-0">
-          {searchOpen ? (
-            <div className="flex items-center gap-1">
-              <input autoFocus type="text" placeholder={t("search.placeholder")}
-                aria-label={t("search.site")}
-                value={searchQuery}
-                onChange={(e) => setSearchQ(e.target.value)}
-                onKeyDown={handleSearchKey}
-                className="bg-white/15 border border-white/30 text-white placeholder-white/60 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-white w-[180px]"
-              />
-              <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-white/80 hover:text-white p-1">
-                <Search size={14} />
-              </button>
-              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-white/60 hover:text-white p-1">
-                <X size={14} />
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setSearch(true)} aria-label={t("search.open")} className="text-white/80 hover:text-white p-1.5 transition-colors">
-              <Search size={15} />
-            </button>
-          )}
+          <HeaderSearch variant="onDark" onSubmit={runSearch} iconSize={15} />
         </div>
       </div>
     </div>
@@ -487,28 +462,8 @@ export default function Header() {
 
             <div className="flex items-center gap-1 ml-auto">
               {settings?.showPushButton !== false && <PushSubscribeButton />}
-              <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
-              {searchOpen ? (
-                <>
-                  <input autoFocus type="text" placeholder={t("search.placeholder")}
-                    aria-label={t("search.site")}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQ(e.target.value)}
-                    onKeyDown={handleSearchKey}
-                    className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px]"
-                  />
-                  <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-gray-500 hover:text-gray-900 p-1">
-                    <Search size={14} />
-                  </button>
-                  <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-gray-400 hover:text-gray-800 p-1">
-                    <X size={14} />
-                  </button>
-                </>
-              ) : (
-                <button onClick={() => setSearch(true)} aria-label={t("search.open")} className="text-gray-500 hover:text-gray-900 p-1 transition-colors rounded">
-                  <Search size={15} />
-                </button>
-              )}
+              <div className={menuBarStyle === "bar" ? "lg:hidden" : ""}>
+                <HeaderSearch variant="light" onSubmit={runSearch} iconSize={15} />
               </div>
             </div>
           </div>
@@ -543,13 +498,9 @@ export default function Header() {
                 mobileHeight={settings?.logoMobileSize} centered />
             </Link>
 
-            <button
-              onClick={() => setSearch(v => !v)}
-              aria-label={searchOpen ? t("search.close") : t("search.open")}
-              className="absolute right-4 text-gray-500 hover:text-gray-900 p-1.5 rounded"
-            >
-              <Search size={17} />
-            </button>
+            <div className="absolute right-4">
+              <HeaderSearch variant="light" onSubmit={runSearch} iconSize={17} />
+            </div>
           </div>
 
           {/* Barra escura própria do estilo centered — cor configurável (menuBarBgColor). */}
@@ -582,24 +533,6 @@ export default function Header() {
               })}
             </nav>
           </div>
-
-          {searchOpen && (
-            <div className="px-4 py-2 border-t border-gray-100 flex gap-2">
-              <input autoFocus type="text" placeholder={t("search.placeholder")}
-                aria-label={t("search.site")}
-                value={searchQuery}
-                onChange={(e) => setSearchQ(e.target.value)}
-                onKeyDown={handleSearchKey}
-                className="flex-1 bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1.5 text-sm rounded focus:outline-none focus:border-gray-500"
-              />
-              <button onClick={() => submitSearch(searchQuery)} aria-label={t("search.submit")} className="text-gray-500 hover:text-gray-900 p-1">
-                <Search size={16} />
-              </button>
-              <button onClick={() => { setSearch(false); setSearchQ(""); }} aria-label={t("search.close")} className="text-gray-400 hover:text-gray-800 p-1">
-                <X size={16} />
-              </button>
-            </div>
-          )}
 
         </header>
         {settings?.showTickerBar !== false && <TickerBar />}
@@ -658,43 +591,8 @@ export default function Header() {
           <div className="flex items-center gap-1 ml-auto">
             {settings?.showPushButton !== false && <PushSubscribeButton />}
             {/* Com o menu em faixa, a busca do desktop mora na própria faixa. */}
-            <div className={`flex items-center gap-1 ${menuBarStyle === "bar" ? "lg:hidden" : ""}`}>
-            {searchOpen ? (
-              <>
-                <input
-                  autoFocus
-                  type="text"
-                  placeholder={t("search.placeholder")}
-                  aria-label={t("search.site")}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQ(e.target.value)}
-                  onKeyDown={handleSearchKey}
-                  className="bg-gray-100 border border-gray-300 text-gray-900 placeholder-gray-400 px-3 py-1 text-[12px] rounded focus:outline-none focus:border-gray-500 w-[150px] sm:w-[200px]"
-                />
-                <button
-                  onClick={() => submitSearch(searchQuery)}
-                  aria-label={t("search.submit")}
-                  className="text-gray-500 hover:text-gray-900 p-1 transition-colors"
-                >
-                  <Search size={15} />
-                </button>
-                <button
-                  onClick={() => { setSearch(false); setSearchQ(""); }}
-                  aria-label={t("search.close")}
-                  className="text-gray-400 hover:text-gray-800 p-1 transition-colors"
-                >
-                  <X size={15} />
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => setSearch(true)}
-                aria-label={t("search.open")}
-                className="text-gray-500 hover:text-gray-900 p-1.5 transition-colors rounded"
-              >
-                <Search size={17} />
-              </button>
-            )}
+            <div className={menuBarStyle === "bar" ? "lg:hidden" : ""}>
+              <HeaderSearch variant="light" onSubmit={runSearch} iconSize={17} />
             </div>
           </div>
         </div>
