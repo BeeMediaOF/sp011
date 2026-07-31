@@ -1154,6 +1154,29 @@ não vale um re-render de página inteira.
 dez execuções que saíram limpas foram em `/` e `/artigo`. Nenhuma foi numa
 editoria.
 
+### Corrigido e medido (2026-07-31, esporteagora, VPS ociosa)
+
+| `/futebol` | antes | depois |
+|---|---:|---:|
+| LCP | 10.040 ms | **3.036 ms** |
+| TBT | 262 ms | **86 ms** |
+| tarefas longas | 5 | 3 |
+| maior tarefa | 255 ms | 105 ms |
+| `index.js` na thread | 241 ms | **108 ms** |
+| console | React #418 | **limpo** |
+| requisições pendentes | 3 | nenhuma |
+| `load` | não disparava em 45 s | normal |
+
+Os 108 ms de `index.js` são o número que fecha o diagnóstico: **idênticos aos
+107 ms da home na mesma execução**. Antes a editoria gastava mais que o dobro da
+home numa página com menos conteúdo — era o React refazendo a árvore inteira
+depois de rejeitar o HTML do servidor. Some o #418, some a diferença.
+
+O `transfer` subiu de 442 KB para 636 KB, e isso é melhora, não piora: os 442 KB
+eram uma contagem **incompleta**, medida numa página cujo `load` nunca disparou.
+
+A home também ganhou um pouco (TBT 74 → 65 ms), pelo `ArtigosRelacionados`.
+
 ### O que o episódio diz sobre o método
 
 O #418 estava em produção em todos os 8 blogs, em todas as editorias, e passou
