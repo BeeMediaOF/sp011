@@ -78,6 +78,27 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     // clicks e passam a enxergar só o público sem mudar nenhuma query.
     sql`ALTER TABLE ad_daily_stats ADD COLUMN IF NOT EXISTS internal_impressions integer NOT NULL DEFAULT 0`,
     sql`ALTER TABLE ad_daily_stats ADD COLUMN IF NOT EXISTS internal_clicks integer NOT NULL DEFAULT 0`,
+    // PRD-NEWSLETTER-01 (Fase 1) — inscritos da newsletter, isolados por blog.
+    // Persistência do e-mail capturado (antes só métrica efêmera) + prova de
+    // consentimento LGPD (IP/UA/origem/timestamp) e double opt-in por token.
+    sql`CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+      id                 serial PRIMARY KEY,
+      email              text NOT NULL UNIQUE,
+      status             text NOT NULL DEFAULT 'pending',
+      confirm_token      text,
+      confirm_sent_at    timestamptz,
+      confirmed_at       timestamptz,
+      unsubscribe_token  text,
+      unsubscribed_at    timestamptz,
+      consent_ip         text,
+      consent_user_agent text,
+      source             text,
+      created_at         timestamptz NOT NULL DEFAULT now(),
+      updated_at         timestamptz NOT NULL DEFAULT now()
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_sub_status_idx ON newsletter_subscribers (status)`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_sub_confirm_token_idx ON newsletter_subscribers (confirm_token)`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_sub_unsub_token_idx ON newsletter_subscribers (unsubscribe_token)`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,

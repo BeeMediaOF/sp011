@@ -7,6 +7,7 @@ import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
 import { trackNewsletter } from "../hooks/useAnalytics";
+import { subscribeNewsletter } from "../lib/newsletter";
 import { siteAssetUrl, siteAssetSrcSet } from "../lib/newsImage";
 import {
   resolveFooterConfig, type FooterLink, type FooterSocialKey, type ResolvedFooter,
@@ -44,9 +45,10 @@ function SocialIcons({ social, className }: {
   );
 }
 
-/** Formulário de newsletter funcional: registra a adesão via analytics (dentro
- *  do gate LGPD — PRD 02 RF1). Fire-and-forget: mostra "ok" após validar o
- *  e-mail localmente; sem consentimento nada sai do dispositivo. */
+/** Formulário de newsletter funcional (PRD-NEWSLETTER-01 RF1). A INSCRIÇÃO
+ *  (subscribeNewsletter) é consentimento próprio de marketing e sai SEMPRE, fora
+ *  do gate de cookies de analytics; a MÉTRICA (trackNewsletter) segue atrás do
+ *  gate, em paralelo. Fire-and-forget: mostra "ok" após validar o e-mail. */
 function NewsletterForm({ dark, accent }: { dark: boolean; accent: string }) {
   const { t } = useT();
   const [email, setEmail] = useState("");
@@ -56,7 +58,8 @@ function NewsletterForm({ dark, accent }: { dark: boolean; accent: string }) {
     e.preventDefault();
     const v = email.trim();
     if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return;
-    trackNewsletter(v);
+    subscribeNewsletter(v, "footer"); // inscrição (fora do gate de analytics)
+    trackNewsletter(v);               // métrica (dentro do gate)
     setStatus("ok");
     setEmail("");
   }

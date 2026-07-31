@@ -22,3 +22,4 @@ export * from "./social_publication_queue";
 export * from "./social_connections";
 export * from "./ad_daily_stats";
 export * from "./behavior_events";
+export * from "./newsletter_subscribers";

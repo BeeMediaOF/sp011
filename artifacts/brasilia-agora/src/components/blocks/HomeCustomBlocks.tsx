@@ -26,6 +26,7 @@ import {
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
 import { proxyUrl, buildSrcSet } from "../../lib/newsImage";
 import { trackSearch, trackNewsletter } from "../../hooks/useAnalytics";
+import { subscribeNewsletter } from "../../lib/newsletter";
 import { normalizeSocialUrl, type FooterSocialKey } from "../../lib/footerConfig";
 import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
 
@@ -371,8 +372,10 @@ export function NewsletterBlock({ block }: { block: HomeBlock }) {
     e.preventDefault();
     const v = email.trim();
     if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) { setStatus("err"); return; }
-    // Dentro do gate LGPD (PRD 02 RF1): sem consentimento nada sai; admin vai
-    // internal:true (descartado no servidor). Fire-and-forget — "ok" imediato.
+    // Inscrição (subscribeNewsletter) = consentimento próprio de marketing, sai
+    // SEMPRE, fora do gate de analytics (PRD-NEWSLETTER-01 RF1). A métrica
+    // (trackNewsletter) segue atrás do gate. Fire-and-forget — "ok" imediato.
+    subscribeNewsletter(v, "home_block");
     trackNewsletter(v);
     setStatus("ok");
     setEmail("");
