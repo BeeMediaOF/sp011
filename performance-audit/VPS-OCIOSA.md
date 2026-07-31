@@ -56,6 +56,11 @@ docker compose exec -T -e REPS=5 api node medir.mjs https://sp011.com.br/ https:
 O container `api` é o único da stack com Playwright + Chromium instalados — por
 isso a medição roda de dentro dele, e não da sua máquina.
 
+⚠️ **O `cp` vai SEMPRE junto, nunca como passo separado.** O arquivo cai na
+camada gravável do container e some quando ele é recriado — e recriar container
+é exatamente o que todo deploy faz. Rodar `node medir.mjs` num container novo dá
+`Cannot find module '/app/artifacts/api-server/medir.mjs'`.
+
 ## 3. Restaurar — NÃO ESQUEÇA
 
 Enquanto a central está parada, a rede **não coleta, não reescreve e não entrega
