@@ -4,6 +4,7 @@ import { adminApi, type Ad } from "../../lib/adminApi";
 import { useCan } from "../../lib/permissionsCache";
 import { inferBlockType, type HomeBlock } from "../../lib/homeBlocks";
 import { sanitizeArticleHtml } from "../../lib/sanitize";
+import { proxyUrl } from "../../lib/newsImage";
 import { invalidateSiteCache } from "../../hooks/useSite";
 import {
   Plus, Trash2, Pencil, Search, Megaphone,
@@ -30,9 +31,18 @@ function calcCTR(clicks: number, impressions: number): string {
   return ((clicks / impressions) * 100).toFixed(2).replace(".", ",") + "%";
 }
 
+/** Onde o bloco-propaganda aparece na home (rótulo humano). */
+function blockLocation(b: HomeBlock): string {
+  return b.area === "sidebar" ? "Home · coluna lateral"
+    : b.area === "main" ? "Home · coluna principal"
+    : b.width === "half" ? "Home · meia largura"
+    : b.width === "quarter" ? "Home · 1/4 de largura"
+    : "Home · largura total";
+}
+
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
-// ─── Position / format maps ────────────────────────────────────────────────────
+// ─── Position / format maps (propagandas clássicas legadas por slot) ───────────
 type AdPosition = Ad["position"];
 
 const POSITION_OPTIONS: { value: AdPosition; label: string; format: string }[] = [
@@ -94,7 +104,38 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
   );
 }
 
-// ─── Empty form factory ────────────────────────────────────────────────────────
+// ─── Miniatura da propaganda (imagem OU render reduzido do HTML) ───────────────
+/** Sempre um preview ao lado do nome — inclusive para propaganda em HTML, que é
+ *  renderizada (sanitizada) e reduzida por transform:scale dentro da caixa.
+ *  Só admin: sem impacto no bundle/critical path do site público. */
+function AdThumb({ image, html, base64 }: { image?: string; html?: string; base64?: string }) {
+  const box = "w-24 h-14 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center relative";
+  if (base64) {
+    return <div className={box}><img src={base64} alt="" className="w-full h-full object-cover" /></div>;
+  }
+  const src = (image ?? "").trim();
+  if (src) {
+    return (
+      <div className={box}>
+        <img src={proxyUrl(src, 240)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
+      </div>
+    );
+  }
+  const clean = html ? sanitizeArticleHtml(html) : "";
+  if (clean) {
+    // 300px de largura natural reduzidos p/ ~96px (w-24) → prévia do canto do banner.
+    return (
+      <div className={box} title="Prévia do HTML">
+        <div className="pointer-events-none select-none absolute top-0 left-0 origin-top-left"
+          style={{ width: 300, transform: "scale(0.32)" }}
+          dangerouslySetInnerHTML={{ __html: clean }} />
+      </div>
+    );
+  }
+  return <div className={box}><ImageIcon size={16} className="text-gray-300" /></div>;
+}
+
+// ─── Empty form factory (propaganda clássica legada — editada por slot) ─────────
 function emptyForm() {
   return {
     name: "", position: "" as AdPosition | "", link: "", preview: "", active: true,
@@ -105,7 +146,7 @@ function emptyForm() {
 
 type StatusFilter = "todos" | "ativo" | "pausado";
 
-// ─── Ad Form Modal ────────────────────────────────────────────────────────────
+// ─── Ad Form Modal (edição de propaganda clássica legada, por slot) ────────────
 function AdFormModal({
   editingId,
   form,
@@ -540,6 +581,234 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
   );
 }
 
+// ─── Nova propaganda = bloco da home (imagem ou HTML, isAd) ────────────────────
+/** Cria uma propaganda que É um bloco da home: entra em settings.homeBlocks com
+ *  isAd=true, aparece no editor de Blocos da Home (arrastável) e renderiza pelo
+ *  caminho já otimizado (ImageBlock/HtmlBlock: proxy + srcset + width/height). */
+function AdCreateModal({ onClose, onCreate }: {
+  onClose: () => void;
+  onCreate: (block: HomeBlock) => Promise<void>;
+}) {
+  const { can } = useCan();
+  const [type, setType]       = useState<"image" | "html">("image");
+  const [name, setName]       = useState("");
+  const [imageUrl, setImageUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [html, setHtml]       = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver]   = useState(false);
+  const [saving, setSaving]   = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const INPUT_CLS = "w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/20 focus:border-[#0B2A66]";
+
+  async function handleUpload(file: File) {
+    if (file.size > 5 * 1024 * 1024) { alert("Arquivo maior que 5MB."); return; }
+    setUploading(true);
+    try {
+      const r = await adminApi.uploadImage(file, name || "propaganda");
+      setImageUrl(r.url);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const clean = type === "html" ? sanitizeArticleHtml(html) : "";
+  const valid = !!name.trim() && (type === "image" ? !!imageUrl.trim() : !!html.trim());
+
+  async function submit() {
+    if (!valid) return;
+    setSaving(true);
+    try {
+      const common = {
+        name: name.trim(), visible: true, order: 0, custom: true, isAd: true,
+        linkUrl: linkUrl.trim() || undefined,
+      };
+      const block: HomeBlock = type === "image"
+        ? { ...common, id: `image-${Date.now()}`, blockType: "image", format: "full_width_image",
+            imageUrl: imageUrl.trim(), caption: caption.trim() || undefined }
+        : { ...common, id: `html-${Date.now()}`, blockType: "html", format: "grid", html: html.trim() };
+      await onCreate(block);
+    } catch (err) {
+      alert((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const canUpload = can("upload.images");
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      style={{ background: "rgba(15,23,42,0.5)" }} onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        style={{ boxShadow: "0 24px 64px rgba(15,23,42,0.2)" }} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
+          <div>
+            <h2 className="text-base font-bold text-[#0F172A]">Nova propaganda</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Entra como bloco na home e pode ser reposicionada em Blocos da Home.</p>
+          </div>
+          <button type="button" onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Nome */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+              Nome da propaganda <span className="text-red-500">*</span>
+            </label>
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Banner do parceiro" autoFocus
+              className={INPUT_CLS} />
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Tipo</label>
+            <div className="flex gap-3">
+              {([
+                { key: "image", label: "Imagem", icon: ImageIcon, hint: "Envie uma arte (banner)" },
+                { key: "html",  label: "HTML",   icon: Code,      hint: "Cole um código HTML" },
+              ] as const).map(({ key, label, icon: Icon, hint }) => {
+                const active = type === key;
+                return (
+                  <button key={key} type="button" onClick={() => setType(key)}
+                    className={`flex-1 flex flex-col items-center gap-1.5 py-3 border-2 rounded-xl transition-colors select-none ${active ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+                    <Icon size={18} className={active ? "text-[#0B2A66]" : "text-gray-400"} />
+                    <span className={`text-xs font-semibold ${active ? "text-[#0B2A66]" : "text-gray-500"}`}>{label}</span>
+                    <span className="text-[10px] text-gray-400">{hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {type === "image" ? (
+            <>
+              {/* Imagem */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-[#0F172A]">
+                    Imagem <span className="text-red-500">*</span>
+                  </label>
+                </div>
+                <input ref={fileRef} type="file" accept="image/*,.gif" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUpload(f); e.target.value = ""; }} />
+                {imageUrl ? (
+                  <div className="relative rounded-xl border border-gray-200 overflow-hidden">
+                    <img src={imageUrl} alt="Prévia" className="w-full max-h-40 object-contain bg-gray-50" />
+                    <button type="button" onClick={() => setImageUrl("")}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-gray-600 hover:text-red-500 transition-colors">
+                      <X size={13} />
+                    </button>
+                  </div>
+                ) : canUpload ? (
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) void handleUpload(f); }}
+                    onClick={() => fileRef.current?.click()}
+                    className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl py-8 cursor-pointer transition-colors ${dragOver ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"}`}>
+                    <Upload size={22} className={dragOver ? "text-[#0B2A66]" : "text-gray-400"} />
+                    <p className="text-xs text-center text-gray-500 leading-relaxed">
+                      {uploading ? "Enviando…" : <>Arraste a imagem aqui<br /><span className="text-[#0B2A66] font-medium">ou clique para selecionar</span></>}
+                    </p>
+                    <p className="text-[10px] text-gray-400">JPG, PNG, GIF — máx. 5MB</p>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 border border-dashed border-gray-200 rounded-xl py-6 text-center">Cole a URL da imagem abaixo.</p>
+                )}
+                <input value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="ou cole a URL da imagem"
+                  className={`${INPUT_CLS} mt-2`} />
+              </div>
+              {/* Legenda */}
+              <div>
+                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Legenda (opcional)</label>
+                <input value={caption} onChange={(e) => setCaption(e.target.value)} className={INPUT_CLS} placeholder="Texto sob a imagem" />
+              </div>
+            </>
+          ) : (
+            <>
+              {/* HTML */}
+              <div>
+                <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">
+                  Código HTML <span className="text-red-500">*</span>
+                </label>
+                <textarea value={html} onChange={(e) => setHtml(e.target.value)} rows={6} spellCheck={false}
+                  className={`${INPUT_CLS} !text-xs font-mono resize-y`} placeholder="<div>…</div>" />
+                <p className="text-[10px] text-gray-400 mt-1">Scripts são removidos ao exibir (sanitização).</p>
+              </div>
+              {/* Prévia */}
+              <div>
+                <p className="text-xs font-semibold text-[#0F172A] mb-1.5">Prévia</p>
+                <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 overflow-auto max-h-56">
+                  {clean ? (
+                    <div className="pointer-events-none select-none origin-top-left"
+                      style={{ transform: "scale(0.8)", width: "125%" }}
+                      dangerouslySetInnerHTML={{ __html: clean }} />
+                  ) : (
+                    <p className="text-xs text-gray-400 text-center py-5">Nada para mostrar ainda.</p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Link */}
+          <div>
+            <label className="block text-xs font-semibold text-[#0F172A] mb-1.5">Link ao clicar (opcional)</label>
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} type="url" placeholder="https://parceiro.com/promo"
+              className={INPUT_CLS} />
+          </div>
+
+          <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
+            <Info size={13} className="text-blue-500 shrink-0 mt-0.5" />
+            <span className="text-[11px] text-blue-700 leading-relaxed">
+              A propaganda entra no fim da home. Depois, arraste-a para a posição desejada em <strong>Blocos da Home</strong>.
+            </span>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+              Cancelar
+            </button>
+            <button type="button" onClick={() => void submit()} disabled={saving || !valid}
+              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-xl text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ backgroundColor: "#E71D36" }}>
+              {saving ? "Criando…" : "Criar propaganda"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Linha unificada da tabela de propagandas ─────────────────────────────────
+interface AdRow {
+  key: string;
+  name: string;
+  thumbImage?: string;
+  thumbHtml?: string;
+  thumbBase64?: string;
+  location: string;
+  typeLabel: string;
+  active: boolean;
+  impressions: number;
+  clicks: number;
+  onEdit: () => void;
+  onToggle?: () => void;
+  onDelete?: () => void;
+}
+
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function AdsManager() {
   const { can } = useCan();
@@ -550,12 +819,15 @@ export default function AdsManager() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
   const [currentPage, setCurrentPage]   = useState(1);
 
+  // Modal de edição de propaganda clássica legada (por slot).
   const [modalOpen, setModalOpen]   = useState(false);
   const [editingId, setEditingId]   = useState<string | null>(null);
   const [form, setForm]             = useState(emptyForm());
   const [dragOver, setDragOver]     = useState(false);
   const [saving, setSaving]         = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Modal de criação (nova propaganda = bloco da home).
+  const [createOpen, setCreateOpen] = useState(false);
 
   // Blocos da home marcados como propaganda (toggle "É uma propaganda" nos
   // blocos de imagem/HTML) + banner do cabeçalho — listados e EDITÁVEIS aqui.
@@ -573,7 +845,7 @@ export default function AdsManager() {
   const articleAdBlocks = articleBlocks.filter((b) => b.isAd === true);
   const hasHeaderBanner = !!headerBannerHtml.trim();
 
-  const PAGE_SIZE = 8;
+  const PAGE_SIZE = 10;
 
   const load = async () => {
     setLoading(true);
@@ -618,44 +890,65 @@ export default function AdsManager() {
     setAdEdit(null);
   }
 
+  // Nova propaganda = novo bloco isAd no FIM da home (reposicionável em Blocos
+  // da Home). Reenvia o array inteiro; o render usa o caminho já otimizado.
+  async function createAdBlock(block: HomeBlock) {
+    const next = [...homeBlocks, { ...block, order: homeBlocks.length }];
+    await adminApi.updateSettings({ homeBlocks: next });
+    setHomeBlocks(next);
+    invalidateSiteCache();
+    setCreateOpen(false);
+    await load();
+  }
+
+  // Excluir propaganda-bloco = remover o bloco da home (ou da lateral da notícia).
+  async function deleteBlock(scope: "home" | "article", id: string) {
+    if (!confirm("Remover esta propaganda? O bloco sai da home.")) return;
+    try {
+      if (scope === "article") {
+        const next = articleBlocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i }));
+        await adminApi.updateSettings({ articleSidebarBlocks: next });
+        setArticleBlocks(next);
+      } else {
+        const next = homeBlocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i }));
+        await adminApi.updateSettings({ homeBlocks: next });
+        setHomeBlocks(next);
+      }
+      invalidateSiteCache();
+    } catch (err) { alert((err as Error).message); }
+  }
+
+  // Ligar/desligar a exibição de um bloco-propaganda (optimista + reverte no erro).
+  async function setBlockVisible(scope: "home" | "article", block: HomeBlock, visible: boolean) {
+    const patched = { ...block, visible };
+    if (scope === "article") {
+      const prev = articleBlocks;
+      const next = articleBlocks.map((b) => (b.id === block.id ? patched : b));
+      setArticleBlocks(next);
+      try { await adminApi.updateSettings({ articleSidebarBlocks: next }); invalidateSiteCache(); }
+      catch (err) { setArticleBlocks(prev); alert((err as Error).message); }
+    } else {
+      const prev = homeBlocks;
+      const next = homeBlocks.map((b) => (b.id === block.id ? patched : b));
+      setHomeBlocks(next);
+      try { await adminApi.updateSettings({ homeBlocks: next }); invalidateSiteCache(); }
+      catch (err) { setHomeBlocks(prev); alert((err as Error).message); }
+    }
+  }
+
+  async function clearHeaderBanner() {
+    if (!confirm("Remover o banner do cabeçalho?")) return;
+    try {
+      await adminApi.updateSettings({ headerBannerHtml: "", headerBannerLinkUrl: "" });
+      setHeaderBannerHtml("");
+      setHeaderBannerLinkUrl("");
+      invalidateSiteCache();
+    } catch (err) { alert((err as Error).message); }
+  }
+
   useEffect(() => { void load(); }, []);
 
-  // ── Stats (propagandas clássicas + blocos-propaganda somados) ───────────────
-  const stats = useMemo(() => {
-    const active = ads.filter((a) => a.active).length;
-    let totalImpressions = ads.reduce((s, a) => s + (a.impressions ?? 0), 0);
-    let totalClicks      = ads.reduce((s, a) => s + (a.clicks ?? 0), 0);
-    for (const b of Object.values(blockStats)) {
-      totalImpressions += b.impressions;
-      totalClicks      += b.clicks;
-    }
-    const ctr = totalImpressions > 0
-      ? ((totalClicks / totalImpressions) * 100).toFixed(2).replace(".", ",") + "%"
-      : "0%";
-    return { active, totalImpressions, totalClicks, ctr };
-  }, [ads, blockStats]);
-
-  // ── Filtered + paginated ─────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = ads;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter((a) =>
-        a.name.toLowerCase().includes(q) ||
-        (POSITION_LABELS[a.position] ?? a.position).toLowerCase().includes(q)
-      );
-    }
-    if (statusFilter === "ativo")   list = list.filter((a) => a.active);
-    if (statusFilter === "pausado") list = list.filter((a) => !a.active);
-    return list;
-  }, [ads, search, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
-
-  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
-
-  // ── Actions ──────────────────────────────────────────────────────────────────
+  // ── Actions (propagandas clássicas legadas) ─────────────────────────────────
   async function toggleActive(ad: Ad) {
     const next = !ad.active;
     setAds(prev => prev.map(a => a.id === ad.id ? { ...a, active: next } : a));
@@ -676,12 +969,6 @@ export default function AdsManager() {
     if (file.size > 5 * 1024 * 1024) { alert("Arquivo maior que 5MB."); return; }
     const b64 = await toBase64(file);
     setForm((f) => ({ ...f, preview: b64 }));
-  }
-
-  function openNew() {
-    setEditingId(null);
-    setForm(emptyForm());
-    setModalOpen(true);
   }
 
   function openEdit(ad: Ad) {
@@ -730,6 +1017,90 @@ export default function AdsManager() {
     }
   }
 
+  // ── Linhas unificadas (banner do cabeçalho + blocos-propaganda + clássicas) ──
+  const rows = useMemo<AdRow[]>(() => {
+    const list: AdRow[] = [];
+    if (hasHeaderBanner) {
+      const st = blockStats["header-banner"] ?? { impressions: 0, clicks: 0 };
+      list.push({
+        key: "header", name: "Banner do cabeçalho", thumbHtml: headerBannerHtml,
+        location: "Cabeçalho (só desktop)", typeLabel: "HTML", active: true,
+        impressions: st.impressions, clicks: st.clicks,
+        onEdit: () => setAdEdit("header"),
+        onDelete: () => { void clearHeaderBanner(); },
+      });
+    }
+    for (const b of homeAdBlocks) {
+      const type = inferBlockType(b);
+      const st = blockStats[b.id] ?? { impressions: 0, clicks: 0 };
+      list.push({
+        key: `home-${b.id}`, name: b.name,
+        thumbImage: type === "image" ? b.imageUrl : undefined,
+        thumbHtml: type === "image" ? undefined : b.html,
+        location: blockLocation(b), typeLabel: type === "image" ? "Imagem" : "HTML",
+        active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
+        onEdit: () => setAdEdit({ scope: "home", block: b }),
+        onToggle: () => { void setBlockVisible("home", b, b.visible === false); },
+        onDelete: () => { void deleteBlock("home", b.id); },
+      });
+    }
+    for (const b of articleAdBlocks) {
+      const type = inferBlockType(b);
+      const st = blockStats[b.id] ?? { impressions: 0, clicks: 0 };
+      list.push({
+        key: `art-${b.id}`, name: b.name,
+        thumbImage: type === "image" ? b.imageUrl : undefined,
+        thumbHtml: type === "image" ? undefined : b.html,
+        location: "Lateral da notícia", typeLabel: type === "image" ? "Imagem" : "HTML",
+        active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
+        onEdit: () => setAdEdit({ scope: "article", block: b }),
+        onToggle: () => { void setBlockVisible("article", b, b.visible === false); },
+        onDelete: () => { void deleteBlock("article", b.id); },
+      });
+    }
+    for (const ad of ads) {
+      list.push({
+        key: `ad-${ad.id}`, name: ad.name, thumbBase64: ad.imageBase64 || undefined,
+        location: POSITION_LABELS[ad.position] ?? ad.position, typeLabel: "Imagem",
+        active: ad.active, impressions: ad.impressions ?? 0, clicks: ad.clicks ?? 0,
+        onEdit: () => openEdit(ad),
+        onToggle: () => { void toggleActive(ad); },
+        onDelete: () => { void handleDelete(ad.id); },
+      });
+    }
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ads, homeBlocks, articleBlocks, headerBannerHtml, blockStats]);
+
+  // ── Stats (propagandas clássicas + blocos-propaganda somados) ───────────────
+  const stats = useMemo(() => {
+    const totalAds = rows.length;
+    const active = rows.filter((r) => r.active).length;
+    const totalImpressions = rows.reduce((s, r) => s + r.impressions, 0);
+    const totalClicks      = rows.reduce((s, r) => s + r.clicks, 0);
+    const ctr = totalImpressions > 0
+      ? ((totalClicks / totalImpressions) * 100).toFixed(2).replace(".", ",") + "%"
+      : "0%";
+    return { totalAds, active, totalImpressions, totalClicks, ctr };
+  }, [rows]);
+
+  // ── Filtered + paginated ─────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let list = rows;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((r) => r.name.toLowerCase().includes(q) || r.location.toLowerCase().includes(q));
+    }
+    if (statusFilter === "ativo")   list = list.filter((r) => r.active);
+    if (statusFilter === "pausado") list = list.filter((r) => !r.active);
+    return list;
+  }, [rows, search, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated  = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setCurrentPage(1); }, [search, statusFilter]);
+
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <AdminLayout title="Propagandas">
@@ -746,6 +1117,13 @@ export default function AdsManager() {
           onClose={closeModal}
           onSubmit={(e) => { void handleSubmit(e); }}
           onFile={handleFile}
+        />
+      )}
+
+      {createOpen && (
+        <AdCreateModal
+          onClose={() => setCreateOpen(false)}
+          onCreate={createAdBlock}
         />
       )}
 
@@ -775,7 +1153,7 @@ export default function AdsManager() {
                 <p className="text-2xl font-bold text-[#0F172A]">{stats.active}</p>
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-3">de {ads.length} cadastradas</p>
+            <p className="text-xs text-gray-400 mt-3">de {stats.totalAds} cadastradas</p>
           </div>
 
           <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
@@ -818,126 +1196,7 @@ export default function AdsManager() {
           </div>
         </div>
 
-        {/* ══ Blocos de propaganda da home e da notícia ════════════════════════ */}
-        {(homeAdBlocks.length > 0 || articleAdBlocks.length > 0 || hasHeaderBanner) && (
-          <div className="bg-white rounded-2xl p-5" style={{ boxShadow: CARD_SHADOW }}>
-            <div className="flex items-start justify-between gap-3 mb-3">
-              <div>
-                <h2 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
-                  <LayoutGrid size={15} className="text-[#0B2A66]" /> Blocos de propaganda (home e notícia)
-                </h2>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  Blocos de imagem/HTML marcados como propaganda em Blocos da Home (abas Blocos e Notícia).
-                </p>
-              </div>
-              {canManageAds && (
-                <a href="/admin/home-blocos"
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors">
-                  <Pencil size={12} /> Editar em Blocos da Home
-                </a>
-              )}
-            </div>
-            {(() => {
-              // Linhas unificadas (banner do cabeçalho + blocos), com as MESMAS
-              // colunas da tabela de propagandas clássicas abaixo.
-              const rows: Array<{
-                key: string; name: string; imageUrl?: string; typeLabel: string;
-                pos: string; active: boolean; statsKey: string; onEdit: () => void;
-              }> = [];
-              if (hasHeaderBanner) {
-                rows.push({
-                  key: "header", name: "Banner do cabeçalho", typeLabel: "HTML",
-                  pos: "Cabeçalho (só desktop)", active: true, statsKey: "header-banner",
-                  onEdit: () => setAdEdit("header"),
-                });
-              }
-              for (const b of homeAdBlocks) {
-                const type = inferBlockType(b);
-                const pos = b.area === "sidebar" ? "Home · coluna lateral"
-                  : b.area === "main" ? "Home · coluna principal"
-                  : b.width === "half" ? "Home · meia largura"
-                  : b.width === "quarter" ? "Home · 1/4 de largura"
-                  : "Home · largura total";
-                rows.push({
-                  key: b.id, name: b.name, imageUrl: type === "image" ? b.imageUrl : undefined,
-                  typeLabel: type === "image" ? "Imagem" : "HTML", pos,
-                  active: b.visible !== false, statsKey: b.id,
-                  onEdit: () => setAdEdit({ scope: "home", block: b }),
-                });
-              }
-              for (const b of articleAdBlocks) {
-                const type = inferBlockType(b);
-                rows.push({
-                  key: `art-${b.id}`, name: b.name, imageUrl: type === "image" ? b.imageUrl : undefined,
-                  typeLabel: type === "image" ? "Imagem" : "HTML", pos: "Lateral da notícia",
-                  active: b.visible !== false, statsKey: b.id,
-                  onEdit: () => setAdEdit({ scope: "article", block: b }),
-                });
-              }
-              return (
-                <div className="overflow-x-auto -mx-5 px-5">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
-                        <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Status</th>
-                        <th className="text-center px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Ações</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((r, i) => {
-                        const st = blockStats[r.statsKey] ?? { impressions: 0, clicks: 0 };
-                        return (
-                          <tr key={r.key} className={`hover:bg-gray-50/50 transition-colors ${i < rows.length - 1 ? "border-b border-gray-50" : ""}`}>
-                            <td className="px-5 py-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-amber-50 shrink-0 flex items-center justify-center">
-                                  {r.imageUrl ? (
-                                    <img src={r.imageUrl} alt={r.name} className="w-full h-full object-cover" />
-                                  ) : r.typeLabel === "Imagem" ? (
-                                    <ImageIcon size={14} className="text-amber-600" />
-                                  ) : (
-                                    <Code size={14} className="text-amber-600" />
-                                  )}
-                                </div>
-                                <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{r.name}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{r.pos}</td>
-                            <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{r.typeLabel}</td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(st.impressions)}</td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(st.clicks)}</td>
-                            <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{calcCTR(st.clicks, st.impressions)}</td>
-                            <td className="px-4 py-3 text-center"><StatusBadge active={r.active} /></td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center justify-center">
-                                {canManageAds ? (
-                                  <button onClick={r.onEdit} title="Editar propaganda"
-                                    className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors">
-                                    <Pencil size={13} />
-                                  </button>
-                                ) : (
-                                  <span className="text-gray-300">—</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-
-        {/* ══ Table card ══════════════════════════════════════════════════════ */}
+        {/* ══ Tabela unificada de propagandas ═════════════════════════════════ */}
         <div className="bg-white rounded-2xl overflow-hidden" style={{ boxShadow: CARD_SHADOW }}>
 
           {/* Filter bar */}
@@ -963,16 +1222,24 @@ export default function AdsManager() {
                 <option value="pausado">Pausado</option>
               </select>
             </div>
-            {canManageAds && (
-              <button
-                onClick={openNew}
-                className="ml-auto flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "#E71D36" }}
-              >
-                <Plus size={16} />
-                Nova propaganda
-              </button>
-            )}
+            <div className="ml-auto flex items-center gap-2">
+              {canManageAds && (
+                <a href="/admin/home-blocos"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-[#0B2A66] border border-[#0B2A66]/25 rounded-xl hover:bg-blue-50 transition-colors">
+                  <LayoutGrid size={13} /> Blocos da Home
+                </a>
+              )}
+              {canManageAds && (
+                <button
+                  onClick={() => setCreateOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: "#E71D36" }}
+                >
+                  <Plus size={16} />
+                  Nova propaganda
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Table body */}
@@ -981,10 +1248,10 @@ export default function AdsManager() {
           ) : filtered.length === 0 ? (
             <div className="py-20 flex flex-col items-center gap-4 text-gray-400">
               <Megaphone size={36} className="text-gray-200" />
-              <p className="text-sm">Nenhuma propaganda encontrada</p>
-              {canManageAds && (
+              <p className="text-sm">{rows.length === 0 ? "Nenhuma propaganda encontrada" : "Nenhuma propaganda para o filtro atual"}</p>
+              {canManageAds && rows.length === 0 && (
                 <button
-                  onClick={openNew}
+                  onClick={() => setCreateOpen(true)}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white"
                   style={{ backgroundColor: "#E71D36" }}
                 >
@@ -999,8 +1266,8 @@ export default function AdsManager() {
                   <thead>
                     <tr className="border-b border-gray-100 bg-gray-50/50">
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Propaganda</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Posição</th>
-                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Formato</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Local</th>
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Tipo</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Impressões</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">Cliques</th>
                       <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 whitespace-nowrap">CTR</th>
@@ -1009,71 +1276,56 @@ export default function AdsManager() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginated.map((ad, i) => (
+                    {paginated.map((r, i) => (
                       <tr
-                        key={ad.id}
+                        key={r.key}
                         className={`hover:bg-gray-50/50 transition-colors ${i < paginated.length - 1 ? "border-b border-gray-50" : ""}`}
                       >
-                        {/* Propaganda */}
+                        {/* Propaganda (miniatura + nome) */}
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-14 h-9 rounded-lg overflow-hidden border border-gray-100 bg-gray-50 shrink-0 flex items-center justify-center">
-                              {ad.imageBase64 ? (
-                                <img src={ad.imageBase64} alt={ad.name} className="w-full h-full object-cover" />
-                              ) : (
-                                <ImageIcon size={14} className="text-gray-300" />
-                              )}
-                            </div>
-                            <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{ad.name}</span>
+                            <AdThumb image={r.thumbImage} html={r.thumbHtml} base64={r.thumbBase64} />
+                            <span className="font-medium text-[#0F172A] text-sm whitespace-nowrap">{r.name}</span>
                           </div>
                         </td>
-                        {/* Posição */}
-                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                          {POSITION_LABELS[ad.position] ?? ad.position}
-                        </td>
-                        {/* Formato */}
-                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                          {FORMAT_LABELS[ad.position] ?? "—"}
-                        </td>
+                        {/* Local */}
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{r.location}</td>
+                        {/* Tipo */}
+                        <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{r.typeLabel}</td>
                         {/* Impressões */}
-                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                          {fmtNum(ad.impressions ?? 0)}
-                        </td>
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(r.impressions)}</td>
                         {/* Cliques */}
-                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                          {fmtNum(ad.clicks ?? 0)}
-                        </td>
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{fmtNum(r.clicks)}</td>
                         {/* CTR */}
-                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">
-                          {calcCTR(ad.clicks ?? 0, ad.impressions ?? 0)}
-                        </td>
+                        <td className="px-4 py-3 text-right text-xs font-mono text-gray-700">{calcCTR(r.clicks, r.impressions)}</td>
                         {/* Status */}
-                        <td className="px-4 py-3 text-center">
-                          <StatusBadge active={ad.active} />
-                        </td>
+                        <td className="px-4 py-3 text-center"><StatusBadge active={r.active} /></td>
                         {/* Ações */}
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1.5">
                             {canManageAds ? (
                               <>
                                 <button
-                                  onClick={() => openEdit(ad)}
+                                  onClick={r.onEdit}
                                   title="Editar"
                                   className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50 hover:text-[#0B2A66] transition-colors"
                                 >
                                   <Pencil size={13} />
                                 </button>
-                                <ToggleSwitch
-                                  checked={ad.active}
-                                  onChange={() => { void toggleActive(ad); }}
-                                />
-                                <button
-                                  onClick={() => { void handleDelete(ad.id); }}
-                                  title="Excluir"
-                                  className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
-                                >
-                                  <Trash2 size={13} />
-                                </button>
+                                {r.onToggle ? (
+                                  <ToggleSwitch checked={r.active} onChange={r.onToggle} />
+                                ) : (
+                                  <span className="inline-block w-9" />
+                                )}
+                                {r.onDelete && (
+                                  <button
+                                    onClick={r.onDelete}
+                                    title="Excluir"
+                                    className="w-8 h-8 rounded-lg border border-red-100 flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
                               </>
                             ) : (
                               <span className="text-gray-300">—</span>
@@ -1153,10 +1405,10 @@ export default function AdsManager() {
           </div>
           <ul className="flex flex-wrap gap-x-8 gap-y-1.5">
             {[
-              "Use formatos responsivos para melhor experiência.",
+              "Toda propaganda criada aqui vira um bloco da home — arraste-a em Blocos da Home para reposicionar.",
               "Verifique o tamanho máximo do arquivo (5MB).",
-              "Anúncios inativos não serão exibidos no site.",
-              "O botão liga/desliga na tabela ativa ou pausa sem abrir o formulário.",
+              "Propagandas pausadas não são exibidas no site.",
+              "O botão liga/desliga na tabela exibe ou oculta sem abrir o formulário.",
             ].map((tip, i) => (
               <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
                 <span className="w-1 h-1 rounded-full bg-blue-400 mt-1.5 shrink-0" />
