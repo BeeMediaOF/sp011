@@ -1040,8 +1040,72 @@ derrubar. Ganhou observador de `longtask` (TBT, contagem e maior tarefa) e de
 adivinhação sobre bundle minificado. O TBT daqui não é o do Lighthouse (janela e
 traçado diferentes): serve para comparar esta série com ela mesma.
 
-**Pendente:** medição em produção. O ganho de 677 ms → 0,5 ms é de bancada; o que
-vale é o TBT de campo depois do deploy.
+## PRD-PERF-07 — validação em produção (2026-07-31, imagem v71)
+
+Medido com a VPS ociosa pelo runbook `VPS-OCIOSA.md` (ollama e central-api
+parados, load abaixo de 1,0 — o `docker stats` da sessão não tinha nenhum
+container acima de 12%).
+
+### Confirmação de que a imagem certa foi medida
+
+O script de medição é copiado à parte (`docker compose cp`), então colunas novas
+no relatório **não** provam que o `web` foi rebuildado. A prova veio do bundle
+servido: `DateTimeFormat: 1` e `toLocaleDateString: 1`. O código antigo tinha
+zero e quatro. Fica como método para as próximas: verificar a imagem pelo
+artefato servido, não pela ferramenta de medir.
+
+### esporteagora — o blog que motivou o PRD (22 blocos)
+
+| | 2026-07-30, antes | 2026-07-30, só imagem corrigida | 2026-07-31, com o PRD-07 |
+|---|---:|---:|---:|
+| Desempenho (PSI móvel) | 48 | 62 | **98** |
+| TBT | 110 ms¹ | 2.210 ms | **10 ms** |
+| Tarefas longas | — | 20 | **1** |
+| LCP | 15,0 s | 3,2 s | **2,1 s** |
+| FCP | 1,2 s | 2,1 s | **1,2 s** |
+| CLS | 0,945 | 0 | **0** |
+
+¹ Os 110 ms da primeira coluna são enganosos e estão aqui só para não sumirem do
+registro: com 4,2 MB de imagem a página ficava presa na rede e o JS rodava
+escondido atrás do download. O trabalho de hidratação sempre esteve lá.
+
+### sp011 — nenhuma regressão, e o instrumento calibrado
+
+PSI móvel: **Desempenho 95**, TBT 110 ms, CLS 0,002, FCP 1,5 s, LCP 2,6 s.
+Medidor de campo (mediana de 5, VPS ociosa):
+
+| rota | FCP | LCP | TTFB | CLS | TBT | tarefas |
+|---|---:|---:|---:|---:|---:|---:|
+| `/` | 1.452 | 1.452 | 13 | 0,002 | 86 | 2 |
+| `/artigo/…` | 1.432 | 1.432 | 10 | 0,002 | 112 | 2 |
+| `/politica` | 1.476 | 1.476 | 12 | 0,02 | 102 | 4 |
+
+**Console limpo nas 15 execuções** — o gate que mais importava nesta mudança.
+Mexer em formatador de data com SSR quebra hidratação em silêncio; o React teria
+logado #418 e não logou.
+
+Vale registrar um cruzamento de instrumentos que antes não existia: na MESMA
+página (sp011), Lighthouse deu TBT 110 ms e o medidor de campo 86 ms — concordam
+dentro de ~25%. Eu havia avisado que comparar os 2.210 do Lighthouse com os 86 do
+medidor seria erro de método; a comparação legítima é esta, e ela valida a série
+de TBT daqui em diante. Para REDE as duas continuam incomparáveis (LCP 2,6 s vs
+1.452 ms): o PSI usa 4G lento com CPU do Moto G Power, o medidor usa 1,6 Mbps e
+RTT 150 ms.
+
+### Atribuição do que sobrou na thread
+
+`index-*.js:(anônima)` 111–127 ms e `vendor-react:bl` 69–94 ms, praticamente
+iguais nas três rotas — inclusive nas duas que **não** renderizam blocos de home.
+É o custo fixo de subir o React e hidratar, não trabalho proporcional ao
+conteúdo. Foi esse padrão que indicou, antes do `grep` no bundle, que a correção
+estava mesmo no ar.
+
+### O que o PSI aponta agora (nenhum é hidratação)
+
+esporteagora: árvore de dependência da rede, entrega de imagens (142 KiB),
+solicitações que bloqueiam renderização, imagens sem `width`/`height`, JS não
+usado (59 KiB). sp011: os mesmos, com 150 ms de render-blocking e 61 KiB de JS
+não usado. O LCP virou a pior métrica dos dois — é o próximo alvo natural.
 
 ## Próxima ação
 
@@ -1066,9 +1130,9 @@ vale é o TBT de campo depois do deploy.
 5. Preencher `tagline` e `seoDescription` por blog no admin. Confirmado no
    rollout: o creditovc, portal de educação financeira, publica
    `"tagline":"Notícia. Agora. Sempre."`. Sem deploy, propaga em ≤1 h.
-6. ~~Hidratação na thread principal~~ — **causa encontrada e corrigida**
-   (PRD-PERF-07 acima): 4.400 construções de `Intl.DateTimeFormat` por render.
-   Falta **medir em produção** o TBT depois do deploy, com a VPS ociosa.
+6. ~~Hidratação na thread principal~~ — **ENCERRADO em 2026-07-31**. TBT do
+   esporteagora 2.210 ms → **10 ms**, nota 62 → **98**; sp011 em 95 sem
+   regressão. Validado em produção na imagem v71.
 7. **Achado fora da auditoria de site:** o `ollama` consome a máquina inteira
    (1576% de CPU) enquanto a central reescreve, e isso é latência real para
    visitante real nos 8 blogs ao mesmo tempo. Nenhum PRD cobre isso.
