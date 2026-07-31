@@ -112,11 +112,16 @@ function ToggleSwitch({ checked, onChange }: { checked: boolean; onChange: () =>
 const THUMB_BOX_W = 128;
 const THUMB_BOX_H = 64;
 
-/** Prévia de HTML que se AJUSTA ao conteúdo: mede o tamanho natural (fit-content,
- *  até 728px) e reduz por scale p/ CABER inteiro na caixa (contain), centralizado
- *  pelo flex do pai + transform-origin center. Assim tanto um banner largo
- *  (leaderboard) quanto um botão pequeno (banner do cabeçalho) ficam proporcionais
- *  — sem amassar num render fixo nem sumir num canto. Admin-only, client-only. */
+// Largura de composição do preview: o HTML monta o layout nessa largura (card
+// largo fica horizontal, banner do cabeçalho não vira coluna fina), depois é
+// reduzido p/ caber. Fixa (não fit-content) porque, dentro da caixa de 128px,
+// o fit-content encolhe o conteúdo ao mínimo (uma tira vertical).
+const THUMB_COMPOSE_W = 340;
+
+/** Prévia de HTML: compõe em 340px, mede a altura e reduz por scale p/ CABER
+ *  inteiro na caixa (contain), centralizado pelo flex do pai + origin center.
+ *  Card largo, botão pequeno e leaderboard ficam todos proporcionais.
+ *  Admin-only, client-only (useLayoutEffect mede antes do paint, sem flash). */
 function HtmlThumb({ clean }: { clean: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
@@ -129,8 +134,8 @@ function HtmlThumb({ clean }: { clean: string }) {
     setScale(s > 0 && Number.isFinite(s) ? s : 0.2);
   }, [clean]);
   return (
-    <div ref={ref} className="pointer-events-none select-none origin-center"
-      style={{ width: "fit-content", maxWidth: 728, transform: scale ? `scale(${scale})` : undefined, opacity: scale ? 1 : 0 }}
+    <div ref={ref} className="pointer-events-none select-none shrink-0 origin-center"
+      style={{ width: THUMB_COMPOSE_W, textAlign: "center", transform: scale ? `scale(${scale})` : undefined, opacity: scale ? 1 : 0 }}
       dangerouslySetInnerHTML={{ __html: clean }} />
   );
 }
