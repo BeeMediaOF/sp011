@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import ArticleCard from "./ArticleCard";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
+import { proxyUrl, buildSrcSet, CARD_WIDTHS } from "../lib/newsImage";
 import AdBanner from "./ads/AdBanner";
 
 export interface Article {
@@ -75,8 +76,13 @@ export default function CategoryPage({
             {[featuredArticle, second].filter(Boolean).map((art, idx) => art && (
               <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
                 <div className="relative overflow-hidden bg-gray-100 h-[220px] sm:h-[300px] md:h-[380px]">
+                  {/* Estes dois são o LCP da editoria e iam CRUS da origem —
+                      foto de agência em tamanho original para uma caixa de no
+                      máximo 640 px. Ver ArticleCard para a medição. */}
                   <img
-                    src={art.imageUrl}
+                    src={proxyUrl(art.imageUrl, CARD_WIDTHS[CARD_WIDTHS.length - 1]!)}
+                    srcSet={buildSrcSet(art.imageUrl, CARD_WIDTHS) || undefined}
+                    sizes="(max-width: 1024px) 100vw, 640px"
                     alt={art.title}
                     width={640}
                     height={380}

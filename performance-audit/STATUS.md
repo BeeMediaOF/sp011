@@ -1107,6 +1107,60 @@ solicitações que bloqueiam renderização, imagens sem `width`/`height`, JS n�
 usado (59 KiB). sp011: os mesmos, com 150 ms de render-blocking e 61 KiB de JS
 não usado. O LCP virou a pior métrica dos dois — é o próximo alvo natural.
 
+## Achado: a editoria nunca passou pelo proxy de imagem, e hidratava errado
+
+Encontrado em 2026-07-31 medindo o esporteagora depois do PRD-07. A home saiu em
+LCP 1.432 ms e console limpo; a **mesma imagem**, na rota `/futebol`:
+
+| | `/` | `/futebol` |
+|---|---:|---:|
+| LCP | 1.432 ms | **10.040 ms** |
+| TBT | 74 ms | 262 ms |
+| `index.js` na thread | 115 ms | 241 ms |
+| console | limpo | **React #418** |
+
+O HTML do servidor está sadio — `curl` na rota devolve 200 em 36 ms com 161 KB.
+O estrago é todo no cliente, e são dois defeitos independentes.
+
+### 1. Imagens cruas da origem
+
+`ArticleCard` e o destaque do `CategoryPage` renderizavam `src={imageUrl}` sem
+proxy e sem `srcset`. A editoria baixava foto de agência em tamanho original
+(`AFP__20260729__…__HighRes__….jpg`) direto do site da fonte, para caixas de
+110–180 px (miniatura) e 640 px (destaque). A 1,6 Mbps, **três requisições não
+terminavam em 45 s** — foi o que travou o evento `load` e o que a lista de
+requisições pendentes do medidor apontou nominalmente.
+
+O proxy já existia, e `.gazetaesportiva.com` já estava na allowlist desde
+2026-07-20. A home sempre usou; a editoria nunca foi ligada. Corrigido também no
+`ArtigosRelacionados` (mesmo defeito, abaixo da dobra no artigo).
+
+### 2. React #418 — tempo relativo contra HTML cacheado
+
+`relativeTimeOrDate` calcula "agora mesmo" / "3 h atrás" a partir de
+`Date.now()`. O HTML da editoria fica em cache por até 60 s: o servidor escreve
+"agora mesmo", o cliente hidrata 40 s depois e calcula "1 min atrás". Divergência
+**garantida** para artigo recente — e é por isso que só a editoria acusava #418:
+a home usa `formatDayMonth` e o artigo `formatDateTime`, ambos absolutos.
+
+O destaque do `CategoryPage` já tinha `suppressHydrationWarning` (com comentário
+explicando exatamente isso); os ~58 cards da lista, não. Agora têm.
+
+Efeito colateral aceito: com a marca, o React mantém o texto do SERVIDOR, então o
+tempo relativo pode nascer até 60 s velho. Trocar "agora mesmo" por "1 min atrás"
+não vale um re-render de página inteira.
+
+**Isto retro-explica o registro de "#418 do esporteagora não se reproduz"**: as
+dez execuções que saíram limpas foram em `/` e `/artigo`. Nenhuma foi numa
+editoria.
+
+### O que o episódio diz sobre o método
+
+O #418 estava em produção em todos os 8 blogs, em todas as editorias, e passou
+por PRD-05, rollout e duas medições. Só apareceu quando o medidor parou de
+morrer na primeira rota travada e passou a listar requisições pendentes. A
+diferença entre "não reproduz" e "reproduz sempre" foi puramente de instrumento.
+
 ## Próxima ação
 
 1. **Verificação visual acumulada (PRD-04 + PRD-03 + PRD-05)** — o gate que

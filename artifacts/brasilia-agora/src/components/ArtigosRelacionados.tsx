@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { safeTitleHtml } from "@/lib/sanitize";
 import { useT, formatDayMonth } from "../lib/i18n";
+import { proxyUrl, buildSrcSet, CARD_WIDTHS } from "../lib/newsImage";
 import { useSite } from "../hooks/useSite";
 
 interface RelatedArticle {
@@ -82,10 +83,15 @@ export default function ArtigosRelacionados({ currentSlug }: Props) {
               <div className="overflow-hidden bg-gray-100 rounded-sm mb-2 aspect-[16/9]">
                 {a.imageUrl ? (
                   <img
-                    src={a.imageUrl}
+                    src={proxyUrl(a.imageUrl, CARD_WIDTHS[1]!)}
+                    srcSet={buildSrcSet(a.imageUrl, CARD_WIDTHS) || undefined}
+                    sizes="(max-width: 768px) 50vw, 240px"
                     alt={a.title.replace(/<[^>]*>/g, "")}
+                    width={480}
+                    height={270}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
+                    decoding="async"
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-200" />
