@@ -26,6 +26,7 @@ const PT = {
   "menu.nav": "Menu de navegação",
   "menu.subOpen": "Abrir submenu",
   "menu.subClose": "Fechar submenu",
+  "menu.more": "Mais",
 
   // ── Comuns ─────────────────────────────────────────────────────────────
   "common.loading": "Carregando…",
@@ -121,6 +122,7 @@ const EN: Record<TKey, string> = {
   "menu.nav": "Navigation menu",
   "menu.subOpen": "Open submenu",
   "menu.subClose": "Close submenu",
+  "menu.more": "More",
 
   "common.loading": "Loading…",
   "common.loadingDots": "Loading...",

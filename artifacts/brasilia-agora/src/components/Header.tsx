@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { Menu, X, House, ChevronDown } from "lucide-react";
 import { useSite } from "../hooks/useSite";
 import HeaderSearch from "./HeaderSearch";
+import OverflowNav from "./OverflowNav";
 import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
@@ -354,12 +355,11 @@ export default function Header() {
   // abaixo dela (estilo portal), com a busca dentro da própria faixa no desktop.
   const menuBarStyle: "attached" | "bar" = settings?.menuBarStyle === "bar" ? "bar" : "attached";
   const menuBarBg = settings?.menuBarBgColor || menuActiveColor;
-  // Menus com submenu não podem viver num nav com overflow-x-auto (o dropdown
-  // seria cortado); nesse caso o nav QUEBRA LINHA quando falta espaço —
-  // overflow-visible puro fazia os itens vazarem por baixo do banner/CTA do
-  // cabeçalho (incidente PontoFarma). Sem submenu, mantém o scroll original.
-  const hasDropdowns = navItems.some((it) => visibleChildren(it).length > 0);
-  const navOverflow = hasDropdowns ? "flex-wrap" : "overflow-x-auto no-scrollbar";
+  // Overflow do menu (antes era flex-wrap/overflow-x-auto, que crescia em altura
+  // ou sumia itens sem afordância): agora TODO nav desktop passa pelo OverflowNav,
+  // que mede a largura disponível e joga o excedente num dropdown "Mais ▾". A
+  // chave abaixo força a remedição quando muda o que altera a largura dos rótulos.
+  const navRecomputeKey = `${menuFontSize}|${menuFontWeight}|${lang}|${navItems.length}`;
   const headerBannerClean = sanitizeArticleHtml(settings?.headerBannerHtml);
   // Link de redirecionamento do banner (painel → Cabeçalho ou aba Propagandas):
   // overlay que cobre o banner inteiro, sem aninhar <a> no HTML do usuário.
@@ -384,29 +384,88 @@ export default function Header() {
     </div>
   ) : null;
 
+  // ── Renderizadores de item por sítio de nav (passados ao OverflowNav) ───────
+  // Cada estilo tem markup próprio do item; o OverflowNav só cuida da MEDIÇÃO e do
+  // corte "Mais ▾". Item com submenu segue como grupo hover (NavDropdown), igual
+  // antes. O OverflowNav aplica o espaçamento por `gap` no container, então os
+  // itens NÃO carregam margem lateral (evita descasar da largura medida).
+  const renderBarItem = (item: NavEntry) => {
+    const { label, path } = item;
+    const kids = visibleChildren(item);
+    const link = (
+      <Link
+        href={path}
+        style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
+        className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
+      >
+        {path === "/" && <House size={13} className="shrink-0" />}
+        {label}
+        {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
+      </Link>
+    );
+    return kids.length > 0
+      ? <div key={path} className="relative group flex items-stretch">{link}<NavDropdown items={kids} /></div>
+      : <React.Fragment key={path}>{link}</React.Fragment>;
+  };
+
+  const renderAttachedItem = (itemPad: string) => (item: NavEntry) => {
+    const { label, path } = item;
+    const kids = visibleChildren(item);
+    const link = (
+      <Link
+        href={path}
+        style={navItemStyle(path)}
+        className={`${itemPad} whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+      >
+        {label}
+        {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-60" />}
+      </Link>
+    );
+    return kids.length > 0
+      ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
+      : <React.Fragment key={path}>{link}</React.Fragment>;
+  };
+
+  const renderCenteredItem = (item: NavEntry) => {
+    const { label, path } = item;
+    const kids = visibleChildren(item);
+    const link = (
+      <Link
+        href={path}
+        style={{
+          fontSize: menuFontSize,
+          fontWeight: menuFontWeight,
+          color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
+          borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
+        }}
+        className={`px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+      >
+        {label}
+        {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
+      </Link>
+    );
+    return kids.length > 0
+      ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
+      : <React.Fragment key={path}>{link}</React.Fragment>;
+  };
+
   const menuBar = menuBarStyle === "bar" ? (
     <div className="hidden lg:block" style={{ backgroundColor: menuBarBg }}>
       <div className="max-w-[1280px] mx-auto flex items-stretch" style={padStyle}>
-        <nav className="flex items-stretch flex-1 overflow-x-visible">
-          {navItems.map((item) => {
-            const { label, path } = item;
-            const kids = visibleChildren(item);
-            const link = (
-              <Link
-                href={path}
-                style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
-                className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
-              >
-                {path === "/" && <House size={13} className="shrink-0" />}
-                {label}
-                {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
-              </Link>
-            );
-            return kids.length > 0
-              ? <div key={path} className="relative group flex items-stretch">{link}<NavDropdown items={kids} /></div>
-              : <React.Fragment key={path}>{link}</React.Fragment>;
-          })}
-        </nav>
+        <OverflowNav
+          items={navItems}
+          renderItem={renderBarItem}
+          className="flex-1"
+          navClassName="flex items-stretch"
+          ariaLabel={t("menu.nav")}
+          isActive={isActive}
+          activeColor={menuActiveColor}
+          recomputeKey={navRecomputeKey}
+          moreLabel={t("menu.more")}
+          moreWrapClassName="items-stretch"
+          moreButtonStyle={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
+          moreButtonClassName="flex items-center gap-1 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white hover:bg-black/15 transition-colors"
+        />
         <div className="flex items-center pl-2 shrink-0">
           <HeaderSearch variant="onDark" onSubmit={runSearch} iconSize={15} />
         </div>
@@ -434,26 +493,19 @@ export default function Header() {
             </Link>
 
             {menuBarStyle === "attached" && (
-              <nav className={`hidden lg:flex items-center self-center gap-0 flex-1 ${navOverflow}`}>
-                {navItems.map((item) => {
-                  const { label, path } = item;
-                  const kids = visibleChildren(item);
-                  const link = (
-                    <Link
-                      key={path}
-                      href={path}
-                      style={navItemStyle(path)}
-                      className={`px-2.5 py-0.5 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
-                    >
-                      {label}
-                      {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-60" />}
-                    </Link>
-                  );
-                  return kids.length > 0
-                    ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
-                    : <React.Fragment key={path}>{link}</React.Fragment>;
-                })}
-              </nav>
+              <OverflowNav
+                items={navItems}
+                renderItem={renderAttachedItem("px-2.5 py-0.5")}
+                className="hidden lg:block self-center flex-1"
+                navClassName="flex items-center gap-0"
+                ariaLabel={t("menu.nav")}
+                isActive={isActive}
+                activeColor={menuActiveColor}
+                recomputeKey={navRecomputeKey}
+                moreLabel={t("menu.more")}
+                moreButtonStyle={{ color: menuTextColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}
+                moreButtonClassName="px-2.5 py-0.5 whitespace-nowrap rounded-sm hover:bg-gray-100 inline-flex items-center gap-1"
+              />
             )}
             {headerBanner}
             {menuBarStyle === "bar" && !headerBanner && <div className="hidden lg:block flex-1" />}
@@ -506,32 +558,20 @@ export default function Header() {
           {/* Barra escura própria do estilo centered — cor configurável (menuBarBgColor). */}
           <div className="hidden lg:block border-t border-gray-100"
             style={{ backgroundColor: settings?.menuBarBgColor || "#1a2448" }}>
-            <nav className="max-w-[1280px] mx-auto flex items-center justify-center gap-1" style={padStyle}>
-              {navItems.map((item) => {
-                const { label, path } = item;
-                const kids = visibleChildren(item);
-                const link = (
-                  <Link
-                    href={path}
-                    style={{
-                      // Barra escura própria: mantemos texto claro/legível e usamos a
-                      // cor do item ativo, tamanho e peso configurados no painel.
-                      fontSize: menuFontSize,
-                      fontWeight: menuFontWeight,
-                      color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
-                      borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
-                    }}
-                    className={`px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
-                  >
-                    {label}
-                    {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
-                  </Link>
-                );
-                return kids.length > 0
-                  ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
-                  : <React.Fragment key={path}>{link}</React.Fragment>;
-              })}
-            </nav>
+            <OverflowNav
+              items={navItems}
+              renderItem={renderCenteredItem}
+              className="max-w-[1280px] mx-auto"
+              style={padStyle}
+              navClassName="flex items-center justify-center gap-1"
+              ariaLabel={t("menu.nav")}
+              isActive={isActive}
+              activeColor={menuActiveColor}
+              recomputeKey={navRecomputeKey}
+              moreLabel={t("menu.more")}
+              moreButtonStyle={{ fontSize: menuFontSize, fontWeight: menuFontWeight, color: "rgba(255,255,255,0.8)" }}
+              moreButtonClassName="px-4 py-2 whitespace-nowrap inline-flex items-center gap-1 transition-colors text-white/80 hover:text-white hover:bg-white/10"
+            />
           </div>
 
         </header>
@@ -563,25 +603,19 @@ export default function Header() {
           </Link>
 
           {menuBarStyle === "attached" && (
-            <nav className={`hidden lg:flex items-center self-center gap-0 flex-1 ${navOverflow}`}>
-              {navItems.map((item) => {
-                const { label, path } = item;
-                const kids = visibleChildren(item);
-                const link = (
-                  <Link
-                    href={path}
-                    style={navItemStyle(path)}
-                    className={`px-3 py-1 whitespace-nowrap transition-colors rounded-sm hover:bg-gray-100 text-center ml-[4px] mr-[4px]${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
-                  >
-                    {label}
-                    {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-60" />}
-                  </Link>
-                );
-                return kids.length > 0
-                  ? <div key={path} className="relative group flex items-center">{link}<NavDropdown items={kids} /></div>
-                  : <React.Fragment key={path}>{link}</React.Fragment>;
-              })}
-            </nav>
+            <OverflowNav
+              items={navItems}
+              renderItem={renderAttachedItem("px-3 py-1 text-center")}
+              className="hidden lg:block self-center flex-1"
+              navClassName="flex items-center gap-2"
+              ariaLabel={t("menu.nav")}
+              isActive={isActive}
+              activeColor={menuActiveColor}
+              recomputeKey={navRecomputeKey}
+              moreLabel={t("menu.more")}
+              moreButtonStyle={{ color: menuTextColor, fontSize: menuFontSize, fontWeight: menuFontWeight }}
+              moreButtonClassName="px-3 py-1 whitespace-nowrap rounded-sm hover:bg-gray-100 inline-flex items-center gap-1"
+            />
           )}
           {headerBanner}
           {menuBarStyle === "bar" && !headerBanner && <div className="hidden lg:block flex-1" />}
