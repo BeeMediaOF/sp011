@@ -38,6 +38,9 @@ const THROTTLE = {
   latency: 150,
 };
 const CPU_RATE = 4;
+/* Teto por navegação. 45 s já é folgado a 1,6 Mbps — os 120 s de antes só
+   adiavam a descoberta de que a página tinha um recurso que nunca responde. */
+const NAV_TIMEOUT = Number(process.env.NAV_TIMEOUT ?? 45_000);
 
 /**
  * Instalado ANTES da navegação (addInitScript). LCP e CLS não saem por
@@ -149,26 +152,57 @@ for (const url of urls) {
         "Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) " +
         "Chrome/124.0.0.0 Mobile Safari/537.36",
     });
-    const page = await context.newPage();
-    await page.addInitScript(observeWebVitals);
-    /* Erro/aviso de console é o gate de hidratação do PRD-05: o React em
-       produção loga o #418/#423 minificado quando descarta o HTML do servidor. */
-    page.on("console", (m) => {
-      if (m.type() === "error" || m.type() === "warning") problems.push(`[${m.type()}] ${m.text()}`);
-    });
-    page.on("pageerror", (e) => problems.push(`[pageerror] ${e.message}`));
+    try {
+      const page = await context.newPage();
+      await page.addInitScript(observeWebVitals);
+      /* Erro/aviso de console é o gate de hidratação do PRD-05: o React em
+         produção loga o #418/#423 minificado quando descarta o HTML do servidor. */
+      page.on("console", (m) => {
+        if (m.type() === "error" || m.type() === "warning") problems.push(`[${m.type()}] ${m.text()}`);
+      });
+      page.on("pageerror", (e) => problems.push(`[pageerror] ${e.message}`));
 
-    const cdp = await context.newCDPSession(page);
-    await cdp.send("Network.enable");
-    await cdp.send("Network.emulateNetworkConditions", THROTTLE);
-    await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_RATE });
+      /* Requisições ainda ABERTAS na hora de coletar. `performance.getEntriesByType
+         ("resource")` só enxerga o que TERMINOU, então um recurso que nunca
+         responde fica invisível ali — e é justamente ele que segura o evento
+         `load` para sempre. Suspeito conhecido: imagem legada que só existe no
+         Supabase Storage, cuja cota de egress estourou em julho. */
+      const abertas = new Map();
+      page.on("request", (r) => abertas.set(r, r.url()));
+      page.on("requestfinished", (r) => abertas.delete(r));
+      page.on("requestfailed", (r) => abertas.delete(r));
 
-    await page.goto(url, { waitUntil: "load", timeout: 120_000 });
-    // O LCP só é definitivo depois que o usuário poderia ter interagido; 2,5 s
-    // de folga cobrem a imagem do topo chegando pela rede estrangulada.
-    await page.waitForTimeout(2500);
-    runs.push(await page.evaluate(collect));
-    await context.close();
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("Network.enable");
+      await cdp.send("Network.emulateNetworkConditions", THROTTLE);
+      await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_RATE });
+
+      /* Timeout de navegação NÃO aborta a leitura. FCP, LCP, CLS e TBT saem de
+         PerformanceObserver e são válidos mesmo que `load` nunca dispare — só
+         `load` e os totais de bytes ficam zerados. Antes, uma rota travada
+         derrubava o processo e levava junto as rotas JÁ MEDIDAS (aconteceu em
+         2026-07-31 com /futebol do esporteagora). Medição perdida por causa da
+         ferramenta é o terceiro tropeço deste tipo na auditoria. */
+      let cargaCompleta = true;
+      try {
+        await page.goto(url, { waitUntil: "load", timeout: NAV_TIMEOUT });
+      } catch (err) {
+        cargaCompleta = false;
+        problems.push(`[carga] ${String(err).split("\n")[0]}`);
+        for (const u of new Set(abertas.values())) problems.push(`[pendente] ${u}`);
+      }
+      // O LCP só é definitivo depois que o usuário poderia ter interagido; 2,5 s
+      // de folga cobrem a imagem do topo chegando pela rede estrangulada.
+      await page.waitForTimeout(2500);
+      const r = await page.evaluate(collect);
+      r.cargaCompleta = cargaCompleta;
+      runs.push(r);
+    } catch (err) {
+      // Falha fora da navegação (contexto, evaluate): registra e segue.
+      problems.push(`[execucao ${i + 1}] ${String(err).split("\n")[0]}`);
+    } finally {
+      await context.close().catch(() => {});
+    }
   }
   report.push({ url, runs, problems });
 }
@@ -178,18 +212,26 @@ console.log(`\nperfil: 412x823 DPR1.75 · ${Math.round(THROTTLE.downloadThroughp
   `RTT ${THROTTLE.latency} ms · CPU ${CPU_RATE}x · ${REPS} execuções (mediana)\n`);
 console.log("rota                            FCP     LCP    TTFB     CLS     TBT  tarefas  maior  transfer   reqs");
 for (const { url, runs } of report) {
-  const p = (k) => median(runs.map((r) => r[k] ?? 0));
   const path = new URL(url).pathname.slice(0, 29).padEnd(29);
+  if (runs.length === 0) {
+    console.log(`${path} — nenhuma leitura concluída (ver "console" abaixo)`);
+    continue;
+  }
+  const p = (k) => median(runs.map((r) => r[k] ?? 0));
+  /* `load` que nunca dispara zera os bytes: a linha continua válida para tempo
+     (FCP/LCP/CLS/TBT vêm de PerformanceObserver), mas transfer/reqs não. */
+  const incompletas = runs.filter((r) => !r.cargaCompleta).length;
   console.log(
     `${path} ${String(p("fcp")).padStart(6)}  ${String(p("lcp")).padStart(6)}  ` +
     `${String(p("ttfb")).padStart(5)}  ${String(p("cls")).padStart(6)}  ` +
     `${String(p("tbt")).padStart(6)}  ${String(p("longTasks")).padStart(7)}  ` +
-    `${String(p("maiorTask")).padStart(5)}  ${kb(p("transfer")).padStart(8)}  ${String(p("requests")).padStart(4)}`,
+    `${String(p("maiorTask")).padStart(5)}  ${kb(p("transfer")).padStart(8)}  ${String(p("requests")).padStart(4)}` +
+    (incompletas ? `   ⚠ ${incompletas}/${runs.length} sem 'load'` : ""),
   );
 }
 console.log("\nleituras individuais (FCP/LCP/TBT):");
 for (const { url, runs } of report) {
-  console.log(`  ${new URL(url).pathname}: ${runs.map((r) => `${r.fcp}/${r.lcp}/${r.tbt}`).join("  ")}`);
+  console.log(`  ${new URL(url).pathname}: ${runs.map((r) => `${r.fcp}/${r.lcp}/${r.tbt}`).join("  ") || "—"}`);
 }
 
 /* Quem gastou a thread. Vazio = Chromium sem long-animation-frame (< 123);
