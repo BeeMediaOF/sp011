@@ -116,8 +116,14 @@ function ConfigTab() {
       {/* Liga/desliga */}
       <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
         <div>
-          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Newsletter ativa</p>
-          <p className="text-[12px] text-slate-500 dark:text-slate-400">Desligada, a captura no site segue funcionando, mas nenhum e-mail é enviado.</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+            Newsletter {form.newsletterEnabled ? "ativa" : "desligada"}
+          </p>
+          <p className="text-[12px] text-slate-500 dark:text-slate-400">
+            {form.newsletterEnabled
+              ? "Ligada — confirmações e campanhas são enviadas pelo remetente configurado. Lembre de Salvar."
+              : "Desligada — a captura no site segue funcionando, mas nenhum e-mail é enviado."}
+          </p>
         </div>
         <button
           onClick={() => set("newsletterEnabled", !form.newsletterEnabled)}
@@ -221,9 +227,11 @@ export default function Newsletter() {
           ))}
         </div>
 
-        {tab === "config" && <ConfigTab />}
+        {/* ConfigTab fica sempre montado (só escondido) para não perder o
+            formulário não-salvo — inclusive o toggle — ao trocar de subaba. */}
+        <div className={tab === "config" ? "" : "hidden"}><ConfigTab /></div>
         {tab === "subscribers" && <ComingSoon title="Lista de inscritos" desc="A gestão de inscritos e a exportação CSV chegam na etapa final da newsletter." />}
-        {tab === "campaigns" && <ComingSoon title="Campanhas" desc="O editor de campanhas e o envio (manual/agendado) chegam junto do motor de disparo." />}
+        {tab === "campaigns" && <ComingSoon title="Campanhas" desc="O editor de campanhas (TipTap) e o envio manual/agendado chegam na etapa final; o motor de disparo já está no ar." />}
       </div>
     </AdminLayout>
   );
