@@ -5,7 +5,7 @@
 | Fase 0 — Investigação (`00-investigacao.md`) | ✅ Concluída | 2026-07-31 |
 | Fase 1 — PRD (`PRD-NEWSLETTER-01-captura-e-disparo.md`) | ✅ Concluído | 2026-07-31 |
 | Revisão pós-aprovação (POST one-click RFC 8058 + teto diário) | ✅ Aplicada | 2026-07-31 |
-| Execução — Fase interna 1 (captura + consentimento) | 🔨 Implementada (aguarda validação na VPS) | 2026-07-31 |
+| Execução — Fase interna 1 (captura + consentimento) | ✅ Validada em prod (VPS, sp011) | 2026-07-31 |
 | Execução — Fase interna 2 (admin: remetente + modelo) | ⬜ Pendente | — |
 | Execução — Fase interna 3 (motor de disparo assíncrono) | ⬜ Pendente | — |
 | Execução — Fase interna 4 (ponta a ponta) | ⬜ Pendente | — |
@@ -38,8 +38,14 @@
   site não regride: antes o e-mail caía efêmero em `behavior_events` e nunca era usado.
 - Local: `lib/db` `tsc -b` ✅, api-server typecheck ✅ + 232 testes ✅ + esbuild ✅,
   frontend typecheck ✅.
+- **Validação em prod (VPS sp011, 2026-07-31):** subscribe → linha `pending` com
+  `consent_ip` + `source='footer'` (prova do desacoplamento do gate + consentimento
+  LGPD); `confirm?token=` → `confirmed` com `confirmed_at`. Filtro de bot confirmado
+  (curl puro = bot → `ok` silencioso sem persistir; UA de navegador persiste).
 
 ## Modo atual
-**Execução — Fase 1 implementada**, aguardando validação na VPS (deploy só de `api` +
-`web` do sp011). Próximo passo após validar: **Fase 2** (admin: subaba Configurações com
-remetente Gmail + modelo de e-mail; refactor de `mailer.ts`).
+**Execução — Fase 1 validada em prod (sp011).** Rollout ainda só no sp011 (blogs
+replicados seguem na imagem anterior). Próximo passo: **Fase 2** (admin: subaba
+Configurações com remetente Gmail encriptado/mascarado + modelo de e-mail; refactor
+de `mailer.ts` com `rejectUnauthorized:true`, `List-Unsubscribe` e `Message-ID`;
+botão "enviar e-mail de teste").
