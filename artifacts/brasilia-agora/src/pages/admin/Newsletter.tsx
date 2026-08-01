@@ -126,11 +126,12 @@ function ConfigTab() {
           </p>
         </div>
         <button
+          type="button"
           onClick={() => set("newsletterEnabled", !form.newsletterEnabled)}
-          className={`w-12 h-6 rounded-full relative transition-colors ${form.newsletterEnabled ? "bg-[#0B2A66]" : "bg-slate-300 dark:bg-slate-600"}`}
           aria-pressed={form.newsletterEnabled}
+          className={`relative shrink-0 inline-flex items-center w-12 h-6 rounded-full transition-colors ${form.newsletterEnabled ? "bg-[#0B2A66]" : "bg-slate-300 dark:bg-slate-600"}`}
         >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${form.newsletterEnabled ? "translate-x-6" : "translate-x-0.5"}`} />
+          <span className={`inline-block w-5 h-5 rounded-full bg-white shadow-md ring-1 ring-black/10 transform transition-transform ${form.newsletterEnabled ? "translate-x-[26px]" : "translate-x-0.5"}`} />
         </button>
       </div>
 
