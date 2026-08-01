@@ -74,6 +74,7 @@ const UsersManager     = lazyWithPreload(() => import("@/pages/admin/UsersManage
 const SecurityCheckup  = lazyWithPreload(() => import("@/pages/admin/SecurityCheckup"));
 const EditorPermissions = lazyWithPreload(() => import("@/pages/admin/EditorPermissions"));
 const SocialMedia      = lazyWithPreload(() => import("@/pages/admin/SocialMedia"));
+const Newsletter       = lazyWithPreload(() => import("@/pages/admin/Newsletter"));
 
 /* Pré-carrega todos os chunks do admin uma vez, em segundo plano, para que a
    troca entre abas seja instantânea (sem o flash do spinner de tela cheia). */
@@ -87,6 +88,7 @@ function preloadAdminPages() {
       Dashboard, Articles, ArticleEdit, MenuManager, Settings, TwoFactorSetup,
       Webhook, AdsManager, ColumnistsManager, Analytics, HomeBlocksManager,
       CategoriesManager, RSSManager, UsersManager, SecurityCheckup, EditorPermissions, SocialMedia,
+      Newsletter,
     ]) {
       c.preload().catch(() => {});
     }
@@ -280,6 +282,9 @@ function Router({ pages }: { pages?: SsrPages }) {
         </Route>
         <Route path="/admin/social">
           <RequirePermission perm="social.view"><SocialMedia /></RequirePermission>
+        </Route>
+        <Route path="/admin/newsletter">
+          <RequirePermission perm="settings.view"><Newsletter /></RequirePermission>
         </Route>
         <Route path="/admin/menu">
           <RequirePermission perm="menu.view"><MenuManager /></RequirePermission>

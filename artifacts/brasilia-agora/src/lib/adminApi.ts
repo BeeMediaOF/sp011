@@ -75,6 +75,13 @@ export const adminApi = {
   getSettings: () => req<{ settings: SiteSettings }>("GET", "/settings"),
   updateSettings: (settings: Partial<SiteSettings>) => req<{ settings: SiteSettings }>("PUT", "/settings", settings),
   uploadLogo: (logoBase64: string) => req<{ settings: SiteSettings }>("POST", "/logo", { logoBase64 }),
+
+  // Newsletter — config (remetente Gmail + modelo). Editado SÓ na subaba
+  // "Configurações" da aba Newsletter (nunca em /settings global).
+  getNewsletterSettings: () => req<{ settings: NewsletterSettings }>("GET", "/newsletter/settings"),
+  updateNewsletterSettings: (settings: Partial<NewsletterSettings>) =>
+    req<{ ok: boolean; settings: NewsletterSettings }>("PUT", "/newsletter/settings", settings),
+  sendNewsletterTest: () => req<{ ok: boolean; to?: string; error?: string }>("POST", "/newsletter/test", {}),
   updateMyProfile: (data: { name?: string; avatarBase64?: string | null; language?: string }) =>
     req<{ user: { id: number; name: string; email: string; role: string; avatarBase64?: string | null; language: string } }>("PUT", "/me", data),
 
@@ -425,6 +432,31 @@ export interface SiteSettings {
   articleRetentionLastCount?: number;
   /** Configuração editável do rodapé (painel → aba Rodapé). */
   footerConfig?: FooterConfig;
+}
+
+/** Modelo (shell) do e-mail da newsletter — espelho do tipo do servidor. */
+export interface NewsletterTemplate {
+  accentColor?: string;
+  logoMode?: "wordmark" | "none";
+  headerText?: string;
+  footerText?: string;
+  signature?: string;
+}
+
+/** Config da newsletter (subaba Configurações). Segredo `newsletterSmtpPass`
+ *  vem MASCARADO na leitura; `hasNewsletterSmtpPass` diz se já existe. */
+export interface NewsletterSettings {
+  newsletterEnabled: boolean;
+  newsletterFromName: string;
+  newsletterFromEmail: string;
+  newsletterSmtpHost: string;
+  newsletterSmtpPort: number;
+  newsletterSmtpUser: string;
+  newsletterSmtpPass: string;
+  hasNewsletterSmtpPass: boolean;
+  newsletterReplyTo: string;
+  newsletterDailyCap: number;
+  newsletterTemplate: NewsletterTemplate;
 }
 
 /** Regra de retenção enviada às rotas de prévia/execução da limpeza. */

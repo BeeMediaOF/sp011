@@ -6,7 +6,7 @@
 | Fase 1 — PRD (`PRD-NEWSLETTER-01-captura-e-disparo.md`) | ✅ Concluído | 2026-07-31 |
 | Revisão pós-aprovação (POST one-click RFC 8058 + teto diário) | ✅ Aplicada | 2026-07-31 |
 | Execução — Fase interna 1 (captura + consentimento) | ✅ Validada em prod (VPS, sp011) | 2026-07-31 |
-| Execução — Fase interna 2 (admin: remetente + modelo) | ⬜ Pendente | — |
+| Execução — Fase interna 2 (admin: remetente + modelo) | 🟡 Implementada (local ok) — validação em prod pendente | 2026-07-31 |
 | Execução — Fase interna 3 (motor de disparo assíncrono) | ⬜ Pendente | — |
 | Execução — Fase interna 4 (ponta a ponta) | ⬜ Pendente | — |
 | `RELATORIO-FINAL.md` (pós-implementação) | ⬜ Pendente | — |
@@ -43,9 +43,34 @@
   LGPD); `confirm?token=` → `confirmed` com `confirmed_at`. Filtro de bot confirmado
   (curl puro = bot → `ok` silencioso sem persistir; UA de navegador persiste).
 
+## Fase 2 — o que entrou (2026-07-31)
+- **Subaba "Configurações" dentro da aba Newsletter** (`/admin/newsletter`) — o
+  ÚNICO lugar onde o admin cadastra o remetente Gmail e o modelo do e-mail
+  (decisão travada do usuário; NÃO fica na página global de Configurações).
+  Subabas Inscritos/Campanhas presentes como placeholders (chegam nas Fases 3/4).
+- Campos novos em `site_settings` (subconjunto newsletter): `newsletterEnabled`,
+  `newsletterFromName/FromEmail`, `newsletterSmtpHost/Port/User`,
+  **`newsletterSmtpPass` (SEGREDO — em `SECRET_FIELDS.site_settings`, encriptado
+  at-rest, mascarado na leitura, redigido do `/api/site` público)**,
+  `newsletterReplyTo`, `newsletterDailyCap` (450), `newsletterTemplate` (shell).
+- Endpoint dedicado `GET/PUT /api/admin/newsletter/settings` (lê/grava só o
+  subconjunto newsletter, sem dobrar no `PUT /settings`) + `POST
+  /api/admin/newsletter/test` (dispara e-mail de teste ao admin logado).
+- **Refactor de `mailer.ts`:** export `sendEmail(config, {to,subject,html,text,
+  headers?})`; TLS endurecido (`rejectUnauthorized:true` + `servername`) no 465 e
+  no upgrade STARTTLS; **timeout re-armado após o upgrade** + guarda `settled`;
+  builder sempre injeta `Message-ID` e aceita headers extras (base de
+  `List-Unsubscribe`/`List-Unsubscribe-Post` das Fases 3/4). `sendWelcomeEmail`
+  segue por env como fallback.
+- Shell de marca do e-mail (`lib/newsletter/email.ts`) parametrizado pelas
+  settings do blog (nome/cor), NÃO por `BRAND`; rodapé já reserva o descadastro.
+- Local: api-server typecheck ✅ + 232 testes ✅ + esbuild ✅; frontend typecheck ✅.
+- **Pendente:** validação em prod na VPS (salvar remetente → segredo `enc:v1:` no
+  banco; botão "teste" → e-mail chega na caixa do admin).
+
 ## Modo atual
-**Execução — Fase 1 validada em prod (sp011).** Rollout ainda só no sp011 (blogs
-replicados seguem na imagem anterior). Próximo passo: **Fase 2** (admin: subaba
-Configurações com remetente Gmail encriptado/mascarado + modelo de e-mail; refactor
-de `mailer.ts` com `rejectUnauthorized:true`, `List-Unsubscribe` e `Message-ID`;
-botão "enviar e-mail de teste").
+**Execução — Fase 2 implementada, validação em prod pendente.** Rollout ainda só
+no sp011 (blogs replicados seguem na imagem anterior). Próximo passo: deploy do
+`api`+`web` no sp011, validar a subaba (segredo encriptado + e-mail de teste),
+depois **Fase 3** (fila + worker + produtor + backoff + teto diário; e o disparo
+do e-mail de confirmação que a Fase 1 deixou stub).

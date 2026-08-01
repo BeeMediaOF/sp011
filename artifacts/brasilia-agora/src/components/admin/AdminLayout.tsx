@@ -7,7 +7,7 @@ import {
   Users, BarChart2, LayoutGrid, Rss,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, Eye, AlertCircle, CheckCircle, Info,
-  Camera, Pencil, Moon, Sun, Share2, FolderOpen,
+  Camera, Pencil, Moon, Sun, Share2, FolderOpen, Mail,
 } from "lucide-react";
 import { getStoredUser, setStoredUser, clearAuth, getStoredRole } from "../../pages/Admin";
 import { adminApi } from "../../lib/adminApi";
@@ -33,6 +33,7 @@ const NAV_MAIN = [
   { tk: "nav.rss",        icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
   { tk: "nav.users",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
   { tk: "nav.social",     icon: Share2,           path: "/admin/social",       permKey: "social.view" },
+  { tk: "nav.newsletter", icon: Mail,             path: "/admin/newsletter",   permKey: "settings.view" },
 ] as const;
 
 interface AdminLayoutProps {

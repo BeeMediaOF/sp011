@@ -1,7 +1,12 @@
 /**
  * Email service using Node.js built-in net/tls (no external dependencies).
  *
- * Required env vars:
+ * Dois modos de uso:
+ *   1. `sendEmail(config, msg)` — envio parametrizado (remetente vindo das
+ *      settings do blog). Base do motor de newsletter (PRD-NEWSLETTER-01).
+ *   2. `sendWelcomeEmail(...)` — mantém o comportamento legado (SMTP via env).
+ *
+ * Env vars do modo legado:
  *   SMTP_HOST   — SMTP server host (e.g. smtp.gmail.com, smtp.office365.com)
  *   SMTP_PORT   — SMTP port: 587 = STARTTLS, 465 = SSL, 25 = plain
  *   SMTP_USER   — SMTP username / email address
@@ -12,72 +17,129 @@
  *   SMTP_HOST=smtp.gmail.com  SMTP_PORT=587
  *   SMTP_USER=seu@gmail.com   SMTP_PASS=<app-password-16-chars>
  *   SMTP_FROM="SBC Agora <seu@gmail.com>"
- *
- * Hotmail/Outlook example:
- *   SMTP_HOST=smtp.office365.com  SMTP_PORT=587
- *   SMTP_USER=seu@hotmail.com     SMTP_PASS=<senha>
- *   SMTP_FROM="SBC Agora <seu@hotmail.com>"
- *
- * Generic SMTP example:
- *   SMTP_HOST=mail.seudominio.com.br  SMTP_PORT=587
- *   SMTP_USER=no-reply@seudominio.com.br  SMTP_PASS=<senha>
- *   SMTP_FROM="SBC Agora <no-reply@seudominio.com.br>"
  */
 
 import net from "node:net";
 import tls from "node:tls";
+import { randomUUID } from "node:crypto";
 import { BRAND } from "./brand.js";
 
 type SocketLike = net.Socket | tls.TLSSocket;
+
+/** Configuração de remetente SMTP (por blog, vinda das settings). */
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  user: string;
+  pass: string;
+  /** "Nome <email>" — o From do cabeçalho. */
+  from: string;
+}
+
+/** Uma mensagem a enviar. `headers` extras (List-Unsubscribe, Reply-To…) são
+ *  injetados no cabeçalho; o Message-ID é sempre gerado pelo builder. */
+export interface SendMessage {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  headers?: Record<string, string>;
+}
 
 function base64(s: string): string {
   return Buffer.from(s, "utf8").toString("base64");
 }
 
-async function smtpSend(opts: {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
-  to: string;
-  subject: string;
-  html: string;
-  text: string;
-}): Promise<void> {
-  const { host, port, user, pass, from, to, subject, html, text } = opts;
-  const useImplicitTls = port === 465;
+function extractEmail(address: string): string {
+  const m = address.match(/<([^>]+)>/);
+  return m?.[1] ?? address.trim();
+}
 
-  return new Promise((resolve, reject) => {
+/** Monta a mensagem MIME crua. Sempre injeta Message-ID; adiciona os headers
+ *  extras (saneados contra injeção de CRLF). */
+function buildRawMessage(from: string, msg: SendMessage): string {
+  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+  const msgDate = new Date().toUTCString();
+  const fromDomain = extractEmail(from).split("@")[1] || "localhost";
+  const messageId = `<${randomUUID()}@${fromDomain}>`;
+
+  const headerLines = [
+    `Date: ${msgDate}`,
+    `From: ${from}`,
+    `To: ${msg.to}`,
+    `Subject: =?UTF-8?B?${base64(msg.subject)}?=`,
+    `Message-ID: ${messageId}`,
+    `MIME-Version: 1.0`,
+  ];
+  // Headers extras (List-Unsubscribe, List-Unsubscribe-Post, Reply-To…).
+  // Uma linha por header; valores saneados para não permitir header injection.
+  for (const [k, v] of Object.entries(msg.headers ?? {})) {
+    const key = k.replace(/[\r\n:]+/g, "").trim();
+    const val = String(v).replace(/[\r\n]+/g, " ").trim();
+    if (key && val) headerLines.push(`${key}: ${val}`);
+  }
+  headerLines.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+
+  return [
+    ...headerLines,
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/plain; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    base64(msg.text),
+    ``,
+    `--${boundary}`,
+    `Content-Type: text/html; charset=UTF-8`,
+    `Content-Transfer-Encoding: base64`,
+    ``,
+    base64(msg.html),
+    ``,
+    `--${boundary}--`,
+  ].join("\r\n");
+}
+
+const SMTP_TIMEOUT_MS = 20_000;
+
+/**
+ * Envia UM e-mail via SMTP (STARTTLS na 587 / TLS implícito na 465).
+ * Endurecimento (revisão do PRD-NEWSLETTER-01):
+ *  - `rejectUnauthorized: true` + `servername` no TLS (não aceita cert inválido);
+ *  - timeout RE-ARMADO após o upgrade STARTTLS (o socket velho é trocado);
+ *  - guarda `settled` — resolve/reject uma única vez.
+ */
+export async function sendEmail(config: SmtpConfig, msg: SendMessage): Promise<void> {
+  const { host, port, user, pass, from } = config;
+  const useImplicitTls = port === 465;
+  const rawMsg = buildRawMessage(from, msg);
+
+  return new Promise<void>((resolve, reject) => {
     let socket: SocketLike;
     let buf = "";
     let upgradedToTls = false;
     let step = 0;
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
-    const boundary = `----=_Part_${Date.now()}`;
-    const msgDate = new Date().toUTCString();
-    const rawMsg = [
-      `Date: ${msgDate}`,
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: =?UTF-8?B?${base64(subject)}?=`,
-      `MIME-Version: 1.0`,
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/plain; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      base64(text),
-      ``,
-      `--${boundary}`,
-      `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: base64`,
-      ``,
-      base64(html),
-      ``,
-      `--${boundary}--`,
-    ].join("\r\n");
+    function armTimeout() {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => fail(new Error("SMTP connection timed out")), SMTP_TIMEOUT_MS);
+      if (timer.unref) timer.unref();
+    }
+    function succeed() {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { socket.destroy(); } catch { /* ignore */ }
+      resolve();
+    }
+    function fail(err: Error) {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      try { socket.destroy(); } catch { /* ignore */ }
+      reject(err);
+    }
 
     function send(cmd: string) {
       socket.write(cmd + "\r\n");
@@ -86,17 +148,16 @@ async function smtpSend(opts: {
     function handleLine(line: string) {
       const code = parseInt(line.slice(0, 3), 10);
       const isLast = line[3] !== "-";
-
       if (!isLast) return;
 
       switch (step) {
         case 0: // banner
-          if (code !== 220) { reject(new Error(`SMTP banner error: ${line}`)); return; }
+          if (code !== 220) { fail(new Error(`SMTP banner error: ${line}`)); return; }
           send(`EHLO localhost`);
           step = 1;
           break;
         case 1: // EHLO response
-          if (code !== 250) { reject(new Error(`EHLO error: ${line}`)); return; }
+          if (code !== 250) { fail(new Error(`EHLO error: ${line}`)); return; }
           if (!useImplicitTls && !upgradedToTls) {
             send(`STARTTLS`);
             step = 2;
@@ -105,63 +166,68 @@ async function smtpSend(opts: {
             step = 3;
           }
           break;
-        case 2: // STARTTLS
-          if (code !== 220) { reject(new Error(`STARTTLS error: ${line}`)); return; }
+        case 2: { // STARTTLS → upgrade da conexão
+          if (code !== 220) { fail(new Error(`STARTTLS error: ${line}`)); return; }
           upgradedToTls = true;
           const rawSocket = socket as net.Socket;
-          const tlsSock = tls.connect({ socket: rawSocket, host, rejectUnauthorized: false }, () => {
-            socket = tlsSock;
-            socket.on("data", onData);
-            send(`EHLO localhost`);
-            step = 1;
-          });
-          tlsSock.on("error", (e) => reject(e));
+          const tlsSock = tls.connect(
+            { socket: rawSocket, host, servername: host, rejectUnauthorized: true },
+            () => {
+              socket = tlsSock;
+              armTimeout(); // re-arma: o socket monitorado mudou
+              socket.on("data", onData);
+              send(`EHLO localhost`);
+              step = 1;
+            },
+          );
+          tlsSock.on("error", (e) => fail(e));
           break;
+        }
         case 3: // AUTH LOGIN prompt
-          if (code !== 334) { reject(new Error(`AUTH LOGIN error: ${line}`)); return; }
+          if (code !== 334) { fail(new Error(`AUTH LOGIN error: ${line}`)); return; }
           send(base64(user));
           step = 4;
           break;
         case 4: // password prompt
-          if (code !== 334) { reject(new Error(`AUTH user error: ${line}`)); return; }
+          if (code !== 334) { fail(new Error(`AUTH user error: ${line}`)); return; }
           send(base64(pass));
           step = 5;
           break;
         case 5: // AUTH success
-          if (code !== 235) { reject(new Error(`AUTH failed: ${line}`)); return; }
+          if (code !== 235) { fail(new Error(`AUTH failed: ${line}`)); return; }
           send(`MAIL FROM:<${extractEmail(from)}>`);
           step = 6;
           break;
         case 6: // MAIL FROM
-          if (code !== 250) { reject(new Error(`MAIL FROM error: ${line}`)); return; }
-          send(`RCPT TO:<${extractEmail(to)}>`);
+          if (code !== 250) { fail(new Error(`MAIL FROM error: ${line}`)); return; }
+          send(`RCPT TO:<${extractEmail(msg.to)}>`);
           step = 7;
           break;
         case 7: // RCPT TO
-          if (code !== 250) { reject(new Error(`RCPT TO error: ${line}`)); return; }
+          if (code !== 250) { fail(new Error(`RCPT TO error: ${line}`)); return; }
           send(`DATA`);
           step = 8;
           break;
         case 8: // DATA ready
-          if (code !== 354) { reject(new Error(`DATA error: ${line}`)); return; }
+          if (code !== 354) { fail(new Error(`DATA error: ${line}`)); return; }
           socket.write(rawMsg + "\r\n.\r\n");
           step = 9;
           break;
         case 9: // message accepted
-          if (code !== 250) { reject(new Error(`Message send error: ${line}`)); return; }
+          if (code !== 250) { fail(new Error(`Message send error: ${line}`)); return; }
           send(`QUIT`);
           step = 10;
           break;
         case 10: // QUIT
-          socket.destroy();
-          resolve();
+          succeed();
           break;
         default:
-          reject(new Error(`Unexpected SMTP response at step ${step}: ${line}`));
+          fail(new Error(`Unexpected SMTP response at step ${step}: ${line}`));
       }
     }
 
     function onData(chunk: Buffer) {
+      armTimeout(); // atividade = progresso: reinicia a janela de inatividade
       buf += chunk.toString("utf8");
       const lines = buf.split("\r\n");
       buf = lines.pop() ?? "";
@@ -171,29 +237,20 @@ async function smtpSend(opts: {
     }
 
     function connect() {
+      armTimeout();
       if (useImplicitTls) {
-        socket = tls.connect({ host, port, rejectUnauthorized: false }, () => {
-          socket.on("data", onData);
-        });
+        socket = tls.connect(
+          { host, port, servername: host, rejectUnauthorized: true },
+          () => { socket.on("data", onData); },
+        );
       } else {
-        socket = net.connect({ host, port }, () => {
-          socket.on("data", onData);
-        });
+        socket = net.connect({ host, port }, () => { socket.on("data", onData); });
       }
-      socket.on("error", (e) => reject(e));
-      socket.setTimeout(15_000, () => {
-        socket.destroy();
-        reject(new Error("SMTP connection timed out"));
-      });
+      socket.on("error", (e) => fail(e));
     }
 
     connect();
   });
-}
-
-function extractEmail(address: string): string {
-  const m = address.match(/<([^>]+)>/);
-  return m?.[1] ?? address.trim();
 }
 
 function welcomeEmailHtml(name: string, email: string, tempPassword: string, portalUrl: string): string {
@@ -316,17 +373,15 @@ export async function sendWelcomeEmail(to: string, name: string, tempPassword: s
   }
 
   try {
-    await smtpSend({
-      host,
-      port,
-      user,
-      pass,
-      from,
-      to,
-      subject: `Bem-vindo ao ${BRAND.name} — Suas credenciais de acesso`,
-      html: welcomeEmailHtml(name, to, tempPassword, baseUrl),
-      text: `Bem-vindo ao ${BRAND.name}!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
-    });
+    await sendEmail(
+      { host, port, user, pass, from },
+      {
+        to,
+        subject: `Bem-vindo ao ${BRAND.name} — Suas credenciais de acesso`,
+        html: welcomeEmailHtml(name, to, tempPassword, baseUrl),
+        text: `Bem-vindo ao ${BRAND.name}!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
+      },
+    );
     return { sent: true };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

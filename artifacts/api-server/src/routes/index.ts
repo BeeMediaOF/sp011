@@ -29,6 +29,7 @@ import sitemapNewsRouter from "./sitemap-news";
 import queueRouter from "./queue";
 import imageRouter from "./image";
 import newsletterRouter from "./newsletter";
+import newsletterAdminRouter from "./newsletterAdmin";
 
 const router: IRouter = Router();
 
@@ -51,6 +52,7 @@ router.use(sitemapRouter);
 router.use(ampRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/newsletter", newsletterRouter);
+router.use("/admin/newsletter", newsletterAdminRouter);
 router.use("/admin/rss", rssRouter);
 router.use("/admin/perplexity", perplexityRouter);
 router.use("/admin/users", usersRouter);

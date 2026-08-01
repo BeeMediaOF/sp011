@@ -24,6 +24,7 @@ const PT = {
   "nav.rss": "Fontes RSS",
   "nav.users": "Usuários",
   "nav.social": "Redes Sociais",
+  "nav.newsletter": "Newsletter",
   "nav.settings": "Configurações",
   "nav.tagline": "A notícia em tempo real",
 
@@ -899,6 +900,7 @@ const EN: Record<AdminTKey, string> = {
   "nav.rss": "RSS Feeds",
   "nav.users": "Users",
   "nav.social": "Social Media",
+  "nav.newsletter": "Newsletter",
   "nav.settings": "Settings",
   "nav.tagline": "News in real time",
 

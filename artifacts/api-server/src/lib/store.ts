@@ -37,6 +37,7 @@ const SECRET_FIELDS: Record<string, string[]> = {
     "rssAiApiKey", "diffbotApiKey", "geminiApiKey",
     "openaiApiKey", "youtubeApiKey", "webhookApiKey",
     "perplexityApiKey", "centralIngestSecret",
+    "newsletterSmtpPass",
   ],
   social_config: ["pageAccessToken", "metaAppSecret"],
 };
@@ -153,6 +154,18 @@ export interface HomeTemplate {
   footerAccentColor?: string;
   /** Fundo da página da home (vazio = branco). */
   pageBgColor?: string;
+}
+
+/** Modelo (shell) do e-mail da newsletter — cabeçalho/rodapé de marca que
+ *  envolve o corpo de cada campanha (PRD-NEWSLETTER-01 RF3). */
+export interface NewsletterTemplate {
+  /** Cor de destaque (cabeçalho/botões). Vazio = usa a cor de acento do site. */
+  accentColor?: string;
+  /** "wordmark" = nome do site no topo; "none" = sem cabeçalho de marca. */
+  logoMode?: "wordmark" | "none";
+  headerText?: string;
+  footerText?: string;
+  signature?: string;
 }
 
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */
@@ -288,6 +301,19 @@ export interface SiteSettings {
   articleRetentionLastRunAt?: string;                   // último ciclo de limpeza (ISO)
   articleRetentionLastCount?: number;                   // nº excluído no último ciclo
   footerConfig?: FooterConfig;                          // rodapé editável (aba Rodapé)
+  // ── Newsletter (PRD-NEWSLETTER-01) — remetente Gmail + modelo do e-mail ──
+  // Editados SÓ na subaba "Configurações" da aba Newsletter (não em /settings).
+  // NUNCA vão no payload público de /api/site (redigidos em getPublicSettings).
+  newsletterEnabled?: boolean;
+  newsletterFromName?: string;
+  newsletterFromEmail?: string;
+  newsletterSmtpHost?: string;                          // default smtp.gmail.com
+  newsletterSmtpPort?: number;                          // default 587 (STARTTLS)
+  newsletterSmtpUser?: string;
+  newsletterSmtpPass?: string;                          // SEGREDO (SECRET_FIELDS)
+  newsletterReplyTo?: string;
+  newsletterDailyCap?: number;                          // teto diário (default 450)
+  newsletterTemplate?: NewsletterTemplate;
 }
 
 export type ColumnistSpecialty =
@@ -877,6 +903,18 @@ export const store = {
     delete out["youtubeApiKey"];
     delete out["webhookApiKey"];
     delete out["centralIngestSecret"];
+    // Config da newsletter (remetente/segredo/modelo) é admin-only e não tem
+    // consumidor no site público — some inteira do /api/site.
+    delete out["newsletterEnabled"];
+    delete out["newsletterFromName"];
+    delete out["newsletterFromEmail"];
+    delete out["newsletterSmtpHost"];
+    delete out["newsletterSmtpPort"];
+    delete out["newsletterSmtpUser"];
+    delete out["newsletterSmtpPass"];
+    delete out["newsletterReplyTo"];
+    delete out["newsletterDailyCap"];
+    delete out["newsletterTemplate"];
     // Imagens base64 → URLs cacheáveis (ver SITE_ASSET_FIELDS).
     for (const [key, field] of Object.entries(SITE_ASSET_FIELDS)) {
       const v = out[field];
