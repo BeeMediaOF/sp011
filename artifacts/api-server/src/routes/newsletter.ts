@@ -13,12 +13,13 @@
  */
 import { Router } from "express";
 import { randomBytes } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db, newsletterSubscribersTable } from "@workspace/db";
 import { store } from "../lib/store.js";
 import { logger } from "../lib/logger.js";
 import { isBotRequest, overRateLimit } from "../lib/trafficGuard.js";
 import { cleanStr, normalizeIp } from "../lib/analyticsShared.js";
+import { enqueueConfirmation } from "../lib/newsletter/dispatch.js";
 
 const router = Router();
 
@@ -78,12 +79,15 @@ router.post("/subscribe", async (req, res) => {
         source:           source ?? row.source ?? null,
         updatedAt:        new Date(),
       }).where(eq(newsletterSubscribersTable.id, row.id));
-      // Fase 3: enfileirar e-mail de confirmação (token = confirmToken).
+      // Enfileira a confirmação (double opt-in) — envio assíncrono no worker,
+      // nunca no caminho da requisição (RNF-Perf-1). Não-fatal.
+      try { await enqueueConfirmation(row.id, email); }
+      catch (e) { logger.warn({ err: e }, "newsletter: enfileirar confirmação falhou (não-fatal)"); }
       res.json({ ok: true });
       return;
     }
 
-    await db.insert(newsletterSubscribersTable).values({
+    const inserted = await db.insert(newsletterSubscribersTable).values({
       email,
       status:           "pending",
       confirmToken:     genToken(),
@@ -91,8 +95,12 @@ router.post("/subscribe", async (req, res) => {
       consentIp:        ip || null,
       consentUserAgent: ua || null,
       source,
-    });
-    // Fase 3: enfileirar e-mail de confirmação.
+    }).returning({ id: newsletterSubscribersTable.id });
+    const newId = inserted[0]?.id;
+    if (newId != null) {
+      try { await enqueueConfirmation(newId, email); }
+      catch (e) { logger.warn({ err: e }, "newsletter: enfileirar confirmação falhou (não-fatal)"); }
+    }
     res.json({ ok: true });
   } catch (err) {
     // Corrida de UNIQUE (dois submits simultâneos do mesmo e-mail) ou banco fora:
@@ -128,6 +136,51 @@ router.get("/confirm", async (req, res) => {
       ? renderPage(site, "Inscrição confirmada!", "Pronto — você vai receber as novidades por e-mail. Todo e-mail traz um link para cancelar quando quiser.")
       : renderPage(site, "Link não é mais válido", "Talvez sua inscrição já tenha sido confirmada, ou o link expirou. Se precisar, inscreva-se de novo pelo site."),
   );
+});
+
+// ─── Descadastro (obrigatório em todo e-mail) ─────────────────────────────────
+// O MESMO token perene (unsubscribe_token) serve os três caminhos: o link
+// visível no corpo (GET), o header List-Unsubscribe (GET) e o botão nativo do
+// Gmail/Yahoo (POST one-click, RFC 8058). Idempotente e sem login.
+
+/** Efetiva o descadastro pelo token. Retorna true se um inscrito foi (ou já
+ *  estava) descadastrado. Só sai de estados não-terminais (bounced/complained
+ *  ficam como estão). */
+async function unsubscribeByToken(token: string | undefined): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const updated = await db.update(newsletterSubscribersTable)
+      .set({ status: "unsubscribed", unsubscribedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(newsletterSubscribersTable.unsubscribeToken, token),
+        inArray(newsletterSubscribersTable.status, ["pending", "confirmed", "unsubscribed"]),
+      ))
+      .returning({ id: newsletterSubscribersTable.id });
+    return updated.length > 0;
+  } catch (err) {
+    logger.warn({ err }, "newsletter unsubscribe falhou (não-fatal)");
+    return false;
+  }
+}
+
+// GET — clique humano no link visível do e-mail → página de confirmação.
+router.get("/unsubscribe", async (req, res) => {
+  const token = cleanStr(req.query["token"], 200);
+  await unsubscribeByToken(token);
+  const site = store.getSettings().siteName || "Newsletter";
+  // Página genérica mesmo quando o token não casa (não revela se o e-mail existe).
+  res.status(200).type("html").send(
+    renderPage(site, "Inscrição cancelada", "Pronto — você não vai mais receber a nossa newsletter. Se mudar de ideia, é só assinar de novo pelo site."),
+  );
+});
+
+// POST — one-click do Gmail/Yahoo (List-Unsubscribe-Post): efetiva e responde
+// 204 SEM página/redirect. Sem esse POST o header mente e o usuário cai no
+// "Denunciar spam" (pior para a reputação do remetente).
+router.post("/unsubscribe", async (req, res) => {
+  const token = cleanStr(req.query["token"], 200);
+  await unsubscribeByToken(token); // idempotente; 204 mesmo se o token não casar
+  res.status(204).end();
 });
 
 /** Página pública mínima e autossuficiente (sem bundle/SSR) para confirm/descadastro. */

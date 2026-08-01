@@ -7,6 +7,7 @@ import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { startSanityMonitor } from "./lib/sanityMonitor.js";
+import { startNewsletterWorker } from "./lib/newsletter/dispatch.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
 import { migrateTwoFactorSecrets } from "./lib/migrateTwoFactorSecrets.js";
 import { ensureSchema } from "./lib/ensureSchema.js";
@@ -202,6 +203,11 @@ async function bootWithDb(): Promise<void> {
   // Malha de sanidade cross-metric (PRD 11): valida invariantes do dashboard a cada
   // ~15min contra o banco do próprio blog. Depois do banco pronto (como o scheduler).
   startSanityMonitor();
+
+  // Motor de disparo da newsletter (PRD-NEWSLETTER-01, Fase 3): poll 30s da fila
+  // newsletter_send_queue (confirmações + campanhas). Só envia com newsletterEnabled
+  // e remetente configurado; inerte nos blogs que não usam newsletter.
+  startNewsletterWorker();
 
   /*
    * Pré-aquece o cache de imagens dos artigos mais recentes em background.

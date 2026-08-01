@@ -99,6 +99,38 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`CREATE INDEX IF NOT EXISTS newsletter_sub_status_idx ON newsletter_subscribers (status)`,
     sql`CREATE INDEX IF NOT EXISTS newsletter_sub_confirm_token_idx ON newsletter_subscribers (confirm_token)`,
     sql`CREATE INDEX IF NOT EXISTS newsletter_sub_unsub_token_idx ON newsletter_subscribers (unsubscribe_token)`,
+    // PRD-NEWSLETTER-01 (Fase 3) — campanhas + fila de disparo, isoladas por blog.
+    sql`CREATE TABLE IF NOT EXISTS newsletter_campaigns (
+      id            serial PRIMARY KEY,
+      subject       text NOT NULL,
+      body_html     text NOT NULL DEFAULT '',
+      status        text NOT NULL DEFAULT 'draft',
+      scheduled_at  timestamptz,
+      sent_at       timestamptz,
+      recipients    integer NOT NULL DEFAULT 0,
+      sent_count    integer NOT NULL DEFAULT 0,
+      failed_count  integer NOT NULL DEFAULT 0,
+      created_at    timestamptz NOT NULL DEFAULT now(),
+      updated_at    timestamptz NOT NULL DEFAULT now()
+    )`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_campaign_status_idx ON newsletter_campaigns (status)`,
+    sql`CREATE TABLE IF NOT EXISTS newsletter_send_queue (
+      id            serial PRIMARY KEY,
+      kind          text NOT NULL DEFAULT 'campaign',
+      campaign_id   integer,
+      subscriber_id integer NOT NULL,
+      email         text NOT NULL,
+      status        text NOT NULL DEFAULT 'pending',
+      attempts      integer NOT NULL DEFAULT 0,
+      next_retry_at timestamptz,
+      scheduled_at  timestamptz,
+      sent_at       timestamptz,
+      last_error    text,
+      created_at    timestamptz NOT NULL DEFAULT now()
+    )`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS newsletter_queue_campaign_sub_uniq ON newsletter_send_queue (campaign_id, subscriber_id)`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_queue_status_retry_idx ON newsletter_send_queue (status, next_retry_at)`,
+    sql`CREATE INDEX IF NOT EXISTS newsletter_queue_campaign_idx ON newsletter_send_queue (campaign_id)`,
     // Conexões de publicação (WordPress, Site Externo, Blogger). Meta fica em social_accounts.
     sql`CREATE TABLE IF NOT EXISTS social_connections (
       id           text PRIMARY KEY,

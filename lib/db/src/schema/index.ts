@@ -23,3 +23,5 @@ export * from "./social_connections";
 export * from "./ad_daily_stats";
 export * from "./behavior_events";
 export * from "./newsletter_subscribers";
+export * from "./newsletter_campaigns";
+export * from "./newsletter_send_queue";

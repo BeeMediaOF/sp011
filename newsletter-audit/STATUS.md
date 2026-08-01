@@ -6,8 +6,8 @@
 | Fase 1 — PRD (`PRD-NEWSLETTER-01-captura-e-disparo.md`) | ✅ Concluído | 2026-07-31 |
 | Revisão pós-aprovação (POST one-click RFC 8058 + teto diário) | ✅ Aplicada | 2026-07-31 |
 | Execução — Fase interna 1 (captura + consentimento) | ✅ Validada em prod (VPS, sp011) | 2026-07-31 |
-| Execução — Fase interna 2 (admin: remetente + modelo) | 🟡 Implementada (local ok) — validação em prod pendente | 2026-07-31 |
-| Execução — Fase interna 3 (motor de disparo assíncrono) | ⬜ Pendente | — |
+| Execução — Fase interna 2 (admin: remetente + modelo) | ✅ Validada em prod (VPS, sp011) | 2026-08-01 |
+| Execução — Fase interna 3 (motor de disparo assíncrono) | 🟡 Implementada (local ok) — validação em prod pendente | 2026-08-01 |
 | Execução — Fase interna 4 (ponta a ponta) | ⬜ Pendente | — |
 | `RELATORIO-FINAL.md` (pós-implementação) | ⬜ Pendente | — |
 
@@ -65,12 +65,46 @@
 - Shell de marca do e-mail (`lib/newsletter/email.ts`) parametrizado pelas
   settings do blog (nome/cor), NÃO por `BRAND`; rodapé já reserva o descadastro.
 - Local: api-server typecheck ✅ + 232 testes ✅ + esbuild ✅; frontend typecheck ✅.
-- **Pendente:** validação em prod na VPS (salvar remetente → segredo `enc:v1:` no
-  banco; botão "teste" → e-mail chega na caixa do admin).
+- **Validado em prod (VPS sp011, 2026-08-01):** remetente salvo → segredo
+  `newsletterSmtpPass` gravado como `enc:v1:` (nunca em claro); config newsletter
+  ausente do `/api/site` público; botão "Enviar e-mail de teste" entregou.
+
+## Fase 3 — o que entrou (2026-08-01)
+- **Duas tabelas novas por blog** (`lib/db` + autocriação em `ensureSchema.ts`):
+  `newsletter_campaigns` (assunto/corpo/status/agenda/contadores) e
+  `newsletter_send_queue` (espelha `deliveries`: `kind` campaign|confirmation,
+  campaignId, subscriberId, status, attempts, next_retry_at, scheduled_at;
+  UNIQUE(campaignId, subscriberId) para idempotência; índice (status, next_retry_at)).
+- **Motor** (`lib/newsletter/dispatch.ts`): produtor `startCampaignSend` (fan-out
+  só para inscritos `confirmed` = supressão por status) + worker
+  `startNewsletterWorker` (poll 30s, `_timer.unref`, guarda `_running`, claim
+  condicional, backoff `1m→5m→15m→1h→6h` 5→dead — módulo puro
+  `newsletter/backoff.ts`). Wiring em `index.ts` (bootWithDb).
+- **Teto diário** (`newsletter/schedule.ts`, puro/testado): `planCampaignSchedule`
+  distribui o `scheduledAt` por dias CIVIS DO BLOG (`siteTimezone`) sem passar do
+  teto; drip intra-dia controla a velocidade. O worker reforça o teto na hora do
+  envio (conta `sent` de campanha no dia do blog) — só confirmações furam o teto
+  (transacionais). Cinto e suspensório.
+- **Confirmação (double opt-in)**: o `/subscribe` da Fase 1 agora ENFILEIRA a
+  confirmação (`enqueueConfirmation`, sem SMTP no request — RNF-Perf-1); o worker
+  envia com o link `GET /api/newsletter/confirm?token=`.
+- **Descadastro** (RF5, adiantado da Fase 4 para não ter header mentiroso):
+  `GET /api/newsletter/unsubscribe?token=` (página, clique humano) +
+  `POST …?token=` (one-click RFC 8058, 204 sem redirect). Todo e-mail carrega o
+  link no corpo E os headers `List-Unsubscribe` + `List-Unsubscribe-Post`.
+- **Endpoints admin de campanha** (`newsletterAdmin.ts`, gate `settings.view`):
+  `GET/POST /campaigns`, `GET/PUT /campaigns/:id`, `POST /campaigns/:id/send`
+  (agora ou agendado), `POST /campaigns/:id/cancel`. Corpo sanitizado com o
+  `sanitizeIngestHtml` isomórfico antes de gravar. (UI TipTap = Fase 4.)
+- Local: `lib/db` `tsc -b` ✅, api-server typecheck ✅ + **240 testes** ✅
+  (8 novos: backoff + teto diário/timezone) + esbuild ✅.
+- **Pendente:** validação em prod na VPS (criar campanha → "Enviar agora" → fila
+  migra `pending→sent`; falha SMTP → `attempts`/`next_retry_at`/`dead`; teto:
+  cap baixo → `date(scheduled_at)` não passa do teto por dia).
 
 ## Modo atual
-**Execução — Fase 2 implementada, validação em prod pendente.** Rollout ainda só
+**Execução — Fase 3 implementada, validação em prod pendente.** Rollout ainda só
 no sp011 (blogs replicados seguem na imagem anterior). Próximo passo: deploy do
-`api`+`web` no sp011, validar a subaba (segredo encriptado + e-mail de teste),
-depois **Fase 3** (fila + worker + produtor + backoff + teto diário; e o disparo
-do e-mail de confirmação que a Fase 1 deixou stub).
+`api` no sp011 (só backend nesta fase — a UI de campanhas é da Fase 4), validar o
+motor por curl/SQL, depois **Fase 4** (UI de campanhas com TipTap, lista de
+inscritos + CSV, ponta a ponta do descadastro).

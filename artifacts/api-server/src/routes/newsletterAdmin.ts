@@ -13,14 +13,16 @@
  */
 
 import { Router } from "express";
-import { eq } from "drizzle-orm";
-import { db, usersTable } from "@workspace/db";
+import { and, count, desc, eq } from "drizzle-orm";
+import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
 import type { SiteSettings, NewsletterTemplate } from "../lib/store.js";
 import { sendEmail } from "../lib/mailer.js";
 import { getNewsletterSmtpConfig, renderNewsletterEmail } from "../lib/newsletter/email.js";
+import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
+import { startCampaignSend } from "../lib/newsletter/dispatch.js";
 
 const router = Router();
 
@@ -134,6 +136,123 @@ router.post("/test", async (req, res) => {
   } catch (e) {
     res.json({ ok: false, error: (e as Error).message });
   }
+});
+
+// ── Campanhas (Fase 3: motor exercitável por curl/SQL; UI TipTap na Fase 4) ───
+// O corpo (bodyHtml) é sanitizado ANTES de gravar (invariante do PRD; o mesmo
+// sanitizador isomórfico do ingest). O disparo real (fan-out + drip + teto) fica
+// no produtor `startCampaignSend`; o worker envia.
+
+function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string } {
+  const out: { subject?: string; bodyHtml?: string } = {};
+  if (typeof b["subject"]  === "string") out.subject  = (b["subject"] as string).trim().slice(0, 300);
+  if (typeof b["bodyHtml"] === "string") out.bodyHtml = sanitizeIngestHtml(b["bodyHtml"] as string);
+  return out;
+}
+
+function parseId(raw: string): number | null {
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+// GET /campaigns — lista (mais recentes primeiro).
+router.get("/campaigns", async (_req, res) => {
+  const rows = await db
+    .select()
+    .from(newsletterCampaignsTable)
+    .orderBy(desc(newsletterCampaignsTable.createdAt))
+    .limit(200);
+  res.json({ campaigns: rows });
+});
+
+// POST /campaigns — cria rascunho.
+router.post("/campaigns", async (req, res) => {
+  const input = parseCampaignInput((req.body ?? {}) as Record<string, unknown>);
+  if (!input.subject) { res.status(400).json({ ok: false, error: "Assunto obrigatório." }); return; }
+  const [row] = await db
+    .insert(newsletterCampaignsTable)
+    .values({ subject: input.subject, bodyHtml: input.bodyHtml ?? "", status: "draft" })
+    .returning();
+  res.json({ ok: true, campaign: row });
+});
+
+// GET /campaigns/:id — campanha + contagem da fila por status.
+router.get("/campaigns/:id", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ ok: false }); return; }
+  const queue = await db
+    .select({ status: newsletterSendQueueTable.status, count: count() })
+    .from(newsletterSendQueueTable)
+    .where(eq(newsletterSendQueueTable.campaignId, id))
+    .groupBy(newsletterSendQueueTable.status);
+  res.json({ campaign, queue });
+});
+
+// PUT /campaigns/:id — edita assunto/corpo (só rascunho/agendada).
+router.put("/campaigns/:id", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [existing] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!existing) { res.status(404).json({ ok: false }); return; }
+  if (existing.status !== "draft" && existing.status !== "scheduled") {
+    res.status(409).json({ ok: false, error: "Só rascunhos ou campanhas agendadas podem ser editados." });
+    return;
+  }
+  const input = parseCampaignInput((req.body ?? {}) as Record<string, unknown>);
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.subject !== undefined)  patch["subject"]  = input.subject;
+  if (input.bodyHtml !== undefined) patch["bodyHtml"] = input.bodyHtml;
+  await db.update(newsletterCampaignsTable).set(patch).where(eq(newsletterCampaignsTable.id, id));
+  const [row] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  res.json({ ok: true, campaign: row });
+});
+
+// POST /campaigns/:id/send — envia agora ou agenda (scheduledAt futuro).
+router.post("/campaigns/:id/send", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ ok: false }); return; }
+  if (campaign.status === "sent" || campaign.status === "sending" || campaign.status === "canceled") {
+    res.status(409).json({ ok: false, error: `Campanha já está '${campaign.status}'.` });
+    return;
+  }
+  if (!store.getSettings().newsletterEnabled) {
+    res.status(400).json({ ok: false, error: "A newsletter está desligada (Configurações → Ativar)." });
+    return;
+  }
+
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const rawWhen = typeof b["scheduledAt"] === "string" ? b["scheduledAt"] : null;
+  const when = rawWhen ? new Date(rawWhen) : null;
+  if (when && !Number.isNaN(when.getTime()) && when.getTime() > Date.now()) {
+    await db.update(newsletterCampaignsTable)
+      .set({ status: "scheduled", scheduledAt: when, updatedAt: new Date() })
+      .where(eq(newsletterCampaignsTable.id, id));
+    res.json({ ok: true, scheduled: true, scheduledAt: when.toISOString() });
+    return;
+  }
+
+  const recipients = await startCampaignSend(id, { firstAt: new Date() });
+  res.json({ ok: true, scheduled: false, recipients });
+});
+
+// POST /campaigns/:id/cancel — cancela (encerra as linhas pendentes da fila).
+router.post("/campaigns/:id/cancel", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ ok: false }); return; }
+  if (campaign.status === "sent") { res.status(409).json({ ok: false, error: "Campanha já foi enviada." }); return; }
+  await db.update(newsletterSendQueueTable)
+    .set({ status: "dead", lastError: "campanha cancelada" })
+    .where(and(eq(newsletterSendQueueTable.campaignId, id), eq(newsletterSendQueueTable.status, "pending")));
+  await db.update(newsletterCampaignsTable)
+    .set({ status: "canceled", updatedAt: new Date() })
+    .where(eq(newsletterCampaignsTable.id, id));
+  res.json({ ok: true });
 });
 
 export default router;

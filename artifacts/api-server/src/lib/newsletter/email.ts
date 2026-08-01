@@ -44,6 +44,24 @@ function senderName(s: SiteSettings): string {
   return (s.newsletterFromName || s.siteName || "Newsletter").trim();
 }
 
+/**
+ * Corpo (interno ao shell) do e-mail de double opt-in. O botão aponta para o
+ * GET /api/newsletter/confirm?token=… — a confirmação é o clique humano.
+ */
+export function confirmationBodyHtml(s: SiteSettings, confirmUrl: string): string {
+  const tpl: NewsletterTemplate = s.newsletterTemplate ?? {};
+  const accent = (tpl.accentColor || s.adminAccentColor || "#0B2A66").trim();
+  const site = (s.siteName || "nossa newsletter").trim();
+  return (
+    `<p style="margin:0 0 16px;">Recebemos um pedido para assinar a newsletter do <strong>${esc(site)}</strong>. ` +
+    `Para confirmar sua inscrição, clique no botão abaixo:</p>` +
+    `<p style="margin:0 0 20px;text-align:center;">` +
+    `<a href="${esc(confirmUrl)}" style="display:inline-block;background:${esc(accent)};color:#ffffff;text-decoration:none;font-weight:700;padding:13px 30px;border-radius:8px;font-size:15px;">Confirmar inscrição</a>` +
+    `</p>` +
+    `<p style="margin:0;color:#4A5568;font-size:13px;line-height:1.6;">Se você não fez este pedido, ignore este e-mail — nenhuma mensagem será enviada sem a confirmação.</p>`
+  );
+}
+
 interface RenderOpts {
   settings: SiteSettings;
   subject: string;
