@@ -82,6 +82,50 @@ export const adminApi = {
   updateNewsletterSettings: (settings: Partial<NewsletterSettings>) =>
     req<{ ok: boolean; settings: NewsletterSettings }>("PUT", "/newsletter/settings", settings),
   sendNewsletterTest: () => req<{ ok: boolean; to?: string; error?: string }>("POST", "/newsletter/test", {}),
+
+  // Newsletter — campanhas (Fase 4). O corpo (TipTap) é sanitizado no servidor.
+  listNewsletterCampaigns: () => req<{ campaigns: NewsletterCampaign[] }>("GET", "/newsletter/campaigns"),
+  getNewsletterCampaign: (id: number) =>
+    req<{ campaign: NewsletterCampaign; queue: NewsletterQueueStat[] }>("GET", `/newsletter/campaigns/${id}`),
+  createNewsletterCampaign: (data: { subject: string; bodyHtml: string }) =>
+    req<{ ok: boolean; campaign: NewsletterCampaign }>("POST", "/newsletter/campaigns", data),
+  updateNewsletterCampaign: (id: number, data: { subject?: string; bodyHtml?: string }) =>
+    req<{ ok: boolean; campaign: NewsletterCampaign }>("PUT", `/newsletter/campaigns/${id}`, data),
+  /** scheduledAt (ISO) no futuro = agenda; ausente/passado = envia agora. */
+  sendNewsletterCampaign: (id: number, scheduledAt?: string) =>
+    req<{ ok: boolean; scheduled: boolean; recipients?: number; scheduledAt?: string }>(
+      "POST", `/newsletter/campaigns/${id}/send`, scheduledAt ? { scheduledAt } : {},
+    ),
+  cancelNewsletterCampaign: (id: number) =>
+    req<{ ok: boolean; error?: string }>("POST", `/newsletter/campaigns/${id}/cancel`, {}),
+
+  // Newsletter — inscritos (Fase 4). CSV baixado por blob (auth Bearer, sem token na URL).
+  listNewsletterSubscribers: (params?: { status?: string; page?: number; q?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.status) qs.set("status", params.status);
+    if (params?.page)   qs.set("page", String(params.page));
+    if (params?.q)      qs.set("q", params.q);
+    const s = qs.toString();
+    return req<NewsletterSubscribersPage>("GET", `/newsletter/subscribers${s ? `?${s}` : ""}`);
+  },
+  downloadNewsletterSubscribersCsv: async (status?: string): Promise<void> => {
+    const token = getToken();
+    const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+    const res = await fetch(`${BASE}/newsletter/subscribers.csv${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("Falha ao exportar CSV.");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inscritos-${status ?? "todos"}-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
   updateMyProfile: (data: { name?: string; avatarBase64?: string | null; language?: string }) =>
     req<{ user: { id: number; name: string; email: string; role: string; avatarBase64?: string | null; language: string } }>("PUT", "/me", data),
 
@@ -457,6 +501,47 @@ export interface NewsletterSettings {
   newsletterReplyTo: string;
   newsletterDailyCap: number;
   newsletterTemplate: NewsletterTemplate;
+}
+
+export type NewsletterCampaignStatus =
+  | "draft" | "scheduled" | "sending" | "sent" | "failed" | "canceled";
+
+/** Campanha de newsletter (subaba Campanhas). Datas em ISO. */
+export interface NewsletterCampaign {
+  id: number;
+  subject: string;
+  bodyHtml: string;
+  status: NewsletterCampaignStatus;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  recipients: number;
+  sentCount: number;
+  failedCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Contagem da fila de envio por status (detalhe da campanha). */
+export interface NewsletterQueueStat { status: string; count: number; }
+
+/** Inscrito (subaba Inscritos). Só os campos necessários (privacidade). */
+export interface NewsletterSubscriber {
+  id: number;
+  email: string;
+  status: string;
+  source: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  unsubscribedAt: string | null;
+}
+
+/** Página de inscritos + total do filtro + contadores globais por status. */
+export interface NewsletterSubscribersPage {
+  subscribers: NewsletterSubscriber[];
+  page: number;
+  pageSize: number;
+  total: number;
+  counts: Record<string, number>;
 }
 
 /** Regra de retenção enviada às rotas de prévia/execução da limpeza. */

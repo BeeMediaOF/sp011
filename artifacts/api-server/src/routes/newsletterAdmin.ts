@@ -13,8 +13,8 @@
  */
 
 import { Router } from "express";
-import { and, count, desc, eq } from "drizzle-orm";
-import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable } from "@workspace/db";
+import { and, count, desc, eq, ilike, type SQL } from "drizzle-orm";
+import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable, newsletterSubscribersTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
@@ -254,6 +254,100 @@ router.post("/campaigns/:id/cancel", async (req, res) => {
     .set({ status: "canceled", updatedAt: new Date() })
     .where(eq(newsletterCampaignsTable.id, id));
   res.json({ ok: true });
+});
+
+// ── Inscritos (RF6: lista paginada + contadores + export CSV) ──────────────────
+const SUB_PAGE_SIZE = 50;
+const SUB_STATUSES = ["pending", "confirmed", "unsubscribed", "bounced", "complained"] as const;
+
+/** Célula CSV: aspas + escape, com guarda contra injeção de fórmula em planilha. */
+function csvCell(v: unknown): string {
+  let s = v == null ? "" : String(v);
+  if (/^[=+\-@]/.test(s)) s = "'" + s; // neutraliza =SUM(), +cmd, etc.
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function subStatusFilter(raw: unknown): string | null {
+  return typeof raw === "string" && (SUB_STATUSES as readonly string[]).includes(raw) ? raw : null;
+}
+
+// GET /subscribers?status=&page=&q= — página + total do filtro + contadores globais.
+router.get("/subscribers", async (req, res) => {
+  const status = subStatusFilter(req.query.status);
+  const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase().slice(0, 120) : "";
+  const page = Math.max(1, Math.floor(Number(req.query.page) || 1));
+
+  const filters: SQL[] = [];
+  if (status) filters.push(eq(newsletterSubscribersTable.status, status));
+  if (q) filters.push(ilike(newsletterSubscribersTable.email, `%${q}%`));
+  const where = filters.length ? and(...filters) : undefined;
+
+  const [rows, totRows, byStatus] = await Promise.all([
+    db.select({
+        id: newsletterSubscribersTable.id,
+        email: newsletterSubscribersTable.email,
+        status: newsletterSubscribersTable.status,
+        source: newsletterSubscribersTable.source,
+        createdAt: newsletterSubscribersTable.createdAt,
+        confirmedAt: newsletterSubscribersTable.confirmedAt,
+        unsubscribedAt: newsletterSubscribersTable.unsubscribedAt,
+      })
+      .from(newsletterSubscribersTable)
+      .where(where)
+      .orderBy(desc(newsletterSubscribersTable.createdAt))
+      .limit(SUB_PAGE_SIZE)
+      .offset((page - 1) * SUB_PAGE_SIZE),
+    db.select({ c: count() }).from(newsletterSubscribersTable).where(where),
+    db.select({ status: newsletterSubscribersTable.status, c: count() })
+      .from(newsletterSubscribersTable)
+      .groupBy(newsletterSubscribersTable.status),
+  ]);
+
+  const counts: Record<string, number> = { all: 0, pending: 0, confirmed: 0, unsubscribed: 0, bounced: 0, complained: 0 };
+  for (const r of byStatus) { counts[r.status] = Number(r.c); counts.all += Number(r.c); }
+
+  res.json({
+    subscribers: rows,
+    page,
+    pageSize: SUB_PAGE_SIZE,
+    total: Number(totRows[0]?.c ?? 0),
+    counts,
+  });
+});
+
+// GET /subscribers.csv?status= — export CSV (auth via Bearer no router). BOM p/ Excel.
+router.get("/subscribers.csv", async (req, res) => {
+  const status = subStatusFilter(req.query.status);
+  const where = status ? eq(newsletterSubscribersTable.status, status) : undefined;
+
+  const rows = await db.select({
+      email: newsletterSubscribersTable.email,
+      status: newsletterSubscribersTable.status,
+      source: newsletterSubscribersTable.source,
+      createdAt: newsletterSubscribersTable.createdAt,
+      confirmedAt: newsletterSubscribersTable.confirmedAt,
+      unsubscribedAt: newsletterSubscribersTable.unsubscribedAt,
+    })
+    .from(newsletterSubscribersTable)
+    .where(where)
+    .orderBy(desc(newsletterSubscribersTable.createdAt))
+    .limit(100_000);
+
+  const header = ["email", "status", "origem", "inscrito_em", "confirmado_em", "descadastrado_em"];
+  const lines = [header.map(csvCell).join(",")];
+  for (const r of rows) {
+    lines.push([
+      r.email, r.status, r.source ?? "",
+      r.createdAt ? r.createdAt.toISOString() : "",
+      r.confirmedAt ? r.confirmedAt.toISOString() : "",
+      r.unsubscribedAt ? r.unsubscribedAt.toISOString() : "",
+    ].map(csvCell).join(","));
+  }
+  const csv = String.fromCharCode(0xfeff) + lines.join("\r\n"); // BOM p/ acentos no Excel
+  const stamp = new Date().toISOString().slice(0, 10);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", `attachment; filename="inscritos-${status ?? "todos"}-${stamp}.csv"`);
+  res.send(csv);
 });
 
 export default router;

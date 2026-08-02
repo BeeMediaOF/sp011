@@ -7,8 +7,8 @@
 | Revisão pós-aprovação (POST one-click RFC 8058 + teto diário) | ✅ Aplicada | 2026-07-31 |
 | Execução — Fase interna 1 (captura + consentimento) | ✅ Validada em prod (VPS, sp011) | 2026-07-31 |
 | Execução — Fase interna 2 (admin: remetente + modelo) | ✅ Validada em prod (VPS, sp011) | 2026-08-01 |
-| Execução — Fase interna 3 (motor de disparo assíncrono) | 🟡 Implementada (local ok) — validação em prod pendente | 2026-08-01 |
-| Execução — Fase interna 4 (ponta a ponta) | ⬜ Pendente | — |
+| Execução — Fase interna 3 (motor de disparo assíncrono) | ✅ Validada em prod (VPS, sp011) | 2026-08-02 |
+| Execução — Fase interna 4 (ponta a ponta) | 🟡 Implementada (UI campanhas + inscritos, local ok) — validação em prod pendente | 2026-08-02 |
 | `RELATORIO-FINAL.md` (pós-implementação) | ⬜ Pendente | — |
 
 ## Decisões travadas (Fase 0)
@@ -98,13 +98,38 @@
   `sanitizeIngestHtml` isomórfico antes de gravar. (UI TipTap = Fase 4.)
 - Local: `lib/db` `tsc -b` ✅, api-server typecheck ✅ + **240 testes** ✅
   (8 novos: backoff + teto diário/timezone) + esbuild ✅.
-- **Pendente:** validação em prod na VPS (criar campanha → "Enviar agora" → fila
-  migra `pending→sent`; falha SMTP → `attempts`/`next_retry_at`/`dead`; teto:
-  cap baixo → `date(scheduled_at)` não passa do teto por dia).
+- **Validado em prod (VPS sp011, 2026-08-02):** confirmação (double opt-in)
+  chegou na Principal do Gmail e o clique marcou `confirmed`. O ajuste
+  transacional (commit `6d6331c`) tirou a confirmação da aba "Gerenciar
+  inscrições". Motor de fila/worker/backoff no ar.
+
+## Fase 4 — o que entrou (2026-08-02)
+- **Subaba Campanhas** (`Newsletter.tsx`): lista de campanhas (assunto/status/
+  envio/data), **editor TipTap** reaproveitando o `RichTextEditor` do artigo
+  (upload de imagem via `/api/uploads/image`), ações **Salvar rascunho**,
+  **Enviar agora** (confirmação) e **Agendar** (datetime-local → ISO), além de
+  **Cancelar**. Campanhas já disparadas viram visualização read-only com o
+  **progresso da fila** (na fila/enviando/enviados/falharam/descartados) lido de
+  `GET /campaigns/:id`.
+- **Subaba Inscritos** (RF6): lista paginada (50/pág.), **filtro por status**
+  com contadores (Todos/Confirmados/Pendentes/Descadastrados), **busca por
+  e-mail** (debounce), e **export CSV** por blob (auth Bearer, sem token na URL;
+  BOM p/ acentos no Excel; guarda contra injeção de fórmula).
+- **Backend novo** (`newsletterAdmin.ts`, gate `settings.view`):
+  `GET /subscribers?status=&page=&q=` (página + total do filtro + contadores
+  globais) e `GET /subscribers.csv?status=`.
+- **Imagens em campanha**: `dispatch.ts` absolutiza URLs root-relativas
+  (`src`/`href="/…"`) do corpo com a base pública do blog antes de compor o
+  e-mail (imagem relativa não resolve em cliente de e-mail).
+- Helpers/tipos no `adminApi.ts` (campanhas + inscritos + `downloadNewsletterSubscribersCsv`).
+- Local: api-server typecheck ✅ + **240 testes** ✅ + esbuild ✅; frontend
+  typecheck ✅.
+- **Pendente:** validação em prod (criar campanha → enviar → recebida →
+  descadastro pelo link visível **e** one-click do Gmail/Yahoo); export CSV;
+  teto diário com cap baixo. Depois: `RELATORIO-FINAL.md` e rollout da rede.
 
 ## Modo atual
-**Execução — Fase 3 implementada, validação em prod pendente.** Rollout ainda só
-no sp011 (blogs replicados seguem na imagem anterior). Próximo passo: deploy do
-`api` no sp011 (só backend nesta fase — a UI de campanhas é da Fase 4), validar o
-motor por curl/SQL, depois **Fase 4** (UI de campanhas com TipTap, lista de
-inscritos + CSV, ponta a ponta do descadastro).
+**Execução — Fase 4 implementada (UI de campanhas + inscritos), validação em
+prod pendente.** Rollout ainda só no sp011 (blogs replicados seguem na imagem
+anterior). Próximo passo: deploy de `api` **e** `web` no sp011, validar ponta a
+ponta por curl/SQL, escrever o `RELATORIO-FINAL.md` e planejar o rollout da rede.

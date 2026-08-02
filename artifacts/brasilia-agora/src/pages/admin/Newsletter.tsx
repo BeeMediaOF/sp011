@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Mail, Users, Send, Settings as SettingsIcon, Save, TestTube2,
-  Loader2, CheckCircle, AlertCircle, Info,
+  Loader2, CheckCircle, AlertCircle, Plus, ArrowLeft, Clock, Calendar,
+  Download, Search, ChevronLeft, ChevronRight, Ban, RefreshCw,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
-import { adminApi, type NewsletterSettings } from "../../lib/adminApi";
+import RichTextEditor from "@/components/admin/RichTextEditor";
+import {
+  adminApi,
+  type NewsletterSettings, type NewsletterCampaign, type NewsletterCampaignStatus,
+  type NewsletterQueueStat, type NewsletterSubscribersPage,
+} from "../../lib/adminApi";
 
 // ─── Subabas ────────────────────────────────────────────────────────────────
 type Tab = "subscribers" | "campaigns" | "config";
@@ -35,6 +41,10 @@ const inputCls =
   "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 " +
   "placeholder:text-slate-400 dark:placeholder:text-slate-500";
 const labelCls = "block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1";
+const btnPrimary =
+  "inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-60 transition-colors";
+const btnGhost =
+  "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -44,6 +54,25 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500">{hint}</p>}
     </div>
   );
+}
+
+function Banner({ msg }: { msg: { type: "ok" | "err"; text: string } | null }) {
+  if (!msg) return null;
+  return (
+    <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${
+      msg.type === "ok"
+        ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
+        : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300"}`}>
+      {msg.type === "ok" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+      {msg.text}
+    </div>
+  );
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
 // ─── Aba Configurações ────────────────────────────────────────────────────────
@@ -103,15 +132,7 @@ function ConfigTab() {
 
   return (
     <div className="max-w-3xl space-y-6">
-      {msg && (
-        <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm ${
-          msg.type === "ok"
-            ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300"
-            : "bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-300"}`}>
-          {msg.type === "ok" ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-          {msg.text}
-        </div>
-      )}
+      <Banner msg={msg} />
 
       {/* Liga/desliga */}
       <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
@@ -184,8 +205,7 @@ function ConfigTab() {
 
       {/* Ações */}
       <div className="flex flex-wrap gap-3">
-        <button onClick={save} disabled={saving || testing}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold hover:bg-[#0a2255] disabled:opacity-60 transition-colors">
+        <button onClick={save} disabled={saving || testing} className={btnPrimary}>
           {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar
         </button>
         <button onClick={test} disabled={saving || testing}
@@ -197,13 +217,439 @@ function ConfigTab() {
   );
 }
 
-// ─── Placeholder das abas das próximas fases ──────────────────────────────────
-function ComingSoon({ title, desc }: { title: string; desc: string }) {
+// ─── Aba Campanhas ────────────────────────────────────────────────────────────
+const CAMPAIGN_STATUS: Record<NewsletterCampaignStatus, { label: string; cls: string }> = {
+  draft:     { label: "Rascunho",  cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
+  scheduled: { label: "Agendada",  cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
+  sending:   { label: "Enviando",  cls: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" },
+  sent:      { label: "Enviada",   cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
+  failed:    { label: "Falhou",    cls: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
+  canceled:  { label: "Cancelada", cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" },
+};
+
+function StatusPill({ status }: { status: NewsletterCampaignStatus }) {
+  const s = CAMPAIGN_STATUS[status] ?? CAMPAIGN_STATUS.draft;
+  return <span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${s.cls}`}>{s.label}</span>;
+}
+
+const QUEUE_LABEL: Record<string, string> = {
+  pending: "Na fila", sending: "Enviando", sent: "Enviados", failed: "Falharam", dead: "Descartados",
+};
+
+function toLocalInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Editor/visualização de uma campanha. `campaign` null = nova. */
+function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | null; onClose: (changed: boolean) => void }) {
+  const editable = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
+  const [subject, setSubject] = useState(campaign?.subject ?? "");
+  const [body, setBody] = useState(campaign?.bodyHtml ?? "");
+  const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel">(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [queue, setQueue] = useState<NewsletterQueueStat[] | null>(null);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const changedRef = useRef(false);
+
+  // Detalhe (fila) só faz sentido depois de disparada.
+  useEffect(() => {
+    if (!campaign || editable) return;
+    let alive = true;
+    adminApi.getNewsletterCampaign(campaign.id)
+      .then((r) => { if (alive) setQueue(r.queue); })
+      .catch(() => { /* silencioso */ });
+    return () => { alive = false; };
+  }, [campaign, editable]);
+
+  function validate(): boolean {
+    if (!subject.trim()) { setMsg({ type: "err", text: "Informe o assunto da campanha." }); return false; }
+    if (!body.replace(/<[^>]+>/g, "").trim()) { setMsg({ type: "err", text: "O corpo da campanha está vazio." }); return false; }
+    return true;
+  }
+
+  /** Cria (se nova) ou atualiza (se rascunho/agendada) e devolve o id. */
+  async function persist(): Promise<number> {
+    if (campaign?.id) {
+      await adminApi.updateNewsletterCampaign(campaign.id, { subject: subject.trim(), bodyHtml: body });
+      changedRef.current = true;
+      return campaign.id;
+    }
+    const r = await adminApi.createNewsletterCampaign({ subject: subject.trim(), bodyHtml: body });
+    changedRef.current = true;
+    return r.campaign.id;
+  }
+
+  async function saveDraft() {
+    if (!validate()) return;
+    setBusy("save"); setMsg(null);
+    try { await persist(); setMsg({ type: "ok", text: "Rascunho salvo." }); }
+    catch (e) { setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao salvar." }); }
+    finally { setBusy(null); }
+  }
+
+  async function sendNow() {
+    if (!validate()) return;
+    if (!window.confirm("Enviar esta campanha agora para todos os inscritos confirmados?")) return;
+    setBusy("send"); setMsg(null);
+    try {
+      const id = await persist();
+      const r = await adminApi.sendNewsletterCampaign(id);
+      if (r.ok) { onClose(true); return; }
+      setMsg({ type: "err", text: "Não foi possível enviar." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao enviar." });
+    } finally { setBusy(null); }
+  }
+
+  async function schedule() {
+    if (!validate()) return;
+    const dt = new Date(when);
+    if (Number.isNaN(dt.getTime()) || dt.getTime() <= Date.now()) {
+      setMsg({ type: "err", text: "Escolha uma data/hora no futuro." }); return;
+    }
+    setBusy("schedule"); setMsg(null);
+    try {
+      const id = await persist();
+      const r = await adminApi.sendNewsletterCampaign(id, dt.toISOString());
+      if (r.ok) { onClose(true); return; }
+      setMsg({ type: "err", text: "Não foi possível agendar." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao agendar." });
+    } finally { setBusy(null); }
+  }
+
+  async function cancel() {
+    if (!campaign) return;
+    if (!window.confirm("Cancelar esta campanha? Os envios ainda na fila serão interrompidos.")) return;
+    setBusy("cancel"); setMsg(null);
+    try {
+      const r = await adminApi.cancelNewsletterCampaign(campaign.id);
+      if (r.ok) { onClose(true); return; }
+      setMsg({ type: "err", text: r.error ?? "Não foi possível cancelar." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao cancelar." });
+    } finally { setBusy(null); }
+  }
+
+  const canCancel = campaign && campaign.status !== "sent" && campaign.status !== "canceled";
+
   return (
-    <div className="max-w-xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center">
-      <Info size={22} className="mx-auto text-slate-400 mb-3" />
-      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{title}</p>
-      <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">{desc}</p>
+    <div className="max-w-3xl space-y-5">
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
+          <ArrowLeft size={15} /> Voltar
+        </button>
+        {campaign && <StatusPill status={campaign.status} />}
+      </div>
+
+      <Banner msg={msg} />
+
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
+        <Field label="Assunto">
+          <input className={inputCls} value={subject} disabled={!editable}
+            onChange={(e) => setSubject(e.target.value)} placeholder="Assunto do e-mail" maxLength={300} />
+        </Field>
+
+        <div>
+          <label className={labelCls}>Conteúdo</label>
+          {editable ? (
+            <RichTextEditor
+              value={body}
+              onChange={setBody}
+              placeholder="Escreva o conteúdo da newsletter…"
+              onUploadFile={async (file) => {
+                const r = await adminApi.uploadImage(file, subject || "newsletter");
+                return { url: r.url, mediaType: "image" as const };
+              }}
+            />
+          ) : (
+            <div className="prose-editor border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm bg-white dark:bg-slate-900 max-h-[420px] overflow-auto"
+              dangerouslySetInnerHTML={{ __html: body || "<p class='text-slate-400'>(sem conteúdo)</p>" }} />
+          )}
+          <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+            A moldura de marca e o rodapé de descadastro são adicionados automaticamente ao enviar.
+          </p>
+        </div>
+      </div>
+
+      {/* Estatísticas da fila (campanhas já disparadas) */}
+      {campaign && !editable && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Progresso do envio</h3>
+            <span className="text-[12px] text-slate-500 dark:text-slate-400">
+              {campaign.recipients} destinatário(s) · disparada {fmtDate(campaign.sentAt ?? campaign.updatedAt)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {(["pending", "sending", "sent", "failed", "dead"] as const).map((k) => {
+              const n = queue?.find((q) => q.status === k)?.count ?? 0;
+              return (
+                <div key={k} className="rounded-xl bg-slate-50 dark:bg-slate-800 px-3 py-2 text-center">
+                  <p className="text-lg font-bold text-slate-800 dark:text-slate-100 tabular-nums">{n}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{QUEUE_LABEL[k]}</p>
+                </div>
+              );
+            })}
+          </div>
+          {queue === null && <p className="text-[12px] text-slate-400 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Carregando fila…</p>}
+        </div>
+      )}
+
+      {/* Agendamento */}
+      {editable && showSchedule && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
+          <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300 flex items-center gap-2"><Calendar size={15} /> Agendar envio</h3>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className={labelCls}>Data e hora</label>
+              <input type="datetime-local" className={inputCls} value={when} min={toLocalInput(new Date())} onChange={(e) => setWhen(e.target.value)} />
+            </div>
+            <button onClick={schedule} disabled={busy !== null} className={btnPrimary}>
+              {busy === "schedule" ? <Loader2 size={15} className="animate-spin" /> : <Clock size={15} />} Confirmar agendamento
+            </button>
+          </div>
+          <p className="text-[11px] text-slate-400 dark:text-slate-500">O horário segue o fuso do seu navegador.</p>
+        </div>
+      )}
+
+      {/* Ações */}
+      <div className="flex flex-wrap gap-3">
+        {editable && (
+          <>
+            <button onClick={saveDraft} disabled={busy !== null} className={btnGhost}>
+              {busy === "save" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar rascunho
+            </button>
+            <button onClick={sendNow} disabled={busy !== null} className={btnPrimary}>
+              {busy === "send" ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar agora
+            </button>
+            <button onClick={() => setShowSchedule((v) => !v)} disabled={busy !== null} className={btnGhost}>
+              <Calendar size={15} /> {showSchedule ? "Ocultar agendamento" : "Agendar"}
+            </button>
+          </>
+        )}
+        {canCancel && (
+          <button onClick={cancel} disabled={busy !== null}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 transition-colors">
+            {busy === "cancel" ? <Loader2 size={15} className="animate-spin" /> : <Ban size={15} />} Cancelar campanha
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CampaignsTab() {
+  const [campaigns, setCampaigns] = useState<NewsletterCampaign[] | null>(null);
+  const [editing, setEditing] = useState<{ campaign: NewsletterCampaign | null } | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const load = useCallback(() => {
+    setCampaigns(null);
+    adminApi.listNewsletterCampaigns()
+      .then((r) => setCampaigns(r.campaigns))
+      .catch((e) => { setCampaigns([]); setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao carregar." }); });
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (editing) {
+    return (
+      <CampaignEditor
+        campaign={editing.campaign}
+        onClose={(changed) => { setEditing(null); if (changed) load(); }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Banner msg={msg} />
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={load} className={btnGhost} title="Recarregar">
+            <RefreshCw size={15} /> Atualizar
+          </button>
+          <button type="button" onClick={() => setEditing({ campaign: null })} className={btnPrimary}>
+            <Plus size={15} /> Nova campanha
+          </button>
+        </div>
+      </div>
+
+      {campaigns === null ? (
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10"><Loader2 size={16} className="animate-spin" /> Carregando…</div>
+      ) : campaigns.length === 0 ? (
+        <div className="max-w-xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center">
+          <Send size={22} className="mx-auto text-slate-400 mb-3" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Nenhuma campanha ainda</p>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Crie a primeira e envie agora ou agende para depois.</p>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400">
+              <tr className="text-left">
+                <th className="px-4 py-3 font-semibold">Assunto</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold hidden sm:table-cell">Envio</th>
+                <th className="px-4 py-3 font-semibold hidden md:table-cell">Data</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaigns.map((c) => (
+                <tr key={c.id}
+                  onClick={() => setEditing({ campaign: c })}
+                  className="border-t border-slate-100 dark:border-slate-800 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-slate-800 dark:text-slate-100 line-clamp-1">{c.subject || "(sem assunto)"}</p>
+                  </td>
+                  <td className="px-4 py-3"><StatusPill status={c.status} /></td>
+                  <td className="px-4 py-3 hidden sm:table-cell text-slate-600 dark:text-slate-300 tabular-nums">
+                    {c.status === "draft" ? "—" : (
+                      <>{c.sentCount}/{c.recipients}{c.failedCount > 0 && <span className="text-red-500"> · {c.failedCount} falha(s)</span>}</>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 dark:text-slate-400 text-[13px]">
+                    {c.status === "scheduled" ? `⏰ ${fmtDate(c.scheduledAt)}` : fmtDate(c.sentAt ?? c.createdAt)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Aba Inscritos ────────────────────────────────────────────────────────────
+const SUB_STATUS: Record<string, { label: string; cls: string }> = {
+  pending:      { label: "Pendente",      cls: "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" },
+  confirmed:    { label: "Confirmado",    cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" },
+  unsubscribed: { label: "Descadastrado", cls: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400" },
+  bounced:      { label: "Rejeitado",     cls: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
+  complained:   { label: "Reclamou",      cls: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" },
+};
+const SOURCE_LABEL: Record<string, string> = { footer: "Rodapé", home_block: "Home" };
+const FILTERS: { id: string; label: string; countKey: string }[] = [
+  { id: "",             label: "Todos",         countKey: "all" },
+  { id: "confirmed",    label: "Confirmados",   countKey: "confirmed" },
+  { id: "pending",      label: "Pendentes",     countKey: "pending" },
+  { id: "unsubscribed", label: "Descadastrados", countKey: "unsubscribed" },
+];
+
+function SubscribersTab() {
+  const [status, setStatus] = useState("");
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const [data, setData] = useState<NewsletterSubscribersPage | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Busca com debounce; recarrega ao mudar filtro/página/termo.
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    const h = setTimeout(() => {
+      adminApi.listNewsletterSubscribers({ status: status || undefined, page, q: q || undefined })
+        .then((r) => { if (alive) setData(r); })
+        .catch((e) => { if (alive) setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao carregar." }); })
+        .finally(() => { if (alive) setLoading(false); });
+    }, q ? 300 : 0);
+    return () => { alive = false; clearTimeout(h); };
+  }, [status, page, q]);
+
+  async function exportCsv() {
+    setExporting(true); setMsg(null);
+    try { await adminApi.downloadNewsletterSubscribersCsv(status || undefined); }
+    catch (e) { setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao exportar." }); }
+    finally { setExporting(false); }
+  }
+
+  const counts = data?.counts ?? {};
+  const total = data?.total ?? 0;
+  const pageSize = data?.pageSize ?? 50;
+  const maxPage = Math.max(1, Math.ceil(total / pageSize));
+
+  return (
+    <div className="space-y-4">
+      <Banner msg={msg} />
+
+      {/* Filtros por status + busca + export */}
+      <div className="flex flex-wrap items-center gap-2">
+        {FILTERS.map((f) => (
+          <button key={f.id} type="button"
+            onClick={() => { setStatus(f.id); setPage(1); }}
+            className={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors ${
+              status === f.id
+                ? "bg-[#0B2A66] text-white"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"}`}>
+            {f.label}<span className="ml-1.5 opacity-70 tabular-nums">{counts[f.countKey] ?? 0}</span>
+          </button>
+        ))}
+        <div className="ml-auto flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className={`${inputCls} pl-8 w-56`}
+              placeholder="Buscar e-mail…"
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setPage(1); }}
+            />
+          </div>
+          <button type="button" onClick={exportCsv} disabled={exporting} className={btnGhost}>
+            {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} CSV
+          </button>
+        </div>
+      </div>
+
+      {/* Tabela */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-500 dark:text-slate-400">
+            <tr className="text-left">
+              <th className="px-4 py-3 font-semibold">E-mail</th>
+              <th className="px-4 py-3 font-semibold">Status</th>
+              <th className="px-4 py-3 font-semibold hidden sm:table-cell">Origem</th>
+              <th className="px-4 py-3 font-semibold hidden md:table-cell">Inscrito em</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading && !data ? (
+              <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400"><Loader2 size={16} className="animate-spin inline mr-2" /> Carregando…</td></tr>
+            ) : (data?.subscribers.length ?? 0) === 0 ? (
+              <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400 text-[13px]">Nenhum inscrito encontrado.</td></tr>
+            ) : (
+              data!.subscribers.map((sub) => {
+                const st = SUB_STATUS[sub.status] ?? { label: sub.status, cls: "bg-slate-100 text-slate-500" };
+                return (
+                  <tr key={sub.id} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="px-4 py-3 text-slate-800 dark:text-slate-100 font-medium">{sub.email}</td>
+                    <td className="px-4 py-3"><span className={`inline-block px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${st.cls}`}>{st.label}</span></td>
+                    <td className="px-4 py-3 hidden sm:table-cell text-slate-500 dark:text-slate-400">{sub.source ? (SOURCE_LABEL[sub.source] ?? sub.source) : "—"}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 dark:text-slate-400 text-[13px]">{fmtDate(sub.createdAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Paginação */}
+      <div className="flex items-center justify-between text-[13px] text-slate-500 dark:text-slate-400">
+        <span>{total} inscrito(s){status ? ` · ${SUB_STATUS[status]?.label ?? status}` : ""}</span>
+        <div className="flex items-center gap-2">
+          <button type="button" disabled={page <= 1 || loading} onClick={() => setPage((p) => Math.max(1, p - 1))}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"><ChevronLeft size={15} /></button>
+          <span className="tabular-nums">{page} / {maxPage}</span>
+          <button type="button" disabled={page >= maxPage || loading} onClick={() => setPage((p) => p + 1)}
+            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 disabled:opacity-40 hover:bg-slate-50 dark:hover:bg-slate-800"><ChevronRight size={15} /></button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -231,8 +677,8 @@ export default function Newsletter() {
         {/* ConfigTab fica sempre montado (só escondido) para não perder o
             formulário não-salvo — inclusive o toggle — ao trocar de subaba. */}
         <div className={tab === "config" ? "" : "hidden"}><ConfigTab /></div>
-        {tab === "subscribers" && <ComingSoon title="Lista de inscritos" desc="A gestão de inscritos e a exportação CSV chegam na etapa final da newsletter." />}
-        {tab === "campaigns" && <ComingSoon title="Campanhas" desc="O editor de campanhas (TipTap) e o envio manual/agendado chegam na etapa final; o motor de disparo já está no ar." />}
+        {tab === "subscribers" && <SubscribersTab />}
+        {tab === "campaigns" && <CampaignsTab />}
       </div>
     </AdminLayout>
   );

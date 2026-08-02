@@ -202,6 +202,17 @@ async function ensureUnsubToken(subId: number, current: string | null): Promise<
 type SubscriberRow = typeof newsletterSubscribersTable.$inferSelect;
 
 /**
+ * Reescreve URLs root-relativas (`src`/`href="/…"`) do corpo da campanha para
+ * absolutas usando a base pública do blog — imagens e links relativos NÃO
+ * resolvem num cliente de e-mail. Protocol-relative (`//host`) e absolutas
+ * (`http`, `mailto`, `data:`) passam intactas.
+ */
+function absolutizeHtml(html: string, base: string): string {
+  const b = base.replace(/\/+$/, "");
+  return html.replace(/(\b(?:src|href)=")\/(?!\/)/gi, `$1${b}/`);
+}
+
+/**
  * Monta a mensagem de uma linha da fila, ou `null` se a linha deve ser
  * DESCARTADA sem envio (supressão/estado inválido) — o chamador aplica o
  * término não-retriável.
@@ -252,7 +263,7 @@ async function buildMessage(
   const { html, text } = renderNewsletterEmail({
     settings: s,
     subject: campaign.subject,
-    bodyHtml: campaign.bodyHtml,
+    bodyHtml: absolutizeHtml(campaign.bodyHtml, base),
     unsubscribeUrl,
   });
   const headers: Record<string, string> = {
