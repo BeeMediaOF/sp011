@@ -157,13 +157,24 @@ export interface HomeTemplate {
 }
 
 /** Modelo (shell) do e-mail da newsletter — cabeçalho/rodapé de marca que
- *  envolve o corpo de cada campanha (PRD-NEWSLETTER-01 RF3). */
+ *  envolve o corpo de cada campanha (PRD-NEWSLETTER-01 RF3). Cores vazias
+ *  herdam o default do shell (`email.ts`). */
 export interface NewsletterTemplate {
-  /** Cor de destaque (cabeçalho/botões). Vazio = usa a cor de acento do site. */
+  /** Cor de destaque (barra do cabeçalho / botão de CTA / link de descadastro).
+   *  Vazio = usa a cor de acento do site. */
   accentColor?: string;
-  /** "wordmark" = nome do site no topo; "none" = sem cabeçalho de marca. */
-  logoMode?: "wordmark" | "none";
+  /** "wordmark" = nome do site no topo; "image" = logo enviada; "none" = sem
+   *  cabeçalho de marca. */
+  logoMode?: "wordmark" | "none" | "image";
+  /** URL da logo (quando logoMode="image"). Root-relativa vira absoluta no e-mail. */
+  logoUrl?: string;
   headerText?: string;
+  /** Cor do texto/logo textual do cabeçalho. Vazio = branco. */
+  headerTextColor?: string;
+  /** Fundo da página do e-mail (fora do cartão). Vazio = cinza claro. */
+  pageBgColor?: string;
+  /** Cor do texto do corpo. Vazio = quase-preto. */
+  bodyTextColor?: string;
   footerText?: string;
   signature?: string;
 }

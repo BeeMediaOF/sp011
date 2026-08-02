@@ -23,6 +23,7 @@ import { sendEmail } from "../lib/mailer.js";
 import { getNewsletterSmtpConfig, renderNewsletterEmail } from "../lib/newsletter/email.js";
 import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
 import { startCampaignSend } from "../lib/newsletter/dispatch.js";
+import { getPublicBase } from "../lib/social/queueProcessor.js";
 
 const router = Router();
 
@@ -36,7 +37,11 @@ const MASK = "••••••••";
 const DEFAULT_TEMPLATE: Required<NewsletterTemplate> = {
   accentColor: "",
   logoMode: "wordmark",
+  logoUrl: "",
   headerText: "",
+  headerTextColor: "",
+  pageBgColor: "",
+  bodyTextColor: "",
   footerText: "",
   signature: "",
 };
@@ -64,11 +69,19 @@ function sanitizeTemplate(input: unknown): NewsletterTemplate {
   const t = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const str = (v: unknown, max: number): string | undefined =>
     typeof v === "string" ? v.slice(0, max) : undefined;
-  const out: NewsletterTemplate = {
-    logoMode: t["logoMode"] === "none" ? "none" : "wordmark",
+  const color = (v: unknown): string => {
+    const c = typeof v === "string" ? v.trim() : "";
+    return c && HEX_RE.test(c) ? c : ""; // "" = herda o default do shell
   };
-  const accent = typeof t["accentColor"] === "string" ? t["accentColor"].trim() : "";
-  out.accentColor = accent && HEX_RE.test(accent) ? accent : "";
+  const out: NewsletterTemplate = {
+    logoMode: t["logoMode"] === "none" ? "none" : t["logoMode"] === "image" ? "image" : "wordmark",
+  };
+  out.accentColor     = color(t["accentColor"]);
+  out.headerTextColor = color(t["headerTextColor"]);
+  out.pageBgColor     = color(t["pageBgColor"]);
+  out.bodyTextColor   = color(t["bodyTextColor"]);
+  const logoUrl = typeof t["logoUrl"] === "string" ? t["logoUrl"].trim().slice(0, 500) : "";
+  out.logoUrl = /^(\/|https?:\/\/)/i.test(logoUrl) ? logoUrl : ""; // só root-relativa ou http(s)
   const header = str(t["headerText"], 120);   if (header !== undefined) out.headerText = header;
   const footer = str(t["footerText"], 1000);  if (footer !== undefined) out.footerText = footer;
   const sign   = str(t["signature"], 1000);   if (sign   !== undefined) out.signature   = sign;
@@ -126,6 +139,7 @@ router.post("/test", async (req, res) => {
       `<p style="margin:0 0 12px;">Se você recebeu este e-mail, o remetente do <strong>${s.siteName}</strong> está configurado corretamente e pronto para enviar a newsletter.</p>` +
       `<p style="margin:0;color:#4A5568;font-size:13px;">Servidor: ${s.newsletterSmtpHost || "smtp.gmail.com"}:${s.newsletterSmtpPort || 587} &middot; enviado para ${to}.</p>`,
     footerNote: "E-mail de teste de configuração — nenhuma ação necessária.",
+    baseUrl: getPublicBase() ?? undefined,
   });
 
   const headers: Record<string, string> = {};
@@ -137,6 +151,37 @@ router.post("/test", async (req, res) => {
   } catch (e) {
     res.json({ ok: false, error: (e as Error).message });
   }
+});
+
+// ── POST /preview — compõe o shell com corpo de exemplo (prévia ao vivo) ──────
+// Usa a MESMA função que compõe o e-mail real (fonte única) → a prévia é fiel.
+// Mescla o template enviado (ainda não salvo) sobre as settings atuais.
+router.post("/preview", (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const s = store.getSettings();
+  const tpl = sanitizeTemplate(b["newsletterTemplate"]);
+  const fromName = typeof b["fromName"] === "string" ? b["fromName"].trim().slice(0, 120) : undefined;
+  const merged: SiteSettings = {
+    ...s,
+    newsletterFromName: fromName ?? s.newsletterFromName,
+    newsletterTemplate: { ...(s.newsletterTemplate ?? {}), ...tpl },
+  };
+  const base = getPublicBase() ?? "";
+  const sampleBody =
+    `<h2 style="margin:0 0 12px;font-size:20px;">Título da matéria</h2>` +
+    `<p style="margin:0 0 14px;">Assim o corpo da sua campanha aparece dentro da moldura de marca. ` +
+    `O conteúdo você escreve no editor da aba <strong>Campanhas</strong>.</p>` +
+    `<p style="margin:0 0 14px;">Mais um parágrafo com um <a href="#">link de exemplo</a> para você ver o espaçamento e as cores.</p>` +
+    `<p style="margin:0;">Abraços,<br/>Equipe.</p>`;
+  const { html } = renderNewsletterEmail({
+    settings: merged,
+    subject: "Prévia da newsletter",
+    bodyHtml: sampleBody,
+    unsubscribeUrl: `${base}/api/newsletter/unsubscribe?token=exemplo`,
+    baseUrl: base || undefined,
+    previewText: "Prévia do modelo de e-mail",
+  });
+  res.json({ html });
 });
 
 // ── Campanhas (Fase 3: motor exercitável por curl/SQL; UI TipTap na Fase 4) ───

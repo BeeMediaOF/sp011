@@ -242,6 +242,7 @@ async function buildMessage(
       settings: s,
       subject,
       bodyHtml: confirmationBodyHtml(s, confirmUrl),
+      baseUrl: base,
     });
     const headers: Record<string, string> = {};
     if (replyTo) headers["Reply-To"] = replyTo;
@@ -265,6 +266,7 @@ async function buildMessage(
     subject: campaign.subject,
     bodyHtml: absolutizeHtml(campaign.bodyHtml, base),
     unsubscribeUrl,
+    baseUrl: base,
   });
   const headers: Record<string, string> = {
     "List-Unsubscribe": `<${unsubscribeUrl}>`,

@@ -122,6 +122,13 @@
   (`src`/`href="/…"`) do corpo com a base pública do blog antes de compor o
   e-mail (imagem relativa não resolve em cliente de e-mail).
 - Helpers/tipos no `adminApi.ts` (campanhas + inscritos + `downloadNewsletterSubscribersCsv`).
+- **Modelo do e-mail editável + prévia ao vivo**: o shell (`email.ts`) ganhou
+  cor do texto do cabeçalho, fundo da página, cor do corpo e **logo por imagem**
+  (`logoMode:"image"`+`logoUrl`, absolutizada com a base pública). Rota
+  `POST /newsletter/preview` compõe o shell com um corpo de exemplo usando a
+  MESMA `renderNewsletterEmail` (fonte única → prévia fiel); a subaba
+  Configurações mostra a prévia num `<iframe sandbox>` que atualiza com debounce
+  conforme se edita. Segredo nenhum novo; template segue redigido do `/api/site`.
 - Local: api-server typecheck ✅ + **240 testes** ✅ + esbuild ✅; frontend
   typecheck ✅.
 - **Pendente:** validação em prod (criar campanha → enviar → recebida →

@@ -76,6 +76,18 @@ interface RenderOpts {
   footerNote?: string;
   /** Texto de pré-visualização (preheader) escondido no topo. */
   previewText?: string;
+  /** Base pública do blog — usada para absolutizar a logo root-relativa. */
+  baseUrl?: string;
+}
+
+/** Torna absoluta uma URL root-relativa (`/…`) usando a base; deixa http(s)/
+ *  protocol-relative/data: intactas. */
+function absUrl(u: string | undefined, base?: string): string | undefined {
+  const s = (u || "").trim();
+  if (!s) return undefined;
+  if (/^https?:\/\//i.test(s) || s.startsWith("//") || s.startsWith("data:")) return s;
+  if (s.startsWith("/") && base) return base.replace(/\/+$/, "") + s;
+  return s;
 }
 
 /**
@@ -84,10 +96,15 @@ interface RenderOpts {
  * parametrizada por blog (cores/nome das settings, NÃO de BRAND).
  */
 export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: string } {
-  const { settings: s, subject, bodyHtml, unsubscribeUrl, footerNote, previewText } = opts;
+  const { settings: s, subject, bodyHtml, unsubscribeUrl, footerNote, previewText, baseUrl } = opts;
   const tpl: NewsletterTemplate = s.newsletterTemplate ?? {};
   const accent = (tpl.accentColor || s.adminAccentColor || "#0B2A66").trim();
-  const showHeader = tpl.logoMode !== "none";
+  const headerTextColor = (tpl.headerTextColor || "#ffffff").trim();
+  const pageBg = (tpl.pageBgColor || "#F0F4F8").trim();
+  const bodyColor = (tpl.bodyTextColor || "#1A202C").trim();
+  const logoMode = tpl.logoMode ?? "wordmark";
+  const showHeader = logoMode !== "none";
+  const logoSrc = logoMode === "image" ? absUrl(tpl.logoUrl, baseUrl) : undefined;
   const name = senderName(s);
   const headerText = tpl.headerText?.trim() || name;
   const footerText = tpl.footerText?.trim() || "";
@@ -98,10 +115,12 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(previewText)}</div>`
     : "";
 
+  // Logo por imagem quando configurada; senão o nome (wordmark) na cor definida.
+  const headerInner = logoSrc
+    ? `<img src="${esc(logoSrc)}" alt="${esc(headerText)}" style="max-height:48px;width:auto;display:inline-block;border:0;" />`
+    : `<span style="color:${esc(headerTextColor)};font-size:22px;font-weight:800;letter-spacing:-0.3px;">${esc(headerText)}</span>`;
   const header = showHeader
-    ? `<tr><td style="background:${esc(accent)};padding:26px 40px;text-align:center;">
-         <span style="color:#ffffff;font-size:22px;font-weight:800;letter-spacing:-0.3px;">${esc(headerText)}</span>
-       </td></tr>`
+    ? `<tr><td style="background:${esc(accent)};padding:26px 40px;text-align:center;">${headerInner}</td></tr>`
     : "";
 
   const footerBlocks: string[] = [];
@@ -128,15 +147,15 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(subject)}</title>
 </head>
-<body style="margin:0;padding:0;background:#F0F4F8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:${esc(pageBg)};font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   ${preheader}
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F8;padding:32px 0;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:${esc(pageBg)};padding:32px 0;">
     <tr>
       <td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
           ${header}
           <tr>
-            <td style="padding:32px 40px;color:#1A202C;font-size:15px;line-height:1.7;">
+            <td style="padding:32px 40px;color:${esc(bodyColor)};font-size:15px;line-height:1.7;">
               ${bodyHtml}
             </td>
           </tr>

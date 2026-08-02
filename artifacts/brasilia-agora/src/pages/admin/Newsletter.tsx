@@ -3,6 +3,7 @@ import {
   Mail, Users, Send, Settings as SettingsIcon, Save, TestTube2,
   Loader2, CheckCircle, AlertCircle, Plus, ArrowLeft, Clock, Calendar,
   Download, Search, ChevronLeft, ChevronRight, Ban, RefreshCw,
+  Image as ImageIcon, Eye,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import RichTextEditor from "@/components/admin/RichTextEditor";
@@ -32,7 +33,10 @@ const EMPTY: NewsletterSettings = {
   hasNewsletterSmtpPass: false,
   newsletterReplyTo: "",
   newsletterDailyCap: 450,
-  newsletterTemplate: { accentColor: "", logoMode: "wordmark", headerText: "", footerText: "", signature: "" },
+  newsletterTemplate: {
+    accentColor: "", logoMode: "wordmark", logoUrl: "", headerText: "", headerTextColor: "",
+    pageBgColor: "", bodyTextColor: "", footerText: "", signature: "",
+  },
 };
 
 // ─── Estilos compartilhados ──────────────────────────────────────────────────
@@ -53,6 +57,21 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <p className="text-[11px] text-slate-400 dark:text-slate-500">{hint}</p>}
     </div>
+  );
+}
+
+/** Campo de cor: seletor + hex textual. Vazio = herda o default do e-mail. */
+function ColorField({ label, hint, value, fallback, onChange }: {
+  label: string; hint?: string; value: string; fallback: string; onChange: (v: string) => void;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <div className="flex items-center gap-2">
+        <input type="color" value={value || fallback} onChange={(e) => onChange(e.target.value)}
+          className="w-10 h-9 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent cursor-pointer shrink-0" />
+        <input className={inputCls} value={value} onChange={(e) => onChange(e.target.value)} placeholder={`${fallback} (vazio = padrão)`} />
+      </div>
+    </Field>
   );
 }
 
@@ -82,6 +101,9 @@ function ConfigTab() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [previewHtml, setPreviewHtml] = useState("");
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -92,12 +114,35 @@ function ConfigTab() {
     return () => { alive = false; };
   }, []);
 
+  // Prévia ao vivo do shell (renderizada no servidor, com debounce) — reflete o
+  // que está na tela mesmo sem salvar.
+  useEffect(() => {
+    if (loading) return;
+    let alive = true;
+    const h = setTimeout(() => {
+      adminApi.previewNewsletter({ newsletterTemplate: form.newsletterTemplate, fromName: form.newsletterFromName })
+        .then((r) => { if (alive) setPreviewHtml(r.html); })
+        .catch(() => { /* prévia é best-effort */ });
+    }, 350);
+    return () => { alive = false; clearTimeout(h); };
+  }, [loading, form.newsletterTemplate, form.newsletterFromName]);
+
   const set = useCallback(<K extends keyof NewsletterSettings>(k: K, v: NewsletterSettings[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
   }, []);
   const setTpl = useCallback((k: keyof NewsletterSettings["newsletterTemplate"], v: string) => {
     setForm((f) => ({ ...f, newsletterTemplate: { ...f.newsletterTemplate, [k]: v } }));
   }, []);
+
+  async function uploadLogo(file: File) {
+    setLogoBusy(true); setMsg(null);
+    try {
+      const r = await adminApi.uploadImage(file, "logo-newsletter");
+      setForm((f) => ({ ...f, newsletterTemplate: { ...f.newsletterTemplate, logoUrl: r.url, logoMode: "image" } }));
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha no upload da logo." });
+    } finally { setLogoBusy(false); }
+  }
 
   async function save() {
     setSaving(true); setMsg(null);
@@ -128,7 +173,6 @@ function ConfigTab() {
   }
 
   const tpl = form.newsletterTemplate;
-  const accent = tpl.accentColor || "#0B2A66";
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -180,27 +224,62 @@ function ConfigTab() {
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
         <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Modelo do e-mail</h3>
         <p className="text-[12px] text-slate-500 dark:text-slate-400 -mt-2">
-          A moldura de marca que envolve o corpo de cada campanha. O descadastro obrigatório é adicionado automaticamente no rodapé.
+          A moldura de marca que envolve o corpo de cada campanha. O descadastro obrigatório é adicionado automaticamente no rodapé. Cores vazias usam o padrão.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Cor de destaque">
-            <div className="flex items-center gap-2">
-              <input type="color" value={accent} onChange={(e) => setTpl("accentColor", e.target.value)} className="w-10 h-9 rounded-lg border border-slate-200 dark:border-slate-600 bg-transparent cursor-pointer" />
-              <input className={inputCls} value={tpl.accentColor ?? ""} onChange={(e) => setTpl("accentColor", e.target.value)} placeholder="#0B2A66 (vazio = cor do painel)" />
-            </div>
-          </Field>
           <Field label="Cabeçalho">
             <select className={inputCls} value={tpl.logoMode ?? "wordmark"} onChange={(e) => setTpl("logoMode", e.target.value)}>
               <option value="wordmark">Nome do site no topo</option>
+              <option value="image">Logo (imagem)</option>
               <option value="none">Sem cabeçalho de marca</option>
             </select>
           </Field>
+          <ColorField label="Cor de destaque" hint="Barra do topo, botões e link de descadastro." value={tpl.accentColor ?? ""} fallback="#0B2A66" onChange={(v) => setTpl("accentColor", v)} />
+
+          {tpl.logoMode === "image" && (
+            <div className="sm:col-span-2 space-y-2">
+              <label className={labelCls}>Logo (imagem)</label>
+              <div className="flex items-center gap-3 flex-wrap">
+                {tpl.logoUrl
+                  ? <img src={tpl.logoUrl} alt="logo" className="h-11 w-auto max-w-[220px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white object-contain px-2" />
+                  : <div className="h-11 px-4 flex items-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-[12px] text-slate-400">Sem logo</div>}
+                <input ref={logoFileRef} type="file" accept="image/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadLogo(f); e.target.value = ""; }} />
+                <button type="button" onClick={() => logoFileRef.current?.click()} disabled={logoBusy} className={btnGhost}>
+                  {logoBusy ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} {tpl.logoUrl ? "Trocar logo" : "Enviar logo"}
+                </button>
+                {tpl.logoUrl && <button type="button" onClick={() => setTpl("logoUrl", "")} className="text-[12px] text-red-500 hover:underline">Remover</button>}
+              </div>
+              <p className="text-[11px] text-slate-400 dark:text-slate-500">PNG com fundo transparente fica melhor sobre a cor de destaque.</p>
+            </div>
+          )}
+
+          <ColorField label="Cor do texto do cabeçalho" hint="Nome do site sobre a barra de destaque." value={tpl.headerTextColor ?? ""} fallback="#ffffff" onChange={(v) => setTpl("headerTextColor", v)} />
+          <ColorField label="Fundo da página" value={tpl.pageBgColor ?? ""} fallback="#F0F4F8" onChange={(v) => setTpl("pageBgColor", v)} />
+          <ColorField label="Cor do texto do corpo" value={tpl.bodyTextColor ?? ""} fallback="#1A202C" onChange={(v) => setTpl("bodyTextColor", v)} />
           <Field label="Texto do cabeçalho (opcional)" hint="Vazio = nome do remetente."><input className={inputCls} value={tpl.headerText ?? ""} onChange={(e) => setTpl("headerText", e.target.value)} /></Field>
           <Field label="Assinatura (opcional)"><input className={inputCls} value={tpl.signature ?? ""} onChange={(e) => setTpl("signature", e.target.value)} placeholder="Equipe SP011" /></Field>
           <div className="sm:col-span-2">
             <Field label="Texto do rodapé (opcional)"><textarea className={`${inputCls} min-h-[70px] resize-y`} value={tpl.footerText ?? ""} onChange={(e) => setTpl("footerText", e.target.value)} placeholder="Endereço, CNPJ ou aviso legal…" /></Field>
           </div>
         </div>
+      </section>
+
+      {/* Pré-visualização ao vivo */}
+      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
+          <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
+          <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
+        </div>
+        {previewHtml ? (
+          <iframe title="Prévia do e-mail" srcDoc={previewHtml} sandbox=""
+            className="w-full h-[560px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white" />
+        ) : (
+          <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
+            <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
+          </div>
+        )}
       </section>
 
       {/* Ações */}

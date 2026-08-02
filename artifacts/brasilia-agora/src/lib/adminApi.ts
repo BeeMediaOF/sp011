@@ -82,6 +82,9 @@ export const adminApi = {
   updateNewsletterSettings: (settings: Partial<NewsletterSettings>) =>
     req<{ ok: boolean; settings: NewsletterSettings }>("PUT", "/newsletter/settings", settings),
   sendNewsletterTest: () => req<{ ok: boolean; to?: string; error?: string }>("POST", "/newsletter/test", {}),
+  /** Prévia do shell do e-mail (renderizada no servidor com um corpo de exemplo). */
+  previewNewsletter: (body: { newsletterTemplate: NewsletterTemplate; fromName?: string }) =>
+    req<{ html: string }>("POST", "/newsletter/preview", body),
 
   // Newsletter — campanhas (Fase 4). O corpo (TipTap) é sanitizado no servidor.
   listNewsletterCampaigns: () => req<{ campaigns: NewsletterCampaign[] }>("GET", "/newsletter/campaigns"),
@@ -481,8 +484,12 @@ export interface SiteSettings {
 /** Modelo (shell) do e-mail da newsletter — espelho do tipo do servidor. */
 export interface NewsletterTemplate {
   accentColor?: string;
-  logoMode?: "wordmark" | "none";
+  logoMode?: "wordmark" | "none" | "image";
+  logoUrl?: string;
   headerText?: string;
+  headerTextColor?: string;
+  pageBgColor?: string;
+  bodyTextColor?: string;
   footerText?: string;
   signature?: string;
 }
