@@ -219,20 +219,20 @@ async function buildMessage(
   if (row.kind === "confirmation") {
     // Só faz sentido confirmar quem ainda está pendente com token vivo.
     if (sub.status !== "pending" || !sub.confirmToken) return { skip: "inscrito não está mais pendente" };
-    const unsubToken = await ensureUnsubToken(sub.id, sub.unsubscribeToken);
     const confirmUrl = `${base}/api/newsletter/confirm?token=${encodeURIComponent(sub.confirmToken)}`;
-    const unsubscribeUrl = `${base}/api/newsletter/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
     const subject = `Confirme sua inscrição — ${s.siteName || "Newsletter"}`;
+    // TRANSACIONAL (double opt-in): SEM List-Unsubscribe e SEM rodapé de
+    // descadastro. Esses sinais fazem o Gmail arquivar o e-mail como "inscrição
+    // gerenciável" (aba Gerenciar inscrições/Promoções) e tirá-lo da Principal —
+    // justo o e-mail que PRECISA do clique. A pessoa ainda nem é assinante; o
+    // corpo já traz o "se não pediu, ignore". (Refina o literal do RF5, que
+    // pedia o header em TODO e-mail — mantido só nas campanhas, onde é exigido.)
     const { html, text } = renderNewsletterEmail({
       settings: s,
       subject,
       bodyHtml: confirmationBodyHtml(s, confirmUrl),
-      unsubscribeUrl,
     });
-    const headers: Record<string, string> = {
-      "List-Unsubscribe": `<${unsubscribeUrl}>`,
-      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-    };
+    const headers: Record<string, string> = {};
     if (replyTo) headers["Reply-To"] = replyTo;
     return { subject, html, text, headers };
   }

@@ -125,6 +125,7 @@ router.post("/test", async (req, res) => {
     bodyHtml:
       `<p style="margin:0 0 12px;">Se você recebeu este e-mail, o remetente do <strong>${s.siteName}</strong> está configurado corretamente e pronto para enviar a newsletter.</p>` +
       `<p style="margin:0;color:#4A5568;font-size:13px;">Servidor: ${s.newsletterSmtpHost || "smtp.gmail.com"}:${s.newsletterSmtpPort || 587} &middot; enviado para ${to}.</p>`,
+    footerNote: "E-mail de teste de configuração — nenhuma ação necessária.",
   });
 
   const headers: Record<string, string> = {};

@@ -67,8 +67,13 @@ interface RenderOpts {
   subject: string;
   /** Corpo HTML da campanha (já sanitizado). */
   bodyHtml: string;
-  /** URL de descadastro tokenizada; ausente = e-mail transacional (teste). */
+  /** URL de descadastro tokenizada. Presente = e-mail de campanha (mostra a
+   *  linha "cancelar inscrição"); ausente = e-mail transacional (confirmação/
+   *  teste), rodapé limpo sem sinais de "bulk". */
   unsubscribeUrl?: string;
+  /** Linha extra e neutra no rodapé de e-mail transacional (ex.: aviso de
+   *  e-mail de teste). Ignorada quando há `unsubscribeUrl`. */
+  footerNote?: string;
   /** Texto de pré-visualização (preheader) escondido no topo. */
   previewText?: string;
 }
@@ -79,7 +84,7 @@ interface RenderOpts {
  * parametrizada por blog (cores/nome das settings, NÃO de BRAND).
  */
 export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: string } {
-  const { settings: s, subject, bodyHtml, unsubscribeUrl, previewText } = opts;
+  const { settings: s, subject, bodyHtml, unsubscribeUrl, footerNote, previewText } = opts;
   const tpl: NewsletterTemplate = s.newsletterTemplate ?? {};
   const accent = (tpl.accentColor || s.adminAccentColor || "#0B2A66").trim();
   const showHeader = tpl.logoMode !== "none";
@@ -112,8 +117,8 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
       `<p style="margin:0;color:#A0AEC0;font-size:12px;">Você recebe este e-mail porque assinou a newsletter. ` +
       `<a href="${esc(unsubscribeUrl)}" style="color:${esc(accent)};text-decoration:underline;">Cancelar inscrição</a>.</p>`,
     );
-  } else {
-    footerBlocks.push(`<p style="margin:0;color:#A0AEC0;font-size:12px;">E-mail de teste de configuração — nenhuma ação necessária.</p>`);
+  } else if (footerNote) {
+    footerBlocks.push(`<p style="margin:0;color:#A0AEC0;font-size:12px;">${esc(footerNote)}</p>`);
   }
 
   const html = `<!DOCTYPE html>
@@ -158,6 +163,7 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
     name + (replyTo ? ` · ${replyTo}` : ""),
   ];
   if (unsubscribeUrl) textParts.push(`Cancelar inscrição: ${unsubscribeUrl}`);
+  else if (footerNote) textParts.push(footerNote);
   const text = textParts.filter((p) => p !== undefined).join("\n").replace(/\n{3,}/g, "\n\n").trim();
 
   return { html, text };
