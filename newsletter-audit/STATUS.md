@@ -8,8 +8,8 @@
 | Execução — Fase interna 1 (captura + consentimento) | ✅ Validada em prod (VPS, sp011) | 2026-07-31 |
 | Execução — Fase interna 2 (admin: remetente + modelo) | ✅ Validada em prod (VPS, sp011) | 2026-08-01 |
 | Execução — Fase interna 3 (motor de disparo assíncrono) | ✅ Validada em prod (VPS, sp011) | 2026-08-02 |
-| Execução — Fase interna 4 (ponta a ponta) | 🟡 Implementada (UI campanhas + inscritos, local ok) — validação em prod pendente | 2026-08-02 |
-| `RELATORIO-FINAL.md` (pós-implementação) | ⬜ Pendente | — |
+| Execução — Fase interna 4 (ponta a ponta) | ✅ Validada em prod (VPS, sp011) | 2026-08-02 |
+| `RELATORIO-FINAL.md` (pós-implementação) | ✅ Escrito | 2026-08-02 |
 
 ## Decisões travadas (Fase 0)
 - Lista **isolada por blog**; disparo **manual + agendado**; remetente **Gmail próprio
@@ -131,12 +131,19 @@
   conforme se edita. Segredo nenhum novo; template segue redigido do `/api/site`.
 - Local: api-server typecheck ✅ + **240 testes** ✅ + esbuild ✅; frontend
   typecheck ✅.
-- **Pendente:** validação em prod (criar campanha → enviar → recebida →
-  descadastro pelo link visível **e** one-click do Gmail/Yahoo); export CSV;
-  teto diário com cap baixo. Depois: `RELATORIO-FINAL.md` e rollout da rede.
+- **Validado em prod (VPS sp011, 2026-08-02):** campanha real criada no admin →
+  enviada → recebida (caiu em "Gerenciar inscrições" do Gmail, comportamento
+  correto/esperado de e-mail de lista com `List-Unsubscribe`); descadastro pelo
+  **link visível (GET)** → `unsubscribed`; **one-click (POST RFC 8058)** →
+  `HTTP/2 204` sem redirect/HTML e status vira `unsubscribed`. Layout do admin
+  em 2 colunas (config + prévia lado a lado; editor + ações lado a lado).
+- **Não exercitado em prod (baixo risco, coberto por teste unitário):** teto
+  diário com cap baixo distribuindo por dias; export CSV (endpoint pronto,
+  conferir o botão).
 
 ## Modo atual
-**Execução — Fase 4 implementada (UI de campanhas + inscritos), validação em
-prod pendente.** Rollout ainda só no sp011 (blogs replicados seguem na imagem
-anterior). Próximo passo: deploy de `api` **e** `web` no sp011, validar ponta a
-ponta por curl/SQL, escrever o `RELATORIO-FINAL.md` e planejar o rollout da rede.
+**Newsletter COMPLETA e validada em prod no sp011 (Fases 1–4).** Rollout ainda
+só no sp011 (blogs replicados seguem na imagem anterior, sem as tabelas/UI de
+newsletter até o próximo bump de imagem). Próximo passo: **rollout da rede**
+(ver `RELATORIO-FINAL.md` §Rollout) — é um bump de `BLOG_IMAGE_VERSION` +
+configurar remetente Gmail por blog (cada blog tem lista/segredo próprios).

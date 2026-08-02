@@ -651,8 +651,11 @@ function SubscribersTab() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  // Busca com debounce; recarrega ao mudar filtro/página/termo.
+  // Busca com debounce; recarrega ao mudar filtro/página/termo ou ao clicar em
+  // Atualizar (a lista não faz auto-refresh — status muda por ação externa, ex.:
+  // descadastro por e-mail).
   useEffect(() => {
     let alive = true;
     setLoading(true);
@@ -663,7 +666,7 @@ function SubscribersTab() {
         .finally(() => { if (alive) setLoading(false); });
     }, q ? 300 : 0);
     return () => { alive = false; clearTimeout(h); };
-  }, [status, page, q]);
+  }, [status, page, q, reloadKey]);
 
   async function exportCsv() {
     setExporting(true); setMsg(null);
@@ -703,6 +706,9 @@ function SubscribersTab() {
               onChange={(e) => { setQ(e.target.value); setPage(1); }}
             />
           </div>
+          <button type="button" onClick={() => setReloadKey((k) => k + 1)} disabled={loading} className={btnGhost} title="Recarregar">
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Atualizar
+          </button>
           <button type="button" onClick={exportCsv} disabled={exporting} className={btnGhost}>
             {exporting ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />} CSV
           </button>
