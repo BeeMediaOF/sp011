@@ -175,8 +175,14 @@ function ConfigTab() {
   const tpl = form.newsletterTemplate;
 
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="space-y-6">
       <Banner msg={msg} />
+
+      {/* Duas colunas: configuração à esquerda, prévia ao vivo à direita — usa a
+          largura toda da tela e evita rolar para ver o resultado. Empilha < xl. */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+      {/* Coluna esquerda — configuração */}
+      <div className="space-y-6 min-w-0">
 
       {/* Liga/desliga */}
       <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
@@ -265,23 +271,6 @@ function ConfigTab() {
         </div>
       </section>
 
-      {/* Pré-visualização ao vivo */}
-      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
-          <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
-        </div>
-        {previewHtml ? (
-          <iframe title="Prévia do e-mail" srcDoc={previewHtml} sandbox=""
-            className="w-full h-[560px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white" />
-        ) : (
-          <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
-            <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
-          </div>
-        )}
-      </section>
-
       {/* Ações */}
       <div className="flex flex-wrap gap-3">
         <button onClick={save} disabled={saving || testing} className={btnPrimary}>
@@ -292,6 +281,29 @@ function ConfigTab() {
           {testing ? <Loader2 size={15} className="animate-spin" /> : <TestTube2 size={15} />} Enviar e-mail de teste
         </button>
       </div>
+
+      </div>{/* fim da coluna esquerda */}
+
+      {/* Coluna direita — prévia ao lado (sticky): preenche a tela e evita rolar */}
+      <div className="min-w-0 xl:sticky xl:top-4">
+        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
+          <div className="flex items-center gap-2">
+            <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
+            <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
+          </div>
+          {previewHtml ? (
+            <iframe title="Prévia do e-mail" srcDoc={previewHtml} sandbox=""
+              className="w-full h-[620px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white" />
+          ) : (
+            <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
+              <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
+            </div>
+          )}
+        </section>
+      </div>
+
+      </div>{/* fim do grid de 2 colunas */}
     </div>
   );
 }
@@ -415,7 +427,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const canCancel = campaign && campaign.status !== "sent" && campaign.status !== "canceled";
 
   return (
-    <div className="max-w-3xl space-y-5">
+    <div className="space-y-5">
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
           <ArrowLeft size={15} /> Voltar
@@ -425,6 +437,11 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
 
       <Banner msg={msg} />
 
+      {/* Editor à esquerda (mais largo), ações/estatísticas à direita — usa a tela
+          toda e mantém os botões à vista sem rolar. Empilha < lg. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      {/* Coluna principal — editor */}
+      <div className="lg:col-span-2 space-y-5 min-w-0">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
         <Field label="Assunto">
           <input className={inputCls} value={subject} disabled={!editable}
@@ -452,6 +469,10 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           </p>
         </div>
       </div>
+      </div>{/* fim da coluna principal */}
+
+      {/* Coluna lateral — estatísticas / agenda / ações (sticky) */}
+      <div className="space-y-5 min-w-0 lg:sticky lg:top-4">
 
       {/* Estatísticas da fila (campanhas já disparadas) */}
       {campaign && !editable && (
@@ -462,7 +483,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
               {campaign.recipients} destinatário(s) · disparada {fmtDate(campaign.sentAt ?? campaign.updatedAt)}
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {(["pending", "sending", "sent", "failed", "dead"] as const).map((k) => {
               const n = queue?.find((q) => q.status === k)?.count ?? 0;
               return (
@@ -481,12 +502,12 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
       {editable && showSchedule && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
           <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300 flex items-center gap-2"><Calendar size={15} /> Agendar envio</h3>
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="space-y-1">
+          <div className="flex flex-col gap-3">
+            <div className="space-y-1 w-full">
               <label className={labelCls}>Data e hora</label>
               <input type="datetime-local" className={inputCls} value={when} min={toLocalInput(new Date())} onChange={(e) => setWhen(e.target.value)} />
             </div>
-            <button onClick={schedule} disabled={busy !== null} className={btnPrimary}>
+            <button onClick={schedule} disabled={busy !== null} className={`${btnPrimary} w-full justify-center`}>
               {busy === "schedule" ? <Loader2 size={15} className="animate-spin" /> : <Clock size={15} />} Confirmar agendamento
             </button>
           </div>
@@ -495,7 +516,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
       )}
 
       {/* Ações */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-col gap-2 [&>button]:w-full [&>button]:justify-center">
         {editable && (
           <>
             <button onClick={saveDraft} disabled={busy !== null} className={btnGhost}>
@@ -516,6 +537,9 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           </button>
         )}
       </div>
+
+      </div>{/* fim da coluna lateral */}
+      </div>{/* fim do grid de 2 colunas */}
     </div>
   );
 }
