@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, jsonb, timestamp, index } from "drizzle-orm/pg-core";
 
 /**
  * Campanhas de newsletter, ISOLADAS por blog (PRD-NEWSLETTER-01, Fase 3). Uma
@@ -20,6 +20,10 @@ export const newsletterCampaignsTable = pgTable("newsletter_campaigns", {
   // Moldura (newsletter_templates.id) que envolve o corpo. NULL = moldura Padrão
   // (site_settings.newsletterTemplate). Resolvida na hora de montar o e-mail.
   templateId:  integer("template_id"),
+  // Ajuste de cabeçalho/rodapé/cores SÓ desta campanha (snapshot editável a
+  // partir da moldura). NULL = segue a moldura escolhida. Precedência no envio:
+  // templateOverride > moldura(templateId) > Padrão. HTML sanitizado ao gravar.
+  templateOverride: jsonb("template_override").$type<Record<string, unknown>>(),
   // Quando disparar (NULL = rascunho). Futuro = agendada; venceu = o worker
   // promove a 'sending' e o produtor faz o fan-out.
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),

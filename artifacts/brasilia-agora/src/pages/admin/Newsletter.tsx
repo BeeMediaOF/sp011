@@ -509,14 +509,25 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
     return () => { alive = false; };
   }, []);
 
-  // Moldura escolhida (biblioteca ou Padrão das Configurações) → prévia ao vivo.
-  const selectedTpl: NewsletterTemplate = useMemo(() => {
+  // Base: moldura escolhida (biblioteca ou Padrão das Configurações).
+  const selectedBase: NewsletterTemplate = useMemo(() => {
     if (templateId !== null) return templates.find((t) => t.id === templateId)?.config ?? {};
     return settings?.newsletterTemplate ?? {};
   }, [templateId, templates, settings]);
+
+  // Ajuste de cabeçalho/rodapé SÓ desta campanha. `frameCustom` = personalizado
+  // (ou já havia override salvo) → não segue mais a moldura base automaticamente.
+  const [frameConfig, setFrameConfig] = useState<NewsletterTemplate>(campaign?.templateOverride ?? {});
+  const [frameCustom, setFrameCustom] = useState<boolean>(!!campaign?.templateOverride);
+  const [showFrameEdit, setShowFrameEdit] = useState<boolean>(!!campaign?.templateOverride);
+  // Sem personalização, a moldura desta campanha espelha a base escolhida (ao vivo).
+  useEffect(() => {
+    if (!frameCustom) setFrameConfig(selectedBase);
+  }, [selectedBase, frameCustom]);
+
   const frame = useMemo(
-    () => buildMolduraFrame(selectedTpl, { fromName: settings?.newsletterFromName, replyTo: settings?.newsletterReplyTo }),
-    [selectedTpl, settings],
+    () => buildMolduraFrame(frameConfig, { fromName: settings?.newsletterFromName, replyTo: settings?.newsletterReplyTo }),
+    [frameConfig, settings],
   );
 
   // Detalhe (fila) só faz sentido depois de disparada.
@@ -537,12 +548,14 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
 
   /** Cria (se nova) ou atualiza (se rascunho/agendada) e devolve o id. */
   async function persist(): Promise<number> {
+    // Personalizou → guarda o ajuste só desta campanha; senão null (segue a moldura).
+    const templateOverride = frameCustom ? frameConfig : null;
     if (campaign?.id) {
-      await adminApi.updateNewsletterCampaign(campaign.id, { subject: subject.trim(), bodyHtml: body, templateId });
+      await adminApi.updateNewsletterCampaign(campaign.id, { subject: subject.trim(), bodyHtml: body, templateId, templateOverride });
       changedRef.current = true;
       return campaign.id;
     }
-    const r = await adminApi.createNewsletterCampaign({ subject: subject.trim(), bodyHtml: body, templateId });
+    const r = await adminApi.createNewsletterCampaign({ subject: subject.trim(), bodyHtml: body, templateId, templateOverride });
     changedRef.current = true;
     return r.campaign.id;
   }
@@ -624,16 +637,16 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
             <input className={inputCls} value={subject} disabled={!editable}
               onChange={(e) => setSubject(e.target.value)} placeholder="Assunto do e-mail" maxLength={300} />
           </Field>
-          <Field label="Moldura" hint="A estrutura visual (cabeçalho/rodapé). Gerencie na aba Modelos.">
+          <Field label="Moldura" hint="Ponto de partida (cabeçalho/rodapé). Personalize só esta campanha abaixo.">
             {editable ? (
               <select className={inputCls} value={templateId === null ? "" : String(templateId)}
-                onChange={(e) => setTemplateId(e.target.value === "" ? null : Number(e.target.value))}>
+                onChange={(e) => { setTemplateId(e.target.value === "" ? null : Number(e.target.value)); setFrameCustom(false); }}>
                 <option value="">Padrão</option>
                 {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             ) : (
               <input className={inputCls} disabled
-                value={templates.find((t) => t.id === templateId)?.name ?? "Padrão"} />
+                value={campaign?.templateOverride ? "Personalizada" : (templates.find((t) => t.id === templateId)?.name ?? "Padrão")} />
             )}
           </Field>
         </div>
@@ -659,6 +672,39 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           </p>
         </div>
       </div>
+
+      {/* Personalizar cabeçalho/rodapé SÓ desta campanha (a moldura base não muda). */}
+      {editable && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" onClick={() => setShowFrameEdit((v) => !v)}
+              className="inline-flex items-center gap-2 text-sm font-bold text-[#0B2A66] dark:text-blue-300">
+              <LayoutTemplate size={15} /> Personalizar cabeçalho e rodapé desta campanha {showFrameEdit ? "▲" : "▼"}
+            </button>
+            {frameCustom && (
+              <button type="button" onClick={() => setFrameCustom(false)}
+                className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 dark:text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-300">
+                <RefreshCw size={13} /> Voltar para a moldura
+              </button>
+            )}
+          </div>
+          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+            {frameCustom
+              ? "Personalizada — estes ajustes valem só para esta campanha; a moldura da aba Modelos não muda."
+              : "Segue a moldura escolhida. Ao editar aqui, você personaliza só esta campanha."}
+          </p>
+          {showFrameEdit && (
+            <div className="mt-4">
+              <ShellFields
+                value={frameConfig}
+                title="Cabeçalho e rodapé desta campanha"
+                onChange={(next) => { setFrameConfig(next); setFrameCustom(true); }}
+                onError={(text) => setMsg({ type: "err", text })}
+              />
+            </div>
+          )}
+        </div>
+      )}
       </div>{/* fim da coluna principal */}
 
       {/* Coluna lateral — estatísticas / agenda / ações (sticky) */}

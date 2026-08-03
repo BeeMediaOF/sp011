@@ -274,7 +274,10 @@ async function buildMessage(
 
   const unsubToken = await ensureUnsubToken(sub.id, sub.unsubscribeToken);
   const unsubscribeUrl = `${base}/api/newsletter/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
-  const template = await loadTemplateConfig(campaign.templateId);
+  // Precedência: ajuste desta campanha (templateOverride) > moldura escolhida
+  // (templateId) > moldura Padrão das settings. O override já é sanitizado ao gravar.
+  const template = (campaign.templateOverride as NewsletterTemplate | null)
+    ?? await loadTemplateConfig(campaign.templateId);
   const { html, text } = renderNewsletterEmail({
     settings: s,
     subject: campaign.subject,

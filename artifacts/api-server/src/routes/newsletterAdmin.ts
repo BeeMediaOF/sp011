@@ -193,8 +193,8 @@ router.post("/preview", (req, res) => {
 // sanitizador isomórfico do ingest). O disparo real (fan-out + drip + teto) fica
 // no produtor `startCampaignSend`; o worker envia.
 
-function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string; templateId?: number | null } {
-  const out: { subject?: string; bodyHtml?: string; templateId?: number | null } = {};
+function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null } {
+  const out: { subject?: string; bodyHtml?: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null } = {};
   if (typeof b["subject"]  === "string") out.subject  = (b["subject"] as string).trim().slice(0, 300);
   if (typeof b["bodyHtml"] === "string") out.bodyHtml = sanitizeIngestHtml(b["bodyHtml"] as string);
   // templateId: null/"" = moldura Padrão; inteiro positivo = moldura da biblioteca.
@@ -202,6 +202,13 @@ function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bod
     const v = b["templateId"];
     if (v === null || v === "") out.templateId = null;
     else { const n = Number(v); if (Number.isInteger(n) && n > 0) out.templateId = n; }
+  }
+  // templateOverride: ajuste de cabeçalho/rodapé SÓ desta campanha. null/"" =
+  // limpa (segue a moldura); objeto = sanitizado pela política de e-mail.
+  if ("templateOverride" in b) {
+    const v = b["templateOverride"];
+    if (v === null || v === "") out.templateOverride = null;
+    else if (typeof v === "object") out.templateOverride = sanitizeTemplate(v);
   }
   return out;
 }
@@ -227,7 +234,7 @@ router.post("/campaigns", async (req, res) => {
   if (!input.subject) { res.status(400).json({ ok: false, error: "Assunto obrigatório." }); return; }
   const [row] = await db
     .insert(newsletterCampaignsTable)
-    .values({ subject: input.subject, bodyHtml: input.bodyHtml ?? "", status: "draft", templateId: input.templateId ?? null })
+    .values({ subject: input.subject, bodyHtml: input.bodyHtml ?? "", status: "draft", templateId: input.templateId ?? null, templateOverride: (input.templateOverride ?? null) as Record<string, unknown> | null })
     .returning();
   res.json({ ok: true, campaign: row });
 });
@@ -261,6 +268,7 @@ router.put("/campaigns/:id", async (req, res) => {
   if (input.subject !== undefined)    patch["subject"]    = input.subject;
   if (input.bodyHtml !== undefined)   patch["bodyHtml"]   = input.bodyHtml;
   if (input.templateId !== undefined) patch["templateId"] = input.templateId;
+  if (input.templateOverride !== undefined) patch["templateOverride"] = input.templateOverride;
   await db.update(newsletterCampaignsTable).set(patch).where(eq(newsletterCampaignsTable.id, id));
   const [row] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
   res.json({ ok: true, campaign: row });

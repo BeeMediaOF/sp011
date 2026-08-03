@@ -184,9 +184,16 @@
   enviar/cancelar/excluir. **Ainda nativos** (fora deste escopo, mapeados p/
   varredura futura): AdsManager, Articles, Categorias, Colunistas, HomeBlocks,
   Menu, RSS, Redes Sociais, Usuários, RewriteQueue, DatabaseCard.
-- **PENDENTE (decisão de arquitetura):** editar cabeçalho/rodapé DENTRO da
-  campanha — por-campanha (guarda override no banco) vs. editar a moldura
-  compartilhada. A confirmar com o usuário antes de implementar.
+- **Override por-campanha (decisão: "só nesta campanha"):** nova coluna
+  `newsletter_campaigns.template_override jsonb` (autocriada no ensureSchema).
+  No editor da campanha, um painel **ShellFields** ("Personalizar cabeçalho e
+  rodapé desta campanha") edita um snapshot que vale SÓ para ela; a moldura da
+  aba Modelos não muda. Sem personalizar, a campanha espelha a moldura base ao
+  vivo ("Voltar para a moldura" limpa o override). Precedência no envio
+  (`dispatch.ts`): `template_override` > moldura(`template_id`) > Padrão. O
+  override é sanitizado por `sanitizeTemplate`/`sanitizeEmailHtml` ao gravar.
+  Backend: schema+ensureSchema+rotas (parse/POST/PUT)+dispatch; **240 testes**
+  api ✅, esbuild ✅. Frontend: `adminApi` + CampaignEditor ✅.
 - Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
   testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
   frontend typecheck ✅. **Falta validar em prod na VPS.**

@@ -90,9 +90,9 @@ export const adminApi = {
   listNewsletterCampaigns: () => req<{ campaigns: NewsletterCampaign[] }>("GET", "/newsletter/campaigns"),
   getNewsletterCampaign: (id: number) =>
     req<{ campaign: NewsletterCampaign; queue: NewsletterQueueStat[] }>("GET", `/newsletter/campaigns/${id}`),
-  createNewsletterCampaign: (data: { subject: string; bodyHtml: string; templateId?: number | null }) =>
+  createNewsletterCampaign: (data: { subject: string; bodyHtml: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null }) =>
     req<{ ok: boolean; campaign: NewsletterCampaign }>("POST", "/newsletter/campaigns", data),
-  updateNewsletterCampaign: (id: number, data: { subject?: string; bodyHtml?: string; templateId?: number | null }) =>
+  updateNewsletterCampaign: (id: number, data: { subject?: string; bodyHtml?: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null }) =>
     req<{ ok: boolean; campaign: NewsletterCampaign }>("PUT", `/newsletter/campaigns/${id}`, data),
   /** scheduledAt (ISO) no futuro = agenda; ausente/passado = envia agora. */
   sendNewsletterCampaign: (id: number, scheduledAt?: string) =>
@@ -544,6 +544,8 @@ export interface NewsletterCampaign {
   status: NewsletterCampaignStatus;
   /** Moldura escolhida (newsletter_templates.id) ou null = moldura Padrão. */
   templateId: number | null;
+  /** Ajuste de cabeçalho/rodapé/cores só desta campanha (null = segue a moldura). */
+  templateOverride: NewsletterTemplate | null;
   scheduledAt: string | null;
   sentAt: string | null;
   recipients: number;
