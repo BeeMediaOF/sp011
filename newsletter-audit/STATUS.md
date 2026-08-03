@@ -158,9 +158,21 @@
   renderizar a moldura recebida (com HTML). `renderNewsletterEmail` ganhou
   override de `template`; o worker resolve `template_id` da campanha.
 - **UI**: nova subaba **Modelos** (lista + editor com campos + modo código +
-  prévia ao vivo, componentes `ShellFields`/`ShellPreview` reaproveitados na
-  Configurações), seletor **Moldura** no editor de campanha. **3 molduras de
+  prévia), seletor **Moldura** no editor de campanha. **3 molduras de
   exemplo** semeadas no boot (uma via HTML) — semeadura idempotente por flag.
+- **Compor dentro da prévia (pós-refino do usuário):** o `RichTextEditor` ganhou
+  uma prop opcional `frame` (retrocompatível) que troca a "caixa" do editor por
+  a **moldura viva do e-mail** — toolbar no topo + cartão 600px com cabeçalho/
+  rodapé em volta da área de edição. Usada em **Criar campanha** (corpo real,
+  prévia que não existia) e em **Modelos** (texto de exemplo, não salvo). A
+  moldura em React (`buildMolduraFrame` no `Newsletter.tsx`) é **réplica fiel**
+  do `renderNewsletterEmail` — o envio real segue montado no servidor (fonte da
+  verdade). HTML avançado na prévia passa por faxina leve client-side
+  (`previewSafeHtml`, defesa em profundidade; sanitização real é no servidor).
+- **Configurações enxuta:** a moldura saiu das Configurações (deixou de duplicar
+  Modelos) — a aba fica só com conexão/remetente/disparo. A moldura **Padrão**
+  segue em `site_settings.newsletterTemplate` como fallback do sistema
+  (confirmações + campanhas sem escolha), agora sem editor dedicado.
 - Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
   testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
   frontend typecheck ✅. **Falta validar em prod na VPS.**

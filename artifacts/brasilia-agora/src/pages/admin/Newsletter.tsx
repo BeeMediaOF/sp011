@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   Mail, Users, Send, Settings as SettingsIcon, Save, TestTube2,
   Loader2, CheckCircle, AlertCircle, Plus, ArrowLeft, Clock, Calendar,
@@ -193,35 +193,109 @@ function ShellFields({ value, title, onChange, onError }: {
   );
 }
 
-/** Prévia ao vivo da moldura (renderizada no servidor, com debounce). */
-function ShellPreview({ template, fromName, height = 620 }: { template: NewsletterTemplate; fromName?: string; height?: number }) {
-  const [html, setHtml] = useState("");
-  useEffect(() => {
-    let alive = true;
-    const h = setTimeout(() => {
-      adminApi.previewNewsletter({ newsletterTemplate: template, fromName })
-        .then((r) => { if (alive) setHtml(r.html); })
-        .catch(() => { /* prévia é best-effort */ });
-    }, 350);
-    return () => { alive = false; clearTimeout(h); };
-  }, [template, fromName]);
+// ─── Moldura viva em React: "compor dentro do preview" ────────────────────────
+// Réplica FIEL do renderNewsletterEmail do servidor (email.ts) — o envio real
+// continua sendo montado no servidor (fonte da verdade); aqui é só para compor
+// e pré-visualizar. Mantenha as duas em sincronia se o shell do e-mail mudar.
+const EMAIL_FONT = "'Helvetica Neue',Helvetica,Arial,sans-serif";
 
-  return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
-      <div className="flex items-center gap-2">
-        <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
-        <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
-        <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
+/** Texto de exemplo para pré-visualizar uma moldura (NÃO é salvo). */
+const SAMPLE_BODY =
+  "<h2>Título da matéria</h2>" +
+  "<p>Assim o corpo da sua campanha aparece dentro da moldura. O conteúdo você escreve no editor da aba <strong>Campanhas</strong>.</p>" +
+  '<p>Mais um parágrafo com um <a href="#">link de exemplo</a> para você ver o espaçamento e as cores.</p>' +
+  "<p>Abraços,<br/>Equipe.</p>";
+
+/** Absolutiza URL root-relativa (logo salva como /api/...) para a prévia. */
+function previewAbsUrl(u?: string): string | undefined {
+  const s = (u || "").trim();
+  if (!s) return undefined;
+  if (/^https?:\/\//i.test(s) || s.startsWith("//") || s.startsWith("data:")) return s;
+  if (s.startsWith("/")) return window.location.origin + s;
+  return s;
+}
+
+/** Faxina LEVE para a prévia no admin (defesa em profundidade — a sanitização
+ *  real é no servidor com sanitizeEmailHtml ao salvar). Evita que um <script>
+ *  colado no HTML avançado execute na página do admin enquanto se digita. */
+function previewSafeHtml(html: string): string {
+  return html
+    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, "")
+    .replace(/<\s*script\b[^>]*>/gi, "")
+    .replace(/<\s*(iframe|object|embed)\b[^>]*>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, '$1="#"');
+}
+
+interface MolduraFrame {
+  header: React.ReactNode;
+  footer: React.ReactNode;
+  bodyStyle: React.CSSProperties;
+  pageStyle: React.CSSProperties;
+}
+
+/** Constrói cabeçalho/rodapé/estilos da moldura para compor dentro do preview. */
+function buildMolduraFrame(tpl: NewsletterTemplate, opts: { fromName?: string; replyTo?: string }): MolduraFrame {
+  const accent = (tpl.accentColor || "#0B2A66").trim();
+  const headerTextColor = (tpl.headerTextColor || "#ffffff").trim();
+  const pageBg = (tpl.pageBgColor || "#F0F4F8").trim();
+  const bodyColor = (tpl.bodyTextColor || "#1A202C").trim();
+  const logoMode = tpl.logoMode ?? "wordmark";
+  const headerHtml = (tpl.headerHtml || "").trim();
+  const footerHtml = (tpl.footerHtml || "").trim();
+  const name = (opts.fromName || "Newsletter").trim();
+  const headerText = (tpl.headerText || name).trim();
+  const footerText = (tpl.footerText || "").trim();
+  const signature = (tpl.signature || "").trim();
+  const replyTo = (opts.replyTo || "").trim();
+  const logoSrc = logoMode === "image" ? previewAbsUrl(tpl.logoUrl) : undefined;
+  const showHeader = logoMode !== "none" || !!headerHtml;
+
+  let header: React.ReactNode = null;
+  if (headerHtml) {
+    header = <div dangerouslySetInnerHTML={{ __html: previewSafeHtml(headerHtml) }} />;
+  } else if (showHeader) {
+    header = (
+      <div style={{ background: accent, padding: "26px 40px", textAlign: "center" }}>
+        {logoSrc
+          ? <img src={logoSrc} alt={headerText} style={{ maxHeight: 48, width: "auto", display: "inline-block", border: 0 }} />
+          : <span style={{ color: headerTextColor, fontSize: 22, fontWeight: 800, letterSpacing: "-0.3px", fontFamily: EMAIL_FONT }}>{headerText}</span>}
       </div>
-      {html ? (
-        <iframe title="Prévia do e-mail" srcDoc={html} sandbox=""
-          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white" style={{ height }} />
-      ) : (
-        <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
-          <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
-        </div>
-      )}
-    </section>
+    );
+  }
+
+  const footer = (
+    <div style={{ background: "#F7F9FC", borderTop: "1px solid #E2E8F0", padding: "22px 40px", textAlign: "center", fontFamily: EMAIL_FONT }}>
+      {footerHtml && <div dangerouslySetInnerHTML={{ __html: previewSafeHtml(footerHtml) }} />}
+      {signature && <p style={{ margin: "0 0 12px", color: "#4A5568", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{signature}</p>}
+      {footerText && <p style={{ margin: "0 0 8px", color: "#A0AEC0", fontSize: 12, lineHeight: 1.5, whiteSpace: "pre-line" }}>{footerText}</p>}
+      <p style={{ margin: "0 0 8px", color: "#A0AEC0", fontSize: 12 }}>{name}{replyTo ? ` · ${replyTo}` : ""}</p>
+      <p style={{ margin: 0, color: "#A0AEC0", fontSize: 12 }}>
+        Você recebe este e-mail porque assinou a newsletter.{" "}
+        <span style={{ color: accent, textDecoration: "underline" }}>Cancelar inscrição</span>.
+      </p>
+    </div>
+  );
+
+  return {
+    header,
+    footer,
+    bodyStyle: { padding: "32px 40px", color: bodyColor, fontSize: 15, lineHeight: 1.7, fontFamily: EMAIL_FONT, background: "#ffffff" },
+    pageStyle: { background: pageBg },
+  };
+}
+
+/** Renderização estática da moldura (campanha já enviada — corpo não editável). */
+function MolduraStatic({ frame, bodyHtml }: { frame: MolduraFrame; bodyHtml: string }) {
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-auto p-4 sm:p-6 max-h-[70vh]" style={frame.pageStyle}>
+      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", background: "#ffffff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+        {frame.header}
+        <div className="prose-editor" style={frame.bodyStyle}
+          dangerouslySetInnerHTML={{ __html: bodyHtml || "<p style='color:#94a3b8'>(sem conteúdo)</p>" }} />
+        {frame.footer}
+      </div>
+    </div>
   );
 }
 
@@ -278,11 +352,7 @@ function ConfigTab() {
     <div className="space-y-6">
       <Banner msg={msg} />
 
-      {/* Duas colunas: configuração à esquerda, prévia ao vivo à direita — usa a
-          largura toda da tela e evita rolar para ver o resultado. Empilha < xl. */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
-      {/* Coluna esquerda — configuração */}
-      <div className="space-y-6 min-w-0">
+      <div className="max-w-3xl space-y-6">
 
       {/* Liga/desliga */}
       <div className="flex items-center justify-between bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4">
@@ -326,17 +396,6 @@ function ConfigTab() {
         </div>
       </section>
 
-      {/* Moldura "Padrão" (usada por confirmações e por campanhas sem moldura escolhida) */}
-      <ShellFields
-        title="Moldura padrão do e-mail"
-        value={form.newsletterTemplate}
-        onChange={(next) => set("newsletterTemplate", next)}
-        onError={(text) => setMsg({ type: "err", text })}
-      />
-      <p className="text-[12px] text-slate-500 dark:text-slate-400 px-1 -mt-2 flex items-center gap-1.5">
-        <LayoutTemplate size={13} /> Esta é a moldura padrão. Crie outras (e escolha por campanha) na aba <strong>Modelos</strong>.
-      </p>
-
       {/* Ações */}
       <div className="flex flex-wrap gap-3">
         <button onClick={save} disabled={saving || testing} className={btnPrimary}>
@@ -348,14 +407,11 @@ function ConfigTab() {
         </button>
       </div>
 
-      </div>{/* fim da coluna esquerda */}
+      <p className="text-[12px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+        <LayoutTemplate size={13} /> A aparência do e-mail (cabeçalho, rodapé, cores e logo) fica na aba <strong>Modelos</strong>.
+      </p>
 
-      {/* Coluna direita — prévia ao lado (sticky): preenche a tela e evita rolar */}
-      <div className="min-w-0 xl:sticky xl:top-4">
-        <ShellPreview template={form.newsletterTemplate} fromName={form.newsletterFromName} />
       </div>
-
-      </div>{/* fim do grid de 2 colunas */}
     </div>
   );
 }
@@ -391,6 +447,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [body, setBody] = useState(campaign?.bodyHtml ?? "");
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
+  const [settings, setSettings] = useState<NewsletterSettings | null>(null);
   const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel">(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [queue, setQueue] = useState<NewsletterQueueStat[] | null>(null);
@@ -398,14 +455,27 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)));
   const changedRef = useRef(false);
 
-  // Molduras da biblioteca para o seletor (Padrão + as salvas).
+  // Molduras da biblioteca (seletor) + settings (moldura Padrão + remetente da prévia).
   useEffect(() => {
     let alive = true;
     adminApi.listNewsletterTemplates()
       .then((r) => { if (alive) setTemplates(r.templates); })
       .catch(() => { /* seletor cai só para "Padrão" */ });
+    adminApi.getNewsletterSettings()
+      .then((r) => { if (alive) setSettings(r.settings); })
+      .catch(() => { /* prévia usa os defaults */ });
     return () => { alive = false; };
   }, []);
+
+  // Moldura escolhida (biblioteca ou Padrão das Configurações) → prévia ao vivo.
+  const selectedTpl: NewsletterTemplate = useMemo(() => {
+    if (templateId !== null) return templates.find((t) => t.id === templateId)?.config ?? {};
+    return settings?.newsletterTemplate ?? {};
+  }, [templateId, templates, settings]);
+  const frame = useMemo(
+    () => buildMolduraFrame(selectedTpl, { fromName: settings?.newsletterFromName, replyTo: settings?.newsletterReplyTo }),
+    [selectedTpl, settings],
+  );
 
   // Detalhe (fila) só faz sentido depois de disparada.
   useEffect(() => {
@@ -515,12 +585,12 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
             {editable ? (
               <select className={inputCls} value={templateId === null ? "" : String(templateId)}
                 onChange={(e) => setTemplateId(e.target.value === "" ? null : Number(e.target.value))}>
-                <option value="">Padrão (Configurações)</option>
+                <option value="">Padrão</option>
                 {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
             ) : (
               <input className={inputCls} disabled
-                value={templates.find((t) => t.id === templateId)?.name ?? "Padrão (Configurações)"} />
+                value={templates.find((t) => t.id === templateId)?.name ?? "Padrão"} />
             )}
           </Field>
         </div>
@@ -532,17 +602,17 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
               value={body}
               onChange={setBody}
               placeholder="Escreva o conteúdo da newsletter…"
+              frame={frame}
               onUploadFile={async (file) => {
                 const r = await adminApi.uploadImage(file, subject || "newsletter");
                 return { url: r.url, mediaType: "image" as const };
               }}
             />
           ) : (
-            <div className="prose-editor border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm bg-white dark:bg-slate-900 max-h-[420px] overflow-auto"
-              dangerouslySetInnerHTML={{ __html: body || "<p class='text-slate-400'>(sem conteúdo)</p>" }} />
+            <MolduraStatic frame={frame} bodyHtml={body} />
           )}
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-            A moldura de marca e o rodapé de descadastro são adicionados automaticamente ao enviar.
+            Você escreve dentro da moldura escolhida. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar — a prévia é fiel, mas o e-mail final é montado no servidor.
           </p>
         </div>
       </div>
@@ -847,7 +917,20 @@ function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | n
   const [config, setConfig] = useState<NewsletterTemplate>(record?.config ?? {});
   const [busy, setBusy] = useState<null | "save" | "delete">(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [sampleBody, setSampleBody] = useState(SAMPLE_BODY);
+  const [sender, setSender] = useState<{ fromName?: string; replyTo?: string }>({});
   const changedRef = useRef(false);
+
+  // Remetente real (só para a prévia refletir o nome/reply-to configurados).
+  useEffect(() => {
+    let alive = true;
+    adminApi.getNewsletterSettings()
+      .then((r) => { if (alive) setSender({ fromName: r.settings.newsletterFromName, replyTo: r.settings.newsletterReplyTo }); })
+      .catch(() => { /* prévia usa defaults */ });
+    return () => { alive = false; };
+  }, []);
+
+  const frame = useMemo(() => buildMolduraFrame(config, sender), [config, sender]);
 
   async function save() {
     if (!name.trim()) { setMsg({ type: "err", text: "Dê um nome à moldura." }); return; }
@@ -901,8 +984,13 @@ function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | n
           </div>
           <ShellFields value={config} onChange={setConfig} onError={(text) => setMsg({ type: "err", text })} />
         </div>
-        <div className="min-w-0 xl:sticky xl:top-4">
-          <ShellPreview template={config} />
+        <div className="min-w-0 xl:sticky xl:top-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
+            <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500">escreva um texto de exemplo — não é salvo com a moldura</span>
+          </div>
+          <RichTextEditor value={sampleBody} onChange={setSampleBody} placeholder="Escreva um texto de exemplo…" frame={frame} />
         </div>
       </div>
     </div>
@@ -950,7 +1038,7 @@ function ModelsTab() {
         <div className="max-w-xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center">
           <LayoutTemplate size={22} className="mx-auto text-slate-400 mb-3" />
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Nenhuma moldura extra ainda</p>
-          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Crie variações da moldura ou cole um HTML no modo avançado. A moldura Padrão fica em Configurações.</p>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Monte a moldura (cabeçalho, rodapé, cores) e componha o texto direto na prévia. Cada campanha escolhe a moldura que quiser.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -981,7 +1069,7 @@ function ModelsTab() {
       )}
 
       <p className="text-[12px] text-slate-500 dark:text-slate-400">
-        A moldura <strong>Padrão</strong> (usada por confirmações e campanhas sem escolha) fica na aba Configurações. Aqui você cria variações — inclusive colando HTML de e-mail no modo avançado.
+        Cada campanha escolhe uma moldura daqui; sem escolha, usa a moldura <strong>Padrão</strong> do sistema (também usada nos e-mails de confirmação). Componha o texto direto na prévia e cole HTML de e-mail no modo avançado.
       </p>
     </div>
   );

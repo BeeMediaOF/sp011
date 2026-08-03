@@ -61,12 +61,24 @@ interface Props {
   onFormatClick?: () => void;
   onUploadFile?: (file: File) => Promise<{ url: string; mediaType: "image" | "video" }>;
   placeholder?: string;
+  /** Newsletter: encaixa o editor DENTRO de uma moldura de e-mail ("compor no
+   *  preview"). Quando definido, a "caixa" do editor vira: toolbar no topo + a
+   *  "página" do e-mail (cartão ~600px) com cabeçalho/rodapé em volta da área de
+   *  edição. Ausente = editor normal (comportamento inalterado). */
+  frame?: {
+    header?: React.ReactNode;
+    footer?: React.ReactNode;
+    /** Estilo do corpo do e-mail (fundo/cor/fonte/padding) aplicado à área editável. */
+    bodyStyle?: React.CSSProperties;
+    /** Fundo da "página" atrás do cartão (pageBgColor da moldura). */
+    pageStyle?: React.CSSProperties;
+  };
 }
 
 type ModalKind = "image" | "youtube" | null;
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
-  ({ value, onChange, onPasteClick, onFormatClick, onUploadFile, placeholder = "Escreva o conteúdo da matéria aqui..." }, ref) => {
+  ({ value, onChange, onPasteClick, onFormatClick, onUploadFile, placeholder = "Escreva o conteúdo da matéria aqui...", frame }, ref) => {
 
     const editor = useEditor({
       extensions: [
@@ -315,97 +327,123 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
         )}
 
         {/* ── Editor ── */}
-        <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#0B2A66] transition-colors">
-          {/* Toolbar */}
-          <div className="flex items-center gap-0.5 px-3 py-2 bg-slate-50 border-b border-slate-100 flex-wrap">
-            {btn(() => editor.chain().focus().toggleBold().run(), Bold, "Negrito", editor.isActive("bold"))}
-            {btn(() => editor.chain().focus().toggleItalic().run(), Italic, "Itálico", editor.isActive("italic"))}
+        {(() => {
+          /* Toolbar — reaproveitada nos dois modos (editor normal e emoldurado). */
+          const toolbar = (
+            <div className="flex items-center gap-0.5 px-3 py-2 bg-slate-50 border-b border-slate-100 flex-wrap">
+              {btn(() => editor.chain().focus().toggleBold().run(), Bold, "Negrito", editor.isActive("bold"))}
+              {btn(() => editor.chain().focus().toggleItalic().run(), Italic, "Itálico", editor.isActive("italic"))}
 
-            <div className="w-px h-4 bg-slate-200 mx-1" />
+              <div className="w-px h-4 bg-slate-200 mx-1" />
 
-            {btn(() => editor.chain().focus().toggleHeading({ level: 1 }).run(), Heading1, "Título H1", editor.isActive("heading", { level: 1 }))}
-            {btn(() => editor.chain().focus().toggleHeading({ level: 2 }).run(), Heading2, "Título H2", editor.isActive("heading", { level: 2 }))}
-            {btn(() => editor.chain().focus().toggleHeading({ level: 3 }).run(), Heading3, "Título H3", editor.isActive("heading", { level: 3 }))}
+              {btn(() => editor.chain().focus().toggleHeading({ level: 1 }).run(), Heading1, "Título H1", editor.isActive("heading", { level: 1 }))}
+              {btn(() => editor.chain().focus().toggleHeading({ level: 2 }).run(), Heading2, "Título H2", editor.isActive("heading", { level: 2 }))}
+              {btn(() => editor.chain().focus().toggleHeading({ level: 3 }).run(), Heading3, "Título H3", editor.isActive("heading", { level: 3 }))}
 
-            <div className="w-px h-4 bg-slate-200 mx-1" />
+              <div className="w-px h-4 bg-slate-200 mx-1" />
 
-            {btn(() => editor.chain().focus().toggleBulletList().run(), List, "Lista", editor.isActive("bulletList"))}
-            {btn(() => editor.chain().focus().toggleOrderedList().run(), ListOrdered, "Lista numerada", editor.isActive("orderedList"))}
-            {btn(() => editor.chain().focus().toggleBlockquote().run(), Quote, "Citação", editor.isActive("blockquote"))}
-            {btn(() => editor.chain().focus().toggleCodeBlock().run(), Code, "Código", editor.isActive("codeBlock"))}
+              {btn(() => editor.chain().focus().toggleBulletList().run(), List, "Lista", editor.isActive("bulletList"))}
+              {btn(() => editor.chain().focus().toggleOrderedList().run(), ListOrdered, "Lista numerada", editor.isActive("orderedList"))}
+              {btn(() => editor.chain().focus().toggleBlockquote().run(), Quote, "Citação", editor.isActive("blockquote"))}
+              {btn(() => editor.chain().focus().toggleCodeBlock().run(), Code, "Código", editor.isActive("codeBlock"))}
 
-            <div className="w-px h-4 bg-slate-200 mx-1" />
+              <div className="w-px h-4 bg-slate-200 mx-1" />
 
-            {btn(addLink, LinkIcon, "Link no texto", editor.isActive("link"))}
-            {btn(openImageModal, ImageIcon, "Imagem / Banner com link")}
-            {btn(openYoutubeModal, YoutubeIcon, "Vídeo YouTube")}
+              {btn(addLink, LinkIcon, "Link no texto", editor.isActive("link"))}
+              {btn(openImageModal, ImageIcon, "Imagem / Banner com link")}
+              {btn(openYoutubeModal, YoutubeIcon, "Vídeo YouTube")}
 
-            {onUploadFile && (
-              <>
-                <div className="w-px h-4 bg-slate-200 mx-1" />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="video/mp4,video/webm,video/ogg,video/quicktime,.mov,.mp4,.webm"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
+              {onUploadFile && (
+                <>
+                  <div className="w-px h-4 bg-slate-200 mx-1" />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/mp4,video/webm,video/ogg,video/quicktime,.mov,.mp4,.webm"
+                    className="hidden"
+                    onChange={handleFileUpload}
+                  />
+                  <button
+                    type="button"
+                    title="Upload de vídeo (MP4, WebM…)"
+                    disabled={uploading}
+                    onMouseDown={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors disabled:opacity-60 border border-purple-200"
+                  >
+                    {uploading
+                      ? <><Loader2 size={12} className="animate-spin" /> Enviando…</>
+                      : <><Video size={12} /> Vídeo</>
+                    }
+                  </button>
+                </>
+              )}
+
+              <div className="w-px h-4 bg-slate-200 mx-1" />
+
+              {btn(() => editor.chain().focus().undo().run(), Undo, "Desfazer")}
+              {btn(() => editor.chain().focus().redo().run(), Redo, "Refazer")}
+
+              {(onPasteClick || onFormatClick) && <div className="w-px h-4 bg-slate-200 mx-1" />}
+
+              {onPasteClick && (
                 <button
                   type="button"
-                  title="Upload de vídeo (MP4, WebM…)"
-                  disabled={uploading}
-                  onMouseDown={(e) => { e.preventDefault(); fileInputRef.current?.click(); }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 transition-colors disabled:opacity-60 border border-purple-200"
+                  title="Colar texto formatado"
+                  onMouseDown={(e) => { e.preventDefault(); onPasteClick(); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 transition-colors"
                 >
-                  {uploading
-                    ? <><Loader2 size={12} className="animate-spin" /> Enviando…</>
-                    : <><Video size={12} /> Vídeo</>
-                  }
+                  <ClipboardPaste size={12} /> Colar texto
                 </button>
-              </>
-            )}
+              )}
+              {onFormatClick && (
+                <button
+                  type="button"
+                  title="Formatar parágrafos automaticamente"
+                  onMouseDown={(e) => { e.preventDefault(); onFormatClick(); }}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                >
+                  <AlignLeft size={12} /> Formatar
+                </button>
+              )}
+            </div>
+          );
 
-            <div className="w-px h-4 bg-slate-200 mx-1" />
+          /* Modo emoldurado (newsletter): compor DENTRO da moldura do e-mail. */
+          if (frame) {
+            return (
+              <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#0B2A66] transition-colors">
+                {toolbar}
+                <div className="overflow-auto p-4 sm:p-6 max-h-[70vh]" style={frame.pageStyle}>
+                  <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", background: "#ffffff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+                    {frame.header}
+                    <div style={frame.bodyStyle}>
+                      <EditorContent
+                        editor={editor}
+                        className="prose-editor outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none"
+                      />
+                    </div>
+                    {frame.footer}
+                  </div>
+                </div>
+              </div>
+            );
+          }
 
-            {btn(() => editor.chain().focus().undo().run(), Undo, "Desfazer")}
-            {btn(() => editor.chain().focus().redo().run(), Redo, "Refazer")}
-
-            {(onPasteClick || onFormatClick) && <div className="w-px h-4 bg-slate-200 mx-1" />}
-
-            {onPasteClick && (
-              <button
-                type="button"
-                title="Colar texto formatado"
-                onMouseDown={(e) => { e.preventDefault(); onPasteClick(); }}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#2563EB] bg-blue-50 hover:bg-blue-100 transition-colors"
-              >
-                <ClipboardPaste size={12} /> Colar texto
-              </button>
-            )}
-            {onFormatClick && (
-              <button
-                type="button"
-                title="Formatar parágrafos automaticamente"
-                onMouseDown={(e) => { e.preventDefault(); onFormatClick(); }}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
-              >
-                <AlignLeft size={12} /> Formatar
-              </button>
-            )}
-          </div>
-
-          {/* Editor area */}
-          <EditorContent
-            editor={editor}
-            className="prose-editor min-h-[280px] px-4 py-3 text-sm outline-none bg-white [&_.ProseMirror]:min-h-[280px] [&_.ProseMirror]:outline-none"
-          />
-
-          {/* Footer */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50">
-            <span className="text-[11px] text-slate-400 font-mono">html</span>
-            <span className="text-[11px] text-slate-400">{wordCount} palavras</span>
-          </div>
-        </div>
+          /* Modo normal (inalterado). */
+          return (
+            <div className="border border-slate-200 rounded-xl overflow-hidden focus-within:border-[#0B2A66] transition-colors">
+              {toolbar}
+              <EditorContent
+                editor={editor}
+                className="prose-editor min-h-[280px] px-4 py-3 text-sm outline-none bg-white [&_.ProseMirror]:min-h-[280px] [&_.ProseMirror]:outline-none"
+              />
+              <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50">
+                <span className="text-[11px] text-slate-400 font-mono">html</span>
+                <span className="text-[11px] text-slate-400">{wordCount} palavras</span>
+              </div>
+            </div>
+          );
+        })()}
       </>
     );
   }
