@@ -21,7 +21,6 @@ import { store } from "../lib/store.js";
 import type { SiteSettings, NewsletterTemplate } from "../lib/store.js";
 import { sendEmail } from "../lib/mailer.js";
 import { getNewsletterSmtpConfig, renderNewsletterEmail } from "../lib/newsletter/email.js";
-import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
 import { sanitizeEmailHtml } from "@workspace/news-engine/sanitize";
 import { startCampaignSend } from "../lib/newsletter/dispatch.js";
 import { getPublicBase } from "../lib/social/queueProcessor.js";
@@ -192,14 +191,18 @@ router.post("/preview", (req, res) => {
 });
 
 // ── Campanhas (Fase 3: motor exercitável por curl/SQL; UI TipTap na Fase 4) ───
-// O corpo (bodyHtml) é sanitizado ANTES de gravar (invariante do PRD; o mesmo
-// sanitizador isomórfico do ingest). O disparo real (fan-out + drip + teto) fica
+// O corpo (bodyHtml) é sanitizado ANTES de gravar (invariante do PRD; política
+// de e-mail, que preserva estilo inline). O disparo real (fan-out + drip + teto) fica
 // no produtor `startCampaignSend`; o worker envia.
 
 function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null } {
   const out: { subject?: string; bodyHtml?: string; templateId?: number | null; templateOverride?: NewsletterTemplate | null } = {};
   if (typeof b["subject"]  === "string") out.subject  = (b["subject"] as string).trim().slice(0, 300);
-  if (typeof b["bodyHtml"] === "string") out.bodyHtml = sanitizeIngestHtml(b["bodyHtml"] as string);
+  // Corpo da campanha usa a MESMA política de e-mail do cabeçalho/rodapé
+  // (sanitizeEmailHtml): preserva `style` inline e os atributos de tabela, sem
+  // os quais um layout rico chega ao inscrito sem nenhum estilo. NÃO usar o
+  // sanitizador de artigo/ingest aqui — ele descarta `style` por design.
+  if (typeof b["bodyHtml"] === "string") out.bodyHtml = sanitizeEmailHtml((b["bodyHtml"] as string).slice(0, 200000));
   // templateId: null/"" = moldura Padrão; inteiro positivo = moldura da biblioteca.
   if ("templateId" in b) {
     const v = b["templateId"];

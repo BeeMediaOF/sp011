@@ -349,18 +349,27 @@ function buildMolduraFrame(tpl: NewsletterTemplate, opts: { fromName?: string; r
   };
 }
 
-/** Renderização estática da moldura (campanha já enviada — corpo não editável). */
-function MolduraStatic({ frame, bodyHtml }: { frame: MolduraFrame; bodyHtml: string }) {
+/** Renderização estática da moldura (corpo não editável: campanha já enviada ou
+ *  prévia do modo HTML). */
+function MolduraStatic({ frame, bodyHtml, width = 600 }: { frame: MolduraFrame; bodyHtml: string; width?: number }) {
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-auto p-4 sm:p-6 max-h-[70vh]" style={frame.pageStyle}>
-      <div style={{ maxWidth: 600, width: "100%", margin: "0 auto", background: "#ffffff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+      <div style={{ maxWidth: width, width: "100%", margin: "0 auto", background: "#ffffff", borderRadius: 12, overflow: "hidden", boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
         {frame.header}
         <div className="prose-editor" style={frame.bodyStyle}
-          dangerouslySetInnerHTML={{ __html: bodyHtml || "<p style='color:#94a3b8'>(sem conteúdo)</p>" }} />
+          dangerouslySetInnerHTML={{ __html: previewSafeHtml(bodyHtml) || "<p style='color:#94a3b8'>(sem conteúdo)</p>" }} />
         {frame.footer}
       </div>
     </div>
   );
+}
+
+/** HTML "rico" = layout de e-mail em tabela (hero, cards, colunas). O editor de
+ *  texto (TipTap) NÃO sabe representar isso: ao carregar, ele normaliza para o
+ *  próprio esquema e descarta tabelas/estilo inline — por isso um corpo assim
+ *  abre direto no modo HTML e só sai de lá com confirmação explícita. */
+function isRichEmailHtml(html: string): boolean {
+  return /<\s*(table|td|tr)\b/i.test(html);
 }
 
 // ─── Aba Configurações ────────────────────────────────────────────────────────
@@ -511,6 +520,8 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [subject, setSubject] = useState(campaign?.subject ?? "");
   // Campanha nova começa com o texto de exemplo (dá para apagar e escrever o seu).
   const [body, setBody] = useState(campaign ? (campaign.bodyHtml ?? "") : SAMPLE_BODY);
+  // Corpo em HTML (layout rico de e-mail) abre no modo código — ver isRichEmailHtml.
+  const [htmlMode, setHtmlMode] = useState(() => isRichEmailHtml(campaign?.bodyHtml ?? ""));
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [settings, setSettings] = useState<NewsletterSettings | null>(null);
@@ -553,6 +564,24 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
     () => buildMolduraFrame(frameConfig, { fromName: settings?.newsletterFromName, replyTo: settings?.newsletterReplyTo }),
     [frameConfig, settings],
   );
+  // Mesma largura do cartão que o servidor usa (email.ts): 640 no tela cheia.
+  const frameWidth = frameConfig.layout === "full" ? 640 : 600;
+
+  /** Alterna editor de texto ⇄ HTML. Sair do HTML com layout rico avisa: o
+   *  TipTap normaliza o conteúdo para o esquema dele e perde tabelas/estilo. */
+  async function switchMode() {
+    if (htmlMode && isRichEmailHtml(body)) {
+      const ok = await confirm({
+        title: "Abrir no editor de texto?",
+        message: "Este conteúdo é um layout de e-mail em tabela. O editor de texto vai simplificá-lo e o visual rico será perdido ao salvar.",
+        confirmLabel: "Abrir mesmo assim",
+        cancelLabel: "Continuar no HTML",
+        tone: "danger",
+      });
+      if (!ok) return;
+    }
+    setHtmlMode((v) => !v);
+  }
 
   // Detalhe (fila) só faz sentido depois de disparada.
   useEffect(() => {
@@ -676,8 +705,33 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
         </div>
 
         <div>
-          <label className={labelCls}>Conteúdo</label>
-          {editable ? (
+          <div className="flex items-center justify-between gap-3 mb-1">
+            <label className={labelCls}>Conteúdo</label>
+            {editable && (
+              <button type="button" onClick={switchMode}
+                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0B2A66] dark:text-blue-300 hover:underline">
+                <Code2 size={13} /> {htmlMode ? "Editor de texto" : "Editar em HTML"}
+              </button>
+            )}
+          </div>
+          {!editable ? (
+            <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
+          ) : htmlMode ? (
+            <div className="space-y-3">
+              <textarea
+                className={`${inputCls} font-mono text-[12px] leading-relaxed`}
+                rows={14}
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                spellCheck={false}
+                placeholder="<table>…</table> — HTML de e-mail (estilo inline)"
+              />
+              <div>
+                <p className={`${labelCls} mb-1`}>Prévia</p>
+                <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
+              </div>
+            </div>
+          ) : (
             <RichTextEditor
               value={body}
               onChange={setBody}
@@ -688,11 +742,11 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
                 return { url: r.url, mediaType: "image" as const };
               }}
             />
-          ) : (
-            <MolduraStatic frame={frame} bodyHtml={body} />
           )}
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-            Você escreve dentro da moldura escolhida. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar — a prévia é fiel, mas o e-mail final é montado no servidor.
+            {htmlMode
+              ? "Modo HTML: use estilo inline (style=\"…\") e tabelas — é o que os clientes de e-mail entendem. Imagens precisam de URL: envie pelo editor de texto ou use /api/uploads/…."
+              : "Você escreve dentro da moldura escolhida. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar — a prévia é fiel, mas o e-mail final é montado no servidor."}
           </p>
         </div>
       </div>
