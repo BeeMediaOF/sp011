@@ -14,7 +14,7 @@
 
 import { Router } from "express";
 import { and, count, desc, eq, ilike, type SQL } from "drizzle-orm";
-import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable, newsletterSubscribersTable } from "@workspace/db";
+import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable, newsletterSubscribersTable, newsletterTemplatesTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
@@ -22,6 +22,7 @@ import type { SiteSettings, NewsletterTemplate } from "../lib/store.js";
 import { sendEmail } from "../lib/mailer.js";
 import { getNewsletterSmtpConfig, renderNewsletterEmail } from "../lib/newsletter/email.js";
 import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
+import { sanitizeEmailHtml } from "@workspace/news-engine/sanitize";
 import { startCampaignSend } from "../lib/newsletter/dispatch.js";
 import { getPublicBase } from "../lib/social/queueProcessor.js";
 
@@ -44,6 +45,8 @@ const DEFAULT_TEMPLATE: Required<NewsletterTemplate> = {
   bodyTextColor: "",
   footerText: "",
   signature: "",
+  headerHtml: "",
+  footerHtml: "",
 };
 
 /** Subconjunto newsletter das settings, com o segredo MASCARADO para leitura. */
@@ -85,6 +88,10 @@ function sanitizeTemplate(input: unknown): NewsletterTemplate {
   const header = str(t["headerText"], 120);   if (header !== undefined) out.headerText = header;
   const footer = str(t["footerText"], 1000);  if (footer !== undefined) out.footerText = footer;
   const sign   = str(t["signature"], 1000);   if (sign   !== undefined) out.signature   = sign;
+  // HTML de cabeçalho/rodapé (modo "código"): sanitizado pela política de e-mail
+  // (preserva `style` inline seguro, mata script/js/on*). Limite antes de sanitizar.
+  if (typeof t["headerHtml"] === "string") out.headerHtml = sanitizeEmailHtml((t["headerHtml"] as string).slice(0, 20000));
+  if (typeof t["footerHtml"] === "string") out.footerHtml = sanitizeEmailHtml((t["footerHtml"] as string).slice(0, 20000));
   return out;
 }
 
@@ -159,13 +166,9 @@ router.post("/test", async (req, res) => {
 router.post("/preview", (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const s = store.getSettings();
-  const tpl = sanitizeTemplate(b["newsletterTemplate"]);
+  const tpl = sanitizeTemplate(b["newsletterTemplate"] ?? b["template"]);
   const fromName = typeof b["fromName"] === "string" ? b["fromName"].trim().slice(0, 120) : undefined;
-  const merged: SiteSettings = {
-    ...s,
-    newsletterFromName: fromName ?? s.newsletterFromName,
-    newsletterTemplate: { ...(s.newsletterTemplate ?? {}), ...tpl },
-  };
+  const merged: SiteSettings = { ...s, newsletterFromName: fromName ?? s.newsletterFromName };
   const base = getPublicBase() ?? "";
   const sampleBody =
     `<h2 style="margin:0 0 12px;font-size:20px;">Título da matéria</h2>` +
@@ -175,6 +178,7 @@ router.post("/preview", (req, res) => {
     `<p style="margin:0;">Abraços,<br/>Equipe.</p>`;
   const { html } = renderNewsletterEmail({
     settings: merged,
+    template: tpl,
     subject: "Prévia da newsletter",
     bodyHtml: sampleBody,
     unsubscribeUrl: `${base}/api/newsletter/unsubscribe?token=exemplo`,
@@ -189,10 +193,16 @@ router.post("/preview", (req, res) => {
 // sanitizador isomórfico do ingest). O disparo real (fan-out + drip + teto) fica
 // no produtor `startCampaignSend`; o worker envia.
 
-function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string } {
-  const out: { subject?: string; bodyHtml?: string } = {};
+function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bodyHtml?: string; templateId?: number | null } {
+  const out: { subject?: string; bodyHtml?: string; templateId?: number | null } = {};
   if (typeof b["subject"]  === "string") out.subject  = (b["subject"] as string).trim().slice(0, 300);
   if (typeof b["bodyHtml"] === "string") out.bodyHtml = sanitizeIngestHtml(b["bodyHtml"] as string);
+  // templateId: null/"" = moldura Padrão; inteiro positivo = moldura da biblioteca.
+  if ("templateId" in b) {
+    const v = b["templateId"];
+    if (v === null || v === "") out.templateId = null;
+    else { const n = Number(v); if (Number.isInteger(n) && n > 0) out.templateId = n; }
+  }
   return out;
 }
 
@@ -217,7 +227,7 @@ router.post("/campaigns", async (req, res) => {
   if (!input.subject) { res.status(400).json({ ok: false, error: "Assunto obrigatório." }); return; }
   const [row] = await db
     .insert(newsletterCampaignsTable)
-    .values({ subject: input.subject, bodyHtml: input.bodyHtml ?? "", status: "draft" })
+    .values({ subject: input.subject, bodyHtml: input.bodyHtml ?? "", status: "draft", templateId: input.templateId ?? null })
     .returning();
   res.json({ ok: true, campaign: row });
 });
@@ -248,8 +258,9 @@ router.put("/campaigns/:id", async (req, res) => {
   }
   const input = parseCampaignInput((req.body ?? {}) as Record<string, unknown>);
   const patch: Record<string, unknown> = { updatedAt: new Date() };
-  if (input.subject !== undefined)  patch["subject"]  = input.subject;
-  if (input.bodyHtml !== undefined) patch["bodyHtml"] = input.bodyHtml;
+  if (input.subject !== undefined)    patch["subject"]    = input.subject;
+  if (input.bodyHtml !== undefined)   patch["bodyHtml"]   = input.bodyHtml;
+  if (input.templateId !== undefined) patch["templateId"] = input.templateId;
   await db.update(newsletterCampaignsTable).set(patch).where(eq(newsletterCampaignsTable.id, id));
   const [row] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
   res.json({ ok: true, campaign: row });
@@ -298,6 +309,72 @@ router.post("/campaigns/:id/cancel", async (req, res) => {
   await db.update(newsletterCampaignsTable)
     .set({ status: "canceled", updatedAt: new Date() })
     .where(eq(newsletterCampaignsTable.id, id));
+  res.json({ ok: true });
+});
+
+// ── Molduras (biblioteca de templates de e-mail) ──────────────────────────────
+// A moldura "Padrão" é a de site_settings.newsletterTemplate (aba Configurações);
+// esta biblioteca guarda molduras EXTRAS, nomeadas. `config` é sanitizado (o HTML
+// de cabeçalho/rodapé pela política de e-mail; ver sanitizeTemplate).
+
+function parseTemplateBody(b: Record<string, unknown>): { name?: string; config?: NewsletterTemplate } {
+  const out: { name?: string; config?: NewsletterTemplate } = {};
+  if (typeof b["name"] === "string") out.name = (b["name"] as string).trim().slice(0, 120);
+  const raw = b["template"] ?? b["config"] ?? b["newsletterTemplate"];
+  if (raw !== undefined) out.config = sanitizeTemplate(raw);
+  return out;
+}
+
+// GET /templates — lista (editadas mais recentemente primeiro).
+router.get("/templates", async (_req, res) => {
+  const rows = await db.select().from(newsletterTemplatesTable).orderBy(desc(newsletterTemplatesTable.updatedAt)).limit(200);
+  res.json({ templates: rows });
+});
+
+// POST /templates — cria uma moldura.
+router.post("/templates", async (req, res) => {
+  const input = parseTemplateBody((req.body ?? {}) as Record<string, unknown>);
+  if (!input.name) { res.status(400).json({ ok: false, error: "Nome obrigatório." }); return; }
+  const [row] = await db
+    .insert(newsletterTemplatesTable)
+    .values({ name: input.name, config: (input.config ?? {}) as Record<string, unknown> })
+    .returning();
+  res.json({ ok: true, template: row });
+});
+
+// GET /templates/:id — uma moldura.
+router.get("/templates/:id", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [row] = await db.select().from(newsletterTemplatesTable).where(eq(newsletterTemplatesTable.id, id)).limit(1);
+  if (!row) { res.status(404).json({ ok: false }); return; }
+  res.json({ template: row });
+});
+
+// PUT /templates/:id — renomeia e/ou atualiza a config.
+router.put("/templates/:id", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const input = parseTemplateBody((req.body ?? {}) as Record<string, unknown>);
+  const patch: Record<string, unknown> = { updatedAt: new Date() };
+  if (input.name !== undefined) {
+    if (!input.name) { res.status(400).json({ ok: false, error: "Nome obrigatório." }); return; }
+    patch["name"] = input.name;
+  }
+  if (input.config !== undefined) patch["config"] = input.config as Record<string, unknown>;
+  const upd = await db.update(newsletterTemplatesTable).set(patch).where(eq(newsletterTemplatesTable.id, id)).returning();
+  if (upd.length === 0) { res.status(404).json({ ok: false }); return; }
+  res.json({ ok: true, template: upd[0] });
+});
+
+// DELETE /templates/:id — remove; campanhas que a usavam voltam à Padrão.
+router.delete("/templates/:id", async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  await db.update(newsletterCampaignsTable)
+    .set({ templateId: null, updatedAt: new Date() })
+    .where(eq(newsletterCampaignsTable.templateId, id));
+  await db.delete(newsletterTemplatesTable).where(eq(newsletterTemplatesTable.id, id));
   res.json({ ok: true });
 });
 

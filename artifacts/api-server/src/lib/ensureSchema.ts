@@ -114,6 +114,17 @@ export async function ensureSchema(target: Db = db): Promise<void> {
       updated_at    timestamptz NOT NULL DEFAULT now()
     )`,
     sql`CREATE INDEX IF NOT EXISTS newsletter_campaign_status_idx ON newsletter_campaigns (status)`,
+    // Moldura escolhida por campanha (NULL = moldura Padrão das settings).
+    sql`ALTER TABLE newsletter_campaigns ADD COLUMN IF NOT EXISTS template_id integer`,
+    // PRD-NEWSLETTER-01 (pós-MVP) — biblioteca de molduras (cabeçalho/rodapé),
+    // isolada por blog. Config = NewsletterTemplate (cores/logo/textos + HTML).
+    sql`CREATE TABLE IF NOT EXISTS newsletter_templates (
+      id          serial PRIMARY KEY,
+      name        text NOT NULL,
+      config      jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at  timestamptz NOT NULL DEFAULT now(),
+      updated_at  timestamptz NOT NULL DEFAULT now()
+    )`,
     sql`CREATE TABLE IF NOT EXISTS newsletter_send_queue (
       id            serial PRIMARY KEY,
       kind          text NOT NULL DEFAULT 'campaign',

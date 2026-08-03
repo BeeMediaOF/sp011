@@ -8,6 +8,7 @@ import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { startScheduler } from "./lib/scheduler.js";
 import { startSanityMonitor } from "./lib/sanityMonitor.js";
 import { startNewsletterWorker } from "./lib/newsletter/dispatch.js";
+import { seedNewsletterTemplates } from "./lib/newsletter/seedTemplates.js";
 import { migrateJsonContent } from "./lib/migrateJsonContent.js";
 import { migrateTwoFactorSecrets } from "./lib/migrateTwoFactorSecrets.js";
 import { ensureSchema } from "./lib/ensureSchema.js";
@@ -170,6 +171,9 @@ async function bootWithDb(): Promise<void> {
   startSettingsSync();
   await seedDefaultRssSources();
   await seedAdminUser();
+  // Molduras de e-mail de exemplo (uma vez por blog; não-fatal). Só depois do
+  // store hidratado (lê/marca settings) e do ensureSchema (tabela criada).
+  await seedNewsletterTemplates();
 
   // Migrate articles from store.json to DB (runs only when DB table is empty)
   try {

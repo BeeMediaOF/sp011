@@ -141,8 +141,33 @@
   diário com cap baixo distribuindo por dias; export CSV (endpoint pronto,
   conferir o botão).
 
+## Pós-MVP — Biblioteca de molduras (templates de e-mail)
+- **Objetivo (pedido do usuário):** poder criar/salvar várias molduras de e-mail
+  (estrutura visual: cabeçalho/rodapé), inclusive por **código HTML**, e escolher
+  a moldura por campanha. O **corpo** da campanha continua no editor de sempre.
+- **Nova tabela `newsletter_templates`** (isolada por blog, autocriada em
+  ensureSchema; jsonb `config` = `NewsletterTemplate`). A moldura **Padrão**
+  segue em `site_settings.newsletterTemplate` (aba Configurações); a tabela guarda
+  as molduras **extras**. `newsletter_campaigns.template_id` (NULL = Padrão).
+- **HTML de cabeçalho/rodapé** (`headerHtml`/`footerHtml`) sanitizado por um
+  sanitizador NOVO exclusivo de e-mail (`sanitizeEmailHtml` no news-engine): mesma
+  allowlist por parser, mas **preserva `style` inline seguro** e atributos de
+  tabela (e-mail só se estiliza inline) — sem tocar no sanitizador de artigo.
+  As linhas automáticas de remetente + **descadastro** nunca somem (LGPD).
+- **Rotas** `/api/admin/newsletter/templates` (CRUD) + `POST /preview` passou a
+  renderizar a moldura recebida (com HTML). `renderNewsletterEmail` ganhou
+  override de `template`; o worker resolve `template_id` da campanha.
+- **UI**: nova subaba **Modelos** (lista + editor com campos + modo código +
+  prévia ao vivo, componentes `ShellFields`/`ShellPreview` reaproveitados na
+  Configurações), seletor **Moldura** no editor de campanha. **3 molduras de
+  exemplo** semeadas no boot (uma via HTML) — semeadura idempotente por flag.
+- Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
+  testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
+  frontend typecheck ✅. **Falta validar em prod na VPS.**
+
 ## Modo atual
-**Newsletter COMPLETA e validada em prod no sp011 (Fases 1–4).** Rollout ainda
+**Newsletter COMPLETA e validada em prod no sp011 (Fases 1–4).** Biblioteca de
+molduras (pós-MVP) implementada e verde localmente — **validar na VPS**. Rollout ainda
 só no sp011 (blogs replicados seguem na imagem anterior, sem as tabelas/UI de
 newsletter até o próximo bump de imagem). Próximo passo: **rollout da rede**
 (ver `RELATORIO-FINAL.md` §Rollout) — é um bump de `BLOG_IMAGE_VERSION` +

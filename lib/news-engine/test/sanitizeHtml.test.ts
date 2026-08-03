@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sanitizeArticleHtml, sanitizeAmpHtml, containsDangerousHtml } from "../src/sanitizeHtml.ts";
+import { sanitizeArticleHtml, sanitizeAmpHtml, sanitizeEmailHtml, containsDangerousHtml } from "../src/sanitizeHtml.ts";
 
 /**
  * PRD-04a — bateria de bypass que a regex antiga (DANGEROUS_HTML) NAO pegava.
@@ -47,6 +47,39 @@ test("HTML editorial legitimo passa intacto e nao e flagrado", () => {
   const limpo = sanitizeArticleHtml(legit);
   for (const tag of ["<h2>", "<p>", "<b>", "<ul>", "<li>", "<h3>", "<blockquote>", "<img", 'href="https://exemplo.com/x"']) {
     assert.ok(limpo.includes(tag), `perdeu conteudo legitimo: ${tag} -> ${limpo}`);
+  }
+});
+
+test("sanitizeEmailHtml PRESERVA style inline seguro + attrs de tabela (ao contrario do artigo)", () => {
+  const html =
+    '<table width="100%" bgcolor="#0B2A66" cellpadding="0" cellspacing="0">' +
+    '<tr><td valign="top" style="padding:24px;text-align:center;color:#ffffff;background:#0B2A66;">' +
+    '<a href="https://exemplo.com" style="color:#fff;text-decoration:none;">Ver no site</a></td></tr></table>';
+  const limpo = sanitizeEmailHtml(html);
+  // style inline e atributos presentacionais sobrevivem (e-mail so estiliza inline)
+  assert.ok(limpo.includes("style="), `perdeu style inline: ${limpo}`);
+  assert.ok(limpo.includes('bgcolor="#0B2A66"'), `perdeu bgcolor: ${limpo}`);
+  assert.ok(limpo.includes('width="100%"'), `perdeu width: ${limpo}`);
+  assert.ok(limpo.includes('href="https://exemplo.com"'), `perdeu href seguro: ${limpo}`);
+  // ...mas o sanitizador de ARTIGO continua removendo style (dominios distintos)
+  assert.ok(!sanitizeArticleHtml(html).includes("style="), "artigo nao deveria manter style inline");
+});
+
+test("sanitizeEmailHtml neutraliza executaveis (script/on*/js: em style/href)", () => {
+  const vetores = [
+    '<div style="color:red;background:url(javascript:alert(1))">x</div>',
+    '<div style="width:expression(alert(1))">x</div>',
+    '<td onclick="alert(1)" style="color:#000">x</td>',
+    '<a href="javascript:alert(1)" style="color:#000">x</a>',
+    '<p>ok</p><script>alert(1)</script>',
+  ];
+  for (const v of vetores) {
+    const limpo = sanitizeEmailHtml(v);
+    assert.equal(containsDangerousHtml(limpo), false, `email nao neutralizou: ${v} -> ${limpo}`);
+    const low = limpo.toLowerCase();
+    for (const proibido of ["onclick", "javascript:", "expression(", "<script"]) {
+      assert.ok(!low.includes(proibido), `resto perigoso "${proibido}" em: ${limpo}`);
+    }
   }
 });
 

@@ -90,9 +90,9 @@ export const adminApi = {
   listNewsletterCampaigns: () => req<{ campaigns: NewsletterCampaign[] }>("GET", "/newsletter/campaigns"),
   getNewsletterCampaign: (id: number) =>
     req<{ campaign: NewsletterCampaign; queue: NewsletterQueueStat[] }>("GET", `/newsletter/campaigns/${id}`),
-  createNewsletterCampaign: (data: { subject: string; bodyHtml: string }) =>
+  createNewsletterCampaign: (data: { subject: string; bodyHtml: string; templateId?: number | null }) =>
     req<{ ok: boolean; campaign: NewsletterCampaign }>("POST", "/newsletter/campaigns", data),
-  updateNewsletterCampaign: (id: number, data: { subject?: string; bodyHtml?: string }) =>
+  updateNewsletterCampaign: (id: number, data: { subject?: string; bodyHtml?: string; templateId?: number | null }) =>
     req<{ ok: boolean; campaign: NewsletterCampaign }>("PUT", `/newsletter/campaigns/${id}`, data),
   /** scheduledAt (ISO) no futuro = agenda; ausente/passado = envia agora. */
   sendNewsletterCampaign: (id: number, scheduledAt?: string) =>
@@ -101,6 +101,16 @@ export const adminApi = {
     ),
   cancelNewsletterCampaign: (id: number) =>
     req<{ ok: boolean; error?: string }>("POST", `/newsletter/campaigns/${id}/cancel`, {}),
+
+  // Newsletter — molduras (aba Modelos). Biblioteca de shells (cabeçalho/rodapé).
+  listNewsletterTemplates: () => req<{ templates: NewsletterTemplateRecord[] }>("GET", "/newsletter/templates"),
+  getNewsletterTemplate: (id: number) => req<{ template: NewsletterTemplateRecord }>("GET", `/newsletter/templates/${id}`),
+  createNewsletterTemplate: (data: { name: string; template: NewsletterTemplate }) =>
+    req<{ ok: boolean; template: NewsletterTemplateRecord }>("POST", "/newsletter/templates", data),
+  updateNewsletterTemplate: (id: number, data: { name?: string; template?: NewsletterTemplate }) =>
+    req<{ ok: boolean; template: NewsletterTemplateRecord }>("PUT", `/newsletter/templates/${id}`, data),
+  deleteNewsletterTemplate: (id: number) =>
+    req<{ ok: boolean }>("DELETE", `/newsletter/templates/${id}`),
 
   // Newsletter — inscritos (Fase 4). CSV baixado por blob (auth Bearer, sem token na URL).
   listNewsletterSubscribers: (params?: { status?: string; page?: number; q?: string }) => {
@@ -481,7 +491,7 @@ export interface SiteSettings {
   footerConfig?: FooterConfig;
 }
 
-/** Modelo (shell) do e-mail da newsletter — espelho do tipo do servidor. */
+/** Moldura (shell) do e-mail da newsletter — espelho do tipo do servidor. */
 export interface NewsletterTemplate {
   accentColor?: string;
   logoMode?: "wordmark" | "none" | "image";
@@ -492,6 +502,19 @@ export interface NewsletterTemplate {
   bodyTextColor?: string;
   footerText?: string;
   signature?: string;
+  /** HTML próprio do cabeçalho (modo "código") — substitui a logo/wordmark. */
+  headerHtml?: string;
+  /** HTML próprio do rodapé (modo "código") — acima das linhas automáticas. */
+  footerHtml?: string;
+}
+
+/** Moldura salva na biblioteca (aba Modelos). Datas em ISO. */
+export interface NewsletterTemplateRecord {
+  id: number;
+  name: string;
+  config: NewsletterTemplate;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Config da newsletter (subaba Configurações). Segredo `newsletterSmtpPass`
@@ -519,6 +542,8 @@ export interface NewsletterCampaign {
   subject: string;
   bodyHtml: string;
   status: NewsletterCampaignStatus;
+  /** Moldura escolhida (newsletter_templates.id) ou null = moldura Padrão. */
+  templateId: number | null;
   scheduledAt: string | null;
   sentAt: string | null;
   recipients: number;

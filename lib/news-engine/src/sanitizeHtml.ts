@@ -132,6 +132,56 @@ export function sanitizeArticleHtml(html: string | null | undefined): string {
   return $.html();
 }
 
+/** Atributos presentacionais seguros extras permitidos SÓ no HTML de e-mail
+ *  (molduras de newsletter): layout de tabela, dimensoes, cor de fundo. Nao
+ *  executaveis. `style` inline e tratado a parte (isSafeStyle). */
+const EMAIL_EXTRA_ATTRS = new Set([
+  "bgcolor", "width", "height", "valign", "cellpadding", "cellspacing", "border", "nowrap",
+]);
+
+/**
+ * `true` se o `style` inline e seguro. E-mail so se estiliza com CSS inline, entao
+ * `style` e PRESERVADO (ao contrario do corpo de artigo, que o descarta), mas
+ * bloqueia os unicos vetores executaveis dentro de style: `expression(...)`
+ * (IE legado) e esquema `javascript:`/`vbscript:` (inclusive dentro de `url()`).
+ */
+function isSafeStyle(v: string | undefined): boolean {
+  if (v == null) return false;
+  if (/expression\s*\(/i.test(v)) return false;
+  if (/(javascript|vbscript)\s*:/i.test(v)) return false;
+  return true;
+}
+
+/**
+ * Sanitiza HTML de CABECALHO/RODAPE de molduras de e-mail (newsletter). Mesma
+ * base da politica de artigo (allowlist por parser, remove script/iframe/tag de
+ * style, handlers `on...` e URLs perigosas), MAS preserva `style` inline seguro
+ * e os atributos presentacionais de tabela — sem eles o e-mail sai sem estilo.
+ * NUNCA usada no corpo de artigo nem no ingest: exclusiva do e-mail.
+ */
+export function sanitizeEmailHtml(html: string | null | undefined): string {
+  if (!html) return "";
+  const $ = cheerio.load(html, undefined, false);
+  $(DANGEROUS_TAGS.join(",")).remove();
+  unwrapDisallowed($, ARTICLE_TAGS);
+  $("*").each((_, el) => {
+    const e = el as El;
+    const tag = tagOf(el);
+    const perTag = ARTICLE_ATTRS[tag] ?? new Set<string>();
+    const attribs = e.attribs ?? {};
+    for (const name of Object.keys(attribs)) {
+      const ln = name.toLowerCase();
+      if (ln.startsWith("on")) { $(el as never).removeAttr(name); continue; }
+      if (ln === "style") { if (!isSafeStyle(attribs[name])) $(el as never).removeAttr(name); continue; }
+      if (URL_ATTRS.has(ln)) { if (!isSafeUrl(attribs[name])) $(el as never).removeAttr(name); continue; }
+      if (!GLOBAL_SAFE_ATTRS.has(ln) && !EMAIL_EXTRA_ATTRS.has(ln) && !perTag.has(ln)) {
+        $(el as never).removeAttr(name);
+      }
+    }
+  });
+  return $.html();
+}
+
 /**
  * Sanitiza HTML para AMP (allowlist estrita): converte `<img>` em `<amp-img>`
  * responsivo, remove tudo de executavel/embed e limpa atributos. Nunca deixa

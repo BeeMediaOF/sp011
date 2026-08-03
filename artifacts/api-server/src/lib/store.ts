@@ -177,6 +177,13 @@ export interface NewsletterTemplate {
   bodyTextColor?: string;
   footerText?: string;
   signature?: string;
+  /** HTML próprio do cabeçalho (modo "código"). Quando presente, substitui a
+   *  logo/wordmark — permite desenhar a faixa de topo à mão. Sanitizado com a
+   *  política de e-mail (preserva `style` inline seguro). */
+  headerHtml?: string;
+  /** HTML próprio do rodapé (modo "código"). Quando presente, entra ACIMA das
+   *  linhas automáticas de remetente e descadastro (que nunca somem — LGPD). */
+  footerHtml?: string;
 }
 
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */
@@ -324,7 +331,8 @@ export interface SiteSettings {
   newsletterSmtpPass?: string;                          // SEGREDO (SECRET_FIELDS)
   newsletterReplyTo?: string;
   newsletterDailyCap?: number;                          // teto diário (default 450)
-  newsletterTemplate?: NewsletterTemplate;
+  newsletterTemplate?: NewsletterTemplate;              // moldura "Padrão"
+  newsletterTemplatesSeeded?: boolean;                  // molduras de exemplo já semeadas (boot)
 }
 
 export type ColumnistSpecialty =
@@ -926,6 +934,7 @@ export const store = {
     delete out["newsletterReplyTo"];
     delete out["newsletterDailyCap"];
     delete out["newsletterTemplate"];
+    delete out["newsletterTemplatesSeeded"];
     // Imagens base64 → URLs cacheáveis (ver SITE_ASSET_FIELDS).
     for (const [key, field] of Object.entries(SITE_ASSET_FIELDS)) {
       const v = out[field];

@@ -78,6 +78,9 @@ interface RenderOpts {
   previewText?: string;
   /** Base pública do blog — usada para absolutizar a logo root-relativa. */
   baseUrl?: string;
+  /** Moldura a usar. Ausente = a moldura "Padrão" das settings
+   *  (`s.newsletterTemplate`). Uma campanha passa a moldura escolhida. */
+  template?: NewsletterTemplate;
 }
 
 /** Torna absoluta uma URL root-relativa (`/…`) usando a base; deixa http(s)/
@@ -90,6 +93,14 @@ function absUrl(u: string | undefined, base?: string): string | undefined {
   return s;
 }
 
+/** Reescreve URLs root-relativas (`src`/`href="/…"`) de um bloco HTML para
+ *  absolutas — imagens/links relativos não resolvem em cliente de e-mail. */
+function absolutizeHtmlUrls(html: string, base?: string): string {
+  if (!base) return html;
+  const b = base.replace(/\/+$/, "");
+  return html.replace(/(\b(?:src|href)=")\/(?!\/)/gi, `$1${b}/`);
+}
+
 /**
  * Envolve o corpo da campanha no shell de marca do blog (tabelas + estilos
  * inline, à prova de cliente de e-mail). Base derivada de `welcomeEmailHtml`,
@@ -97,13 +108,15 @@ function absUrl(u: string | undefined, base?: string): string | undefined {
  */
 export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: string } {
   const { settings: s, subject, bodyHtml, unsubscribeUrl, footerNote, previewText, baseUrl } = opts;
-  const tpl: NewsletterTemplate = s.newsletterTemplate ?? {};
+  const tpl: NewsletterTemplate = opts.template ?? s.newsletterTemplate ?? {};
   const accent = (tpl.accentColor || s.adminAccentColor || "#0B2A66").trim();
   const headerTextColor = (tpl.headerTextColor || "#ffffff").trim();
   const pageBg = (tpl.pageBgColor || "#F0F4F8").trim();
   const bodyColor = (tpl.bodyTextColor || "#1A202C").trim();
   const logoMode = tpl.logoMode ?? "wordmark";
-  const showHeader = logoMode !== "none";
+  const headerHtml = tpl.headerHtml?.trim() || "";
+  const footerHtml = tpl.footerHtml?.trim() || "";
+  const showHeader = logoMode !== "none" || !!headerHtml;
   const logoSrc = logoMode === "image" ? absUrl(tpl.logoUrl, baseUrl) : undefined;
   const name = senderName(s);
   const headerText = tpl.headerText?.trim() || name;
@@ -115,15 +128,24 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
     ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${esc(previewText)}</div>`
     : "";
 
-  // Logo por imagem quando configurada; senão o nome (wordmark) na cor definida.
-  const headerInner = logoSrc
-    ? `<img src="${esc(logoSrc)}" alt="${esc(headerText)}" style="max-height:48px;width:auto;display:inline-block;border:0;" />`
-    : `<span style="color:${esc(headerTextColor)};font-size:22px;font-weight:800;letter-spacing:-0.3px;">${esc(headerText)}</span>`;
-  const header = showHeader
-    ? `<tr><td style="background:${esc(accent)};padding:26px 40px;text-align:center;">${headerInner}</td></tr>`
-    : "";
+  // Cabeçalho: HTML próprio (modo código) manda; ele controla fundo/padding —
+  // a célula não impõe cor de destaque. Senão, logo por imagem ou wordmark.
+  let header: string;
+  if (headerHtml) {
+    header = `<tr><td>${absolutizeHtmlUrls(headerHtml, baseUrl)}</td></tr>`;
+  } else if (showHeader) {
+    const headerInner = logoSrc
+      ? `<img src="${esc(logoSrc)}" alt="${esc(headerText)}" style="max-height:48px;width:auto;display:inline-block;border:0;" />`
+      : `<span style="color:${esc(headerTextColor)};font-size:22px;font-weight:800;letter-spacing:-0.3px;">${esc(headerText)}</span>`;
+    header = `<tr><td style="background:${esc(accent)};padding:26px 40px;text-align:center;">${headerInner}</td></tr>`;
+  } else {
+    header = "";
+  }
 
   const footerBlocks: string[] = [];
+  // Rodapé em HTML próprio (modo código) entra ANTES das linhas automáticas
+  // (remetente + descadastro) — que nunca somem, garantindo o descadastro LGPD.
+  if (footerHtml) footerBlocks.push(absolutizeHtmlUrls(footerHtml, baseUrl));
   if (signature) {
     footerBlocks.push(`<p style="margin:0 0 12px;color:#4A5568;font-size:14px;line-height:1.6;">${esc(signature).replace(/\n/g, "<br/>")}</p>`);
   }

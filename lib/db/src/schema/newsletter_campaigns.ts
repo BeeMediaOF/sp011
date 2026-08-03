@@ -17,6 +17,9 @@ export const newsletterCampaignsTable = pgTable("newsletter_campaigns", {
   bodyHtml:    text("body_html").notNull().default(""),
   // 'draft' | 'scheduled' | 'sending' | 'sent' | 'failed' | 'canceled'.
   status:      text("status").notNull().default("draft"),
+  // Moldura (newsletter_templates.id) que envolve o corpo. NULL = moldura Padrão
+  // (site_settings.newsletterTemplate). Resolvida na hora de montar o e-mail.
+  templateId:  integer("template_id"),
   // Quando disparar (NULL = rascunho). Futuro = agendada; venceu = o worker
   // promove a 'sending' e o produtor faz o fan-out.
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),

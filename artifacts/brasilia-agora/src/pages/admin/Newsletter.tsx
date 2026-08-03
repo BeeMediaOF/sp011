@@ -3,7 +3,7 @@ import {
   Mail, Users, Send, Settings as SettingsIcon, Save, TestTube2,
   Loader2, CheckCircle, AlertCircle, Plus, ArrowLeft, Clock, Calendar,
   Download, Search, ChevronLeft, ChevronRight, Ban, RefreshCw,
-  Image as ImageIcon, Eye,
+  Image as ImageIcon, Eye, LayoutTemplate, Code2, Trash2, Copy,
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import RichTextEditor from "@/components/admin/RichTextEditor";
@@ -11,14 +11,16 @@ import {
   adminApi,
   type NewsletterSettings, type NewsletterCampaign, type NewsletterCampaignStatus,
   type NewsletterQueueStat, type NewsletterSubscribersPage,
+  type NewsletterTemplate, type NewsletterTemplateRecord,
 } from "../../lib/adminApi";
 
 // ─── Subabas ────────────────────────────────────────────────────────────────
-type Tab = "subscribers" | "campaigns" | "config";
+type Tab = "subscribers" | "campaigns" | "templates" | "config";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "subscribers", label: "Inscritos",      icon: Users },
   { id: "campaigns",   label: "Campanhas",      icon: Send },
+  { id: "templates",   label: "Modelos",        icon: LayoutTemplate },
   { id: "config",      label: "Configurações",  icon: SettingsIcon },
 ];
 
@@ -94,6 +96,135 @@ function fmtDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+// ─── Moldura: campos + prévia (compartilhados por Configurações e Modelos) ────
+const monoCls =
+  "w-full px-3 py-2 border rounded-xl text-[12px] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 " +
+  "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-600 text-slate-800 dark:text-slate-100 " +
+  "placeholder:text-slate-400 dark:placeholder:text-slate-500";
+
+/** Campos estruturados da moldura (cabeçalho/rodapé/cores/logo) + modo "código"
+ *  (HTML próprio de cabeçalho e rodapé). Controlado: `value` + `onChange`. */
+function ShellFields({ value, title, onChange, onError }: {
+  value: NewsletterTemplate; title?: string;
+  onChange: (next: NewsletterTemplate) => void; onError?: (msg: string) => void;
+}) {
+  const [logoBusy, setLogoBusy] = useState(false);
+  const logoFileRef = useRef<HTMLInputElement>(null);
+  const [showCode, setShowCode] = useState(!!(value.headerHtml || value.footerHtml));
+  const set = (k: keyof NewsletterTemplate, v: string) => onChange({ ...value, [k]: v });
+
+  async function uploadLogo(file: File) {
+    setLogoBusy(true);
+    try {
+      const r = await adminApi.uploadImage(file, "logo-newsletter");
+      onChange({ ...value, logoUrl: r.url, logoMode: "image" });
+    } catch (e) {
+      onError?.(e instanceof Error ? e.message : "Falha no upload da logo.");
+    } finally { setLogoBusy(false); }
+  }
+
+  return (
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
+      <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">{title ?? "Cabeçalho e rodapé"}</h3>
+      <p className="text-[12px] text-slate-500 dark:text-slate-400 -mt-2">
+        A moldura que envolve o corpo de cada campanha. O descadastro obrigatório é adicionado automaticamente no rodapé. Cores vazias usam o padrão.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Cabeçalho">
+          <select className={inputCls} value={value.logoMode ?? "wordmark"} onChange={(e) => set("logoMode", e.target.value)}>
+            <option value="wordmark">Nome do site no topo</option>
+            <option value="image">Logo (imagem)</option>
+            <option value="none">Sem cabeçalho de marca</option>
+          </select>
+        </Field>
+        <ColorField label="Cor de destaque" hint="Barra do topo, botões e link de descadastro." value={value.accentColor ?? ""} fallback="#0B2A66" onChange={(v) => set("accentColor", v)} />
+
+        {value.logoMode === "image" && (
+          <div className="sm:col-span-2 space-y-2">
+            <label className={labelCls}>Logo (imagem)</label>
+            <div className="flex items-center gap-3 flex-wrap">
+              {value.logoUrl
+                ? <img src={value.logoUrl} alt="logo" className="h-11 w-auto max-w-[220px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white object-contain px-2" />
+                : <div className="h-11 px-4 flex items-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-[12px] text-slate-400">Sem logo</div>}
+              <input ref={logoFileRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadLogo(f); e.target.value = ""; }} />
+              <button type="button" onClick={() => logoFileRef.current?.click()} disabled={logoBusy} className={btnGhost}>
+                {logoBusy ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} {value.logoUrl ? "Trocar logo" : "Enviar logo"}
+              </button>
+              {value.logoUrl && <button type="button" onClick={() => set("logoUrl", "")} className="text-[12px] text-red-500 hover:underline">Remover</button>}
+            </div>
+            <p className="text-[11px] text-slate-400 dark:text-slate-500">PNG com fundo transparente fica melhor sobre a cor de destaque.</p>
+          </div>
+        )}
+
+        <ColorField label="Cor do texto do cabeçalho" hint="Nome do site sobre a barra de destaque." value={value.headerTextColor ?? ""} fallback="#ffffff" onChange={(v) => set("headerTextColor", v)} />
+        <ColorField label="Fundo da página" value={value.pageBgColor ?? ""} fallback="#F0F4F8" onChange={(v) => set("pageBgColor", v)} />
+        <ColorField label="Cor do texto do corpo" value={value.bodyTextColor ?? ""} fallback="#1A202C" onChange={(v) => set("bodyTextColor", v)} />
+        <Field label="Texto do cabeçalho (opcional)" hint="Vazio = nome do remetente."><input className={inputCls} value={value.headerText ?? ""} onChange={(e) => set("headerText", e.target.value)} /></Field>
+        <Field label="Assinatura (opcional)"><input className={inputCls} value={value.signature ?? ""} onChange={(e) => set("signature", e.target.value)} placeholder="Equipe SP011" /></Field>
+        <div className="sm:col-span-2">
+          <Field label="Texto do rodapé (opcional)"><textarea className={`${inputCls} min-h-[70px] resize-y`} value={value.footerText ?? ""} onChange={(e) => set("footerText", e.target.value)} placeholder="Endereço, CNPJ ou aviso legal…" /></Field>
+        </div>
+      </div>
+
+      {/* Modo "código": HTML próprio de cabeçalho/rodapé (colar ou eu montar). */}
+      <div className="border-t border-slate-100 dark:border-slate-800 pt-3">
+        <button type="button" onClick={() => setShowCode((v) => !v)}
+          className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#0B2A66] dark:text-blue-300">
+          <Code2 size={15} /> HTML avançado (cabeçalho/rodapé) {showCode ? "▲" : "▼"}
+        </button>
+        {showCode && (
+          <div className="mt-3 space-y-3">
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Cole HTML de e-mail (tabelas + <code>style</code> inline). Estilos inline seguros são preservados; scripts e <code>on…</code> são removidos. Deixe vazio para usar os campos acima.
+            </p>
+            <Field label="HTML do cabeçalho" hint="Substitui a logo/wordmark quando preenchido.">
+              <textarea className={`${monoCls} min-h-[120px] resize-y`} value={value.headerHtml ?? ""} onChange={(e) => set("headerHtml", e.target.value)}
+                placeholder={'<table width="100%"><tr><td style="padding:24px;text-align:center;background:#0B2A66;color:#fff;">…</td></tr></table>'} />
+            </Field>
+            <Field label="HTML do rodapé" hint="Entra acima das linhas automáticas de remetente e descadastro (que nunca somem).">
+              <textarea className={`${monoCls} min-h-[120px] resize-y`} value={value.footerHtml ?? ""} onChange={(e) => set("footerHtml", e.target.value)}
+                placeholder={'<table width="100%"><tr><td style="text-align:center;">…</td></tr></table>'} />
+            </Field>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Prévia ao vivo da moldura (renderizada no servidor, com debounce). */
+function ShellPreview({ template, fromName, height = 620 }: { template: NewsletterTemplate; fromName?: string; height?: number }) {
+  const [html, setHtml] = useState("");
+  useEffect(() => {
+    let alive = true;
+    const h = setTimeout(() => {
+      adminApi.previewNewsletter({ newsletterTemplate: template, fromName })
+        .then((r) => { if (alive) setHtml(r.html); })
+        .catch(() => { /* prévia é best-effort */ });
+    }, 350);
+    return () => { alive = false; clearTimeout(h); };
+  }, [template, fromName]);
+
+  return (
+    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
+        <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
+        <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
+      </div>
+      {html ? (
+        <iframe title="Prévia do e-mail" srcDoc={html} sandbox=""
+          className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white" style={{ height }} />
+      ) : (
+        <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
+          <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
+        </div>
+      )}
+    </section>
+  );
+}
+
 // ─── Aba Configurações ────────────────────────────────────────────────────────
 function ConfigTab() {
   const [form, setForm] = useState<NewsletterSettings>(EMPTY);
@@ -101,9 +232,6 @@ function ConfigTab() {
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
-  const [previewHtml, setPreviewHtml] = useState("");
-  const [logoBusy, setLogoBusy] = useState(false);
-  const logoFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -114,35 +242,9 @@ function ConfigTab() {
     return () => { alive = false; };
   }, []);
 
-  // Prévia ao vivo do shell (renderizada no servidor, com debounce) — reflete o
-  // que está na tela mesmo sem salvar.
-  useEffect(() => {
-    if (loading) return;
-    let alive = true;
-    const h = setTimeout(() => {
-      adminApi.previewNewsletter({ newsletterTemplate: form.newsletterTemplate, fromName: form.newsletterFromName })
-        .then((r) => { if (alive) setPreviewHtml(r.html); })
-        .catch(() => { /* prévia é best-effort */ });
-    }, 350);
-    return () => { alive = false; clearTimeout(h); };
-  }, [loading, form.newsletterTemplate, form.newsletterFromName]);
-
   const set = useCallback(<K extends keyof NewsletterSettings>(k: K, v: NewsletterSettings[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
   }, []);
-  const setTpl = useCallback((k: keyof NewsletterSettings["newsletterTemplate"], v: string) => {
-    setForm((f) => ({ ...f, newsletterTemplate: { ...f.newsletterTemplate, [k]: v } }));
-  }, []);
-
-  async function uploadLogo(file: File) {
-    setLogoBusy(true); setMsg(null);
-    try {
-      const r = await adminApi.uploadImage(file, "logo-newsletter");
-      setForm((f) => ({ ...f, newsletterTemplate: { ...f.newsletterTemplate, logoUrl: r.url, logoMode: "image" } }));
-    } catch (e) {
-      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha no upload da logo." });
-    } finally { setLogoBusy(false); }
-  }
 
   async function save() {
     setSaving(true); setMsg(null);
@@ -171,8 +273,6 @@ function ConfigTab() {
   if (loading) {
     return <div className="flex items-center gap-2 text-slate-400 text-sm py-10"><Loader2 size={16} className="animate-spin" /> Carregando…</div>;
   }
-
-  const tpl = form.newsletterTemplate;
 
   return (
     <div className="space-y-6">
@@ -226,50 +326,16 @@ function ConfigTab() {
         </div>
       </section>
 
-      {/* Modelo do e-mail */}
-      <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-        <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Modelo do e-mail</h3>
-        <p className="text-[12px] text-slate-500 dark:text-slate-400 -mt-2">
-          A moldura de marca que envolve o corpo de cada campanha. O descadastro obrigatório é adicionado automaticamente no rodapé. Cores vazias usam o padrão.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Cabeçalho">
-            <select className={inputCls} value={tpl.logoMode ?? "wordmark"} onChange={(e) => setTpl("logoMode", e.target.value)}>
-              <option value="wordmark">Nome do site no topo</option>
-              <option value="image">Logo (imagem)</option>
-              <option value="none">Sem cabeçalho de marca</option>
-            </select>
-          </Field>
-          <ColorField label="Cor de destaque" hint="Barra do topo, botões e link de descadastro." value={tpl.accentColor ?? ""} fallback="#0B2A66" onChange={(v) => setTpl("accentColor", v)} />
-
-          {tpl.logoMode === "image" && (
-            <div className="sm:col-span-2 space-y-2">
-              <label className={labelCls}>Logo (imagem)</label>
-              <div className="flex items-center gap-3 flex-wrap">
-                {tpl.logoUrl
-                  ? <img src={tpl.logoUrl} alt="logo" className="h-11 w-auto max-w-[220px] rounded-lg border border-slate-200 dark:border-slate-600 bg-white object-contain px-2" />
-                  : <div className="h-11 px-4 flex items-center rounded-lg border border-dashed border-slate-300 dark:border-slate-600 text-[12px] text-slate-400">Sem logo</div>}
-                <input ref={logoFileRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) void uploadLogo(f); e.target.value = ""; }} />
-                <button type="button" onClick={() => logoFileRef.current?.click()} disabled={logoBusy} className={btnGhost}>
-                  {logoBusy ? <Loader2 size={15} className="animate-spin" /> : <ImageIcon size={15} />} {tpl.logoUrl ? "Trocar logo" : "Enviar logo"}
-                </button>
-                {tpl.logoUrl && <button type="button" onClick={() => setTpl("logoUrl", "")} className="text-[12px] text-red-500 hover:underline">Remover</button>}
-              </div>
-              <p className="text-[11px] text-slate-400 dark:text-slate-500">PNG com fundo transparente fica melhor sobre a cor de destaque.</p>
-            </div>
-          )}
-
-          <ColorField label="Cor do texto do cabeçalho" hint="Nome do site sobre a barra de destaque." value={tpl.headerTextColor ?? ""} fallback="#ffffff" onChange={(v) => setTpl("headerTextColor", v)} />
-          <ColorField label="Fundo da página" value={tpl.pageBgColor ?? ""} fallback="#F0F4F8" onChange={(v) => setTpl("pageBgColor", v)} />
-          <ColorField label="Cor do texto do corpo" value={tpl.bodyTextColor ?? ""} fallback="#1A202C" onChange={(v) => setTpl("bodyTextColor", v)} />
-          <Field label="Texto do cabeçalho (opcional)" hint="Vazio = nome do remetente."><input className={inputCls} value={tpl.headerText ?? ""} onChange={(e) => setTpl("headerText", e.target.value)} /></Field>
-          <Field label="Assinatura (opcional)"><input className={inputCls} value={tpl.signature ?? ""} onChange={(e) => setTpl("signature", e.target.value)} placeholder="Equipe SP011" /></Field>
-          <div className="sm:col-span-2">
-            <Field label="Texto do rodapé (opcional)"><textarea className={`${inputCls} min-h-[70px] resize-y`} value={tpl.footerText ?? ""} onChange={(e) => setTpl("footerText", e.target.value)} placeholder="Endereço, CNPJ ou aviso legal…" /></Field>
-          </div>
-        </div>
-      </section>
+      {/* Moldura "Padrão" (usada por confirmações e por campanhas sem moldura escolhida) */}
+      <ShellFields
+        title="Moldura padrão do e-mail"
+        value={form.newsletterTemplate}
+        onChange={(next) => set("newsletterTemplate", next)}
+        onError={(text) => setMsg({ type: "err", text })}
+      />
+      <p className="text-[12px] text-slate-500 dark:text-slate-400 px-1 -mt-2 flex items-center gap-1.5">
+        <LayoutTemplate size={13} /> Esta é a moldura padrão. Crie outras (e escolha por campanha) na aba <strong>Modelos</strong>.
+      </p>
 
       {/* Ações */}
       <div className="flex flex-wrap gap-3">
@@ -286,21 +352,7 @@ function ConfigTab() {
 
       {/* Coluna direita — prévia ao lado (sticky): preenche a tela e evita rolar */}
       <div className="min-w-0 xl:sticky xl:top-4">
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-3">
-          <div className="flex items-center gap-2">
-            <Eye size={16} className="text-[#0B2A66] dark:text-blue-300" />
-            <h3 className="text-sm font-bold text-[#0B2A66] dark:text-blue-300">Pré-visualização</h3>
-            <span className="text-[11px] text-slate-400 dark:text-slate-500">atualiza conforme você edita</span>
-          </div>
-          {previewHtml ? (
-            <iframe title="Prévia do e-mail" srcDoc={previewHtml} sandbox=""
-              className="w-full h-[620px] rounded-xl border border-slate-200 dark:border-slate-700 bg-white" />
-          ) : (
-            <div className="h-[240px] rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center text-slate-400 text-sm">
-              <Loader2 size={16} className="animate-spin mr-2" /> Gerando prévia…
-            </div>
-          )}
-        </section>
+        <ShellPreview template={form.newsletterTemplate} fromName={form.newsletterFromName} />
       </div>
 
       </div>{/* fim do grid de 2 colunas */}
@@ -337,12 +389,23 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const editable = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
   const [subject, setSubject] = useState(campaign?.subject ?? "");
   const [body, setBody] = useState(campaign?.bodyHtml ?? "");
+  const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
+  const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel">(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [queue, setQueue] = useState<NewsletterQueueStat[] | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)));
   const changedRef = useRef(false);
+
+  // Molduras da biblioteca para o seletor (Padrão + as salvas).
+  useEffect(() => {
+    let alive = true;
+    adminApi.listNewsletterTemplates()
+      .then((r) => { if (alive) setTemplates(r.templates); })
+      .catch(() => { /* seletor cai só para "Padrão" */ });
+    return () => { alive = false; };
+  }, []);
 
   // Detalhe (fila) só faz sentido depois de disparada.
   useEffect(() => {
@@ -363,11 +426,11 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   /** Cria (se nova) ou atualiza (se rascunho/agendada) e devolve o id. */
   async function persist(): Promise<number> {
     if (campaign?.id) {
-      await adminApi.updateNewsletterCampaign(campaign.id, { subject: subject.trim(), bodyHtml: body });
+      await adminApi.updateNewsletterCampaign(campaign.id, { subject: subject.trim(), bodyHtml: body, templateId });
       changedRef.current = true;
       return campaign.id;
     }
-    const r = await adminApi.createNewsletterCampaign({ subject: subject.trim(), bodyHtml: body });
+    const r = await adminApi.createNewsletterCampaign({ subject: subject.trim(), bodyHtml: body, templateId });
     changedRef.current = true;
     return r.campaign.id;
   }
@@ -443,10 +506,24 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
       {/* Coluna principal — editor */}
       <div className="lg:col-span-2 space-y-5 min-w-0">
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5 space-y-4">
-        <Field label="Assunto">
-          <input className={inputCls} value={subject} disabled={!editable}
-            onChange={(e) => setSubject(e.target.value)} placeholder="Assunto do e-mail" maxLength={300} />
-        </Field>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label="Assunto">
+            <input className={inputCls} value={subject} disabled={!editable}
+              onChange={(e) => setSubject(e.target.value)} placeholder="Assunto do e-mail" maxLength={300} />
+          </Field>
+          <Field label="Moldura" hint="A estrutura visual (cabeçalho/rodapé). Gerencie na aba Modelos.">
+            {editable ? (
+              <select className={inputCls} value={templateId === null ? "" : String(templateId)}
+                onChange={(e) => setTemplateId(e.target.value === "" ? null : Number(e.target.value))}>
+                <option value="">Padrão (Configurações)</option>
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            ) : (
+              <input className={inputCls} disabled
+                value={templates.find((t) => t.id === templateId)?.name ?? "Padrão (Configurações)"} />
+            )}
+          </Field>
+        </div>
 
         <div>
           <label className={labelCls}>Conteúdo</label>
@@ -763,6 +840,153 @@ function SubscribersTab() {
   );
 }
 
+// ─── Aba Modelos (biblioteca de molduras) ─────────────────────────────────────
+/** Editor de uma moldura salva. `record` null = nova. */
+function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | null; onClose: (changed: boolean) => void }) {
+  const [name, setName] = useState(record?.name ?? "");
+  const [config, setConfig] = useState<NewsletterTemplate>(record?.config ?? {});
+  const [busy, setBusy] = useState<null | "save" | "delete">(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const changedRef = useRef(false);
+
+  async function save() {
+    if (!name.trim()) { setMsg({ type: "err", text: "Dê um nome à moldura." }); return; }
+    setBusy("save"); setMsg(null);
+    try {
+      if (record) await adminApi.updateNewsletterTemplate(record.id, { name: name.trim(), template: config });
+      else await adminApi.createNewsletterTemplate({ name: name.trim(), template: config });
+      changedRef.current = true;
+      onClose(true);
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao salvar." });
+      setBusy(null);
+    }
+  }
+
+  async function remove() {
+    if (!record) return;
+    if (!window.confirm(`Excluir a moldura "${record.name}"? Campanhas que a usam voltam à moldura Padrão.`)) return;
+    setBusy("delete"); setMsg(null);
+    try { await adminApi.deleteNewsletterTemplate(record.id); onClose(true); }
+    catch (e) { setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao excluir." }); setBusy(null); }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
+          <ArrowLeft size={15} /> Voltar
+        </button>
+        <div className="flex items-center gap-2">
+          {record && (
+            <button type="button" onClick={remove} disabled={busy !== null}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 transition-colors">
+              {busy === "delete" ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Excluir
+            </button>
+          )}
+          <button type="button" onClick={save} disabled={busy !== null} className={btnPrimary}>
+            {busy === "save" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar moldura
+          </button>
+        </div>
+      </div>
+
+      <Banner msg={msg} />
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <div className="space-y-4 min-w-0">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-5">
+            <Field label="Nome da moldura">
+              <input className={inputCls} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Resumo da semana" maxLength={120} />
+            </Field>
+          </div>
+          <ShellFields value={config} onChange={setConfig} onError={(text) => setMsg({ type: "err", text })} />
+        </div>
+        <div className="min-w-0 xl:sticky xl:top-4">
+          <ShellPreview template={config} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModelsTab() {
+  const [templates, setTemplates] = useState<NewsletterTemplateRecord[] | null>(null);
+  const [editing, setEditing] = useState<{ record: NewsletterTemplateRecord | null } | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
+  const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  const load = useCallback(() => {
+    setTemplates(null);
+    adminApi.listNewsletterTemplates()
+      .then((r) => setTemplates(r.templates))
+      .catch((e) => { setTemplates([]); setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao carregar." }); });
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function duplicate(t: NewsletterTemplateRecord) {
+    setBusyId(t.id); setMsg(null);
+    try { await adminApi.createNewsletterTemplate({ name: `${t.name} (cópia)`, template: t.config }); load(); }
+    catch (e) { setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao duplicar." }); }
+    finally { setBusyId(null); }
+  }
+
+  if (editing) {
+    return <ModelEditor record={editing.record} onClose={(changed) => { setEditing(null); if (changed) load(); }} />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3">
+        <Banner msg={msg} />
+        <div className="ml-auto flex items-center gap-2">
+          <button type="button" onClick={load} className={btnGhost} title="Recarregar"><RefreshCw size={15} /> Atualizar</button>
+          <button type="button" onClick={() => setEditing({ record: null })} className={btnPrimary}><Plus size={15} /> Nova moldura</button>
+        </div>
+      </div>
+
+      {templates === null ? (
+        <div className="flex items-center gap-2 text-slate-400 text-sm py-10"><Loader2 size={16} className="animate-spin" /> Carregando…</div>
+      ) : templates.length === 0 ? (
+        <div className="max-w-xl bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-8 text-center">
+          <LayoutTemplate size={22} className="mx-auto text-slate-400 mb-3" />
+          <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Nenhuma moldura extra ainda</p>
+          <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1">Crie variações da moldura ou cole um HTML no modo avançado. A moldura Padrão fica em Configurações.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {templates.map((t) => (
+            <div key={t.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{t.name}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">Editada {fmtDate(t.updatedAt)}</p>
+                </div>
+                <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                  {t.config.headerHtml || t.config.footerHtml ? <><Code2 size={11} /> HTML</> : "Campos"}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2 mt-auto">
+                <button type="button" onClick={() => setEditing({ record: t })}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-[13px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+                  Editar
+                </button>
+                <button type="button" onClick={() => duplicate(t)} disabled={busyId === t.id}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-[13px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60">
+                  {busyId === t.id ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />} Duplicar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[12px] text-slate-500 dark:text-slate-400">
+        A moldura <strong>Padrão</strong> (usada por confirmações e campanhas sem escolha) fica na aba Configurações. Aqui você cria variações — inclusive colando HTML de e-mail no modo avançado.
+      </p>
+    </div>
+  );
+}
+
 // ─── Página ───────────────────────────────────────────────────────────────────
 export default function Newsletter() {
   const [tab, setTab] = useState<Tab>("config");
@@ -788,6 +1012,7 @@ export default function Newsletter() {
         <div className={tab === "config" ? "" : "hidden"}><ConfigTab /></div>
         {tab === "subscribers" && <SubscribersTab />}
         {tab === "campaigns" && <CampaignsTab />}
+        {tab === "templates" && <ModelsTab />}
       </div>
     </AdminLayout>
   );

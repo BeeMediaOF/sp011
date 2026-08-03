@@ -26,10 +26,11 @@ import {
   newsletterCampaignsTable,
   newsletterSendQueueTable,
   newsletterSubscribersTable,
+  newsletterTemplatesTable,
   type NewsletterSendQueueRow,
 } from "@workspace/db";
 import { and, asc, count, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
-import { store, type SiteSettings } from "../store.js";
+import { store, type SiteSettings, type NewsletterTemplate } from "../store.js";
 import { logger } from "../logger.js";
 import { sendEmail, type SmtpConfig } from "../mailer.js";
 import { getPublicBase } from "../social/queueProcessor.js";
@@ -212,6 +213,18 @@ function absolutizeHtml(html: string, base: string): string {
   return html.replace(/(\b(?:src|href)=")\/(?!\/)/gi, `$1${b}/`);
 }
 
+/** Config da moldura escolhida pela campanha; `undefined` (= moldura Padrão das
+ *  settings) quando não há template_id ou a moldura foi removida. */
+async function loadTemplateConfig(templateId: number | null): Promise<NewsletterTemplate | undefined> {
+  if (!templateId) return undefined;
+  const [row] = await db
+    .select({ config: newsletterTemplatesTable.config })
+    .from(newsletterTemplatesTable)
+    .where(eq(newsletterTemplatesTable.id, templateId))
+    .limit(1);
+  return row ? (row.config as NewsletterTemplate) : undefined;
+}
+
 /**
  * Monta a mensagem de uma linha da fila, ou `null` se a linha deve ser
  * DESCARTADA sem envio (supressão/estado inválido) — o chamador aplica o
@@ -261,12 +274,14 @@ async function buildMessage(
 
   const unsubToken = await ensureUnsubToken(sub.id, sub.unsubscribeToken);
   const unsubscribeUrl = `${base}/api/newsletter/unsubscribe?token=${encodeURIComponent(unsubToken)}`;
+  const template = await loadTemplateConfig(campaign.templateId);
   const { html, text } = renderNewsletterEmail({
     settings: s,
     subject: campaign.subject,
     bodyHtml: absolutizeHtml(campaign.bodyHtml, base),
     unsubscribeUrl,
     baseUrl: base,
+    template,
   });
   const headers: Record<string, string> = {
     "List-Unsubscribe": `<${unsubscribeUrl}>`,
