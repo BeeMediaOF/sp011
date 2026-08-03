@@ -6,10 +6,10 @@
 --
 -- ANTES DE RODAR: suba as 5 imagens de deploy/pontofarma/assets/ (logo.png,
 -- hero.jpg, art1.jpg, art2.jpg, art3.jpg) no Storage público do pontofarma e
--- troque o placeholder __IMG__ pela URL BASE (sem barra no fim). Ex.:
+-- troque o placeholder https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma pela URL BASE (sem barra no fim). Ex.:
 --
 --   IMG='https://SEU-PROJ.supabase.co/storage/v1/object/public/pontofarma'
---   sed "s#__IMG__#$IMG#g" deploy/pontofarma/newsletter_rica.sql > /tmp/pf_rica.sql
+--   sed "s#https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma#$IMG#g" deploy/pontofarma/newsletter_rica.sql > /tmp/pf_rica.sql
 --   cd /opt/sp011
 --   docker compose exec -T pg-blogs psql -U postgres -d pontofarma -v ON_ERROR_STOP=1 < /tmp/pf_rica.sql
 --
@@ -35,7 +35,7 @@ SELECT 'PontoFarma — Rica (tela cheia)', jsonb_build_object(
     </tr></table>
   </td></tr>
   <tr><td style="background:#ffffff;padding:20px 26px;text-align:center;">
-    <img src="__IMG__/logo.png" width="230" alt="pontofarma.com" style="display:inline-block;width:230px;max-width:60%;height:auto;border:0;" />
+    <img src="https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma/logo.png" width="230" alt="pontofarma.com" style="display:inline-block;width:230px;max-width:60%;height:auto;border:0;" />
   </td></tr>
 </table>
 $hdr$,
@@ -80,7 +80,7 @@ SELECT
       <p style="margin:0;font-size:14px;line-height:1.65;color:#b9c6dc;">Aqui você encontra informação confiável, atualizada e de fácil compreensão sobre saúde, medicamentos, prevenção e novidades do setor farmacêutico.</p>
     </td>
     <td width="48%" valign="middle" align="center" style="padding:26px 30px 26px 12px;">
-      <img src="__IMG__/hero.jpg" width="250" alt="Farmacêutica PontoFarma" style="display:block;width:100%;max-width:250px;height:auto;border:3px solid #1a8a9e;border-radius:20px;" />
+      <img src="https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma/hero.jpg" width="250" alt="Farmacêutica PontoFarma" style="display:block;width:100%;max-width:250px;height:auto;border:3px solid #1a8a9e;border-radius:20px;" />
     </td>
   </tr>
 </table>
@@ -110,21 +110,21 @@ SELECT
     <p style="margin:0 0 18px;font-size:13px;color:#7a8aa0;">Confira nossos conteúdos mais acessados e fique por dentro.</p>
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
       <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="__IMG__/art1.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
+        <img src="https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma/art1.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
         <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Medicamentos</p>
         <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">Genéricos x Similares: entenda as diferenças</p>
         <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">O que muda entre eles e como escolher com segurança.</p>
         <a href="https://pontofarma.midia.run" style="font-size:12px;font-weight:700;color:#1a8a9e;text-decoration:none;">Ler artigo &rarr;</a>
       </td>
       <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="__IMG__/art2.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
+        <img src="https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma/art2.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
         <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Saúde e bem-estar</p>
         <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">5 hábitos simples para a sua qualidade de vida</p>
         <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">Pequenas mudanças que fazem toda a diferença.</p>
         <a href="https://pontofarma.midia.run" style="font-size:12px;font-weight:700;color:#1a8a9e;text-decoration:none;">Ler artigo &rarr;</a>
       </td>
       <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="__IMG__/art3.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
+        <img src="https://hvqrdmhfolyumkeokshk.supabase.co/storage/v1/object/public/pontofarma/art3.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
         <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Notícias</p>
         <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">Novos medicamentos aprovados chegam ao mercado</p>
         <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">Veja os principais lançamentos e o que esperar.</p>
