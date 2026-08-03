@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Preview — Newsletter PontoFarma (Boas-vindas)</title>
+</head>
+<!--
+  PREVIEW ESTÁTICO (abra no navegador) da campanha de boas-vindas do PontoFarma
+  com a moldura "PontoFarma — Boas-vindas". Espelha o que o servidor
+  (renderNewsletterEmail) monta: moldura (cabeçalho/rodapé) + corpo + linhas
+  automáticas de remetente e descadastro. Fonte da verdade do envio é o seed
+  deploy/pontofarma/newsletter_boas_vindas.sql — mantenha os dois em sincronia.
+-->
+<body style="margin:0;padding:0;background:#eef2f6;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f6;padding:32px 0;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+          <!-- ── Cabeçalho (moldura) ── -->
+          <tr><td>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;background:#ffffff;">
+              <tr>
+                <td style="padding:30px 40px 22px;text-align:center;border-bottom:3px solid #18a957;">
+                  <div style="font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:32px;font-weight:800;letter-spacing:-0.8px;line-height:1;color:#0e2341;">ponto<span style="color:#158b9c;">farma</span><span style="font-size:15px;font-weight:700;color:#0e2341;">.com</span></div>
+                  <div style="margin-top:10px;font-family:'Segoe UI',Helvetica,Arial,sans-serif;font-size:11px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#18a957;">conteúdo que gera resultado</div>
+                </td>
+              </tr>
+            </table>
+          </td></tr>
+          <!-- ── Corpo (campanha) ── -->
+          <tr>
+            <td style="padding:32px 40px;color:#334155;font-size:15px;line-height:1.7;">
+              <h1 style="margin:0 0 6px;font-size:24px;line-height:1.25;color:#0e2341;font-weight:800;">Que bom ter você aqui! 👋</h1>
+              <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#334155;">Você acaba de assinar a newsletter da <strong style="color:#0e2341;">PontoFarma</strong> — o conteúdo B2B feito para quem toca uma farmácia no dia a dia. A cada edição, resumimos o que importa para você <strong>vender mais, cumprir a lei e gerir melhor</strong>, sem juridiquês.</p>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;margin:0 0 24px;">
+                <tr>
+                  <td style="background:#f0f9f4;border:1px solid #cdeede;border-left:4px solid #18a957;border-radius:10px;padding:18px 20px;">
+                    <p style="margin:0 0 10px;font-size:13px;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;color:#0c8b46;">O que você vai receber</p>
+                    <p style="margin:0;font-size:14px;line-height:1.9;color:#334155;">💼 <strong>Gestão</strong> e <strong>Vendas</strong> para o balcão<br>📋 <strong>Fiscal, Tributário</strong> e <strong>Legislação</strong> sem complicação<br>📈 <strong>Mercado</strong> e tendências do setor farmacêutico<br>👥 <strong>Equipe</strong>, <strong>Tecnologia</strong> e <strong>Saúde</strong> no varejo</p>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border-collapse:collapse;margin:0 0 26px;">
+                <tr>
+                  <td align="center">
+                    <a href="https://pontofarma.midia.run" style="display:inline-block;background:#18a957;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:14px 34px;border-radius:9px;">Explorar o portal &rarr;</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 4px;font-size:15px;line-height:1.7;color:#334155;">Fique de olho na caixa de entrada: a próxima edição chega em breve. E se tiver uma dúvida ou sugestão de pauta, é só responder este e-mail.</p>
+              <p style="margin:20px 0 0;font-size:15px;line-height:1.6;color:#334155;">Um abraço,<br><strong style="color:#0e2341;">Equipe PontoFarma</strong></p>
+            </td>
+          </tr>
+          <!-- ── Rodapé (moldura + linhas automáticas) ── -->
+          <tr>
+            <td style="background:#F7F9FC;border-top:1px solid #E2E8F0;padding:22px 40px;text-align:center;">
+              <div style="font-family:'Segoe UI',Helvetica,Arial,sans-serif;margin-bottom:14px;">
+                <div style="font-size:16px;font-weight:800;letter-spacing:-0.3px;color:#0e2341;">ponto<span style="color:#158b9c;">farma</span><span style="font-size:11px;color:#0e2341;">.com</span></div>
+                <div style="margin:6px 0 2px;font-size:12px;color:#64748b;">Conteúdo B2B para o varejo farmacêutico</div>
+              </div>
+              <p style="margin:0 0 8px;color:#A0AEC0;font-size:12px;">PontoFarma</p>
+              <p style="margin:0;color:#A0AEC0;font-size:12px;">Você recebe este e-mail porque assinou a newsletter. <a href="#" style="color:#18a957;text-decoration:underline;">Cancelar inscrição</a>.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
