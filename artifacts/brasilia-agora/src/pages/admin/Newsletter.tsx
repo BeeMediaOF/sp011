@@ -96,6 +96,45 @@ function fmtDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+// ─── Diálogo de confirmação (identidade do admin — substitui window.confirm) ──
+interface ConfirmOpts { title?: string; message: string; confirmLabel?: string; cancelLabel?: string; tone?: "primary" | "danger"; }
+
+function ConfirmDialog({ opts, onResolve }: { opts: ConfirmOpts; onResolve: (ok: boolean) => void }) {
+  const danger = opts.tone === "danger";
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onMouseDown={() => onResolve(false)}>
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden" onMouseDown={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full shrink-0 ${danger ? "bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-300" : "bg-[#0B2A66]/10 text-[#0B2A66] dark:bg-blue-950/50 dark:text-blue-300"}`}>
+            <AlertCircle size={16} />
+          </span>
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">{opts.title ?? "Confirmar"}</h3>
+        </div>
+        <div className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">{opts.message}</div>
+        <div className="flex justify-end gap-2 px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onClick={() => onResolve(false)} className={btnGhost}>{opts.cancelLabel ?? "Cancelar"}</button>
+          <button type="button" onClick={() => onResolve(true)}
+            className={danger
+              ? "inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors"
+              : btnPrimary}>
+            {opts.confirmLabel ?? "Confirmar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Hook: `confirm(opts) => Promise<boolean>` + o elemento a renderizar (`confirmUI`). */
+function useConfirm() {
+  const [state, setState] = useState<{ opts: ConfirmOpts; resolve: (ok: boolean) => void } | null>(null);
+  const confirm = useCallback((opts: ConfirmOpts) => new Promise<boolean>((resolve) => setState({ opts, resolve })), []);
+  const confirmUI = state
+    ? <ConfirmDialog opts={state.opts} onResolve={(ok) => { state.resolve(ok); setState(null); }} />
+    : null;
+  return { confirm, confirmUI };
+}
+
 // ─── Moldura: campos + prévia (compartilhados por Configurações e Modelos) ────
 const monoCls =
   "w-full px-3 py-2 border rounded-xl text-[12px] font-mono leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#0B2A66]/30 " +
@@ -199,11 +238,12 @@ function ShellFields({ value, title, onChange, onError }: {
 // e pré-visualizar. Mantenha as duas em sincronia se o shell do e-mail mudar.
 const EMAIL_FONT = "'Helvetica Neue',Helvetica,Arial,sans-serif";
 
-/** Texto de exemplo para pré-visualizar uma moldura (NÃO é salvo). */
+/** Texto de exemplo mostrado dentro da moldura (prévia da moldura e ponto de
+ *  partida de uma campanha nova). Pode ser apagado e reescrito. */
 const SAMPLE_BODY =
   "<h2>Título da matéria</h2>" +
-  "<p>Assim o corpo da sua campanha aparece dentro da moldura. O conteúdo você escreve no editor da aba <strong>Campanhas</strong>.</p>" +
-  '<p>Mais um parágrafo com um <a href="#">link de exemplo</a> para você ver o espaçamento e as cores.</p>' +
+  "<p>Este é um texto de exemplo para você ver como o conteúdo aparece dentro da moldura. Pode apagar e escrever o seu.</p>" +
+  '<p>Use a barra de ferramentas para <strong>negrito</strong>, listas e <a href="#">links</a> — e confira o espaçamento e as cores.</p>' +
   "<p>Abraços,<br/>Equipe.</p>";
 
 /** Absolutiza URL root-relativa (logo salva como /api/...) para a prévia. */
@@ -443,8 +483,10 @@ function toLocalInput(d: Date): string {
 /** Editor/visualização de uma campanha. `campaign` null = nova. */
 function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | null; onClose: (changed: boolean) => void }) {
   const editable = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
+  const { confirm, confirmUI } = useConfirm();
   const [subject, setSubject] = useState(campaign?.subject ?? "");
-  const [body, setBody] = useState(campaign?.bodyHtml ?? "");
+  // Campanha nova começa com o texto de exemplo (dá para apagar e escrever o seu).
+  const [body, setBody] = useState(campaign ? (campaign.bodyHtml ?? "") : SAMPLE_BODY);
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [settings, setSettings] = useState<NewsletterSettings | null>(null);
@@ -515,7 +557,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
 
   async function sendNow() {
     if (!validate()) return;
-    if (!window.confirm("Enviar esta campanha agora para todos os inscritos confirmados?")) return;
+    if (!(await confirm({ title: "Enviar campanha", message: "Enviar esta campanha agora para todos os inscritos confirmados?", confirmLabel: "Enviar agora" }))) return;
     setBusy("send"); setMsg(null);
     try {
       const id = await persist();
@@ -546,7 +588,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
 
   async function cancel() {
     if (!campaign) return;
-    if (!window.confirm("Cancelar esta campanha? Os envios ainda na fila serão interrompidos.")) return;
+    if (!(await confirm({ title: "Cancelar campanha", message: "Cancelar esta campanha? Os envios ainda na fila serão interrompidos.", confirmLabel: "Cancelar campanha", cancelLabel: "Voltar", tone: "danger" }))) return;
     setBusy("cancel"); setMsg(null);
     try {
       const r = await adminApi.cancelNewsletterCampaign(campaign.id);
@@ -561,6 +603,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
 
   return (
     <div className="space-y-5">
+      {confirmUI}
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
           <ArrowLeft size={15} /> Voltar
@@ -919,6 +962,7 @@ function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | n
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [sampleBody, setSampleBody] = useState(SAMPLE_BODY);
   const [sender, setSender] = useState<{ fromName?: string; replyTo?: string }>({});
+  const { confirm, confirmUI } = useConfirm();
   const changedRef = useRef(false);
 
   // Remetente real (só para a prévia refletir o nome/reply-to configurados).
@@ -948,7 +992,7 @@ function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | n
 
   async function remove() {
     if (!record) return;
-    if (!window.confirm(`Excluir a moldura "${record.name}"? Campanhas que a usam voltam à moldura Padrão.`)) return;
+    if (!(await confirm({ title: "Excluir moldura", message: `Excluir a moldura "${record.name}"? Campanhas que a usam voltam à moldura Padrão.`, confirmLabel: "Excluir", cancelLabel: "Voltar", tone: "danger" }))) return;
     setBusy("delete"); setMsg(null);
     try { await adminApi.deleteNewsletterTemplate(record.id); onClose(true); }
     catch (e) { setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao excluir." }); setBusy(null); }
@@ -956,6 +1000,7 @@ function ModelEditor({ record, onClose }: { record: NewsletterTemplateRecord | n
 
   return (
     <div className="space-y-5">
+      {confirmUI}
       <div className="flex items-center justify-between gap-3">
         <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
           <ArrowLeft size={15} /> Voltar

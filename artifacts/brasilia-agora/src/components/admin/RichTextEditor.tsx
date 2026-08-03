@@ -35,6 +35,14 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
+/* Escapes para inserir texto/links vindos dos modais (o servidor sanitiza no salvar). */
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function escAttr(s: string): string {
+  return escHtml(s).replace(/"/g, "&quot;");
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
@@ -75,7 +83,7 @@ interface Props {
   };
 }
 
-type ModalKind = "image" | "youtube" | null;
+type ModalKind = "image" | "youtube" | "link" | null;
 
 const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
   ({ value, onChange, onPasteClick, onFormatClick, onUploadFile, placeholder = "Escreva o conteúdo da matéria aqui...", frame }, ref) => {
@@ -101,6 +109,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
     const [imgHref,   setImgHref]   = useState("");
     const [imgAlt,    setImgAlt]    = useState("");
     const [ytUrl,     setYtUrl]     = useState("");
+    const [linkUrl,   setLinkUrl]   = useState("");
+    const [linkText,  setLinkText]  = useState("");
+    const [notice,    setNotice]    = useState<string | null>(null);
     const [imgUploadBusy, setImgUploadBusy] = useState(false);
     const imgFileRef  = useRef<HTMLInputElement>(null);
 
@@ -133,11 +144,31 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
       </button>
     );
 
-    /* ── link handler ── */
+    /* ── link handler: abre o modal (com texto opcional), pré-carrega link/seleção atual ── */
     function addLink() {
-      const url = window.prompt("URL do link:");
-      if (!url) return;
-      editor?.chain().focus().setLink({ href: url }).run();
+      if (!editor) return;
+      const prevUrl = (editor.getAttributes("link")?.href as string | undefined) ?? "";
+      const { from, to } = editor.state.selection;
+      const sel = editor.state.doc.textBetween(from, to, " ");
+      setLinkUrl(prevUrl);
+      setLinkText(sel);
+      setModal("link");
+    }
+
+    /* ── confirma o link do modal: seleção → aplica; texto → insere <a>texto</a> ── */
+    function confirmLink() {
+      if (!editor) return;
+      const url = linkUrl.trim();
+      const { from, to } = editor.state.selection;
+      const hasSelection = to > from;
+      const text = linkText.trim();
+      if (!url) { editor.chain().focus().extendMarkRange("link").unsetLink().run(); setModal(null); return; }
+      if (hasSelection && (!text || text === editor.state.doc.textBetween(from, to, " "))) {
+        editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
+      } else {
+        editor.chain().focus().insertContent(`<a href="${escAttr(url)}">${escHtml(text || url)}</a>`).run();
+      }
+      setModal(null);
     }
 
     /* ── open image modal ── */
@@ -167,7 +198,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
         const { url } = await onUploadFile(file);
         setImgSrc(url);
       } catch (err) {
-        alert(err instanceof Error ? err.message : "Erro no upload");
+        setNotice(err instanceof Error ? err.message : "Erro no upload");
       } finally {
         setImgUploadBusy(false);
       }
@@ -201,7 +232,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
           ).run();
         }
       } catch (err) {
-        alert(err instanceof Error ? err.message : "Erro no upload");
+        setNotice(err instanceof Error ? err.message : "Erro no upload");
       } finally {
         setUploading(false);
       }
@@ -321,6 +352,66 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
                 className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
               >
                 Incorporar
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Link modal ── */}
+        {modal === "link" && (
+          <Modal title="Inserir link" onClose={() => setModal(null)}>
+            <Field label="URL do link">
+              <input
+                className={INPUT}
+                placeholder="https://exemplo.com/pagina"
+                value={linkUrl}
+                onChange={e => setLinkUrl(e.target.value)}
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); confirmLink(); } }}
+              />
+            </Field>
+            <Field label="Texto do link (opcional)">
+              <input
+                className={INPUT}
+                placeholder="Ex.: leia a matéria completa"
+                value={linkText}
+                onChange={e => setLinkText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); confirmLink(); } }}
+              />
+            </Field>
+            <p className="text-[11px] text-slate-400">
+              Com texto selecionado, o link é aplicado nele. Sem seleção, criamos um texto com o link. URL vazia remove o link.
+            </p>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setModal(null); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); confirmLink(); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2459] transition-colors"
+              >
+                Inserir link
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Aviso (substitui o alert nativo) ── */}
+        {notice && (
+          <Modal title="Aviso" onClose={() => setNotice(null)}>
+            <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{notice}</p>
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setNotice(null); }}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2459] transition-colors"
+              >
+                Entendi
               </button>
             </div>
           </Modal>

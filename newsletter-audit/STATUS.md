@@ -173,6 +173,20 @@
   Modelos) — a aba fica só com conexão/remetente/disparo. A moldura **Padrão**
   segue em `site_settings.newsletterTemplate` como fallback do sistema
   (confirmações + campanhas sem escolha), agora sem editor dedicado.
+- **Campanha nova nasce com o texto de exemplo** (`SAMPLE_BODY`, editável) — a
+  prévia não fica vazia. O mesmo sample serve de conteúdo de exemplo na prévia
+  da moldura em Modelos.
+- **Diálogos com identidade (fim dos nativos do navegador):** o `RichTextEditor`
+  ganhou **modal de link** (URL + texto opcional; seleção aplica, sem seleção
+  cria `<a>texto</a>`, URL vazia remove) no lugar do `window.prompt`, e um
+  **modal de Aviso** no lugar do `alert` de upload. No `Newsletter.tsx`, um
+  `ConfirmDialog`/`useConfirm` estilizado substitui os `window.confirm` de
+  enviar/cancelar/excluir. **Ainda nativos** (fora deste escopo, mapeados p/
+  varredura futura): AdsManager, Articles, Categorias, Colunistas, HomeBlocks,
+  Menu, RSS, Redes Sociais, Usuários, RewriteQueue, DatabaseCard.
+- **PENDENTE (decisão de arquitetura):** editar cabeçalho/rodapé DENTRO da
+  campanha — por-campanha (guarda override no banco) vs. editar a moldura
+  compartilhada. A confirmar com o usuário antes de implementar.
 - Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
   testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
   frontend typecheck ✅. **Falta validar em prod na VPS.**
