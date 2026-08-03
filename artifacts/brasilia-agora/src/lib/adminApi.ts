@@ -506,6 +506,9 @@ export interface NewsletterTemplate {
   headerHtml?: string;
   /** HTML próprio do rodapé (modo "código") — acima das linhas automáticas. */
   footerHtml?: string;
+  /** "standard" = corpo com margem + rodapé claro; "full" = e-mail borda-a-borda
+   *  (designs ricos: corpo sem padding, header/footer full-bleed). */
+  layout?: "standard" | "full";
 }
 
 /** Moldura salva na biblioteca (aba Modelos). Datas em ISO. */

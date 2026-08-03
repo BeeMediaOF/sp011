@@ -217,6 +217,14 @@ function ShellFields({ value, title, onChange, onError }: {
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               Cole HTML de e-mail (tabelas + <code>style</code> inline). Estilos inline seguros são preservados; scripts e <code>on…</code> são removidos. Deixe vazio para usar os campos acima.
             </p>
+            <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2.5 cursor-pointer">
+              <input type="checkbox" className="mt-0.5 accent-[#0B2A66]" checked={value.layout === "full"}
+                onChange={(e) => onChange({ ...value, layout: e.target.checked ? "full" : "standard" })} />
+              <span>
+                <span className="block text-[13px] font-semibold text-slate-700 dark:text-slate-200">Layout tela cheia (borda-a-borda)</span>
+                <span className="block text-[11px] text-slate-500 dark:text-slate-400">Para designs ricos: o corpo perde a margem fixa e o cabeçalho/rodapé encostam nas bordas. Só a linha de descadastro é adicionada.</span>
+              </span>
+            </label>
             <Field label="HTML do cabeçalho" hint="Substitui a logo/wordmark quando preenchido.">
               <textarea className={`${monoCls} min-h-[120px] resize-y`} value={value.headerHtml ?? ""} onChange={(e) => set("headerHtml", e.target.value)}
                 placeholder={'<table width="100%"><tr><td style="padding:24px;text-align:center;background:#0B2A66;color:#fff;">…</td></tr></table>'} />
@@ -290,6 +298,7 @@ function buildMolduraFrame(tpl: NewsletterTemplate, opts: { fromName?: string; r
   const replyTo = (opts.replyTo || "").trim();
   const logoSrc = logoMode === "image" ? previewAbsUrl(tpl.logoUrl) : undefined;
   const showHeader = logoMode !== "none" || !!headerHtml;
+  const full = tpl.layout === "full";
 
   let header: React.ReactNode = null;
   if (headerHtml) {
@@ -304,7 +313,20 @@ function buildMolduraFrame(tpl: NewsletterTemplate, opts: { fromName?: string; r
     );
   }
 
-  const footer = (
+  // Modo "full": rodapé HTML full-bleed + faixa mínima obrigatória (remetente +
+  // descadastro). Modo padrão: rodapé claro com assinatura/textos/linhas auto.
+  const footer = full ? (
+    <div style={{ fontFamily: EMAIL_FONT }}>
+      {footerHtml && <div dangerouslySetInnerHTML={{ __html: previewSafeHtml(footerHtml) }} />}
+      <div style={{ background: pageBg, padding: "14px 24px", textAlign: "center" }}>
+        <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: 11 }}>{name}{replyTo ? ` · ${replyTo}` : ""}</p>
+        <p style={{ margin: 0, color: "#94a3b8", fontSize: 11 }}>
+          Você recebe este e-mail porque assinou a newsletter.{" "}
+          <span style={{ color: accent, textDecoration: "underline" }}>Cancelar inscrição</span>.
+        </p>
+      </div>
+    </div>
+  ) : (
     <div style={{ background: "#F7F9FC", borderTop: "1px solid #E2E8F0", padding: "22px 40px", textAlign: "center", fontFamily: EMAIL_FONT }}>
       {footerHtml && <div dangerouslySetInnerHTML={{ __html: previewSafeHtml(footerHtml) }} />}
       {signature && <p style={{ margin: "0 0 12px", color: "#4A5568", fontSize: 14, lineHeight: 1.6, whiteSpace: "pre-line" }}>{signature}</p>}
@@ -320,7 +342,9 @@ function buildMolduraFrame(tpl: NewsletterTemplate, opts: { fromName?: string; r
   return {
     header,
     footer,
-    bodyStyle: { padding: "32px 40px", color: bodyColor, fontSize: 15, lineHeight: 1.7, fontFamily: EMAIL_FONT, background: "#ffffff" },
+    bodyStyle: full
+      ? { padding: 0, color: bodyColor, fontSize: 15, lineHeight: 1.7, fontFamily: EMAIL_FONT, background: "#ffffff" }
+      : { padding: "32px 40px", color: bodyColor, fontSize: 15, lineHeight: 1.7, fontFamily: EMAIL_FONT, background: "#ffffff" },
     pageStyle: { background: pageBg },
   };
 }

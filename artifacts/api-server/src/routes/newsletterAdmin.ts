@@ -48,6 +48,7 @@ const DEFAULT_TEMPLATE: Required<NewsletterTemplate> = {
   signature: "",
   headerHtml: "",
   footerHtml: "",
+  layout: "standard",
 };
 
 /** Subconjunto newsletter das settings, com o segredo MASCARADO para leitura. */
@@ -93,6 +94,7 @@ function sanitizeTemplate(input: unknown): NewsletterTemplate {
   // (preserva `style` inline seguro, mata script/js/on*). Limite antes de sanitizar.
   if (typeof t["headerHtml"] === "string") out.headerHtml = sanitizeEmailHtml((t["headerHtml"] as string).slice(0, 20000));
   if (typeof t["footerHtml"] === "string") out.footerHtml = sanitizeEmailHtml((t["footerHtml"] as string).slice(0, 20000));
+  out.layout = t["layout"] === "full" ? "full" : "standard";
   return out;
 }
 

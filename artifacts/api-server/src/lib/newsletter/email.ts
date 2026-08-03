@@ -162,6 +162,40 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
     footerBlocks.push(`<p style="margin:0;color:#A0AEC0;font-size:12px;">${esc(footerNote)}</p>`);
   }
 
+  // Layout "full" (borda-a-borda): corpo sem padding fixo (o próprio HTML
+  // controla o espaçamento), footerHtml full-bleed, e só uma faixa mínima
+  // obrigatória com remetente + descadastro (LGPD). Cartão um pouco mais largo.
+  const full = tpl.layout === "full";
+  const cardWidth = full ? 640 : 600;
+
+  const bodyRow = full
+    ? `<tr><td style="padding:0;color:${esc(bodyColor)};font-size:15px;line-height:1.7;">${bodyHtml}</td></tr>`
+    : `<tr>
+            <td style="padding:32px 40px;color:${esc(bodyColor)};font-size:15px;line-height:1.7;">
+              ${bodyHtml}
+            </td>
+          </tr>`;
+
+  let footerRow: string;
+  if (full) {
+    const bleed = footerHtml ? `<tr><td>${absolutizeHtmlUrls(footerHtml, baseUrl)}</td></tr>` : "";
+    const strip: string[] = [
+      `<p style="margin:0 0 6px;color:#94a3b8;font-size:11px;">${esc(name)}${replyTo ? ` &middot; ${esc(replyTo)}` : ""}</p>`,
+    ];
+    if (unsubscribeUrl) {
+      strip.push(`<p style="margin:0;color:#94a3b8;font-size:11px;">Você recebe este e-mail porque assinou a newsletter. <a href="${esc(unsubscribeUrl)}" style="color:${esc(accent)};text-decoration:underline;">Cancelar inscrição</a>.</p>`);
+    } else if (footerNote) {
+      strip.push(`<p style="margin:0;color:#94a3b8;font-size:11px;">${esc(footerNote)}</p>`);
+    }
+    footerRow = `${bleed}<tr><td style="background:${esc(pageBg)};padding:14px 24px;text-align:center;">${strip.join("")}</td></tr>`;
+  } else {
+    footerRow = `<tr>
+            <td style="background:#F7F9FC;border-top:1px solid #E2E8F0;padding:22px 40px;text-align:center;">
+              ${footerBlocks.join("\n              ")}
+            </td>
+          </tr>`;
+  }
+
   const html = `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -174,18 +208,10 @@ export function renderNewsletterEmail(opts: RenderOpts): { html: string; text: s
   <table width="100%" cellpadding="0" cellspacing="0" style="background:${esc(pageBg)};padding:32px 0;">
     <tr>
       <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <table width="${cardWidth}" cellpadding="0" cellspacing="0" style="max-width:${cardWidth}px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
           ${header}
-          <tr>
-            <td style="padding:32px 40px;color:${esc(bodyColor)};font-size:15px;line-height:1.7;">
-              ${bodyHtml}
-            </td>
-          </tr>
-          <tr>
-            <td style="background:#F7F9FC;border-top:1px solid #E2E8F0;padding:22px 40px;text-align:center;">
-              ${footerBlocks.join("\n              ")}
-            </td>
-          </tr>
+          ${bodyRow}
+          ${footerRow}
         </table>
       </td>
     </tr>

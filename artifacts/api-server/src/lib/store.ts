@@ -184,6 +184,10 @@ export interface NewsletterTemplate {
   /** HTML próprio do rodapé (modo "código"). Quando presente, entra ACIMA das
    *  linhas automáticas de remetente e descadastro (que nunca somem — LGPD). */
   footerHtml?: string;
+  /** "standard" (padrão) = corpo com margem fixa + rodapé claro; "full" = e-mail
+   *  de borda-a-borda (corpo sem padding, headerHtml/footerHtml full-bleed; só a
+   *  linha obrigatória de descadastro fica) — para designs ricos. */
+  layout?: "standard" | "full";
 }
 
 /** Configuração editável do rodapé (persistida em site_settings.footerConfig). */

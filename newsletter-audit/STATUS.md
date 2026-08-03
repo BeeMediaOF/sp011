@@ -203,6 +203,15 @@
   renderiza sozinho na aba (GROUP_ICONS/DESC com Mail). Editores começam SEM
   acesso (não estão em EDITOR_DEFAULTS) — admin libera. Enforcement é backend;
   esconder botão por botão no front fica p/ depois (admin sempre passa).
+- **Modo tela cheia (full-bleed) p/ newsletters ricas:** `NewsletterTemplate.layout`
+  = `"standard"|"full"`. Em `full`, `renderNewsletterEmail` tira o padding fixo do
+  corpo, deixa header/footerHtml de borda-a-borda, cartão 640px e mantém só a
+  linha de descadastro obrigatória. Toggle no ShellFields + prévia
+  (`buildMolduraFrame`) + `sanitizeTemplate` preserva `layout`; 2 testes novos
+  (`newsletterEmail.test`, 242 no total). PontoFarma: design rico + assets
+  gerados em `deploy/pontofarma/` (`newsletter_boas_vindas_rica.html`, `assets/`,
+  seed `newsletter_rica.sql` com placeholder `__IMG__`). Base para os ricos de
+  TODOS os blogs — ver memória `newsletter-rich-design-plan`.
 - Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
   testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
   frontend typecheck ✅. **Falta validar em prod na VPS.**
