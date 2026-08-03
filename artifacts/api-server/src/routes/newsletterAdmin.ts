@@ -29,9 +29,10 @@ import { getPublicBase } from "../lib/social/queueProcessor.js";
 const router = Router();
 
 router.use(authMiddleware);
-// Newsletter é config do site (remetente/modelo) → mesma permissão de settings.
-// Admin passa direto (ignora permissões por design).
-router.use(requirePermission("settings.view"));
+// Acesso à Newsletter (ler inscritos/campanhas/modelos). Ações específicas
+// (criar/editar campanha, disparar, gerenciar inscritos/modelos, configurar
+// remetente) exigem permissões próprias por rota, abaixo. Admin passa direto.
+router.use(requirePermission("newsletter.view"));
 
 const MASK = "••••••••";
 
@@ -101,7 +102,7 @@ router.get("/settings", (_req, res) => {
 });
 
 // ── PUT /settings — grava só o subconjunto newsletter em site_settings ────────
-router.put("/settings", (req, res) => {
+router.put("/settings", requirePermission("newsletter.settings"), (req, res) => {
   const b = (req.body ?? {}) as Record<string, unknown>;
   const patch: Partial<SiteSettings> = {};
 
@@ -124,7 +125,7 @@ router.put("/settings", (req, res) => {
 });
 
 // ── POST /test — dispara um e-mail de teste ao admin logado ───────────────────
-router.post("/test", async (req, res) => {
+router.post("/test", requirePermission("newsletter.settings"), async (req, res) => {
   const s = store.getSettings();
   const cfg = getNewsletterSmtpConfig(s);
   if (!cfg.ok) { res.status(400).json({ ok: false, error: cfg.error }); return; }
@@ -213,8 +214,9 @@ function parseCampaignInput(b: Record<string, unknown>): { subject?: string; bod
   return out;
 }
 
-function parseId(raw: string): number | null {
-  const n = Number(raw);
+function parseId(raw: string | string[] | undefined): number | null {
+  const s = Array.isArray(raw) ? raw[0] : raw;
+  const n = Number(s);
   return Number.isInteger(n) && n > 0 ? n : null;
 }
 
@@ -229,7 +231,7 @@ router.get("/campaigns", async (_req, res) => {
 });
 
 // POST /campaigns — cria rascunho.
-router.post("/campaigns", async (req, res) => {
+router.post("/campaigns", requirePermission("newsletter.campaigns"), async (req, res) => {
   const input = parseCampaignInput((req.body ?? {}) as Record<string, unknown>);
   if (!input.subject) { res.status(400).json({ ok: false, error: "Assunto obrigatório." }); return; }
   const [row] = await db
@@ -254,7 +256,7 @@ router.get("/campaigns/:id", async (req, res) => {
 });
 
 // PUT /campaigns/:id — edita assunto/corpo (só rascunho/agendada).
-router.put("/campaigns/:id", async (req, res) => {
+router.put("/campaigns/:id", requirePermission("newsletter.campaigns"), async (req, res) => {
   const id = parseId(req.params.id ?? "");
   if (id == null) { res.status(400).json({ ok: false }); return; }
   const [existing] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
@@ -275,7 +277,7 @@ router.put("/campaigns/:id", async (req, res) => {
 });
 
 // POST /campaigns/:id/send — envia agora ou agenda (scheduledAt futuro).
-router.post("/campaigns/:id/send", async (req, res) => {
+router.post("/campaigns/:id/send", requirePermission("newsletter.send"), async (req, res) => {
   const id = parseId(req.params.id ?? "");
   if (id == null) { res.status(400).json({ ok: false }); return; }
   const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
@@ -305,7 +307,7 @@ router.post("/campaigns/:id/send", async (req, res) => {
 });
 
 // POST /campaigns/:id/cancel — cancela (encerra as linhas pendentes da fila).
-router.post("/campaigns/:id/cancel", async (req, res) => {
+router.post("/campaigns/:id/cancel", requirePermission("newsletter.send"), async (req, res) => {
   const id = parseId(req.params.id ?? "");
   if (id == null) { res.status(400).json({ ok: false }); return; }
   const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
@@ -340,7 +342,7 @@ router.get("/templates", async (_req, res) => {
 });
 
 // POST /templates — cria uma moldura.
-router.post("/templates", async (req, res) => {
+router.post("/templates", requirePermission("newsletter.templates"), async (req, res) => {
   const input = parseTemplateBody((req.body ?? {}) as Record<string, unknown>);
   if (!input.name) { res.status(400).json({ ok: false, error: "Nome obrigatório." }); return; }
   const [row] = await db
@@ -360,7 +362,7 @@ router.get("/templates/:id", async (req, res) => {
 });
 
 // PUT /templates/:id — renomeia e/ou atualiza a config.
-router.put("/templates/:id", async (req, res) => {
+router.put("/templates/:id", requirePermission("newsletter.templates"), async (req, res) => {
   const id = parseId(req.params.id ?? "");
   if (id == null) { res.status(400).json({ ok: false }); return; }
   const input = parseTemplateBody((req.body ?? {}) as Record<string, unknown>);
@@ -376,7 +378,7 @@ router.put("/templates/:id", async (req, res) => {
 });
 
 // DELETE /templates/:id — remove; campanhas que a usavam voltam à Padrão.
-router.delete("/templates/:id", async (req, res) => {
+router.delete("/templates/:id", requirePermission("newsletter.templates"), async (req, res) => {
   const id = parseId(req.params.id ?? "");
   if (id == null) { res.status(400).json({ ok: false }); return; }
   await db.update(newsletterCampaignsTable)
@@ -446,7 +448,7 @@ router.get("/subscribers", async (req, res) => {
 });
 
 // GET /subscribers.csv?status= — export CSV (auth via Bearer no router). BOM p/ Excel.
-router.get("/subscribers.csv", async (req, res) => {
+router.get("/subscribers.csv", requirePermission("newsletter.subscribers"), async (req, res) => {
   const status = subStatusFilter(req.query.status);
   const where = status ? eq(newsletterSubscribersTable.status, status) : undefined;
 

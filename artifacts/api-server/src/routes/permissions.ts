@@ -39,6 +39,13 @@ export const ALL_PERMISSIONS: PermissionDef[] = [
   { key: "social.manage",        label: "Gerenciar redes sociais",  group: "Automações",     description: "Configurar publicação automática" },
   { key: "columnists.view",      label: "Ver colunistas",           group: "Automações",     description: "Acessar a lista de colunistas" },
   { key: "columnists.manage",    label: "Gerenciar colunistas",     group: "Automações",     description: "Criar e editar colunistas" },
+  // Newsletter
+  { key: "newsletter.view",        label: "Ver newsletter",           group: "Newsletter",     description: "Acessar inscritos, campanhas e modelos" },
+  { key: "newsletter.campaigns",   label: "Criar/editar campanhas",   group: "Newsletter",     description: "Criar e editar campanhas (rascunhos)" },
+  { key: "newsletter.send",        label: "Disparar campanhas",       group: "Newsletter",     description: "Enviar, agendar ou cancelar campanhas" },
+  { key: "newsletter.subscribers", label: "Gerenciar inscritos",      group: "Newsletter",     description: "Exportar a lista de inscritos (CSV)" },
+  { key: "newsletter.templates",   label: "Gerenciar modelos",        group: "Newsletter",     description: "Criar e editar molduras de e-mail" },
+  { key: "newsletter.settings",    label: "Configurar remetente",     group: "Newsletter",     description: "Editar remetente/Gmail e enviar e-mail de teste" },
   // Administração
   { key: "settings.view",        label: "Configurações",            group: "Administração",  description: "Acessar configurações do portal" },
   { key: "users.manage",         label: "Usuários e permissões",    group: "Administração",  description: "Gerenciar usuários da plataforma" },

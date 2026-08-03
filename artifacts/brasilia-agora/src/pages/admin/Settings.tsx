@@ -1947,12 +1947,14 @@ export default function Settings() {
             "Conteúdo":      FileText,
             "Plataforma":    LayoutDashboard,
             "Automações":    Activity,
+            "Newsletter":    Mail,
             "Administração": ShieldCheck,
           };
           const GROUP_DESC: Record<string, string> = {
             "Conteúdo":      "Permissões relacionadas a artigos, imagens e publicação.",
             "Plataforma":    "Acesso aos módulos principais do painel administrativo.",
             "Automações":    "Fontes RSS, redes sociais, colunistas e publicação automática.",
+            "Newsletter":    "Inscritos, campanhas, modelos de e-mail e remetente.",
             "Administração": "Configurações avançadas, usuários e logs do sistema.",
           };
           const groups = [...new Set(perms.map(p => p.group))];

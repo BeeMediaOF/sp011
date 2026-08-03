@@ -33,7 +33,7 @@ const NAV_MAIN = [
   { tk: "nav.rss",        icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
   { tk: "nav.users",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
   { tk: "nav.social",     icon: Share2,           path: "/admin/social",       permKey: "social.view" },
-  { tk: "nav.newsletter", icon: Mail,             path: "/admin/newsletter",   permKey: "settings.view" },
+  { tk: "nav.newsletter", icon: Mail,             path: "/admin/newsletter",   permKey: "newsletter.view" },
 ] as const;
 
 interface AdminLayoutProps {

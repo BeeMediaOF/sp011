@@ -194,6 +194,15 @@
   override é sanitizado por `sanitizeTemplate`/`sanitizeEmailHtml` ao gravar.
   Backend: schema+ensureSchema+rotas (parse/POST/PUT)+dispatch; **240 testes**
   api ✅, esbuild ✅. Frontend: `adminApi` + CampaignEditor ✅.
+- **Permissões de newsletter (aba Permissões):** grupo novo "Newsletter" com 6
+  chaves — `newsletter.view` (acesso), `.campaigns` (criar/editar), `.send`
+  (disparar/agendar/cancelar), `.subscribers` (exportar CSV), `.templates`
+  (molduras), `.settings` (remetente/teste). O router de newsletter deixou de
+  usar `settings.view` e passou a exigir `newsletter.view` no base + a permissão
+  específica por rota de escrita. Nav gateado por `newsletter.view`; grupo
+  renderiza sozinho na aba (GROUP_ICONS/DESC com Mail). Editores começam SEM
+  acesso (não estão em EDITOR_DEFAULTS) — admin libera. Enforcement é backend;
+  esconder botão por botão no front fica p/ depois (admin sempre passa).
 - Local: `lib/db`+`lib/news-engine` `tsc -b` ✅; api-server typecheck ✅ + **240
   testes** ✅ + esbuild ✅; news-engine **139 testes** ✅ (2 novos p/ e-mail);
   frontend typecheck ✅. **Falta validar em prod na VPS.**
