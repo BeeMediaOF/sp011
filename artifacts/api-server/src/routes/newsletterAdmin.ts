@@ -341,7 +341,7 @@ router.put("/campaigns/:id", requirePermission("newsletter.campaigns"), async (r
   const [existing] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
   if (!existing) { res.status(404).json({ ok: false }); return; }
   if (existing.status !== "draft" && existing.status !== "scheduled") {
-    res.status(409).json({ ok: false, error: "Só rascunhos ou campanhas agendadas podem ser editados." });
+    res.status(409).json({ ok: false, error: "Só rascunhos ou campanhas agendadas podem ser editados. Use “Duplicar” para reaproveitar esta campanha." });
     return;
   }
   const input = parseCampaignInput((req.body ?? {}) as Record<string, unknown>);
@@ -353,6 +353,47 @@ router.put("/campaigns/:id", requirePermission("newsletter.campaigns"), async (r
   await db.update(newsletterCampaignsTable).set(patch).where(eq(newsletterCampaignsTable.id, id));
   const [row] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
   res.json({ ok: true, campaign: row });
+});
+
+// POST /campaigns/:id/duplicate — clona como RASCUNHO novo (assunto, corpo,
+// moldura e personalização). É o caminho para reaproveitar o layout de uma
+// campanha já enviada: editar a original mudaria o que os inscritos já leram.
+router.post("/campaigns/:id/duplicate", requirePermission("newsletter.campaigns"), async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [src] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!src) { res.status(404).json({ ok: false }); return; }
+  const [row] = await db
+    .insert(newsletterCampaignsTable)
+    .values({
+      subject:          `Cópia de ${src.subject}`.slice(0, 300),
+      bodyHtml:         src.bodyHtml ?? "",
+      status:           "draft",
+      templateId:       src.templateId ?? null,
+      templateOverride: (src.templateOverride ?? null) as Record<string, unknown> | null,
+    })
+    .returning();
+  res.json({ ok: true, campaign: row });
+});
+
+// POST /campaigns/:id/resend — reenvia uma campanha JÁ ENVIADA só a quem entrou
+// depois (inscrito confirmado sem linha na fila desta campanha). Não reenvia
+// para quem já recebeu, e não altera o corpo já lido por eles.
+router.post("/campaigns/:id/resend", requirePermission("newsletter.send"), async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ ok: false }); return; }
+  if (campaign.status !== "sent" && campaign.status !== "failed") {
+    res.status(409).json({ ok: false, error: `Só campanhas já enviadas podem ser reenviadas (esta está '${campaign.status}').` });
+    return;
+  }
+  if (!store.getSettings().newsletterEnabled) {
+    res.status(400).json({ ok: false, error: "A newsletter está desligada (Configurações → Ativar)." });
+    return;
+  }
+  const added = await startCampaignSend(id, { firstAt: new Date(), onlyNew: true });
+  res.json({ ok: true, added });
 });
 
 // POST /campaigns/:id/send — envia agora ou agenda (scheduledAt futuro).

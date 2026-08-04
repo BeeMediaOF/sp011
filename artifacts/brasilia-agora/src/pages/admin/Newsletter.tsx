@@ -538,7 +538,7 @@ function EmailImagesPanel({ sources, onError, title, briefing }: {
 
   // Todos os slots dos trechos, achatados numa lista só. `key` identifica o slot
   // de forma estável entre renders (o índice global mudaria ao editar o HTML).
-  const joined = sources.map((s) => s.html).join(" ");
+  const joined = sources.map((s) => s.html).join("\u0000");
   const images = useMemo(
     () => sources.flatMap((s, si) =>
       listHtmlImages(s.html).map((img, ii) => ({ ...img, si, ii, key: `${si}:${ii}`, origin: s.label }))),
@@ -851,8 +851,10 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** Editor/visualização de uma campanha. `campaign` null = nova. */
-function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | null; onClose: (changed: boolean) => void }) {
+/** Editor/visualização de uma campanha. `campaign` null = nova.
+ *  `onClose(changed, next)`: com `next`, o pai troca a campanha aberta em vez
+ *  de voltar para a lista (é o que acontece ao duplicar). */
+function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | null; onClose: (changed: boolean, next?: NewsletterCampaign) => void }) {
   const editable = !campaign || campaign.status === "draft" || campaign.status === "scheduled";
   const { confirm, confirmUI } = useConfirm();
   const [subject, setSubject] = useState(campaign?.subject ?? "");
@@ -864,7 +866,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [settings, setSettings] = useState<NewsletterSettings | null>(null);
-  const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel" | "test">(null);
+  const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel" | "test" | "duplicate" | "resend">(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [queue, setQueue] = useState<NewsletterQueueStat[] | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
@@ -1070,7 +1072,42 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
     } finally { setBusy(null); }
   }
 
+  /** Clona como rascunho novo e abre a cópia (campanha enviada não se edita:
+   *  o corpo é o que os inscritos já leram). */
+  async function duplicate() {
+    if (!campaign) return;
+    setBusy("duplicate"); setMsg(null);
+    try {
+      const r = await adminApi.duplicateNewsletterCampaign(campaign.id);
+      onClose(true, r.campaign);
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao duplicar." });
+      setBusy(null);
+    }
+  }
+
+  /** Enfileira esta campanha para quem se inscreveu DEPOIS do disparo. */
+  async function resendNew() {
+    if (!campaign) return;
+    if (!(await confirm({
+      title: "Enviar aos novos inscritos",
+      message: "Enfileirar esta campanha para os inscritos confirmados que ainda não a receberam? Quem já recebeu fica de fora.",
+      confirmLabel: "Enviar aos novos",
+    }))) return;
+    setBusy("resend"); setMsg(null);
+    try {
+      const r = await adminApi.resendNewsletterCampaign(campaign.id);
+      if (!r.ok) { setMsg({ type: "err", text: r.error ?? "Não foi possível reenviar." }); return; }
+      if (r.added === 0) { setMsg({ type: "ok", text: "Nenhum inscrito novo — todos os confirmados já receberam esta campanha." }); return; }
+      changedRef.current = true;
+      onClose(true);
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao reenviar." });
+    } finally { setBusy(null); }
+  }
+
   const canCancel = campaign && campaign.status !== "sent" && campaign.status !== "canceled";
+  const canResend = campaign && (campaign.status === "sent" || campaign.status === "failed");
 
   return (
     <div className="space-y-5">
@@ -1086,6 +1123,14 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
       </div>
 
       <Banner msg={msg} />
+
+      {campaign && !editable && (
+        <p className="text-[12px] text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+          Campanha já disparada — o conteúdo fica travado porque é exatamente o que os inscritos receberam.
+          Use <strong>Duplicar campanha</strong> para editar uma cópia
+          {canResend ? <> ou <strong>Enviar aos novos inscritos</strong> para alcançar quem entrou depois</> : null}.
+        </p>
+      )}
 
       {/* Editor à esquerda (mais largo), ações/estatísticas à direita — usa a tela
           toda e mantém os botões à vista sem rolar. Empilha < lg. */}
@@ -1286,6 +1331,23 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
             </button>
           </>
         )}
+        {/* Campanha já disparada: não dá para editar (o corpo é o que os
+            inscritos leram), mas dá para reaproveitar e para alcançar quem
+            entrou depois. */}
+        {campaign && !editable && (
+          <>
+            {canResend && (
+              <button onClick={resendNew} disabled={busy !== null} className={btnPrimary}
+                title="Envia só para quem se inscreveu depois do disparo">
+                {busy === "resend" ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar aos novos inscritos
+              </button>
+            )}
+            <button onClick={duplicate} disabled={busy !== null} className={btnGhost}
+              title="Cria um rascunho novo com o mesmo assunto, corpo e moldura">
+              {busy === "duplicate" ? <Loader2 size={15} className="animate-spin" /> : <Copy size={15} />} Duplicar campanha
+            </button>
+          </>
+        )}
         {canCancel && (
           <button onClick={cancel} disabled={busy !== null}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 dark:border-red-900 text-red-600 dark:text-red-300 text-sm font-semibold hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-60 transition-colors">
@@ -1304,6 +1366,9 @@ function CampaignsTab() {
   const [campaigns, setCampaigns] = useState<NewsletterCampaign[] | null>(null);
   const [editing, setEditing] = useState<{ campaign: NewsletterCampaign | null } | null>(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [dupId, setDupId] = useState<number | null>(null);
+  /** Houve mudança enquanto o editor trocou de campanha (duplicar) — recarrega ao sair. */
+  const staleRef = useRef(false);
 
   const load = useCallback(() => {
     setCampaigns(null);
@@ -1314,11 +1379,31 @@ function CampaignsTab() {
 
   useEffect(() => { load(); }, [load]);
 
+  /** Duplicar direto da lista: abre o rascunho novo já no editor. */
+  async function duplicate(c: NewsletterCampaign) {
+    setDupId(c.id); setMsg(null);
+    try {
+      const r = await adminApi.duplicateNewsletterCampaign(c.id);
+      staleRef.current = true;
+      setEditing({ campaign: r.campaign });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao duplicar." });
+    } finally { setDupId(null); }
+  }
+
   if (editing) {
     return (
+      // `key`: trocar a campanha aberta (duplicar) tem de remontar o editor —
+      // o estado dele nasce das props e não se atualiza sozinho.
       <CampaignEditor
+        key={editing.campaign?.id ?? "new"}
         campaign={editing.campaign}
-        onClose={(changed) => { setEditing(null); if (changed) load(); }}
+        onClose={(changed, next) => {
+          if (changed) staleRef.current = true;
+          if (next) { setEditing({ campaign: next }); return; }
+          setEditing(null);
+          if (staleRef.current) { staleRef.current = false; load(); }
+        }}
       />
     );
   }
@@ -1354,6 +1439,7 @@ function CampaignsTab() {
                 <th className="px-4 py-3 font-semibold">Status</th>
                 <th className="px-4 py-3 font-semibold hidden sm:table-cell">Envio</th>
                 <th className="px-4 py-3 font-semibold hidden md:table-cell">Data</th>
+                <th className="px-4 py-3 font-semibold text-right">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -1372,6 +1458,16 @@ function CampaignsTab() {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell text-slate-500 dark:text-slate-400 text-[13px]">
                     {c.status === "scheduled" ? `⏰ ${fmtDate(c.scheduledAt)}` : fmtDate(c.sentAt ?? c.createdAt)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {/* Reaproveitar o layout sem abrir a campanha. stopPropagation:
+                        a linha inteira é clicável (abre o editor). */}
+                    <button type="button" disabled={dupId !== null}
+                      onClick={(e) => { e.stopPropagation(); void duplicate(c); }}
+                      title="Duplicar como rascunho novo"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-[13px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-60">
+                      {dupId === c.id ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />} Duplicar
+                    </button>
                   </td>
                 </tr>
               ))}

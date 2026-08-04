@@ -104,6 +104,12 @@ export const adminApi = {
   /** Envia ESTA campanha (corpo real, moldura, cards resolvidos) só para o admin logado. */
   testNewsletterCampaign: (id: number) =>
     req<{ ok: boolean; to?: string; error?: string }>("POST", `/newsletter/campaigns/${id}/test`, {}),
+  /** Clona como rascunho novo (assunto, corpo, moldura) — reaproveita o layout. */
+  duplicateNewsletterCampaign: (id: number) =>
+    req<{ ok: boolean; campaign: NewsletterCampaign }>("POST", `/newsletter/campaigns/${id}/duplicate`, {}),
+  /** Reenvia uma campanha já enviada SÓ a quem se inscreveu depois. */
+  resendNewsletterCampaign: (id: number) =>
+    req<{ ok: boolean; added: number; error?: string }>("POST", `/newsletter/campaigns/${id}/resend`, {}),
 
   // Newsletter — apoio ao editor de corpo (cards de artigo e imagens).
   /** HTML dos cards dos artigos escolhidos, na ordem dos ids. */

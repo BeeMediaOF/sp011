@@ -77,6 +77,12 @@ async function campaignSentToday(tz: string, now: Date): Promise<number> {
 export interface StartSendOptions {
   /** Quando começar o primeiro dia de envio (agendamento). Default: agora. */
   firstAt?: Date;
+  /**
+   * Reenvio aos NOVOS: enfileira só quem ainda não tem linha na fila desta
+   * campanha. Único modo que aceita campanha já `sent` — quem já recebeu
+   * (ou falhou/descartou) fica de fora, e `recipients` só cresce.
+   */
+  onlyNew?: boolean;
 }
 
 /**
@@ -91,7 +97,8 @@ export async function startCampaignSend(campaignId: number, opts: StartSendOptio
     .where(eq(newsletterCampaignsTable.id, campaignId))
     .limit(1);
   if (!campaign) return 0;
-  if (campaign.status === "sent" || campaign.status === "canceled") return 0;
+  if (campaign.status === "canceled") return 0;
+  if (campaign.status === "sent" && !opts.onlyNew) return 0;
 
   const s = store.getSettings();
   const tz = blogTz(s);
@@ -99,10 +106,28 @@ export async function startCampaignSend(campaignId: number, opts: StartSendOptio
 
   // Somente inscritos confirmados (supressão = filtro por status: unsubscribed/
   // bounced/complained/pending nunca entram no fan-out).
-  const subs = await db
+  const confirmed = await db
     .select({ id: newsletterSubscribersTable.id, email: newsletterSubscribersTable.email })
     .from(newsletterSubscribersTable)
     .where(eq(newsletterSubscribersTable.status, "confirmed"));
+
+  // Reenvio aos novos: tira quem já tem linha na fila desta campanha. O
+  // onConflictDoNothing abaixo já protegeria contra duplicata, mas o corte
+  // precisa acontecer ANTES do planCampaignSchedule — senão o teto diário
+  // seria gasto com linhas que nem chegam a ser inseridas.
+  let subs = confirmed;
+  if (opts.onlyNew) {
+    const queued = await db
+      .select({ id: newsletterSendQueueTable.subscriberId })
+      .from(newsletterSendQueueTable)
+      .where(eq(newsletterSendQueueTable.campaignId, campaignId));
+    const seen = new Set(queued.map((r) => r.id).filter((id): id is number => id != null));
+    subs = confirmed.filter((sub) => !seen.has(sub.id));
+    if (subs.length === 0) {
+      logger.info({ campaignId }, "Newsletter: reenvio sem inscritos novos");
+      return 0;
+    }
+  }
 
   const now = new Date();
   const sentToday = await campaignSentToday(tz, now);
@@ -131,6 +156,21 @@ export async function startCampaignSend(campaignId: number, opts: StartSendOptio
       .onConflictDoNothing({
         target: [newsletterSendQueueTable.campaignId, newsletterSendQueueTable.subscriberId],
       });
+  }
+
+  if (opts.onlyNew) {
+    // `recipients` acumula (é o total já endereçado); `sentAt` fica como está —
+    // o finalize reescreve quando a fila drenar de novo.
+    await db
+      .update(newsletterCampaignsTable)
+      .set({
+        status:     "sending",
+        recipients: (campaign.recipients ?? 0) + subs.length,
+        updatedAt:  new Date(),
+      })
+      .where(eq(newsletterCampaignsTable.id, campaignId));
+    logger.info({ campaignId, added: subs.length }, "Newsletter: reenvio aos novos inscritos");
+    return subs.length;
   }
 
   await db
