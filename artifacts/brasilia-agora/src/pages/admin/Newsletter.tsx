@@ -522,6 +522,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [body, setBody] = useState(campaign ? (campaign.bodyHtml ?? "") : SAMPLE_BODY);
   // Corpo em HTML (layout rico de e-mail) abre no modo código — ver isRichEmailHtml.
   const [htmlMode, setHtmlMode] = useState(() => isRichEmailHtml(campaign?.bodyHtml ?? ""));
+  const [showCode, setShowCode] = useState(false);
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [settings, setSettings] = useState<NewsletterSettings | null>(null);
@@ -718,14 +719,27 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
             <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
           ) : htmlMode ? (
             <div className="space-y-3">
-              <textarea
-                className={`${inputCls} font-mono text-[12px] leading-relaxed`}
-                rows={14}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                spellCheck={false}
-                placeholder="<table>…</table> — HTML de e-mail (estilo inline)"
-              />
+              {/* Código recolhido por padrão: o que importa no dia a dia é a
+                  prévia; o HTML só aparece quando se vai de fato mexer nele. */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+                <button type="button" onClick={() => setShowCode((v) => !v)}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-[#0B2A66] dark:text-blue-300">
+                  <Code2 size={15} /> Código HTML do conteúdo {showCode ? "▲" : "▼"}
+                </button>
+                <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+                  Estilo inline e tabelas — é o que os clientes de e-mail entendem. Imagens precisam de URL pública.
+                </p>
+                {showCode && (
+                  <textarea
+                    className={`${inputCls} font-mono text-[12px] leading-relaxed mt-3`}
+                    rows={16}
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    spellCheck={false}
+                    placeholder="<table>…</table> — HTML de e-mail (estilo inline)"
+                  />
+                )}
+              </div>
               <div>
                 <p className={`${labelCls} mb-1`}>Prévia</p>
                 <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
@@ -745,7 +759,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           )}
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
             {htmlMode
-              ? "Modo HTML: use estilo inline (style=\"…\") e tabelas — é o que os clientes de e-mail entendem. Imagens precisam de URL: envie pelo editor de texto ou use /api/uploads/…."
+              ? "A prévia mostra o conteúdo dentro da moldura. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar."
               : "Você escreve dentro da moldura escolhida. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar — a prévia é fiel, mas o e-mail final é montado no servidor."}
           </p>
         </div>
