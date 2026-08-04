@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import AdminLayout from "@/components/admin/AdminLayout";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import { listHtmlImages, replaceHtmlImageSrc, PLACEHOLDER_SRC } from "../../lib/emailImages";
 import {
   adminApi,
   type NewsletterSettings, type NewsletterCampaign, type NewsletterCampaignStatus,
@@ -233,6 +234,16 @@ function ShellFields({ value, title, onChange, onError }: {
               <textarea className={`${monoCls} min-h-[120px] resize-y`} value={value.footerHtml ?? ""} onChange={(e) => set("footerHtml", e.target.value)}
                 placeholder={'<table width="100%"><tr><td style="text-align:center;">…</td></tr></table>'} />
             </Field>
+            {/* A logo de um cabeçalho rico mora aqui dentro, no HTML — sem este
+                painel só dava para trocá-la editando o código na mão. */}
+            <EmailImagesPanel
+              title="Imagens do cabeçalho e do rodapé"
+              sources={[
+                { label: "Cabeçalho", html: value.headerHtml ?? "", onHtml: (h) => set("headerHtml", h) },
+                { label: "Rodapé",    html: value.footerHtml ?? "", onHtml: (h) => set("footerHtml", h) },
+              ]}
+              onError={(m) => onError?.(m)}
+            />
           </div>
         )}
       </div>
@@ -370,6 +381,333 @@ function MolduraStatic({ frame, bodyHtml, width = 600 }: { frame: MolduraFrame; 
  *  abre direto no modo HTML e só sai de lá com confirmação explícita. */
 function isRichEmailHtml(html: string): boolean {
   return /<\s*(table|td|tr)\b/i.test(html);
+}
+
+/** Corpo com token de artigo (`{{artigos:3}}`) — a prévia precisa pedir ao
+ *  servidor a versão resolvida, senão mostra o marcador cru justo no lugar
+ *  onde o inscrito verá os cards. */
+function hasArticleToken(html: string): boolean {
+  return /\{\{\s*(artigos|mais-lidos)\s*:/i.test(html);
+}
+
+// ─── Picker de artigos do blog ───────────────────────────────────────────────
+
+interface PickableArticle {
+  id: string; slug?: string; title: string; category?: string; imageUrl?: string; publishedAt?: string;
+}
+
+/** Escolhe artigos publicados para virarem cards no corpo da campanha. Lê a
+ *  lista PÚBLICA (/api/articles) — é o mesmo acervo que o leitor vê, e o link
+ *  do card tem de existir de verdade. Filtro no cliente, como na aba Redes
+ *  Sociais. */
+function ArticlePickerModal({ onCancel, onConfirm }: {
+  onCancel: () => void;
+  onConfirm: (ids: string[]) => void;
+}) {
+  const [articles, setArticles] = useState<PickableArticle[] | null>(null);
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState<string[]>([]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/articles?limit=200&sort=recent")
+      .then((r) => r.json())
+      .then((d: { articles?: PickableArticle[] }) => { if (alive) setArticles(d.articles ?? []); })
+      .catch(() => { if (alive) setArticles([]); });
+    return () => { alive = false; };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const term = q.trim().toLowerCase();
+    const all = articles ?? [];
+    if (!term) return all.slice(0, 60);
+    return all.filter((a) =>
+      a.title.toLowerCase().includes(term) || (a.category ?? "").toLowerCase().includes(term)).slice(0, 60);
+  }, [articles, q]);
+
+  // A ordem dos cards é a ordem em que foram marcados (não a da lista).
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onMouseDown={onCancel}>
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[85vh]"
+        onMouseDown={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+          <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm">Inserir artigos do blog</h3>
+          <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
+            Cada artigo vira um card com imagem, categoria e link para a página dele.
+          </p>
+        </div>
+        <div className="px-5 py-3 border-b border-slate-100 dark:border-slate-800">
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input className={`${inputCls} pl-9`} value={q} onChange={(e) => setQ(e.target.value)}
+              placeholder="Buscar por título ou categoria…" autoFocus />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 py-2 min-h-[200px]">
+          {articles === null && (
+            <p className="text-[12px] text-slate-400 flex items-center gap-2 px-3 py-6">
+              <Loader2 size={13} className="animate-spin" /> Carregando artigos…
+            </p>
+          )}
+          {articles !== null && filtered.length === 0 && (
+            <p className="text-[12px] text-slate-400 px-3 py-6">Nenhum artigo publicado encontrado.</p>
+          )}
+          {filtered.map((a) => {
+            const on = picked.includes(a.id);
+            return (
+              <button key={a.id} type="button" onClick={() => toggle(a.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-colors ${
+                  on ? "bg-[#0B2A66]/10 dark:bg-blue-950/50" : "hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                {a.imageUrl
+                  ? <img src={a.imageUrl} alt="" className="w-14 h-10 rounded-lg object-cover shrink-0 bg-slate-100 dark:bg-slate-800" />
+                  : <div className="w-14 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0" />}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] font-semibold text-slate-800 dark:text-slate-100 truncate">{a.title}</span>
+                  <span className="block text-[11px] text-slate-400">{a.category || "sem categoria"}</span>
+                </span>
+                {on && <CheckCircle size={16} className="text-[#0B2A66] dark:text-blue-300 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
+          <button type="button" onClick={onCancel} className={btnGhost}>Cancelar</button>
+          <button type="button" onClick={() => onConfirm(picked)} disabled={picked.length === 0} className={btnPrimary}>
+            Inserir {picked.length > 0 ? `${picked.length} card(s)` : "cards"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Imagens do corpo (slots detectados no HTML + biblioteca) ────────────────
+
+/** Instruções para montar o HTML fora do painel (ChatGPT/Claude). Sai com a
+ *  identidade DESTE blog e com as duas convenções que o painel entende:
+ *  placeholder de imagem e token de artigos. */
+function buildAiBriefing(o: { siteName: string; accent: string; width: number }): string {
+  return [
+    `Monte o HTML do CORPO de um e-mail (newsletter) do blog "${o.siteName}".`,
+    "",
+    "REGRAS OBRIGATÓRIAS (é e-mail, não é site):",
+    `- Largura máxima ${o.width}px, layout em <table> aninhada com role="presentation".`,
+    "- TODO estilo inline no atributo style. Nada de <style>, classes, CSS externo, flex ou grid.",
+    "- Não inclua <html>, <head> nem <body>: é só o miolo. Cabeçalho e rodapé já existem.",
+    `- Cor de destaque: ${o.accent}. Use-a nos títulos de seção, chips e botões.`,
+    "- Botões como <a> com padding e background inline (não use <button>).",
+    "",
+    "IMAGENS — não invente URL:",
+    `- Toda imagem deve sair como <img src="${PLACEHOLDER_SRC}" alt="descricao-curta" width="..." />.`,
+    "- O alt é o nome do slot: use algo curto e distinto (logo, hero, capa-1, capa-2).",
+    "- Depois eu envio os arquivos pelo painel e ele troca cada src sozinho.",
+    "",
+    "ARTIGOS DO BLOG — não invente títulos nem links:",
+    "- Onde quiser uma lista de artigos, escreva o marcador {{artigos:3}} sozinho dentro de um <td>.",
+    "- Variantes: {{artigos:3:nome-da-editoria}} e {{mais-lidos:3}}.",
+    "- O painel troca o marcador pelos artigos reais no momento do envio.",
+    "",
+    "Devolva só o HTML, sem explicação.",
+  ].join("\n");
+}
+
+/** Um trecho de HTML editável cujas imagens o painel gerencia. São vários
+ *  porque a logo mora no `headerHtml` da moldura e a arte no corpo — quem monta
+ *  a newsletter não deveria precisar saber dessa divisão. */
+interface ImageSource { label: string; html: string; onHtml: (html: string) => void; }
+
+function EmailImagesPanel({ sources, onError, title, briefing }: {
+  sources: ImageSource[];
+  onError: (msg: string) => void;
+  title?: string;
+  /** Só o editor de campanha oferece o briefing (é ele que recebe HTML de fora). */
+  briefing?: { siteName: string; accent: string; width: number };
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [library, setLibrary] = useState<{ filename: string; url: string }[] | null>(null);
+  const [libOpen, setLibOpen] = useState(false);
+  /** Slot que a biblioteca vai preencher; null = clicar só copia a URL. */
+  const [target, setTarget] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const slotRef = useRef<{ si: number; ii: number }>({ si: 0, ii: 0 });
+
+  // Todos os slots dos trechos, achatados numa lista só. `key` identifica o slot
+  // de forma estável entre renders (o índice global mudaria ao editar o HTML).
+  const joined = sources.map((s) => s.html).join(" ");
+  const images = useMemo(
+    () => sources.flatMap((s, si) =>
+      listHtmlImages(s.html).map((img, ii) => ({ ...img, si, ii, key: `${si}:${ii}`, origin: s.label }))),
+    // `joined` cobre a mudança de conteúdo; `sources` muda de identidade a cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [joined],
+  );
+  const pending = images.filter((i) => i.pending).length;
+  const multi = sources.length > 1;
+
+  const loadLibrary = useCallback(() => {
+    adminApi.listNewsletterImages()
+      .then((r) => setLibrary(r.images))
+      .catch(() => setLibrary([]));
+  }, []);
+
+  useEffect(() => { if (open && library === null) loadLibrary(); }, [open, library, loadLibrary]);
+
+  /** Aplica uma URL a um slot, escrevendo de volta no trecho de origem. */
+  function applyTo(si: number, ii: number, url: string) {
+    const src = sources[si];
+    if (src) src.onHtml(replaceHtmlImageSrc(src.html, ii, url));
+  }
+
+  async function upload(file: File, si: number, ii: number) {
+    setBusy(`${si}:${ii}`);
+    try {
+      // Prefixo `nl-`: é o que faz o arquivo aparecer na biblioteca da newsletter
+      // (a rota lista só esse prefixo, para não expor o acervo dos artigos).
+      const alt = images.find((i) => i.si === si && i.ii === ii)?.alt?.trim();
+      const r = await adminApi.uploadImage(file, `nl-${alt || "imagem"}`);
+      applyTo(si, ii, r.url);
+      setLibrary(null); // recarrega na próxima abertura
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Falha no upload da imagem.");
+    } finally { setBusy(null); }
+  }
+
+  function applyFromLibrary(url: string) {
+    const slot = target ? images.find((i) => i.key === target) : undefined;
+    if (!slot) {
+      void navigator.clipboard?.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+      return;
+    }
+    applyTo(slot.si, slot.ii, url);
+    setTarget(null);
+  }
+
+  function copyBriefing() {
+    if (!briefing) return;
+    void navigator.clipboard?.writeText(buildAiBriefing(briefing));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-3">
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void upload(f, slotRef.current.si, slotRef.current.ii);
+          e.target.value = "";
+        }} />
+
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button type="button" onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center gap-2 text-sm font-bold text-[#0B2A66] dark:text-blue-300">
+          <ImageIcon size={15} /> {title ?? "Imagens deste e-mail"} ({images.length}){pending > 0 && (
+            <span className="px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 text-[11px] font-bold">
+              {pending} pendente{pending > 1 ? "s" : ""}
+            </span>
+          )} {open ? "▲" : "▼"}
+        </button>
+        {briefing && (
+          <button type="button" onClick={copyBriefing}
+            className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 dark:text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-300">
+            <Copy size={13} /> {copied ? "Copiado!" : "Copiar briefing para IA"}
+          </button>
+        )}
+      </div>
+      <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
+        Envie o arquivo e o painel troca o endereço no HTML sozinho — você não precisa saber o caminho.
+      </p>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          {images.length === 0 && (
+            <p className="text-[12px] text-slate-400 dark:text-slate-500">
+              Nenhuma <code>&lt;img&gt;</code> no conteúdo ainda. Cole o HTML (ou use o briefing acima) e as imagens aparecem aqui.
+            </p>
+          )}
+
+          {images.map((img) => (
+            <div key={img.key} className="flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2">
+              {img.pending ? (
+                <div className="w-16 h-12 shrink-0 rounded-lg border border-dashed border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                  <AlertCircle size={15} />
+                </div>
+              ) : (
+                <img src={previewAbsUrl(img.src)} alt=""
+                  className="w-16 h-12 shrink-0 rounded-lg object-cover bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = "0.25"; }} />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 truncate">
+                  {multi && <span className="text-slate-400 font-normal">{img.origin} · </span>}
+                  {img.alt || <span className="text-slate-400 font-normal">sem alt</span>}
+                </p>
+                <p className="text-[11px] font-mono text-slate-400 dark:text-slate-500 truncate">{img.src || "(vazio)"}</p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button type="button" disabled={busy !== null}
+                  onClick={() => { slotRef.current = { si: img.si, ii: img.ii }; fileRef.current?.click(); }}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 text-[12px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 disabled:opacity-60">
+                  {busy === img.key ? <Loader2 size={13} className="animate-spin" /> : <ImageIcon size={13} />}
+                  {img.pending ? "Enviar" : "Trocar"}
+                </button>
+                <button type="button" onClick={() => { setTarget(img.key); setLibOpen(true); }}
+                  className={`px-2.5 py-1.5 rounded-lg border text-[12px] font-semibold transition-colors ${
+                    target === img.key
+                      ? "border-[#0B2A66] text-[#0B2A66] dark:border-blue-400 dark:text-blue-300"
+                      : "border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-700"}`}>
+                  Biblioteca
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <button type="button" onClick={() => { setLibOpen((v) => !v); if (!libOpen) loadLibrary(); }}
+                className="text-[12px] font-bold text-slate-600 dark:text-slate-300">
+                Já enviadas ({library?.length ?? 0}) {libOpen ? "▲" : "▼"}
+              </button>
+              {libOpen && (
+                <button type="button" onClick={loadLibrary}
+                  className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-[#0B2A66] dark:hover:text-blue-300">
+                  <RefreshCw size={12} /> Atualizar
+                </button>
+              )}
+            </div>
+            {libOpen && (
+              <>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  {target !== null
+                    ? `Escolha a imagem para "${images.find((i) => i.key === target)?.alt || "o slot marcado"}".`
+                    : "Clique para copiar o endereço — ou use “Biblioteca” numa imagem acima para aplicar direto."}
+                </p>
+                {library === null && <p className="text-[11px] text-slate-400 mt-2 flex items-center gap-1"><Loader2 size={12} className="animate-spin" /> Carregando…</p>}
+                {library?.length === 0 && <p className="text-[11px] text-slate-400 mt-2">Nenhuma imagem enviada pela newsletter ainda.</p>}
+                {library && library.length > 0 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-2">
+                    {library.map((f) => (
+                      <button key={f.filename} type="button" onClick={() => applyFromLibrary(f.url)} title={f.filename}
+                        className="aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:ring-2 hover:ring-[#0B2A66]/40">
+                        <img src={f.url} alt={f.filename} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Aba Configurações ────────────────────────────────────────────────────────
@@ -526,11 +864,15 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   const [templateId, setTemplateId] = useState<number | null>(campaign?.templateId ?? null);
   const [templates, setTemplates] = useState<NewsletterTemplateRecord[]>([]);
   const [settings, setSettings] = useState<NewsletterSettings | null>(null);
-  const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel">(null);
+  const [busy, setBusy] = useState<null | "save" | "send" | "schedule" | "cancel" | "test">(null);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [queue, setQueue] = useState<NewsletterQueueStat[] | null>(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [when, setWhen] = useState(() => toLocalInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [showPicker, setShowPicker] = useState(false);
+  /** Corpo com os tokens de artigo já resolvidos (só para a prévia). */
+  const [resolvedBody, setResolvedBody] = useState<string | null>(null);
+  const codeRef = useRef<HTMLTextAreaElement>(null);
   const changedRef = useRef(false);
 
   // Molduras da biblioteca (seletor) + settings (moldura Padrão + remetente da prévia).
@@ -567,6 +909,52 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   );
   // Mesma largura do cartão que o servidor usa (email.ts): 640 no tela cheia.
   const frameWidth = frameConfig.layout === "full" ? 640 : 600;
+
+  /* Prévia fiel de um corpo com `{{artigos:N}}`: quem sabe quais artigos entram
+     é o servidor (mesma regra do envio). Debounce para não consultar a cada
+     tecla; corpo sem token nem chama a rota. */
+  useEffect(() => {
+    if (!hasArticleToken(body)) { setResolvedBody(null); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      adminApi.renderNewsletterBody(body, { accent: frameConfig.accentColor, textColor: frameConfig.bodyTextColor })
+        .then((r) => { if (alive) setResolvedBody(r.html); })
+        .catch(() => { if (alive) setResolvedBody(null); });
+    }, 600);
+    return () => { alive = false; clearTimeout(t); };
+  }, [body, frameConfig.accentColor, frameConfig.bodyTextColor]);
+
+  const previewBody = resolvedBody ?? body;
+
+  /** Insere HTML no ponto do cursor (modo código) ou no fim do corpo. */
+  function insertHtml(html: string) {
+    const ta = codeRef.current;
+    if (!ta) { setBody(body + html); return; }
+    const start = ta.selectionStart ?? body.length;
+    const end = ta.selectionEnd ?? start;
+    setBody(body.slice(0, start) + html + body.slice(end));
+    requestAnimationFrame(() => {
+      ta.focus();
+      const caret = start + html.length;
+      ta.setSelectionRange(caret, caret);
+    });
+  }
+
+  async function insertArticleCards(ids: string[]) {
+    setShowPicker(false);
+    if (ids.length === 0) return;
+    try {
+      const r = await adminApi.newsletterArticleCards(ids, {
+        accent: frameConfig.accentColor, textColor: frameConfig.bodyTextColor,
+      });
+      insertHtml(r.html);
+      // Cards são tabela: o editor de texto os desmontaria ao salvar.
+      if (!htmlMode) setHtmlMode(true);
+      setMsg({ type: "ok", text: `${r.count} card(s) inserido(s) no conteúdo.` });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao montar os cards." });
+    }
+  }
 
   /** Alterna editor de texto ⇄ HTML. Sair do HTML com layout rico avisa: o
    *  TipTap normaliza o conteúdo para o esquema dele e perde tabelas/estilo. */
@@ -653,6 +1041,22 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
     } finally { setBusy(null); }
   }
 
+  /** Envia esta campanha só para o admin logado. Salva antes: o servidor lê o
+   *  corpo do banco (mesmo caminho do envio real), não o que está na tela. */
+  async function sendTest() {
+    if (!validate()) return;
+    setBusy("test"); setMsg(null);
+    try {
+      const id = await persist();
+      const r = await adminApi.testNewsletterCampaign(id);
+      setMsg(r.ok
+        ? { type: "ok", text: `Teste enviado para ${r.to}. Os inscritos não receberam nada.` }
+        : { type: "err", text: r.error ?? "Não foi possível enviar o teste." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao enviar o teste." });
+    } finally { setBusy(null); }
+  }
+
   async function cancel() {
     if (!campaign) return;
     if (!(await confirm({ title: "Cancelar campanha", message: "Cancelar esta campanha? Os envios ainda na fila serão interrompidos.", confirmLabel: "Cancelar campanha", cancelLabel: "Voltar", tone: "danger" }))) return;
@@ -671,6 +1075,9 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
   return (
     <div className="space-y-5">
       {confirmUI}
+      {showPicker && (
+        <ArticlePickerModal onCancel={() => setShowPicker(false)} onConfirm={(ids) => void insertArticleCards(ids)} />
+      )}
       <div className="flex items-center justify-between">
         <button type="button" onClick={() => onClose(changedRef.current)} className={btnGhost}>
           <ArrowLeft size={15} /> Voltar
@@ -709,14 +1116,20 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           <div className="flex items-center justify-between gap-3 mb-1">
             <label className={labelCls}>Conteúdo</label>
             {editable && (
-              <button type="button" onClick={switchMode}
-                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0B2A66] dark:text-blue-300 hover:underline">
-                <Code2 size={13} /> {htmlMode ? "Editor de texto" : "Editar em HTML"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setShowPicker(true)}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0B2A66] dark:text-blue-300 hover:underline">
+                  <Plus size={13} /> Inserir artigos do blog
+                </button>
+                <button type="button" onClick={switchMode}
+                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#0B2A66] dark:text-blue-300 hover:underline">
+                  <Code2 size={13} /> {htmlMode ? "Editor de texto" : "Editar em HTML"}
+                </button>
+              </div>
             )}
           </div>
           {!editable ? (
-            <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
+            <MolduraStatic frame={frame} bodyHtml={previewBody} width={frameWidth} />
           ) : htmlMode ? (
             <div className="space-y-3">
               {/* Código recolhido por padrão: o que importa no dia a dia é a
@@ -727,10 +1140,11 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
                   <Code2 size={15} /> Código HTML do conteúdo {showCode ? "▲" : "▼"}
                 </button>
                 <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">
-                  Estilo inline e tabelas — é o que os clientes de e-mail entendem. Imagens precisam de URL pública.
+                  Estilo inline e tabelas — é o que os clientes de e-mail entendem. Envie as imagens no painel abaixo.
                 </p>
                 {showCode && (
                   <textarea
+                    ref={codeRef}
                     className={`${inputCls} font-mono text-[12px] leading-relaxed mt-3`}
                     rows={16}
                     value={body}
@@ -740,9 +1154,18 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
                   />
                 )}
               </div>
+              <EmailImagesPanel
+                sources={[{ label: "Conteúdo", html: body, onHtml: setBody }]}
+                onError={(text) => setMsg({ type: "err", text })}
+                briefing={{
+                  siteName: settings?.newsletterFromName || "o blog",
+                  accent: frameConfig.accentColor || "#0B2A66",
+                  width: frameWidth,
+                }}
+              />
               <div>
                 <p className={`${labelCls} mb-1`}>Prévia</p>
-                <MolduraStatic frame={frame} bodyHtml={body} width={frameWidth} />
+                <MolduraStatic frame={frame} bodyHtml={previewBody} width={frameWidth} />
               </div>
             </div>
           ) : (
@@ -759,7 +1182,7 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           )}
           <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
             {htmlMode
-              ? "A prévia mostra o conteúdo dentro da moldura. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar."
+              ? "A prévia mostra o conteúdo dentro da moldura, com os artigos de {{artigos:N}} já resolvidos. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar."
               : "Você escreve dentro da moldura escolhida. O remetente e o link de descadastro entram no rodapé automaticamente ao enviar — a prévia é fiel, mas o e-mail final é montado no servidor."}
           </p>
         </div>
@@ -849,6 +1272,11 @@ function CampaignEditor({ campaign, onClose }: { campaign: NewsletterCampaign | 
           <>
             <button onClick={saveDraft} disabled={busy !== null} className={btnGhost}>
               {busy === "save" ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} Salvar rascunho
+            </button>
+            {/* Validação de verdade: o corpo real, na moldura real, num cliente
+                de e-mail real. Salva a campanha antes (não dispara para ninguém). */}
+            <button onClick={sendTest} disabled={busy !== null} className={btnGhost}>
+              {busy === "test" ? <Loader2 size={15} className="animate-spin" /> : <TestTube2 size={15} />} Enviar teste para mim
             </button>
             <button onClick={sendNow} disabled={busy !== null} className={btnPrimary}>
               {busy === "send" ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />} Enviar agora

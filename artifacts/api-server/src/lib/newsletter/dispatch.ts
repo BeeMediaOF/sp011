@@ -41,6 +41,8 @@ import {
   renderNewsletterEmail,
   confirmationBodyHtml,
 } from "./email.js";
+import { resolveArticleTokens } from "./articleCards.js";
+import { loadCardArticles } from "./articleSource.js";
 
 const POLL_MS = 30_000;
 const BATCH = 10;
@@ -278,10 +280,18 @@ async function buildMessage(
   // (templateId) > moldura Padrão das settings. O override já é sanitizado ao gravar.
   const template = (campaign.templateOverride as NewsletterTemplate | null)
     ?? await loadTemplateConfig(campaign.templateId);
+  // Tokens de artigo (`{{artigos:3}}`) resolvem AQUI, antes da absolutização: os
+  // cards nascem root-relativos (`/artigo/…`) e o passo seguinte os torna
+  // absolutos com a base do blog. Resolver depois deixaria link relativo no
+  // e-mail. A cor vem da moldura desta campanha, para o card não destoar.
+  const bodyWithCards = await resolveArticleTokens(campaign.bodyHtml, loadCardArticles, {
+    accent: template?.accentColor || s.adminAccentColor,
+    textColor: template?.bodyTextColor,
+  });
   const { html, text } = renderNewsletterEmail({
     settings: s,
     subject: campaign.subject,
-    bodyHtml: absolutizeHtml(campaign.bodyHtml, base),
+    bodyHtml: absolutizeHtml(bodyWithCards, base),
     unsubscribeUrl,
     baseUrl: base,
     template,

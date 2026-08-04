@@ -101,6 +101,20 @@ export const adminApi = {
     ),
   cancelNewsletterCampaign: (id: number) =>
     req<{ ok: boolean; error?: string }>("POST", `/newsletter/campaigns/${id}/cancel`, {}),
+  /** Envia ESTA campanha (corpo real, moldura, cards resolvidos) só para o admin logado. */
+  testNewsletterCampaign: (id: number) =>
+    req<{ ok: boolean; to?: string; error?: string }>("POST", `/newsletter/campaigns/${id}/test`, {}),
+
+  // Newsletter — apoio ao editor de corpo (cards de artigo e imagens).
+  /** HTML dos cards dos artigos escolhidos, na ordem dos ids. */
+  newsletterArticleCards: (ids: string[], colors?: { accent?: string; textColor?: string }) =>
+    req<{ ok: boolean; html: string; count: number }>("POST", "/newsletter/article-cards", { ids, ...colors }),
+  /** Resolve os tokens `{{artigos:N}}` do corpo — é o que torna a prévia fiel. */
+  renderNewsletterBody: (bodyHtml: string, colors?: { accent?: string; textColor?: string }) =>
+    req<{ html: string }>("POST", "/newsletter/render-body", { bodyHtml, ...colors }),
+  /** Imagens já enviadas pela newsletter (prefixo `nl-`), para reuso entre campanhas. */
+  listNewsletterImages: () =>
+    req<{ images: { filename: string; url: string; size: number; mtime: number }[] }>("GET", "/newsletter/images"),
 
   // Newsletter — molduras (aba Modelos). Biblioteca de shells (cabeçalho/rodapé).
   listNewsletterTemplates: () => req<{ templates: NewsletterTemplateRecord[] }>("GET", "/newsletter/templates"),

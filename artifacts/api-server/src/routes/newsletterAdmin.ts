@@ -13,6 +13,8 @@
  */
 
 import { Router } from "express";
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { and, count, desc, eq, ilike, type SQL } from "drizzle-orm";
 import { db, usersTable, newsletterCampaignsTable, newsletterSendQueueTable, newsletterSubscribersTable, newsletterTemplatesTable } from "@workspace/db";
 import { authMiddleware } from "../middlewares/auth.js";
@@ -23,6 +25,10 @@ import { sendEmail } from "../lib/mailer.js";
 import { getNewsletterSmtpConfig, renderNewsletterEmail } from "../lib/newsletter/email.js";
 import { sanitizeEmailHtml } from "@workspace/news-engine/sanitize";
 import { startCampaignSend } from "../lib/newsletter/dispatch.js";
+import { buildArticleCardsHtml, resolveArticleTokens } from "../lib/newsletter/articleCards.js";
+import { loadCardArticles } from "../lib/newsletter/articleSource.js";
+import { articleService } from "../lib/articleService.js";
+import { LOCAL_UPLOADS_DIR } from "../lib/uploadsFile.js";
 import { getPublicBase } from "../lib/social/queueProcessor.js";
 
 const router = Router();
@@ -190,6 +196,74 @@ router.post("/preview", (req, res) => {
   res.json({ html });
 });
 
+// ── Cards de artigo, prévia de corpo e biblioteca de imagens ─────────────────
+// Três rotas de apoio ao editor de campanha. Todas sob o `newsletter.view` do
+// router: nenhuma delas grava nada.
+
+/** Cor de destaque/texto vindas do corpo da requisição (a moldura da campanha
+ *  ainda pode nem estar salva). Sanitizadas pelo próprio articleCards. */
+function cardOptsFrom(b: Record<string, unknown>): { accent?: string; textColor?: string } {
+  const out: { accent?: string; textColor?: string } = {};
+  if (typeof b["accent"] === "string") out.accent = b["accent"];
+  if (typeof b["textColor"] === "string") out.textColor = b["textColor"];
+  return out;
+}
+
+// POST /article-cards — HTML dos cards dos artigos escolhidos no picker.
+// Devolve HTML pronto para colar no corpo; a ORDEM segue a dos ids enviados.
+router.post("/article-cards", async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const ids = Array.isArray(b["ids"]) ? (b["ids"] as unknown[]).slice(0, 12).map((v) => String(v)) : [];
+  if (ids.length === 0) { res.status(400).json({ ok: false, error: "Nenhum artigo escolhido." }); return; }
+
+  const all = await articleService.getArticles();
+  const byKey = new Map<string, (typeof all)[number]>();
+  for (const a of all) {
+    if (a.status !== "published") continue;
+    byKey.set(a.id, a);
+    if (a.slug) byKey.set(a.slug, a);
+  }
+  const chosen = ids.map((id) => byKey.get(id)).filter((a): a is (typeof all)[number] => !!a);
+  const html = buildArticleCardsHtml(
+    chosen.map((a) => ({ id: a.id, slug: a.slug, title: a.title, category: a.category, imageUrl: a.imageUrl })),
+    cardOptsFrom(b),
+  );
+  res.json({ ok: true, html, count: chosen.length });
+});
+
+// POST /render-body — resolve os tokens de artigo do corpo (só isso).
+// A prévia do editor é montada no cliente; sem esta rota ela mostraria
+// `{{artigos:3}}` cru justamente onde o inscrito verá os cards.
+router.post("/render-body", async (req, res) => {
+  const b = (req.body ?? {}) as Record<string, unknown>;
+  const bodyHtml = typeof b["bodyHtml"] === "string" ? (b["bodyHtml"] as string).slice(0, 200000) : "";
+  res.json({ html: await resolveArticleTokens(bodyHtml, loadCardArticles, cardOptsFrom(b)) });
+});
+
+// GET /images — imagens já enviadas pela newsletter (prefixo `nl-`), para reuso
+// entre campanhas. Mora AQUI, e não em /api/uploads, de propósito: um listador
+// genérico de /data/uploads exporia o acervo inteiro de imagens de artigos.
+// Sem DELETE — apagar arquivo quebraria campanha já enviada que alguém reabra.
+router.get("/images", (_req, res) => {
+  try {
+    const files = readdirSync(LOCAL_UPLOADS_DIR)
+      .filter((f) => /^nl-/i.test(f))
+      .map((filename) => {
+        try {
+          const st = statSync(join(LOCAL_UPLOADS_DIR, filename));
+          return { filename, url: `/api/uploads/${filename}`, size: st.size, mtime: st.mtimeMs };
+        } catch { return null; }
+      })
+      .filter((f): f is { filename: string; url: string; size: number; mtime: number } => !!f)
+      .sort((a, b) => b.mtime - a.mtime)
+      .slice(0, 200);
+    res.json({ images: files });
+  } catch {
+    // Diretório ausente num ambiente novo não é erro para o painel — é lista vazia.
+    res.json({ images: [] });
+  }
+});
+
 // ── Campanhas (Fase 3: motor exercitável por curl/SQL; UI TipTap na Fase 4) ───
 // O corpo (bodyHtml) é sanitizado ANTES de gravar (invariante do PRD; política
 // de e-mail, que preserva estilo inline). O disparo real (fan-out + drip + teto) fica
@@ -309,6 +383,62 @@ router.post("/campaigns/:id/send", requirePermission("newsletter.send"), async (
 
   const recipients = await startCampaignSend(id, { firstAt: new Date() });
   res.json({ ok: true, scheduled: false, recipients });
+});
+
+// POST /campaigns/:id/test — envia ESTA campanha ao e-mail do admin logado.
+// O /test de cima só valida o remetente (corpo fixo); sem esta rota não havia
+// como conferir o corpo real — cards, imagens e moldura — sem disparar para a
+// lista inteira. Não mexe no status nem na fila: é um envio avulso.
+router.post("/campaigns/:id/test", requirePermission("newsletter.campaigns"), async (req, res) => {
+  const id = parseId(req.params.id ?? "");
+  if (id == null) { res.status(400).json({ ok: false }); return; }
+  const [campaign] = await db.select().from(newsletterCampaignsTable).where(eq(newsletterCampaignsTable.id, id)).limit(1);
+  if (!campaign) { res.status(404).json({ ok: false }); return; }
+
+  const s = store.getSettings();
+  const cfg = getNewsletterSmtpConfig(s);
+  if (!cfg.ok) { res.status(400).json({ ok: false, error: cfg.error }); return; }
+
+  let to = req.userEmail;
+  if (!to && req.userId) {
+    const [u] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
+    to = u?.email;
+  }
+  if (!to) { res.status(400).json({ ok: false, error: "Não foi possível determinar o e-mail do administrador logado." }); return; }
+
+  const base = getPublicBase() ?? "";
+  const template = (campaign.templateOverride as NewsletterTemplate | null)
+    ?? (campaign.templateId
+      ? (await db.select({ config: newsletterTemplatesTable.config }).from(newsletterTemplatesTable)
+          .where(eq(newsletterTemplatesTable.id, campaign.templateId)).limit(1))[0]?.config as NewsletterTemplate | undefined
+      : undefined);
+
+  // MESMO caminho do envio real (dispatch.buildMessage): resolve tokens e só
+  // então absolutiza — o teste tem de mentir o mínimo possível.
+  const withCards = await resolveArticleTokens(campaign.bodyHtml, loadCardArticles, {
+    accent: template?.accentColor || s.adminAccentColor,
+    textColor: template?.bodyTextColor,
+  });
+  const bodyHtml = base ? withCards.replace(/(\b(?:src|href)=")\/(?!\/)/gi, `$1${base.replace(/\/+$/, "")}/`) : withCards;
+
+  const opts: Parameters<typeof renderNewsletterEmail>[0] = {
+    settings: s,
+    subject: `[TESTE] ${campaign.subject}`,
+    bodyHtml,
+    footerNote: "E-mail de TESTE desta campanha — os inscritos não receberam nada.",
+  };
+  if (base) opts.baseUrl = base;
+  if (template) opts.template = template;
+  const { html, text } = renderNewsletterEmail(opts);
+
+  const headers: Record<string, string> = {};
+  if (s.newsletterReplyTo) headers["Reply-To"] = s.newsletterReplyTo;
+  try {
+    await sendEmail(cfg.config, { to, subject: `[TESTE] ${campaign.subject}`, html, text, headers });
+    res.json({ ok: true, to });
+  } catch (e) {
+    res.json({ ok: false, error: (e as Error).message });
+  }
 });
 
 // POST /campaigns/:id/cancel — cancela (encerra as linhas pendentes da fila).

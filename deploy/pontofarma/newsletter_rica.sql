@@ -4,19 +4,22 @@
 -- Design de borda-a-borda (hero com foto, 5 ícones, cards de artigo, CTA,
 -- rodapé social) usando o modo `layout:"full"` da moldura.
 --
--- IMAGENS: hospedadas no PRÓPRIO blog (volume api_data → GET /api/uploads/:nome),
--- referenciadas como root-relativas `/api/uploads/nl-*`. O dispatch absolutiza
--- para `https://<dominio>/api/uploads/...` no envio, então o mesmo arquivo serve
--- qualquer blog. Zero egress de Storage. ANTES DE RODAR, copie os 5 arquivos de
--- deploy/pontofarma/assets/ para dentro do container do blog:
+-- NADA A COPIAR PARA A VPS: este seed usa as duas convenções do painel, e o
+-- resto se resolve pelo admin (Newsletter → Campanhas → abrir a campanha).
 --
---   cd /opt/blogs/pontofarma
---   docker compose cp /opt/sp011/deploy/pontofarma/assets/logo.png api:/data/uploads/nl-logo.png
---   docker compose cp /opt/sp011/deploy/pontofarma/assets/hero.jpg api:/data/uploads/nl-hero.jpg
---   docker compose cp /opt/sp011/deploy/pontofarma/assets/art1.jpg api:/data/uploads/nl-art1.jpg
---   docker compose cp /opt/sp011/deploy/pontofarma/assets/art2.jpg api:/data/uploads/nl-art2.jpg
---   docker compose cp /opt/sp011/deploy/pontofarma/assets/art3.jpg api:/data/uploads/nl-art3.jpg
---   curl -sI https://pontofarma.midia.run/api/uploads/nl-hero.jpg | head -1   # 200 OK
+--  1. IMAGENS — cada <img> nasce com src="COLOQUE_A_IMAGEM_AQUI". O painel
+--     detecta esses slots ("Imagens deste e-mail", com selo *pendente*), aceita
+--     o upload e reescreve o src sozinho para /api/uploads/nl-<alt>-<hash>.
+--     O logo mora no headerHtml da MOLDURA: aparece no painel de imagens de
+--     "Personalizar cabeçalho e rodapé" (ou na aba Modelos), não no do corpo.
+--     Root-relativo de propósito: o dispatch absolutiza para
+--     https://<dominio>/api/uploads/... no envio, então o mesmo HTML serve
+--     qualquer blog da rede. Zero egress de Storage.
+--
+--  2. ARTIGOS — a seção "Comece agora a explorar" é o marcador {{artigos:3}},
+--     trocado no ENVIO pelos 3 artigos publicados mais recentes (imagem,
+--     categoria e link /artigo/<slug> reais). Variantes: {{artigos:3:gestao}}
+--     e {{mais-lidos:3}}. A prévia do editor já mostra resolvido.
 --
 -- Idempotente (guarda por nome da moldura / assunto). Campanha entra como
 -- RASCUNHO. Requer a imagem do blog COM o modo full-bleed (email.ts) e com o
@@ -42,7 +45,7 @@ SELECT 'PontoFarma — Rica (tela cheia)', jsonb_build_object(
     </tr></table>
   </td></tr>
   <tr><td style="background:#ffffff;padding:20px 26px;text-align:center;">
-    <img src="/api/uploads/nl-logo.png" width="230" alt="pontofarma.com" style="display:inline-block;width:230px;max-width:60%;height:auto;border:0;" />
+    <img src="COLOQUE_A_IMAGEM_AQUI" width="230" alt="logo" style="display:inline-block;width:230px;max-width:60%;height:auto;border:0;" />
   </td></tr>
 </table>
 $hdr$,
@@ -87,7 +90,7 @@ SELECT
       <p style="margin:0;font-size:14px;line-height:1.65;color:#b9c6dc;">Aqui você encontra informação confiável, atualizada e de fácil compreensão sobre saúde, medicamentos, prevenção e novidades do setor farmacêutico.</p>
     </td>
     <td width="48%" valign="middle" align="center" style="padding:26px 30px 26px 12px;">
-      <img src="/api/uploads/nl-hero.jpg" width="250" alt="Farmacêutica PontoFarma" style="display:block;width:100%;max-width:250px;height:auto;border:3px solid #1a8a9e;border-radius:20px;" />
+      <img src="COLOQUE_A_IMAGEM_AQUI" width="250" alt="hero" style="display:block;width:100%;max-width:250px;height:auto;border:3px solid #1a8a9e;border-radius:20px;" />
     </td>
   </tr>
 </table>
@@ -114,30 +117,8 @@ SELECT
   </td></tr>
   <tr><td style="padding:0 30px 6px;">
     <h2 style="margin:0 0 4px;font-size:21px;font-weight:800;color:#0e2341;">Comece agora a explorar!</h2>
-    <p style="margin:0 0 18px;font-size:13px;color:#7a8aa0;">Confira nossos conteúdos mais acessados e fique por dentro.</p>
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
-      <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="/api/uploads/nl-art1.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
-        <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Medicamentos</p>
-        <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">Genéricos x Similares: entenda as diferenças</p>
-        <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">O que muda entre eles e como escolher com segurança.</p>
-        <a href="https://pontofarma.midia.run" style="font-size:12px;font-weight:700;color:#1a8a9e;text-decoration:none;">Ler artigo &rarr;</a>
-      </td>
-      <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="/api/uploads/nl-art2.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
-        <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Saúde e bem-estar</p>
-        <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">5 hábitos simples para a sua qualidade de vida</p>
-        <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">Pequenas mudanças que fazem toda a diferença.</p>
-        <a href="https://pontofarma.midia.run" style="font-size:12px;font-weight:700;color:#1a8a9e;text-decoration:none;">Ler artigo &rarr;</a>
-      </td>
-      <td width="33%" valign="top" style="padding:0 6px;">
-        <img src="/api/uploads/nl-art3.jpg" width="180" alt="" style="display:block;width:100%;height:auto;border:0;border-radius:9px;margin-bottom:8px;" />
-        <p style="margin:0 0 5px;font-size:10px;font-weight:800;letter-spacing:0.5px;text-transform:uppercase;color:#1a8a9e;">Notícias</p>
-        <p style="margin:0 0 5px;font-size:13px;font-weight:700;line-height:1.3;color:#0e2341;">Novos medicamentos aprovados chegam ao mercado</p>
-        <p style="margin:0 0 8px;font-size:11px;line-height:1.5;color:#7a8aa0;">Veja os principais lançamentos e o que esperar.</p>
-        <a href="https://pontofarma.midia.run" style="font-size:12px;font-weight:700;color:#1a8a9e;text-decoration:none;">Ler artigo &rarr;</a>
-      </td>
-    </tr></table>
+    <p style="margin:0 0 18px;font-size:13px;color:#7a8aa0;">Nossas publicações mais recentes, direto do blog.</p>
+    {{artigos:3}}
   </td></tr>
   <tr><td style="padding:22px 30px 34px;">
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#0e2341;border-radius:14px;"><tr>
