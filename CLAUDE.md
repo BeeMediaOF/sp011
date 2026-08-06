@@ -90,6 +90,7 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 | `creditovc` | credito.vc (zona própria; ou .midia.run provisório) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | Kit completo em `deploy/creditovc/` (GO_LIVE + sources_financas + template); go-live pendente; sem backfill (nicho novo) |
 | `apostaganha` | apostaganha.midia.run | pt-BR, esporte (marca Aposta Ganha) | laranja vivo `#ff6a00` (só sobre fundo escuro) + laranja queimado `#c24500` (blocos/menu ativo) + preto `#111111`, rodapé `#080808` | Kit completo em `deploy/apostaganha/`; go-live pendente |
 | `recebabet` | recebabet.midia.run | pt-BR, esporte (marca Receba Bet) | azul-céu `#3d9bff` + azul royal `#0f62d6` + navy `#071b3d`, rodapé `#040f26` | Kit completo em `deploy/recebabet/`; go-live pendente |
+| `ocomandante` | ocomandante.midia.run (ou zona própria) | pt-BR, notícias gerais | navy `#14265e` (wordmark) + azul royal `#1657d0` (emblema) + azul claro `#4d8dff` (só sobre escuro) + vermelho `#d81f26` (bloco "NEWS", só com tinta branca), dark `#0a1740`, rodapé `#060e26`, tagline "No comando da notícia" | Kit em `deploy/ocomandante/` (GO_LIVE + template com 2 homes); go-live pendente; **nasce vazio** (sem fontes/regras/backfill/artes) |
 
 - Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee/Aposta
   Ganha/Receba Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
@@ -116,10 +117,19 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   existirem colunistas reais. NÃO é a família KSports-Final; os
   template_final.sql deles também fazem bootstrap do site_settings com os
   defaults do app (espelho do store.ts) quando a linha não existe.
+- Slugs do **ocomandante**: `politica, brasil, mundo, economia, seguranca,
+  esportes, tecnologia, cultura, geral` — são as editorias CLÁSSICAS do blog
+  engine (`FIXED_CATEGORIES` em `brasilia-agora/src/lib/categoryRoutes.ts`),
+  escolhidas porque resolvem por rota fixa e funcionam sem taxonomia
+  cadastrada (o blog nasce sem fontes). Único blog da rede com DOIS templates
+  no mesmo `template_final.sql` (dollar-quotes `$tplp$`/`$tplr$` +
+  `jsonb_build_array`): "O Comandante - Portal" (22 blocos, família
+  KSports-Final) e "O Comandante - Revista" (20 blocos, layout do mock, exige
+  imagem ≥ v85 pelos layouts `hero`/`mini`).
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
   sozinho — ksports mora em ksports.bebee.me), Aposta Ganha `%aposta%ganha%`,
-  Receba Bet `%receba%bet%`.
+  Receba Bet `%receba%bet%`, O Comandante `%comandante%`.
 
 ## 5. Workflow git + deploy padrão (VPS)
 
@@ -495,6 +505,13 @@ montada no servidor.
    admin. São blogs de ESPORTE pt-BR — herdam as 16 fontes e os 8 slugs dos
    irmãos, então o mesmo artigo passa a existir em até 7 domínios: o aviso de
    SEO no fim de cada GO_LIVE explica quando pular o backfill.
+10. **O Comandante News** (2026-08-06): kit em `deploy/ocomandante/` (GO_LIVE
+    + template_final com as DUAS homes). Pedido do usuário: subir o blog com
+    a home de esporte/bets E a home do Crédito.vc disponíveis para escolher,
+    **sem fontes, sem regras de distribuição e sem posts** — as editorias
+    definitivas ainda não foram decididas. Falta: go-live na VPS, upload das
+    logos, escolha da home, e depois (quando o nicho fechar) categorias +
+    fontes/regras próprias na central e artes sociais.
 
 ## 20. Onde procurar mais (no repo)
 
