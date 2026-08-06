@@ -88,9 +88,11 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 | `beeesportes` | beeesportes.midia.run | pt-BR, esporte | verde menta `#57c785`, profundo `#18754e`, dark `#0e1412` | Kit completo; go-live pendente |
 | `pontofarma` | pontofarma.com (zona própria; ou .midia.run provisório) | pt-BR, B2B setor farmacêutico | verde `#18a957`/`#0c8b46` + navy `#0e2341`, rodapé `#0c1630`, tagline "conteúdo que gera resultado" | Kit completo em `deploy/pontofarma/` (GO_LIVE + sources_farma + template); go-live pendente; sem backfill (nicho novo) |
 | `creditovc` | credito.vc (zona própria; ou .midia.run provisório) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | Kit completo em `deploy/creditovc/` (GO_LIVE + sources_financas + template); go-live pendente; sem backfill (nicho novo) |
+| `apostaganha` | apostaganha.midia.run | pt-BR, esporte (marca Aposta Ganha) | laranja vivo `#ff6a00` (só sobre fundo escuro) + laranja queimado `#c24500` (blocos/menu ativo) + preto `#111111`, rodapé `#080808` | Kit completo em `deploy/apostaganha/`; go-live pendente |
+| `recebabet` | recebabet.midia.run | pt-BR, esporte (marca Receba Bet) | azul-céu `#3d9bff` + azul royal `#0f62d6` + navy `#071b3d`, rodapé `#040f26` | Kit completo em `deploy/recebabet/`; go-live pendente |
 
-- Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee, todos
-  iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
+- Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee/Aposta
+  Ganha/Receba Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
   e-sports, outros`. **Propositalmente ≠ dos slugs EN do ksports**
   (`world-cup, football, volleyball, tennis, formula-1, nfl, esports,
   others`) — regra da central casa por categoria sem filtrar idioma; slug
@@ -116,7 +118,8 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   defaults do app (espelho do store.ts) quando a linha não existe.
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
-  sozinho — ksports mora em ksports.bebee.me).
+  sozinho — ksports mora em ksports.bebee.me), Aposta Ganha `%aposta%ganha%`,
+  Receba Bet `%receba%bet%`.
 
 ## 5. Workflow git + deploy padrão (VPS)
 
@@ -485,6 +488,13 @@ montada no servidor.
    NÃO usar sources_pt.sql dos irmãos nem backfill do Esporte Agora
    (catálogo nasce da coleta orgânica). ICTQ e Portal Contábeis nascem
    inativas (validar endpoint do feed antes de ativar).
+9. **Aposta Ganha e Receba Bet** (2026-08-06): kits completos em
+   `deploy/<id>/` (GO_LIVE + sources_pt + backfill_50 + template + 2 SQLs de
+   arte social), clonados do Oley Sports com a paleta trocada por mapa de
+   slots. Falta o go-live operacional na VPS e as logos das duas marcas no
+   admin. São blogs de ESPORTE pt-BR — herdam as 16 fontes e os 8 slugs dos
+   irmãos, então o mesmo artigo passa a existir em até 7 domínios: o aviso de
+   SEO no fim de cada GO_LIVE explica quando pular o backfill.
 
 ## 20. Onde procurar mais (no repo)
 
