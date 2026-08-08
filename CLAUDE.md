@@ -388,6 +388,17 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
   Salvar nas Configurações — reiniciar o central-api ANTES de salvar.
 - Texto NDPA do ksports é rascunho pendente de validação jurídica.
 - Admin ignora permissões por design; nunca rebaixar/excluir o último admin.
+- **Permissão é POR USUÁRIO** (ago/2026): tabela `user_permissions`, editada na
+  sub-aba "Permissões" do modal do usuário (a aba única em Configurações virou
+  só um atalho para Usuários). `role_permissions` sobrou como MODELO do perfil —
+  é o que o usuário novo recebe copiado e o que responde por quem ainda não tem
+  linhas próprias (nenhum editor antigo perde acesso no deploy). Três perfis:
+  `admin` (tudo), `editor`, `columnist`. Colunista enxerga/edita SÓ os artigos
+  que assina (`articles.columnist_id` = `users.columnist_id`) — o escopo é do
+  servidor (`columnistScope` em `routes/admin.ts`), não da tela; ele nasce sem
+  `articles.publish`. Um usuário Colunista sempre tem um perfil em
+  `settings.columnists` (criado junto pelo `POST /users`) — é dele a foto/nome/
+  bio que assinam o artigo no site.
 - Isolamento entre blogs é por infra (container+DB+SESSION_SECRET próprios);
   NÃO existe blogId no app — nunca hardcodar conteúdo por blog na imagem
   compartilhada (usar settings).

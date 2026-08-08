@@ -142,6 +142,8 @@ export interface Article {
   imageCredit?: string;
   /** Exibição do crédito da foto: true/false força; null/ausente segue o padrão do site. */
   showImageCredit?: boolean | null;
+  /** Colunista assinante (settings.columnists); null/ausente = assinatura do portal. */
+  columnistId?: string | null;
   /** Tempo de leitura estimado em minutos (derivado do content; não persiste). */
   readingMinutes: number;
 }
@@ -175,6 +177,7 @@ function rowToArticle(row: ArticleRow): Article {
     showSourceCredit: row.showSourceCredit,
     imageCredit:   row.imageCredit ?? undefined,
     showImageCredit: row.showImageCredit,
+    columnistId:   row.columnistId ?? null,
     readingMinutes: readingMinutes(row.content),
   };
 }
@@ -380,6 +383,7 @@ export const articleService = {
         showSourceCredit: data.showSourceCredit ?? null,
         imageCredit:   data.imageCredit ?? null,
         showImageCredit: data.showImageCredit ?? null,
+        columnistId:   data.columnistId ?? null,
         createdAt:     now,
         updatedAt:     now,
       })
@@ -420,6 +424,7 @@ export const articleService = {
         ...(data.showSourceCredit !== undefined && { showSourceCredit: data.showSourceCredit }),
         ...(data.imageCredit   !== undefined && { imageCredit:   data.imageCredit }),
         ...(data.showImageCredit !== undefined && { showImageCredit: data.showImageCredit }),
+        ...(data.columnistId   !== undefined && { columnistId:   data.columnistId }),
         updatedAt: new Date(),
       })
       .where(eq(articlesTable.id, id))

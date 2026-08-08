@@ -39,6 +39,26 @@ export async function ensureSchema(target: Db = db): Promise<void> {
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS language text NOT NULL DEFAULT 'pt-BR'`,
     // Corte de revogação de token por logout (PRD-03) — se autocria no boot.
     sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_from timestamp`,
+    // ── Colunistas com login (ago/2026) ────────────────────────────────────
+    // Terceiro perfil de usuário. PG 12+ aceita ADD VALUE dentro de transação
+    // desde que o valor não seja USADO nela — aqui é statement isolado, e o
+    // primeiro INSERT com role='columnist' só acontece muito depois, no admin.
+    sql`ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'columnist'`,
+    // Login ↔ perfil de colunista (foto/bio da assinatura, escopo "meus artigos").
+    sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS columnist_id text`,
+    // Colunista assinante do artigo (NULL = assinatura padrão do portal).
+    sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS columnist_id text`,
+    sql`CREATE INDEX IF NOT EXISTS articles_columnist_idx ON articles (columnist_id)`,
+    // Permissão POR USUÁRIO — substitui a aba única do perfil Editor. Usuário
+    // sem nenhuma linha aqui continua caindo no padrão do perfil (role_permissions).
+    sql`CREATE TABLE IF NOT EXISTS user_permissions (
+      id             serial PRIMARY KEY,
+      user_id        integer NOT NULL,
+      permission_key text NOT NULL,
+      enabled        boolean NOT NULL DEFAULT false,
+      updated_at     timestamp NOT NULL DEFAULT now()
+    )`,
+    sql`CREATE UNIQUE INDEX IF NOT EXISTS user_perm_unique ON user_permissions (user_id, permission_key)`,
     sql`CREATE UNIQUE INDEX IF NOT EXISTS articles_central_id_uniq ON articles (central_id) WHERE central_id IS NOT NULL`,
     // Nonces de ingest consumidos (PRD-14, anti-replay) — se autocria no boot.
     sql`CREATE TABLE IF NOT EXISTS ingest_nonces (signature text PRIMARY KEY, seen_at timestamptz NOT NULL DEFAULT now())`,

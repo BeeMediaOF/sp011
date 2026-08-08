@@ -22,6 +22,13 @@ export const articlesTable = pgTable("articles", {
   tag:           text("tag").notNull().default("GERAL"),
   imageUrl:      text("image_url").notNull().default(""),
   author:        text("author").notNull().default("Redação"),
+  /**
+   * Colunista assinante (settings.columnists). Quando preenchido, o site mostra
+   * foto + nome + bio na assinatura e `author` guarda o nome como texto (para
+   * quem lê só a coluna antiga). NULL = assinatura padrão do portal.
+   * Coluna criada por ensureSchema (ADD COLUMN IF NOT EXISTS).
+   */
+  columnistId:   text("columnist_id"),
   publishedAt:   timestamp("published_at", { withTimezone: true }),
   status:        articleStatusEnum("status").notNull().default("draft"),
   origin:        articleOriginEnum("origin"),

@@ -3,8 +3,10 @@ import RichTextEditor from "../../components/admin/RichTextEditor";
 import { useCategories } from "../../hooks/useCategories";
 import { useLocation, useRoute } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
-import { adminApi, type Article } from "../../lib/adminApi";
+import { adminApi, type Article, type Columnist } from "../../lib/adminApi";
 import { useCan } from "../../lib/permissionsCache";
+import { getStoredRole } from "../Admin";
+import { useSite } from "../../hooks/useSite";
 import { invalidateArticlesCache } from "../../hooks/useArticles";
 import {
   Save, Send, Eye, ChevronDown, ChevronRight,
@@ -21,7 +23,7 @@ const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
 
 const empty: Partial<Article> = {
   title: "", subtitle: "", content: "", category: "geral",
-  tag: "GERAL", imageUrl: "", author: "Redação", status: "draft",
+  tag: "GERAL", imageUrl: "", author: "", status: "draft", columnistId: null,
 };
 
 function AiBadge() {
@@ -51,8 +53,10 @@ export default function ArticleEdit() {
   const isNew     = !matchEdit || paramsEdit?.id === "novo";
   const articleId = isNew ? null : (paramsEdit?.id ?? null);
   const { categories } = useCategories();
+  const { settings: siteSettings } = useSite();
 
   const [form, setForm]               = useState<Partial<Article>>(empty);
+  const [columnists, setColumnists]   = useState<Columnist[]>([]);
   const [slug, setSlug]               = useState("");
   const [tags, setTags]               = useState<string[]>([]);
   const [tagInput, setTagInput]       = useState("");
@@ -126,6 +130,25 @@ export default function ArticleEdit() {
   useEffect(() => {
     if (isNew) setSlug(slugify(form.title ?? ""));
   }, [form.title, isNew]);
+
+  // Colunistas ativos — alimentam o seletor de assinatura (foto + nome).
+  useEffect(() => {
+    adminApi.getColumnists()
+      .then(({ columnists: list }) => setColumnists(list.filter((c) => c.active)))
+      .catch(() => setColumnists([]));
+  }, []);
+
+  // Colunista logado assina a si mesmo: o artigo novo já nasce com o perfil dele
+  // marcado (o backend impõe o mesmo — aqui é só o reflexo na tela).
+  useEffect(() => {
+    if (!isNew || getStoredRole() !== "columnist") return;
+    adminApi.me()
+      .then(({ user }) => {
+        if (!user.columnistId) return;
+        setForm((f) => ({ ...f, columnistId: user.columnistId, author: user.name }));
+      })
+      .catch(() => {});
+  }, [isNew]);
 
   // ── Debounced autofill — triggers 1.5s after title/content stabilises ──
   useEffect(() => {
@@ -423,6 +446,15 @@ export default function ArticleEdit() {
   // Enviar arquivo exige `upload.images`; a entrada por URL fica sempre disponível.
   // Inerte para admin e para editor com a permissão (can() já devolve true).
   const canUpload = can("upload.images");
+
+  // ── Assinatura do artigo ────────────────────────────────────────────────
+  // Colunista logado assina a si mesmo (o backend impõe o mesmo — o seletor só
+  // reflete a regra). Sem colunista, vale a assinatura padrão do portal.
+  const isColumnistUser = getStoredRole() === "columnist";
+  const defaultByline   = siteSettings?.bylineName?.trim()
+    || siteSettings?.siteName?.trim()
+    || "Redação";
+  const selectedColumnist = columnists.find((c) => c.id === form.columnistId) ?? null;
 
   async function handleSave(intent: "draft" | "publish" | "update") {
     setError(""); setSuccess("");
@@ -1268,23 +1300,60 @@ export default function ArticleEdit() {
               <p className="text-[11px] text-slate-400 mt-1">Separe as tags com Enter</p>
             </div>
 
-            {/* Autor */}
+            {/* Autor — Redação (assinatura do portal) ou um colunista cadastrado.
+                Com um colunista escolhido, o site passa a mostrar a FOTO e o NOME
+                dele na assinatura do artigo. */}
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">
                 Autor <span className="text-[#E71D36]">*</span>
               </label>
               <div className="relative">
                 <select
-                  value={form.author ?? "Redação"}
-                  onChange={(e) => setField("author", e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700"
+                  value={form.columnistId ?? ""}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    const c = columnists.find((x) => x.id === id);
+                    setField("columnistId", id || null);
+                    setField("author", c ? c.name : defaultByline);
+                  }}
+                  disabled={isColumnistUser}
+                  className="w-full px-4 py-2.5 text-sm border border-slate-200 rounded-xl outline-none focus:border-[#0B2A66] bg-slate-50 appearance-none cursor-pointer text-slate-700 disabled:opacity-70 disabled:cursor-not-allowed"
                 >
-                  <option value="Administrador (Você)">Administrador (Você)</option>
-                  <option value="Redação">Redação</option>
-                  <option value="Colunista">Colunista</option>
+                  <option value="">{defaultByline}</option>
+                  {columnists.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
                 </select>
                 <ChevronDown size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
+
+              {selectedColumnist ? (
+                <div className="flex items-center gap-3 mt-2 p-2.5 bg-slate-50 border border-slate-100 rounded-xl">
+                  {selectedColumnist.avatarBase64 ? (
+                    <img src={selectedColumnist.avatarBase64} alt={selectedColumnist.name}
+                      className="w-10 h-10 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-[#EEF2FF] text-[#0B2A66] text-xs font-bold flex items-center justify-center shrink-0">
+                      {selectedColumnist.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{selectedColumnist.name}</p>
+                    <p className="text-[11px] text-slate-500 truncate">
+                      {selectedColumnist.bio || selectedColumnist.specialty}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  {columnists.length === 0
+                    ? "Nenhum colunista ativo cadastrado — crie um em Usuários (perfil Colunista) ou em Colunistas."
+                    : "Sem colunista: o artigo sai com a assinatura padrão do portal."}
+                </p>
+              )}
+              {isColumnistUser && (
+                <p className="text-[11px] text-slate-400 mt-1.5">Você assina os seus próprios textos.</p>
+              )}
             </div>
 
             {/* RSS / AI info */}

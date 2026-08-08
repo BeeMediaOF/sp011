@@ -34,6 +34,8 @@ declare global {
       userId?: number;
       userRole?: string;
       userEmail?: string;
+      /** Perfil de colunista ligado ao login (só role "columnist"). */
+      userColumnistId?: string | null;
       isWebhookKey?: boolean;
     }
   }
@@ -44,6 +46,7 @@ declare global {
 interface UserCache {
   status: string;
   role: string;
+  columnistId: string | null;
   passwordChangedAt: Date | null;
   tokensValidFrom: Date | null;
   cachedAt: number;
@@ -93,6 +96,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     }
     req.userId   = payload.userId;
     req.userRole = cached.role;
+    req.userColumnistId = cached.columnistId;
     next();
     return;
   }
@@ -101,6 +105,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     const [user] = await db
       .select({
         status: usersTable.status, role: usersTable.role, email: usersTable.email,
+        columnistId: usersTable.columnistId,
         passwordChangedAt: usersTable.passwordChangedAt, tokensValidFrom: usersTable.tokensValidFrom,
       })
       .from(usersTable)
@@ -112,7 +117,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     }
 
     _userCache.set(payload.userId, {
-      status: user.status, role: user.role,
+      status: user.status, role: user.role, columnistId: user.columnistId ?? null,
       passwordChangedAt: user.passwordChangedAt, tokensValidFrom: user.tokensValidFrom,
       cachedAt: Date.now(),
     });
@@ -123,6 +128,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     req.userId    = payload.userId;
     req.userRole  = user.role;
     req.userEmail = user.email;
+    req.userColumnistId = user.columnistId ?? null;
     // Update lastSeenAt in the background (non-blocking)
     db.update(usersTable).set({ lastSeenAt: new Date() }).where(eq(usersTable.id, payload.userId)).catch(() => {});
     next();
@@ -141,6 +147,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       }
       req.userId   = payload.userId;
       req.userRole = stale.role;
+      req.userColumnistId = stale.columnistId;
       next();
       return;
     }

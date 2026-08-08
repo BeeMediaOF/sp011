@@ -495,7 +495,12 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
 
         {/* Nav */}
         <nav className="flex-1 py-4 space-y-0.5 pr-2 overflow-y-auto min-h-0">
-          {visibleMain.map(({ tk, icon: Icon, path }) => navItem(t(tk), Icon, path))}
+          {visibleMain.map(({ tk, icon: Icon, path }) => navItem(
+            // Colunista só enxerga os próprios textos (escopo do servidor) —
+            // o rótulo acompanha para não prometer o acervo inteiro.
+            tk === "nav.articles" && role === "columnist" ? t("nav.myColumn") : t(tk),
+            Icon, path,
+          ))}
 
           {/* Configurações — single direct link */}
           {canSeeConfig && (

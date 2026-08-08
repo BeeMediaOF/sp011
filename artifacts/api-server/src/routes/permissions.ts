@@ -1,6 +1,15 @@
+/**
+ * Catálogo de permissões + resolução do que CADA USUÁRIO pode fazer.
+ *
+ * Desde ago/2026 a permissão é POR USUÁRIO (`user_permissions`), editada na
+ * sub-aba "Permissões" do modal do usuário. `role_permissions` continua sendo o
+ * MODELO do perfil: é o que um usuário novo recebe copiado e o que responde por
+ * usuários antigos que ainda não têm linhas próprias — assim nenhum editor já
+ * existente perde acesso no deploy que criou a tabela.
+ */
 import { Router } from "express";
-import { eq, and } from "drizzle-orm";
-import { db, rolePermissionsTable } from "@workspace/db";
+import { eq, and, inArray, sql } from "drizzle-orm";
+import { db, rolePermissionsTable, userPermissionsTable } from "@workspace/db";
 import { authMiddleware, requireAdmin } from "../middlewares/auth.js";
 import { logAudit, getClientIp } from "../lib/audit.js";
 
@@ -61,33 +70,125 @@ const EDITOR_DEFAULTS = new Set([
   "articles.create",
 ]);
 
+/** Colunista nasce podendo escrever a própria coluna — e nada além disso.
+ *  Publicar NÃO entra: a coluna vai para o editor/admin aprovar. */
+const COLUMNIST_DEFAULTS = new Set([
+  "dashboard.view",
+  "articles.view",
+  "articles.create",
+  "articles.edit",
+  "upload.images",
+]);
+
+/** Perfis que passam pela checagem de permissão (admin ignora — §13). */
+export const MANAGED_ROLES = ["editor", "columnist"] as const;
+export type ManagedRole = (typeof MANAGED_ROLES)[number];
+
+export function normalizeRole(role: string | undefined): ManagedRole {
+  return role === "columnist" ? "columnist" : "editor";
+}
+
+function defaultsFor(role: ManagedRole): Set<string> {
+  return role === "columnist" ? COLUMNIST_DEFAULTS : EDITOR_DEFAULTS;
+}
+
+/** Semeia o MODELO de cada perfil (linhas faltantes apenas — no-op depois). */
 export async function ensurePermissionsSeeded(): Promise<void> {
   const existing = await db
     .select()
     .from(rolePermissionsTable)
-    .where(eq(rolePermissionsTable.role, "editor"));
+    .where(inArray(rolePermissionsTable.role, [...MANAGED_ROLES]));
 
-  const existingKeys = new Set(existing.map((p) => p.permissionKey));
-  const toInsert: Array<{ role: string; permissionKey: string; enabled: boolean }> =
-    ALL_PERMISSIONS.filter((p) => !existingKeys.has(p.key)).map((p) => ({
-      role: "editor",
-      permissionKey: p.key,
-      enabled: EDITOR_DEFAULTS.has(p.key),
-    }));
-
+  const toInsert: Array<{ role: string; permissionKey: string; enabled: boolean }> = [];
+  for (const role of MANAGED_ROLES) {
+    const have = new Set(existing.filter((p) => p.role === role).map((p) => p.permissionKey));
+    for (const p of ALL_PERMISSIONS) {
+      if (have.has(p.key)) continue;
+      toInsert.push({ role, permissionKey: p.key, enabled: defaultsFor(role).has(p.key) });
+    }
+  }
   if (toInsert.length > 0) {
     await db.insert(rolePermissionsTable).values(toInsert);
   }
 }
 
-/** GET /api/admin/permissions — all permissions + editor's current state (admin only) */
+/** Chaves ligadas no MODELO do perfil (fallback de quem não tem linhas próprias). */
+export async function roleDefaultKeys(role: ManagedRole): Promise<Set<string>> {
+  await ensurePermissionsSeeded();
+  const rows = await db
+    .select()
+    .from(rolePermissionsTable)
+    .where(and(eq(rolePermissionsTable.role, role), eq(rolePermissionsTable.enabled, true)));
+  if (rows.length > 0) return new Set(rows.map((r) => r.permissionKey));
+  return new Set(defaultsFor(role));
+}
+
+/**
+ * Permissões efetivas de um usuário. Admin recebe tudo. Quem tem QUALQUER linha
+ * em `user_permissions` é resolvido só por ela (a ausência de uma chave ali é um
+ * "não" explícito); quem não tem nenhuma cai no modelo do perfil.
+ */
+export async function resolveUserPermissions(
+  userId: number | undefined,
+  role: string | undefined,
+): Promise<Set<string>> {
+  if (role === "admin") return new Set(ALL_PERMISSIONS.map((p) => p.key));
+  const normalized = normalizeRole(role);
+  if (typeof userId === "number") {
+    const own = await db
+      .select()
+      .from(userPermissionsTable)
+      .where(eq(userPermissionsTable.userId, userId));
+    if (own.length > 0) {
+      return new Set(own.filter((p) => p.enabled).map((p) => p.permissionKey));
+    }
+  }
+  return roleDefaultKeys(normalized);
+}
+
+/** Grava o conjunto do usuário (todas as chaves do catálogo, ligadas ou não). */
+export async function saveUserPermissions(
+  userId: number,
+  enabledKeys: Iterable<string>,
+): Promise<void> {
+  const enabled = new Set(enabledKeys);
+  const now = new Date();
+  const values = ALL_PERMISSIONS.map((p) => ({
+    userId,
+    permissionKey: p.key,
+    enabled: enabled.has(p.key),
+    updatedAt: now,
+  }));
+  await db
+    .insert(userPermissionsTable)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [userPermissionsTable.userId, userPermissionsTable.permissionKey],
+      set: {
+        enabled: sql`excluded.enabled`,
+        updatedAt: now,
+      },
+    });
+}
+
+/** Copia o modelo do perfil para o usuário (usado ao criar/trocar de perfil). */
+export async function seedUserPermissionsFromRole(userId: number, role: string): Promise<void> {
+  await saveUserPermissions(userId, await roleDefaultKeys(normalizeRole(role)));
+}
+
+export async function deleteUserPermissions(userId: number): Promise<void> {
+  await db.delete(userPermissionsTable).where(eq(userPermissionsTable.userId, userId));
+}
+
+/** GET /api/admin/permissions?role=editor|columnist — MODELO do perfil (admin) */
 router.get("/", authMiddleware, requireAdmin, async (req, res) => {
   try {
     await ensurePermissionsSeeded();
+    const role = normalizeRole(String(req.query["role"] ?? "editor"));
     const dbPerms = await db
       .select()
       .from(rolePermissionsTable)
-      .where(eq(rolePermissionsTable.role, "editor"));
+      .where(eq(rolePermissionsTable.role, role));
     const permMap = new Map(dbPerms.map((p) => [p.permissionKey, p.enabled]));
     const permissions = ALL_PERMISSIONS.map((p) => ({
       key: p.key,
@@ -103,29 +204,17 @@ router.get("/", authMiddleware, requireAdmin, async (req, res) => {
   }
 });
 
-/** GET /api/admin/permissions/me — current user's enabled permission keys */
+/** GET /api/admin/permissions/me — chaves liberadas para o usuário logado */
 router.get("/me", authMiddleware, async (req, res) => {
   try {
-    if (req.userRole === "admin") {
-      res.json({ permissions: ALL_PERMISSIONS.map((p) => p.key) });
-      return;
-    }
-    await ensurePermissionsSeeded();
-    const dbPerms = await db
-      .select()
-      .from(rolePermissionsTable)
-      .where(
-        and(
-          eq(rolePermissionsTable.role, "editor"),
-          eq(rolePermissionsTable.enabled, true),
-        ),
-      );
-    res.json({ permissions: dbPerms.map((p) => p.permissionKey) });
+    const keys = await resolveUserPermissions(req.userId, req.userRole);
+    res.json({ permissions: [...keys], role: req.userRole ?? "" });
   } catch (err) {
     req.log.error({ err }, "Error fetching my permissions");
     res.status(500).json({ error: "Erro ao buscar permissões" });
   }
 });
+
 
 /** PUT /api/admin/permissions/:key — enable or disable a permission (admin only) */
 router.put("/:key", authMiddleware, requireAdmin, async (req, res) => {

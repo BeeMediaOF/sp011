@@ -250,6 +250,7 @@ router.get("/me", authMiddleware, async (req, res) => {
       role: usersTable.role, status: usersTable.status,
       lastLogin: usersTable.lastLogin, mustChangePassword: usersTable.mustChangePassword,
       avatarBase64: usersTable.avatarBase64, language: usersTable.language,
+      columnistId: usersTable.columnistId,
     }).from(usersTable).where(eq(usersTable.id, req.userId));
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
     res.json({ user });
@@ -308,13 +309,25 @@ router.use(authMiddleware);
 
 // ─── Articles ────────────────────────────────────────────────────────────────
 
+/**
+ * Colunista só enxerga/edita a PRÓPRIA coluna. O escopo é do servidor, não da
+ * tela: esconder o botão no painel não impediria um PUT direto na API.
+ * Devolve o id do perfil quando há escopo, ou null quando o usuário vê tudo.
+ */
+function columnistScope(req: import("express").Request): string | null {
+  if (req.userRole !== "columnist") return null;
+  return req.userColumnistId ?? "__sem_perfil__";
+}
+
 /** GET /api/admin/articles */
-router.get("/articles", requirePermission("articles.view"), async (_req, res) => {
+router.get("/articles", requirePermission("articles.view"), async (req, res) => {
   const [articles, viewsMap] = await Promise.all([
     articleService.getArticles(),
     Promise.resolve(store.getArticleViews()),
   ]);
-  const withViews = articles.map((a) => ({
+  const scope = columnistScope(req);
+  const visible = scope ? articles.filter((a) => a.columnistId === scope) : articles;
+  const withViews = visible.map((a) => ({
     ...a,
     views: viewsMap[a.id]?.views ?? 0,
   }));
@@ -325,17 +338,24 @@ router.get("/articles", requirePermission("articles.view"), async (_req, res) =>
 router.get("/articles/:id", requirePermission("articles.view"), async (req, res) => {
   const article = await articleService.getArticle(String(req.params.id ?? ""));
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
+  const scope = columnistScope(req);
+  if (scope && article.columnistId !== scope) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** POST /api/admin/articles */
 router.post("/articles", requirePermission("articles.create"), async (req, res) => {
-  const { title, subtitle, content, category, tag, imageUrl, author, status, imageCredit, showImageCredit } = req.body as {
+  const { title, subtitle, content, category, tag, imageUrl, author, status, imageCredit, showImageCredit, columnistId } = req.body as {
     title?: string; subtitle?: string; content?: string; category?: string;
     tag?: string; imageUrl?: string; author?: string; status?: string;
-    imageCredit?: string; showImageCredit?: boolean | null;
+    imageCredit?: string; showImageCredit?: boolean | null; columnistId?: string | null;
   };
   if (!title) { res.status(400).json({ error: "title is required" }); return; }
+  const scope = columnistScope(req);
+  // Colunista assina sempre a si mesmo, e o texto nasce rascunho a menos que
+  // tenha ganhado a permissão de publicar.
+  const signedBy = scope ?? (columnistId || null);
+  const columnistName = signedBy ? store.getColumnist(signedBy)?.name : undefined;
   const article = await articleService.createArticle({
     title: title ?? "",
     subtitle: subtitle ?? "",
@@ -343,25 +363,44 @@ router.post("/articles", requirePermission("articles.create"), async (req, res) 
     category: category ?? "geral",
     tag: tag ?? "GERAL",
     imageUrl: imageUrl ?? "",
-    author: author ?? defaultAuthor(),
+    author: columnistName ?? author ?? defaultAuthor(),
     publishedAt: new Date().toISOString(),
     status: (status === "published" ? "published" : "draft"),
     imageCredit: imageCredit || undefined,
     showImageCredit: showImageCredit ?? null,
+    columnistId: signedBy,
   });
   res.status(201).json({ article });
 });
 
 /** PUT /api/admin/articles/:id */
 router.put("/articles/:id", requirePermission("articles.edit"), async (req, res) => {
-  const article = await articleService.updateArticle(String(req.params.id ?? ""), req.body as Parameters<typeof articleService.updateArticle>[1]);
+  const id = String(req.params.id ?? "");
+  const scope = columnistScope(req);
+  const patch = { ...(req.body as Parameters<typeof articleService.updateArticle>[1]) };
+  if (scope) {
+    const current = await articleService.getArticle(id);
+    if (!current || current.columnistId !== scope) { res.status(404).json({ error: "Article not found" }); return; }
+    patch.columnistId = scope;                       // não deixa reassinar para outro
+  }
+  if (patch.columnistId !== undefined && patch.columnistId) {
+    const name = store.getColumnist(patch.columnistId)?.name;
+    if (name) patch.author = name;                   // assinatura textual acompanha o perfil
+  }
+  const article = await articleService.updateArticle(id, patch);
   if (!article) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ article });
 });
 
 /** DELETE /api/admin/articles/:id */
 router.delete("/articles/:id", requirePermission("articles.delete"), async (req, res) => {
-  const deleted = await articleService.deleteArticle(String(req.params.id ?? ""));
+  const id = String(req.params.id ?? "");
+  const scope = columnistScope(req);
+  if (scope) {
+    const current = await articleService.getArticle(id);
+    if (!current || current.columnistId !== scope) { res.status(404).json({ error: "Article not found" }); return; }
+  }
+  const deleted = await articleService.deleteArticle(id);
   if (!deleted) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ success: true });
 });

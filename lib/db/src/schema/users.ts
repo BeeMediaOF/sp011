@@ -2,7 +2,8 @@ import { pgTable, serial, text, timestamp, integer, boolean, pgEnum } from "driz
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const userRoleEnum = pgEnum("user_role", ["admin", "editor"]);
+/** "columnist" entrou em ago/2026 (ver ensureSchema: ALTER TYPE ... ADD VALUE). */
+export const userRoleEnum = pgEnum("user_role", ["admin", "editor", "columnist"]);
 export const userStatusEnum = pgEnum("user_status", ["active", "inactive", "blocked"]);
 
 export const usersTable = pgTable("users", {
@@ -29,6 +30,12 @@ export const usersTable = pgTable("users", {
   twoFactorSecret: text("two_factor_secret"),
   twoFactorEnabled: boolean("two_factor_enabled").notNull().default(false),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  /**
+   * Perfil de colunista (settings.columnists) ligado a este login. Só role
+   * "columnist" usa: é o que dá foto/bio à assinatura do artigo e o que escopa
+   * "meus artigos". Coluna criada por ensureSchema (ADD COLUMN IF NOT EXISTS).
+   */
+  columnistId: text("columnist_id"),
 });
 
 export const insertUserSchema = createInsertSchema(usersTable).omit({

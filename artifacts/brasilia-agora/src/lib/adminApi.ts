@@ -207,17 +207,23 @@ export const adminApi = {
   // Users (admin only)
   getUsers: () => req<{ users: AdminUser[] }>("GET", "/users"),
   getUser: (id: number) => req<{ user: AdminUser }>("GET", `/users/${id}`),
-  createUser: (data: { name: string; email: string; password: string; role: "admin" | "editor"; status: "active" | "inactive" }) =>
+  createUser: (data: UserPayload & { name: string; email: string; password: string }) =>
     req<{ user: AdminUser }>("POST", "/users", data),
-  updateUser: (id: number, data: { name?: string; email?: string; role?: "admin" | "editor"; status?: "active" | "inactive" | "blocked" }) =>
+  updateUser: (id: number, data: UserPayload) =>
     req<{ user: AdminUser }>("PUT", `/users/${id}`, data),
   changeUserPassword: (id: number, password: string) =>
     req<{ success: boolean }>("PUT", `/users/${id}/password`, { password }),
   deleteUser: (id: number) => req<{ success: boolean }>("DELETE", `/users/${id}`),
+  /** Permissões DESTE usuário (catálogo + estado efetivo). */
+  getUserPermissions: (id: number) =>
+    req<{ role: UserRole; permissions: EditorPermission[] }>("GET", `/users/${id}/permissions`),
+  setUserPermissions: (id: number, permissions: string[]) =>
+    req<{ permissions: string[] }>("PUT", `/users/${id}/permissions`, { permissions }),
 
-  // Permissions (admin only)
-  getEditorPermissions: () =>
-    req<{ permissions: EditorPermission[] }>("GET", "/permissions"),
+  // Permissions (admin only) — MODELO do perfil, usado como ponto de partida do
+  // usuário novo. O que vale no dia a dia é o conjunto por usuário (acima).
+  getEditorPermissions: (role: "editor" | "columnist" = "editor") =>
+    req<{ permissions: EditorPermission[] }>("GET", `/permissions?role=${role}`),
   setEditorPermission: (key: string, enabled: boolean) =>
     req<{ key: string; enabled: boolean }>("PUT", `/permissions/${key}`, { enabled }),
   getMyPermissions: () =>
@@ -281,17 +287,35 @@ export const adminApi = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type UserRole = "admin" | "editor" | "columnist";
+
 export interface AdminUser {
   id: number;
   name: string;
   email: string;
-  role: "admin" | "editor";
+  role: UserRole;
   status: "active" | "inactive" | "blocked";
   createdAt: string;
   updatedAt: string;
   lastLogin: string | null;
   mustChangePassword: number;
   language?: string;
+  avatarBase64?: string | null;
+  /** Perfil de colunista ligado ao login (só role "columnist"). */
+  columnistId?: string | null;
+}
+
+/** Dados que o modal de usuário envia — inclui a sub-aba Colunista e as permissões. */
+export interface UserPayload {
+  name?: string;
+  email?: string;
+  role?: UserRole;
+  status?: "active" | "inactive" | "blocked";
+  /** Chaves LIGADAS. Ausente = mantém o que já está gravado. */
+  permissions?: string[];
+  bio?: string;
+  specialty?: ColumnistSpecialty;
+  avatarBase64?: string;
 }
 
 export interface AuditLog {
@@ -355,6 +379,8 @@ export interface Article {
   imageCredit?: string;
   /** Crédito da foto: true/false força; null/ausente segue o padrão do site. */
   showImageCredit?: boolean | null;
+  /** Colunista assinante; null = assinatura padrão do portal (Redação). */
+  columnistId?: string | null;
 }
 
 export interface MenuItem {

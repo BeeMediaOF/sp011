@@ -30,6 +30,18 @@ export interface Article {
   /** Tempo de leitura estimado em minutos (calculado no api-server; ausente em
    *  payload de imagem antiga — exibição sempre condicional). */
   readingMinutes?: number;
+  /** Colunista assinante — só vem em /api/articles/:id (a lista não carrega foto). */
+  columnistId?: string | null;
+  columnist?: ArticleColumnist | null;
+}
+
+/** Assinatura de colunista embutida na resposta de /api/articles/:id. */
+export interface ArticleColumnist {
+  id: string;
+  name: string;
+  bio: string;
+  specialty: string;
+  avatarBase64: string;
 }
 
 // ─── Singleton module-level cache (2 min TTL) ─────────────────────────────────

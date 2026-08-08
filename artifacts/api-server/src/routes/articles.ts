@@ -98,13 +98,20 @@ router.get("/", async (req, res) => {
   });
 });
 
-/** GET /api/articles/:id — single article (public) */
+/** GET /api/articles/:id — single article (public).
+ *  Vem com `columnist` embutido (foto/nome/bio) quando o texto é assinado por um
+ *  colunista: a página do artigo é SSR, e uma 2ª requisição para montar a
+ *  assinatura atrasaria o conteúdo acima da dobra. */
 router.get("/:id", async (req, res) => {
   const article = await articleService.getArticle(req.params.id ?? "");
   if (!article || article.status !== "published") {
     res.status(404).json({ error: "Article not found" }); return;
   }
-  res.json({ article });
+  const c = article.columnistId ? store.getColumnist(article.columnistId) : null;
+  const columnist = c && c.active
+    ? { id: c.id, name: c.name, bio: c.bio, specialty: c.specialty, avatarBase64: c.avatarBase64 }
+    : null;
+  res.json({ article: { ...article, columnist } });
 });
 
 /** GET /api/articles/:id/relacionados — related published articles (?limit=, padrão 4) */

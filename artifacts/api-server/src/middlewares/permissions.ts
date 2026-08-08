@@ -1,6 +1,5 @@
-import { eq, and } from "drizzle-orm";
-import { db, rolePermissionsTable } from "@workspace/db";
 import type { Request, Response, NextFunction } from "express";
+import { resolveUserPermissions } from "../routes/permissions.js";
 
 export function requirePermission(key: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -8,16 +7,10 @@ export function requirePermission(key: string) {
     // key foi removido); ela só autoriza as rotas de publish via publishAuth.
     if (req.userRole === "admin") { next(); return; }
     try {
-      const [perm] = await db
-        .select()
-        .from(rolePermissionsTable)
-        .where(
-          and(
-            eq(rolePermissionsTable.role, "editor"),
-            eq(rolePermissionsTable.permissionKey, key),
-          ),
-        );
-      if (perm?.enabled) { next(); return; }
+      // Permissão é POR USUÁRIO desde ago/2026 (user_permissions); quem ainda não
+      // tem linhas próprias cai no modelo do perfil (role_permissions).
+      const keys = await resolveUserPermissions(req.userId, req.userRole);
+      if (keys.has(key)) { next(); return; }
     } catch {
       // On DB error, deny access
     }

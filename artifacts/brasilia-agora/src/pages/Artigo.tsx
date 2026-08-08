@@ -131,6 +131,8 @@ export default function Artigo() {
   /* Mesma cascata do byline dos cards (NewsCard/HeroSection/SectionBlockFeatured). */
   const bylineAvatar =
     settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
+  /* Colunista assinante vem embutido na resposta do artigo (sem 2ª requisição). */
+  const columnist = article?.columnist ?? null;
   const { t, lang, tz } = useT();
   const { trackArticle, trackShare } = useAnalytics();
   // article.id (não o slug): pageview/read usam o id — com o slug seria
@@ -535,7 +537,7 @@ export default function Artigo() {
           "@type": "Person",
           // Mesma cadeia da assinatura visível do artigo (abaixo): o que o leitor
           // lê e o que o buscador indexa não podem divergir.
-          name: explicitAuthor || settings?.bylineName || siteName,
+          name: columnist?.name || explicitAuthor || settings?.bylineName || siteName,
         },
         publisher: {
           "@type": "Organization",
@@ -659,9 +661,27 @@ export default function Artigo() {
                   {/* Autor + compartilhamento */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between py-3 border-y border-gray-100 mb-6 gap-3">
                     <div className="flex items-center gap-3">
-                      {/* Avatar do byline só quando /api/site respondeu — nunca o
+                      {/* Artigo assinado por colunista mostra a FOTO e o NOME dele;
+                          sem colunista, cai no avatar/nome do portal. O avatar do
+                          byline só aparece quando /api/site respondeu — nunca o
                           favicon padrão embutido (/favicon.jpg) antes das settings. */}
-                      {settings ? (
+                      {columnist ? (
+                        columnist.avatarBase64 ? (
+                          <img
+                            src={columnist.avatarBase64}
+                            alt={columnist.name}
+                            width={36}
+                            height={36}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-9 h-9 rounded-full object-cover shrink-0"
+                          />
+                        ) : (
+                          <span className="w-9 h-9 rounded-full bg-gray-100 shrink-0 flex items-center justify-center text-[11px] font-bold text-[#1a2448]">
+                            {columnist.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                          </span>
+                        )
+                      ) : settings ? (
                         <img
                           src={siteAssetUrl(bylineAvatar, 48)}
                           srcSet={siteAssetSrcSet(bylineAvatar, 48)}
@@ -677,9 +697,10 @@ export default function Artigo() {
                       )}
                       <div>
                         <div className="font-bold text-sm text-[#1a2448]">
-                          {explicitAuthor || settings?.bylineName || settings?.siteName || t("common.newsroom")}
+                          {columnist?.name || explicitAuthor || settings?.bylineName || settings?.siteName || t("common.newsroom")}
                         </div>
                         <div className="text-xs text-gray-400">
+                          {columnist?.specialty ? `${columnist.specialty} · ` : ""}
                           {formatDateTime(article.publishedAt, lang, tz)}
                         </div>
                       </div>
@@ -776,6 +797,36 @@ export default function Artigo() {
                         {t("article.sourceLabel")}{" "}
                         <span className="font-medium text-gray-500 not-italic">{article.rssSourceName}</span>
                       </p>
+                    </div>
+                  )}
+
+                  {/* Sobre o colunista — só em texto assinado, e só quando há bio. */}
+                  {columnist && columnist.bio && (
+                    <div className="mt-8 p-4 sm:p-5 rounded-2xl bg-gray-50 border border-gray-100 flex items-start gap-4">
+                      {columnist.avatarBase64 ? (
+                        <img
+                          src={columnist.avatarBase64}
+                          alt={columnist.name}
+                          width={56}
+                          height={56}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-14 h-14 rounded-full object-cover shrink-0"
+                        />
+                      ) : (
+                        <span className="w-14 h-14 rounded-full bg-white shrink-0 flex items-center justify-center text-sm font-bold text-[#1a2448]">
+                          {columnist.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-[15px] text-[#1a2448]">{columnist.name}</p>
+                        {columnist.specialty && (
+                          <p className="text-[11px] font-semibold uppercase tracking-wide mt-0.5" style={{ color: chapeuColor }}>
+                            {columnist.specialty}
+                          </p>
+                        )}
+                        <p className="text-[13px] text-gray-600 leading-relaxed mt-1.5">{columnist.bio}</p>
+                      </div>
                     </div>
                   )}
 

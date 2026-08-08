@@ -1,5 +1,5 @@
 /**
- * Cache das permissões do perfil Editor logado.
+ * Cache das permissões do USUÁRIO logado (perfis Editor e Colunista).
  *
  * Fonte ÚNICA usada por dois consumidores:
  *  - o chrome do painel (`AdminLayout`) para montar o menu lateral;
@@ -41,14 +41,17 @@ export function invalidatePermissionsCache(): void {
  * consultar o conjunto.
  */
 export function useEditorPermissions(role: string): { permSet: Set<string>; loaded: boolean } {
+  // Admin é o único que não passa por aqui. Todo o resto (editor, colunista e
+  // qualquer perfil futuro) resolve pelo conjunto do PRÓPRIO usuário.
+  const managed = role !== "" && role !== "admin";
   const [permSet, setPermSet] = useState<Set<string>>(() => {
-    if (role !== "editor") return new Set<string>();
+    if (!managed) return new Set<string>();
     return getCachedPermsSync();
   });
-  const [loaded, setLoaded] = useState(role !== "editor" || _cachedPerms !== null);
+  const [loaded, setLoaded] = useState(!managed || _cachedPerms !== null);
 
   const fetchPerms = useCallback(() => {
-    if (role !== "editor") return;
+    if (!managed) return;
     if (_cachedPerms) { setPermSet(_cachedPerms); setLoaded(true); return; }
     if (!_permPromise) {
       _permPromise = adminApi.getMyPermissions()
@@ -67,7 +70,7 @@ export function useEditorPermissions(role: string): { permSet: Set<string>; load
       if (_cachedPerms) setPermSet(_cachedPerms);
       setLoaded(true);
     });
-  }, [role]);
+  }, [managed]);
 
   useEffect(() => { fetchPerms(); }, [fetchPerms]);
 
