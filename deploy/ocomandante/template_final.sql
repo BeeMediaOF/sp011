@@ -1,33 +1,40 @@
 -- =============================================================================
--- O Comandante News — importa os DOIS templates de home do blog:
+-- O Comandante News — importa os DOIS templates de home do blog + cadastra as
+-- 4 editorias em Categorias. Roda no banco DO BLOG.
 --   "O Comandante - Portal"  (22 blocos) — clone estrutural do "Aposta Ganha -
 --      Final" / familia "KSports - Final": top bar escura, hero portal com
 --      sidebar (Mais Lidas + Ultimas), faixa de anuncio, recentes, 4 colunas
---      por editoria, secao horizontal e "mais noticias". Denso, cara de portal.
---   "O Comandante - Revista" (20 blocos) — clone estrutural do "Credito.vc -
+--      (uma por editoria), "Radar da Aviacao" horizontal e "mais noticias".
+--   "O Comandante - Revista" (21 blocos) — clone estrutural do "Credito.vc -
 --      Final" / layout do mock Bee Media: coluna unica clara, hero de
---      boas-vindas com busca, cards revista (layout "mini"), grade de
+--      boas-vindas com busca, cards revista (layout "mini"), grade das 4
 --      editorias com icones, escolha do editor, newsletter em cartao.
 --      EXIGE imagem blog-api/blog-web com os layouts "hero"/"mini" (>= v85).
 -- Os dois ficam salvos em "Meus templates" — aplique um, veja no site, e
 -- troque pelo outro quando quiser (Desfazer restaura o estado anterior).
 -- =============================================================================
+-- EDITORIAS (definidas em 2026-08-07): negocios, economia, aviacao, turismo.
+--   * So "economia" e editoria FIXA do engine (categoryRoutes.ts). /negocios,
+--     /aviacao e /turismo resolvem porque existe menuItem apontando para elas —
+--     por isso as 4 estao no menu dos DOIS templates. Tirar uma do menu derruba
+--     a pagina dela (404), a menos que seja a economia.
+--   * As 4 tambem sao gravadas em settings.categories (painel -> Categorias):
+--     alimenta o seletor de categoria dos blocos e o editor de artigos.
+--     Aplicar template NAO mexe nessa lista.
+--   * O ingest da central grava o slug que a regra de distribuicao definir —
+--     ver deploy/ocomandante/sources_ocomandante.sql (banco CENTRAL).
+--
 -- Identidade (das logos O Comandante News): navy #14265e (wordmark e metade de
--- cima do emblema — accent do tema, item ativo do menu e cor primaria dos
--- blocos); azul royal #1657d0 (metade de baixo do emblema — cor alternada dos
--- blocos); azul claro #4d8dff (acento do rodape e dos banners: so vive sobre
--- fundo escuro); vermelho #d81f26 (o bloco "NEWS" — botoes e CTAs, SEMPRE com
--- tinta branca por cima); navy profundo #0a1740 (top bar, barra de menu, fundo
--- dos banners); rodape #060e26.
+-- cima do emblema — accent do tema, item ativo do menu e chip de Negocios);
+-- azul royal #1657d0 (metade de baixo do emblema — chip de Economia); royal
+-- clareado #2f6fe0 (chip de Turismo, 4,7:1 com branco); navy profundo #0a1740
+-- (top bar, barra de menu, fundo dos banners e chip de Aviacao); azul claro
+-- #4d8dff (acento do rodape e dos banners: so vive sobre fundo escuro);
+-- vermelho #d81f26 (o bloco "NEWS" — botoes e CTAs, SEMPRE com tinta branca);
+-- rodape #060e26.
 --   * A cor do bloco vira o fundo do chip de categoria com texto BRANCO por
---     cima (SectionBlock*.tsx) — por isso os chips usam navy (14,3:1) e royal
---     (6,3:1), e o vermelho fica so em botao/CTA (5,1:1 com branco).
--- Editorias/slugs: politica, brasil, mundo, economia, seguranca, esportes,
--- tecnologia, cultura, geral — as CLASSICAS do blog engine, que resolvem por
--- rota fixa (categoryRoutes.ts) e nao dependem de taxonomia cadastrada. O blog
--- nasce sem fontes e sem posts: as secoes ficam vazias ate existir conteudo.
--- Quando as editorias definitivas forem decididas, troque slug/rotulo no menu
--- e nos blocos (Home + menu no admin) ou peca um template novo.
+--     cima (SectionBlock*.tsx) — por isso todas as cores de bloco passam de
+--     4,5:1 com branco e o vermelho fica so em botao/CTA (5,1:1).
 --   * Banners nascem como "Anuncie aqui" na identidade da marca — troque o
 --     HTML do bloco quando houver anunciante. Artes de upload de OUTROS blogs
 --     nunca funcionam aqui (bucket por blog).
@@ -39,9 +46,11 @@
 -- api-server/src/lib/store.ts) + siteName/tagline do O Comandante.
 --
 -- Idempotente: remove as versoes anteriores dos DOIS templates (por id) antes
--- de anexar. Pre-requisito: wizard /admin/setup concluido.
--- O app rele site_settings a cada 15s — os templates aparecem em "Meus
--- templates" sem restart. Nao salve Configuracoes no admin no mesmo instante.
+-- de anexar, e so grava settings.categories se ainda nao existir (nao apaga
+-- categoria que voce tenha criado no painel). Pre-requisito: wizard
+-- /admin/setup concluido. O app rele site_settings a cada 15s — os templates
+-- aparecem em "Meus templates" sem restart. Nao salve Configuracoes no admin
+-- no mesmo instante.
 --
 -- Uso (VPS, /opt/sp011):
 --   docker compose exec -T pg-blogs psql -U postgres -d ocomandante -v ON_ERROR_STOP=1 < deploy/ocomandante/template_final.sql
@@ -60,6 +69,48 @@ SELECT 'site_settings',
 now()
 WHERE NOT EXISTS (SELECT 1 FROM settings WHERE key = 'site_settings');
 
+-- 1) Categorias do blog (painel -> Categorias). So grava se ainda nao houver
+--    lista salva — o admin mostra as sugeridas ate o 1o Salvar.
+UPDATE settings s
+SET value = jsonb_set(s.value::jsonb, '{categories}', $cats$
+[
+  {
+    "id": "oc-negocios",
+    "name": "Negócios",
+    "slug": "negocios",
+    "color": "#14265e",
+    "visible": true
+  },
+  {
+    "id": "oc-economia",
+    "name": "Economia",
+    "slug": "economia",
+    "color": "#1657d0",
+    "visible": true
+  },
+  {
+    "id": "oc-aviacao",
+    "name": "Aviação",
+    "slug": "aviacao",
+    "color": "#0a1740",
+    "visible": true
+  },
+  {
+    "id": "oc-turismo",
+    "name": "Turismo",
+    "slug": "turismo",
+    "color": "#2f6fe0",
+    "visible": true
+  }
+]
+$cats$::jsonb, true)::text,
+    updated_at = now()
+WHERE s.key = 'site_settings'
+  AND COALESCE(jsonb_array_length(
+        CASE WHEN jsonb_typeof(s.value::jsonb->'categories') = 'array'
+             THEN s.value::jsonb->'categories' ELSE '[]'::jsonb END), 0) = 0;
+
+-- 2) Os dois templates de home
 UPDATE settings s
 SET value = jsonb_set(
       s.value::jsonb,
@@ -72,7 +123,7 @@ SET value = jsonb_set(
 {
   "id": "tpl-ocomandante-portal",
   "name": "O Comandante - Portal",
-  "createdAt": "2026-08-06T12:00:00.000Z",
+  "createdAt": "2026-08-07T12:00:00.000Z",
   "accentColor": "#14265e",
   "headerStyle": "standard",
   "footerStyle": "dark",
@@ -102,21 +153,9 @@ SET value = jsonb_set(
       "visible": true
     },
     {
-      "id": "oc-m-politica",
-      "label": "POLÍTICA",
-      "path": "/politica",
-      "visible": true
-    },
-    {
-      "id": "oc-m-brasil",
-      "label": "BRASIL",
-      "path": "/brasil",
-      "visible": true
-    },
-    {
-      "id": "oc-m-mundo",
-      "label": "MUNDO",
-      "path": "/mundo",
+      "id": "oc-m-negocios",
+      "label": "NEGÓCIOS",
+      "path": "/negocios",
       "visible": true
     },
     {
@@ -126,38 +165,20 @@ SET value = jsonb_set(
       "visible": true
     },
     {
-      "id": "oc-m-seguranca",
-      "label": "SEGURANÇA",
-      "path": "/seguranca",
+      "id": "oc-m-aviacao",
+      "label": "AVIAÇÃO",
+      "path": "/aviacao",
       "visible": true
     },
     {
-      "id": "oc-m-esportes",
-      "label": "ESPORTES",
-      "path": "/esportes",
-      "visible": true
-    },
-    {
-      "id": "oc-m-tecnologia",
-      "label": "TECNOLOGIA",
-      "path": "/tecnologia",
-      "visible": true
-    },
-    {
-      "id": "oc-m-cultura",
-      "label": "CULTURA",
-      "path": "/cultura",
-      "visible": true
-    },
-    {
-      "id": "oc-m-geral",
-      "label": "GERAL",
-      "path": "/geral",
+      "id": "oc-m-turismo",
+      "label": "TURISMO",
+      "path": "/turismo",
       "visible": true
     }
   ],
   "footerConfig": {
-    "description": "Notícia com apuração, contexto e independência.",
+    "description": "Negócios, economia, aviação e turismo — o que move o mercado, com apuração e contexto.",
     "showSocial": false,
     "socialEnabled": {},
     "columns": [
@@ -166,19 +187,9 @@ SET value = jsonb_set(
         "title": "Editorias",
         "links": [
           {
-            "id": "oc-nav-politica",
-            "label": "Política",
-            "href": "/politica"
-          },
-          {
-            "id": "oc-nav-brasil",
-            "label": "Brasil",
-            "href": "/brasil"
-          },
-          {
-            "id": "oc-nav-mundo",
-            "label": "Mundo",
-            "href": "/mundo"
+            "id": "oc-nav-negocios",
+            "label": "Negócios",
+            "href": "/negocios"
           },
           {
             "id": "oc-nav-economia",
@@ -186,29 +197,14 @@ SET value = jsonb_set(
             "href": "/economia"
           },
           {
-            "id": "oc-nav-seguranca",
-            "label": "Segurança",
-            "href": "/seguranca"
+            "id": "oc-nav-aviacao",
+            "label": "Aviação",
+            "href": "/aviacao"
           },
           {
-            "id": "oc-nav-esportes",
-            "label": "Esportes",
-            "href": "/esportes"
-          },
-          {
-            "id": "oc-nav-tecnologia",
-            "label": "Tecnologia",
-            "href": "/tecnologia"
-          },
-          {
-            "id": "oc-nav-cultura",
-            "label": "Cultura",
-            "href": "/cultura"
-          },
-          {
-            "id": "oc-nav-geral",
-            "label": "Geral",
-            "href": "/geral"
+            "id": "oc-nav-turismo",
+            "label": "Turismo",
+            "href": "/turismo"
           }
         ]
       },
@@ -352,8 +348,8 @@ SET value = jsonb_set(
       "html": "<div style=\"max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;border:1px solid #1c2f66;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(77,141,255,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(22,87,208,.55), transparent 46%), linear-gradient(135deg, #0a1740, #0f1e4d 60%, #0a1740);\"><div style=\"color:#c3d0ef;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;\">ESPAÇO PUBLICITÁRIO</div><div style=\"margin-bottom:12px;\"><span style=\"font-weight:900;font-size:24px;letter-spacing:.02em;color:#ffffff;white-space:nowrap;\">O Comandante <span style=\"background:#d81f26;color:#ffffff;padding:2px 7px;border-radius:3px;font-size:18px;\">NEWS</span></span></div><div style=\"color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;\">SUA MARCA<br/>NESTE ESPAÇO</div><div style=\"display:inline-block;background:#d81f26;color:#ffffff;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;\">ANUNCIE AQUI</div></div>"
     },
     {
-      "id": "content-oc-politica",
-      "name": "Política",
+      "id": "content-oc-negocios",
+      "name": "Negócios",
       "color": "#14265e",
       "order": 7,
       "width": "quarter",
@@ -362,7 +358,7 @@ SET value = jsonb_set(
       "layout": "featured",
       "source": "automatic_by_category",
       "visible": true,
-      "category": "politica",
+      "category": "negocios",
       "blockType": "content",
       "linkLabel": "VER TODAS →"
     },
@@ -382,9 +378,9 @@ SET value = jsonb_set(
       "linkLabel": "VER TODAS →"
     },
     {
-      "id": "content-oc-mundo",
-      "name": "Mundo",
-      "color": "#14265e",
+      "id": "content-oc-aviacao",
+      "name": "Aviação",
+      "color": "#0a1740",
       "order": 9,
       "width": "quarter",
       "custom": true,
@@ -392,14 +388,14 @@ SET value = jsonb_set(
       "layout": "featured",
       "source": "automatic_by_category",
       "visible": true,
-      "category": "mundo",
+      "category": "aviacao",
       "blockType": "content",
       "linkLabel": "VER TODAS →"
     },
     {
-      "id": "content-oc-seguranca",
-      "name": "Segurança",
-      "color": "#1657d0",
+      "id": "content-oc-turismo",
+      "name": "Turismo",
+      "color": "#2f6fe0",
       "order": 10,
       "width": "quarter",
       "custom": true,
@@ -407,14 +403,14 @@ SET value = jsonb_set(
       "layout": "featured",
       "source": "automatic_by_category",
       "visible": true,
-      "category": "seguranca",
+      "category": "turismo",
       "blockType": "content",
       "linkLabel": "VER TODAS →"
     },
     {
-      "id": "content-oc-brasil-destaque",
-      "name": "Brasil",
-      "color": "#14265e",
+      "id": "content-oc-radar",
+      "name": "Radar da Aviação",
+      "color": "#0a1740",
       "order": 11,
       "custom": true,
       "format": "cultura",
@@ -422,7 +418,7 @@ SET value = jsonb_set(
       "source": "automatic_by_category",
       "reverse": false,
       "visible": true,
-      "category": "brasil",
+      "category": "aviacao",
       "blockType": "content",
       "itemsLimit": 4
     },
@@ -521,7 +517,7 @@ $tplp$::jsonb, $tplr$
 {
   "id": "tpl-ocomandante-revista",
   "name": "O Comandante - Revista",
-  "createdAt": "2026-08-06T12:00:00.000Z",
+  "createdAt": "2026-08-07T12:00:00.000Z",
   "accentColor": "#14265e",
   "headerStyle": "standard",
   "footerStyle": "light",
@@ -545,21 +541,9 @@ $tplp$::jsonb, $tplr$
   "headerBannerHtml": "<a href=\"/#newsletter-oc-r-assine\" style=\"display:inline-flex;align-items:center;background:#d81f26;color:#ffffff;padding:10px 22px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;white-space:nowrap;box-shadow:0 8px 28px rgba(15,23,42,.10);\">Receber notícias</a>",
   "menuItems": [
     {
-      "id": "ocr-m-politica",
-      "label": "Política",
-      "path": "/politica",
-      "visible": true
-    },
-    {
-      "id": "ocr-m-brasil",
-      "label": "Brasil",
-      "path": "/brasil",
-      "visible": true
-    },
-    {
-      "id": "ocr-m-mundo",
-      "label": "Mundo",
-      "path": "/mundo",
+      "id": "ocr-m-negocios",
+      "label": "Negócios",
+      "path": "/negocios",
       "visible": true
     },
     {
@@ -569,38 +553,20 @@ $tplp$::jsonb, $tplr$
       "visible": true
     },
     {
-      "id": "ocr-m-seguranca",
-      "label": "Segurança",
-      "path": "/seguranca",
+      "id": "ocr-m-aviacao",
+      "label": "Aviação",
+      "path": "/aviacao",
       "visible": true
     },
     {
-      "id": "ocr-m-esportes",
-      "label": "Esportes",
-      "path": "/esportes",
-      "visible": true
-    },
-    {
-      "id": "ocr-m-tecnologia",
-      "label": "Tecnologia",
-      "path": "/tecnologia",
-      "visible": true
-    },
-    {
-      "id": "ocr-m-cultura",
-      "label": "Cultura",
-      "path": "/cultura",
-      "visible": true
-    },
-    {
-      "id": "ocr-m-geral",
-      "label": "Geral",
-      "path": "/geral",
+      "id": "ocr-m-turismo",
+      "label": "Turismo",
+      "path": "/turismo",
       "visible": true
     }
   ],
   "footerConfig": {
-    "description": "Notícia com apuração, contexto e independência — o que importa do dia, sem rodeio.",
+    "description": "Negócios, economia, aviação e turismo — o que move o mercado, com apuração e contexto.",
     "showSocial": true,
     "socialEnabled": {},
     "columns": [
@@ -609,19 +575,9 @@ $tplp$::jsonb, $tplr$
         "title": "Editorias",
         "links": [
           {
-            "id": "ocr-nav-politica",
-            "label": "Política",
-            "href": "/politica"
-          },
-          {
-            "id": "ocr-nav-brasil",
-            "label": "Brasil",
-            "href": "/brasil"
-          },
-          {
-            "id": "ocr-nav-mundo",
-            "label": "Mundo",
-            "href": "/mundo"
+            "id": "ocr-nav-negocios",
+            "label": "Negócios",
+            "href": "/negocios"
           },
           {
             "id": "ocr-nav-economia",
@@ -629,29 +585,14 @@ $tplp$::jsonb, $tplr$
             "href": "/economia"
           },
           {
-            "id": "ocr-nav-seguranca",
-            "label": "Segurança",
-            "href": "/seguranca"
+            "id": "ocr-nav-aviacao",
+            "label": "Aviação",
+            "href": "/aviacao"
           },
           {
-            "id": "ocr-nav-esportes",
-            "label": "Esportes",
-            "href": "/esportes"
-          },
-          {
-            "id": "ocr-nav-tecnologia",
-            "label": "Tecnologia",
-            "href": "/tecnologia"
-          },
-          {
-            "id": "ocr-nav-cultura",
-            "label": "Cultura",
-            "href": "/cultura"
-          },
-          {
-            "id": "ocr-nav-geral",
-            "label": "Geral",
-            "href": "/geral"
+            "id": "ocr-nav-turismo",
+            "label": "Turismo",
+            "href": "/turismo"
           }
         ]
       },
@@ -711,10 +652,10 @@ $tplp$::jsonb, $tplr$
       "visible": true,
       "blockType": "content",
       "itemsLimit": 3,
-      "caption": "Buscar notícias, editorias e colunas...",
+      "caption": "Buscar notícias, empresas e destinos...",
       "linkLabel": "✉️ Receba as principais notícias do dia no seu e-mail. Quero me inscrever →",
       "linkUrl": "#newsletter-oc-r-assine",
-      "html": "<div style=\"color:#14265e;font-weight:800;letter-spacing:.08em;font-size:13px;text-transform:uppercase;margin-bottom:14px;\">O Comandante News</div><div style=\"font-size:36px;line-height:1.08;color:#0a1740;font-weight:800;margin-bottom:14px;\">No comando da notícia</div><div style=\"color:#6b7280;font-size:16px;line-height:1.5;margin-bottom:18px;\">Política, economia, Brasil e mundo com apuração direta e linguagem clara — o que importa do dia, sem rodeio.</div>"
+      "html": "<div style=\"color:#14265e;font-weight:800;letter-spacing:.08em;font-size:13px;text-transform:uppercase;margin-bottom:14px;\">O Comandante News</div><div style=\"font-size:36px;line-height:1.08;color:#0a1740;font-weight:800;margin-bottom:14px;\">No comando da notícia</div><div style=\"color:#6b7280;font-size:16px;line-height:1.5;margin-bottom:18px;\">Negócios, economia, aviação e turismo — o que move o mercado, com apuração e contexto.</div>"
     },
     {
       "id": "content-oc-r-recentes",
@@ -739,20 +680,20 @@ $tplp$::jsonb, $tplr$
       "format": "grid",
       "visible": true,
       "blockType": "html",
-      "html": "<div><div style=\"font-size:22px;line-height:1.2;font-weight:800;color:#1a1a1a;margin-bottom:18px;\">Editorias</div><div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;\"><a href=\"/politica\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📣</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Política</span></a><a href=\"/brasil\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🇧🇷</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Brasil</span></a><a href=\"/mundo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🌎</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Mundo</span></a><a href=\"/economia\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📈</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Economia</span></a><a href=\"/seguranca\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🚨</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Segurança</span></a><a href=\"/esportes\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">⚽</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Esportes</span></a><a href=\"/tecnologia\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💻</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Tecnologia</span></a><a href=\"/cultura\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🎭</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Cultura</span></a><a href=\"/arquivo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📰</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Todas as editorias</span></a></div></div>"
+      "html": "<div><div style=\"font-size:22px;line-height:1.2;font-weight:800;color:#1a1a1a;margin-bottom:18px;\">Editorias</div><div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;\"><a href=\"/negocios\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💼</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Negócios</span></a><a href=\"/economia\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📈</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Economia</span></a><a href=\"/aviacao\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">✈️</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Aviação</span></a><a href=\"/turismo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🧳</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Turismo</span></a><a href=\"/arquivo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📰</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Todas as editorias</span></a></div></div>"
     },
     {
-      "id": "content-oc-r-destaque",
-      "name": "Destaque do Dia",
+      "id": "content-oc-r-radar",
+      "name": "Radar da Aviação",
       "area": "main",
       "order": 3,
-      "color": "#14265e",
+      "color": "#0a1740",
       "custom": true,
       "format": "cultura",
       "layout": "cultura",
       "sectionStyle": "revista",
       "source": "automatic_by_category",
-      "category": "politica",
+      "category": "aviacao",
       "caption": "Cobertura completa",
       "visible": true,
       "blockType": "content",
@@ -769,7 +710,7 @@ $tplp$::jsonb, $tplr$
       "format": "grid",
       "visible": true,
       "blockType": "html",
-      "html": "<div style=\"background:linear-gradient(180deg,#0a1740,#060e26);color:#ffffff;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.06);\"><span style=\"display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);color:#c3d0ef;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;\">Espaço publicitário</span><div style=\"font-size:24px;line-height:1.15;font-weight:800;margin-bottom:10px;\">Sua marca ao lado da notícia que o leitor procura.</div><div style=\"color:#c3d0ef;font-size:14px;line-height:1.5;margin-bottom:16px;\">Formatos de destaque na home e nas editorias do O Comandante News.</div><a href=\"/contato\" style=\"display:inline-block;background:#d81f26;color:#ffffff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;\">Fale com a gente →</a></div>"
+      "html": "<div style=\"background:linear-gradient(180deg,#0a1740,#060e26);color:#ffffff;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(15,23,42,.06);\"><span style=\"display:inline-block;padding:6px 10px;border-radius:999px;background:rgba(255,255,255,.12);color:#c3d0ef;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px;\">Espaço publicitário</span><div style=\"font-size:24px;line-height:1.15;font-weight:800;margin-bottom:10px;\">Sua marca ao lado da notícia que decide investimento.</div><div style=\"color:#c3d0ef;font-size:14px;line-height:1.5;margin-bottom:16px;\">Formatos de destaque na home e nas editorias do O Comandante News.</div><a href=\"/contato\" style=\"display:inline-block;background:#d81f26;color:#ffffff;padding:12px 20px;border-radius:12px;font-weight:700;font-size:14px;text-decoration:none;\">Fale com a gente →</a></div>"
     },
     {
       "id": "content-oc-r-editor",
@@ -787,11 +728,27 @@ $tplp$::jsonb, $tplr$
       "linkUrl": "/arquivo"
     },
     {
-      "id": "content-oc-r-economia",
-      "name": "Economia",
+      "id": "content-oc-r-negocios",
+      "name": "Negócios",
       "width": "half",
       "order": 6,
       "color": "#14265e",
+      "custom": true,
+      "format": "mini",
+      "layout": "mini",
+      "source": "automatic_by_category",
+      "category": "negocios",
+      "visible": true,
+      "blockType": "content",
+      "itemsLimit": 3,
+      "linkLabel": "Ver todas →"
+    },
+    {
+      "id": "content-oc-r-economia",
+      "name": "Economia",
+      "width": "half",
+      "order": 7,
+      "color": "#1657d0",
       "custom": true,
       "format": "mini",
       "layout": "mini",
@@ -803,38 +760,37 @@ $tplp$::jsonb, $tplr$
       "linkLabel": "Ver todas →"
     },
     {
-      "id": "content-oc-r-esportes",
-      "name": "Esportes",
-      "width": "half",
-      "order": 7,
-      "color": "#1657d0",
+      "id": "content-oc-r-turismo",
+      "name": "Turismo",
+      "order": 8,
+      "color": "#2f6fe0",
       "custom": true,
       "format": "mini",
       "layout": "mini",
       "source": "automatic_by_category",
-      "category": "esportes",
+      "category": "turismo",
       "visible": true,
       "blockType": "content",
-      "itemsLimit": 3,
+      "itemsLimit": 4,
       "linkLabel": "Ver todas →"
     },
     {
       "id": "newsletter-oc-r-assine",
       "name": "Receba as notícias do dia",
-      "order": 8,
+      "order": 9,
       "color": "#0a1740",
       "custom": true,
       "format": "card",
       "visible": true,
       "blockType": "newsletter",
-      "caption": "Um resumo diário com o que realmente importa — política, economia, Brasil e mundo.",
+      "caption": "Um resumo diário do que move negócios, economia, aviação e turismo.",
       "buttonLabel": "Quero receber",
       "linkLabel": "Sem spam. Você pode cancelar quando quiser."
     },
     {
       "id": "hero",
       "name": "Principais Notícias",
-      "order": 9,
+      "order": 10,
       "layout": "portal",
       "visible": false
     },
@@ -842,7 +798,7 @@ $tplp$::jsonb, $tplr$
       "id": "brasil",
       "name": "Brasil",
       "color": "#16a34a",
-      "order": 10,
+      "order": 11,
       "layout": "grid",
       "visible": false,
       "category": "brasil"
@@ -851,7 +807,7 @@ $tplp$::jsonb, $tplr$
       "id": "mundo",
       "name": "Mundo",
       "color": "#6b21a8",
-      "order": 11,
+      "order": 12,
       "layout": "grid",
       "visible": false,
       "category": "mundo"
@@ -860,7 +816,7 @@ $tplp$::jsonb, $tplr$
       "id": "esporte",
       "name": "Esporte",
       "color": "#dc2626",
-      "order": 12,
+      "order": 13,
       "layout": "cultura",
       "visible": false,
       "category": "esportes"
@@ -869,7 +825,7 @@ $tplp$::jsonb, $tplr$
       "id": "cultura",
       "name": "Cultura",
       "color": "#0d9488",
-      "order": 13,
+      "order": 14,
       "layout": "cultura",
       "visible": false,
       "category": "cultura"
@@ -878,7 +834,7 @@ $tplp$::jsonb, $tplr$
       "id": "df",
       "name": "DF",
       "color": "#0b3d91",
-      "order": 14,
+      "order": 15,
       "layout": "duplo",
       "visible": false,
       "category": "cidade"
@@ -887,7 +843,7 @@ $tplp$::jsonb, $tplr$
       "id": "saude",
       "name": "Saúde",
       "color": "#16a34a",
-      "order": 15,
+      "order": 16,
       "layout": "grid",
       "visible": false,
       "category": "saude"
@@ -896,7 +852,7 @@ $tplp$::jsonb, $tplr$
       "id": "tecnologia",
       "name": "Tecnologia",
       "color": "#0284c7",
-      "order": 16,
+      "order": 17,
       "layout": "grid",
       "visible": false,
       "category": "tecnologia"
@@ -904,20 +860,20 @@ $tplp$::jsonb, $tplr$
     {
       "id": "colunistas",
       "name": "Colunistas",
-      "order": 17,
+      "order": 18,
       "visible": false
     },
     {
       "id": "ultimas",
       "name": "Últimas Notícias",
-      "order": 18,
+      "order": 19,
       "visible": false
     },
     {
       "id": "mais-lidas",
       "name": "Mais Lidas",
       "color": "#14265e",
-      "order": 19,
+      "order": 20,
       "visible": false,
       "itemsLimit": 5
     }
@@ -934,6 +890,13 @@ COMMIT;
 \echo ''
 \echo '=== TEMPLATES SALVOS NESTE BLOG ==='
 SELECT t->>'id' AS id, t->>'name' AS nome,
-       jsonb_array_length(t->'blocks') AS blocos
+       jsonb_array_length(t->'blocks') AS blocos,
+       jsonb_array_length(t->'menuItems') AS itens_menu
 FROM settings, jsonb_array_elements(value::jsonb->'homeTemplates') AS t
+WHERE key = 'site_settings';
+
+\echo ''
+\echo '=== CATEGORIAS DO BLOG ==='
+SELECT c->>'slug' AS slug, c->>'name' AS nome, c->>'color' AS cor
+FROM settings, jsonb_array_elements(value::jsonb->'categories') AS c
 WHERE key = 'site_settings';
