@@ -30,6 +30,7 @@ import queueRouter from "./queue";
 import imageRouter from "./image";
 import newsletterRouter from "./newsletter";
 import newsletterAdminRouter from "./newsletterAdmin";
+import youtubeRouter from "./youtube";
 
 const router: IRouter = Router();
 
@@ -47,6 +48,7 @@ router.use("/columnists", columnistsPublicRouter);
 router.use("/messages", msgsRouter);
 router.use("/articles", articlesRouter);
 router.use("/quotes", quotesRouter);
+router.use("/youtube", youtubeRouter);
 router.use(siteRouter);
 router.use(sitemapRouter);
 router.use(ampRouter);

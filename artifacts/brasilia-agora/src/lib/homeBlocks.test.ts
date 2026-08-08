@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
   isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks, sampleForPreview,
-  categoriesBlockSource, resolveCategoryBlockItems,
+  categoriesBlockSource, resolveCategoryBlockItems, parsePlaylistId,
   type HomeBlock,
 } from "./homeBlocks";
 
@@ -228,4 +228,22 @@ test("resolveCategoryBlockItems: ajustes por editoria (imagem, rótulo, ocultar)
 test("resolveCategoryBlockItems: itemsLimit corta e lista vazia devolve []", () => {
   assert.equal(resolveCategoryBlockItems({ itemsLimit: 2 }, CATS, MENU, icon).length, 2);
   assert.deepEqual(resolveCategoryBlockItems({}, [], [], icon), []);
+});
+
+test("parsePlaylistId: id cru, URL de playlist e URL de video dentro dela", () => {
+  assert.equal(parsePlaylistId("PLxAbc123_-defGHI"), "PLxAbc123_-defGHI");
+  assert.equal(parsePlaylistId("https://www.youtube.com/playlist?list=PLxAbc123_-defGHI"), "PLxAbc123_-defGHI");
+  assert.equal(parsePlaylistId("https://www.youtube.com/watch?v=abc123&list=PLxAbc123_-defGHI&index=2"), "PLxAbc123_-defGHI");
+});
+
+test("parsePlaylistId: recusa vazio, video solto e esquema perigoso", () => {
+  assert.equal(parsePlaylistId(""), null);
+  assert.equal(parsePlaylistId(undefined), null);
+  assert.equal(parsePlaylistId("https://www.youtube.com/watch?v=abc123"), null);
+  assert.equal(parsePlaylistId("javascript:alert(1)"), null);
+});
+
+test("bloco playlist: tipo inferido pelo prefixo do id e formato padrao", () => {
+  assert.equal(inferBlockType({ id: "playlist-1723000000", custom: true }), "playlist");
+  assert.equal(defaultFormatForType("playlist"), "playlist_player");
 });

@@ -22,7 +22,7 @@ import { useT } from "../../lib/i18n";
 import { safeTitleHtml, sanitizeArticleHtml } from "../../lib/sanitize";
 import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
-  categoriesBlockSource, resolveCategoryBlockItems,
+  parsePlaylistId, categoriesBlockSource, resolveCategoryBlockItems,
 } from "../../lib/homeBlocks";
 import { categoryIcon } from "../../lib/categoryIcons";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
@@ -268,6 +268,150 @@ export function VideoEmbedBlock({ block, preview }: { block: HomeBlock; preview?
               allowFullScreen referrerPolicy="strict-origin-when-cross-origin"
               className="absolute inset-0 w-full h-full border-0" />
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Playlist do YouTube ─────────────────────────────────────────────────────
+interface PlaylistVideo { id: string; title: string; thumb: string; publishedAt: string }
+
+/**
+ * Player + lista de vídeos da playlist, no visual do portal (não o embed cru do
+ * YouTube). A lista vem de `/api/youtube/playlist`, que lê o feed público —
+ * nenhum blog precisa de chave de API no `.env`.
+ *
+ * Sempre no cliente: é conteúdo de terceiro que muda sozinho e não entra no
+ * SSR da home (buscar no servidor a cada render atrasaria o topo da página).
+ * Enquanto carrega, o bloco não desenha nada — nunca um esqueleto que some.
+ */
+export function YoutubePlaylistBlock({ block, preview }: { block: HomeBlock; preview?: boolean }) {
+  const playlistId = parsePlaylistId(block.playlistUrl);
+  const [videos, setVideos] = useState<PlaylistVideo[]>([]);
+  const [feedTitle, setFeedTitle] = useState("");
+  const [current, setCurrent] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const color = block.color ?? "#E71D36";
+
+  useEffect(() => {
+    if (!playlistId) return;
+    let alive = true;
+    fetch(`/api/youtube/playlist?id=${encodeURIComponent(playlistId)}`)
+      .then((r) => r.json())
+      .then((data: { title?: string; videos?: PlaylistVideo[] }) => {
+        if (!alive) return;
+        setVideos(data.videos ?? []);
+        setFeedTitle(data.title ?? "");
+        setCurrent(0);
+        setLoaded(true);
+      })
+      .catch(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, [playlistId]);
+
+  if (!playlistId) {
+    return <BlockPlaceholder preview={preview} label={`Playlist do YouTube: ${block.name}`}
+      hint="Cole no painel o link da playlist (youtube.com/playlist?list=...)." />;
+  }
+  if (!loaded) return null;
+  if (videos.length === 0) {
+    return <BlockPlaceholder preview={preview} label={`Playlist do YouTube: ${block.name}`}
+      hint="A playlist não devolveu vídeos. Confira se ela é pública e se o link está correto." />;
+  }
+
+  const playing = videos[Math.min(current, videos.length - 1)]!;
+  const limited = block.itemsLimit ? videos.slice(0, block.itemsLimit) : videos;
+
+  return (
+    <section className="border-t border-gray-200 py-8">
+      <div className="max-w-[1280px] mx-auto px-4">
+        {/* Cabeçalho: título do bloco + atalho para a playlist no YouTube */}
+        <div className="flex items-end justify-between gap-4 mb-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-1 h-5 shrink-0" style={{ backgroundColor: color }} />
+            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider truncate">
+              {block.name || feedTitle}
+            </h2>
+          </div>
+          <a
+            href={`https://www.youtube.com/playlist?list=${playlistId}`}
+            target="_blank" rel="noopener noreferrer"
+            className="text-[11px] font-bold uppercase tracking-wider shrink-0 hover:underline"
+            style={{ color }}
+          >
+            {block.linkLabel?.trim() || "Abrir no YouTube"}
+          </a>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4 items-start">
+          {/* Player */}
+          <div>
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black">
+              <iframe
+                src={`https://www.youtube-nocookie.com/embed/${playing.id}?list=${playlistId}&rel=0`}
+                title={playing.title}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                referrerPolicy="strict-origin-when-cross-origin"
+                className="absolute inset-0 w-full h-full border-0"
+              />
+            </div>
+            <h3 className="text-[15px] font-bold text-[#1a1a1a] mt-3 leading-snug">{playing.title}</h3>
+          </div>
+
+          {/* Lista de vídeos */}
+          <div className="rounded-xl border border-gray-200 overflow-hidden bg-white">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-b border-gray-200">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                Reproduzindo agora
+              </span>
+              <span className="text-[10px] font-semibold text-gray-400">
+                {Math.min(current, limited.length - 1) + 1}/{limited.length}
+              </span>
+            </div>
+            <ul className="max-h-[360px] overflow-y-auto divide-y divide-gray-100">
+              {limited.map((v, i) => {
+                const active = i === Math.min(current, limited.length - 1);
+                return (
+                  <li key={v.id}>
+                    <button
+                      type="button"
+                      onClick={() => setCurrent(i)}
+                      aria-current={active ? "true" : undefined}
+                      className={`w-full flex items-start gap-2.5 p-2.5 text-left transition-colors ${
+                        active ? "bg-gray-50" : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="relative shrink-0">
+                        <img
+                          src={v.thumb} alt="" width={96} height={54} loading="lazy" decoding="async"
+                          className="w-24 h-[54px] rounded-md object-cover bg-gray-100"
+                        />
+                        {active && (
+                          <span className="absolute inset-0 rounded-md pointer-events-none"
+                            style={{ boxShadow: `inset 0 0 0 2px ${color}` }} />
+                        )}
+                      </span>
+                      <span className="min-w-0">
+                        <span
+                          className={`block text-[12px] leading-snug line-clamp-3 ${active ? "font-bold text-[#1a1a1a]" : "text-gray-700"}`}
+                        >
+                          {v.title}
+                        </span>
+                        {active && (
+                          <span className="block text-[10px] font-bold uppercase tracking-wider mt-1" style={{ color }}>
+                            Reproduzindo
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </div>
       </div>
     </section>

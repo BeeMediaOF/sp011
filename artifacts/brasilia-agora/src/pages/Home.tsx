@@ -24,6 +24,7 @@ import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
   EmbedBlock, TickerBlock, NewsletterBlock, CategoriesBlock, SocialLinksBlock,
   QuotesBlock, SeparatorBlock, AdSlotBlock, BlockFontScope, SearchBlock, SearchForm,
+  YoutubePlaylistBlock,
 } from "../components/blocks/HomeCustomBlocks";
 import { ZoneBlock, ZoneSectionHeader, MiniCardsGrid } from "../components/blocks/PortalZoneBlocks";
 
@@ -502,6 +503,7 @@ function CustomBlock({ block, getArticles, preview }: {
   switch (type) {
     case "image":       return <ImageBlock block={block} preview={preview} />;
     case "video":       return <VideoEmbedBlock block={block} preview={preview} />;
+    case "playlist":    return <YoutubePlaylistBlock block={block} preview={preview} />;
     case "carousel":    return <CarouselBlock block={block} articles={byCategory} preview={preview} />;
     case "ticker":      return <TickerBlock block={block} articles={byCategory} preview={preview} />;
     case "advertising": return <AdSlotBlock block={block} preview={preview} />;

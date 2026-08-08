@@ -4,7 +4,7 @@ import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../.
 import { articlesUrl } from "../../lib/articlesQuery";
 import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
-import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, categoriesBlockSource, type TemplateMenuItem, type CategoryBlockItem } from "../../lib/homeBlocks";
+import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, parsePlaylistId, safeEmbedUrl, categoriesBlockSource, type TemplateMenuItem, type CategoryBlockItem } from "../../lib/homeBlocks";
 import { categoryIcon, hasCategoryIcon } from "../../lib/categoryIcons";
 import { FONT_OPTIONS, FONT_GROUP_LABELS, fontCss, ensureFontLoaded, type FontOption } from "../../lib/fonts";
 import type { FooterConfig } from "../../lib/footerConfig";
@@ -19,11 +19,11 @@ import {
   Newspaper, Users, AlignJustify, Globe, Flame,
   Trophy, Building2, Heart, Cpu, Star, BarChart3,
   Type, Palette, Eye as EyeIcon, FileImage,
-  ChevronRight, ChevronUp, Layers,
+  ChevronRight, ChevronUp, Layers, ListVideo,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search";
+type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search" | "playlist";
 type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine" | "mini" | "hero";
 /** "menu"/"html" só valem no bloco Categorias (origem da navegação). */
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity" | "menu" | "html";
@@ -79,6 +79,7 @@ const MAIN_MODULES = [
   { type: "image" as BlockType,       name: "Imagem",       desc: "Banners ou imagens editoriais.",       Icon: Image,             iconBg: "#FDF4FF", iconColor: "#A855F7" },
   { type: "carousel" as BlockType,    name: "Carrossel",    desc: "Itens roláveis em destaque.",          Icon: GalleryHorizontal, iconBg: "#FFF7ED", iconColor: "#F97316" },
   { type: "video" as BlockType,       name: "Vídeo",        desc: "YouTube, Vimeo ou upload.",            Icon: Play,              iconBg: "#FEF2F2", iconColor: "#EF4444" },
+  { type: "playlist" as BlockType,    name: "Playlist YouTube", desc: "Player + lista de vídeos do canal.", Icon: ListVideo,      iconBg: "#FEF2F2", iconColor: "#DC2626" },
   { type: "advertising" as BlockType, name: "Propaganda",   desc: "Anúncios em diferentes formatos.",     Icon: Megaphone,         iconBg: "#FFFBEB", iconColor: "#F59E0B" },
   { type: "list" as BlockType,        name: "Lista",        desc: "Lista compacta de artigos.",           Icon: List,              iconBg: "#F0FDF4", iconColor: "#22C55E" },
   { type: "ticker" as BlockType,      name: "Ticker",       desc: "Faixa de notícias rolando.",           Icon: Radio,             iconBg: "#EFF6FF", iconColor: "#3B82F6" },
@@ -542,6 +543,7 @@ interface BlockForm {
   linkUrl: string;
   caption: string;
   videoUrl: string;
+  playlistUrl: string;
   html: string;
   embedUrl: string;
   adSlot: string;
@@ -564,7 +566,7 @@ const EMPTY_FORM: BlockForm = {
   categories: [], category: "politica", layout: "grid",
   source: "automatic_by_category", itemsLimit: 4,
   color: "#1d4ed8", reverse: false,
-  imageUrl: "", linkUrl: "", caption: "", videoUrl: "", html: "", embedUrl: "",
+  imageUrl: "", linkUrl: "", caption: "", videoUrl: "", playlistUrl: "", html: "", embedUrl: "",
   adSlot: "slot_05", adId: "",
   area: "", width: "", linkLabel: "",
   buttonLabel: "",
@@ -593,6 +595,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     linkUrl:       block.linkUrl ?? "",
     caption:       block.caption ?? "",
     videoUrl:      block.videoUrl ?? "",
+    playlistUrl:   block.playlistUrl ?? "",
     html:          block.html ?? "",
     embedUrl:      block.embedUrl ?? "",
     adSlot:        block.adSlot ?? "slot_05",
@@ -630,6 +633,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     linkUrl:    f.linkUrl.trim() || undefined,
     caption:    f.caption.trim() || undefined,
     videoUrl:   f.videoUrl.trim() || undefined,
+    playlistUrl: f.playlistUrl.trim() || undefined,
     html:       f.html.trim() || undefined,
     embedUrl:   f.embedUrl.trim() || undefined,
     adSlot:     f.blockType === "advertising" ? f.adSlot : undefined,
@@ -969,6 +973,7 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
               <option value="image">Imagem</option>
               <option value="carousel">Carrossel</option>
               <option value="video">Vídeo</option>
+              <option value="playlist">Playlist do YouTube</option>
               <option value="advertising">Propaganda</option>
               <option value="list">Lista</option>
               <option value="ticker">Ticker</option>
@@ -1033,6 +1038,26 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
           {form.videoUrl.trim() !== "" && !parseVideoEmbedUrl(form.videoUrl) && (
             <p className="text-[11px] text-amber-600 mt-1.5">URL não reconhecida — use um link do YouTube, Vimeo ou arquivo .mp4/.webm.</p>
           )}
+        </PanelSection>
+      )}
+
+      {/* ── Playlist do YouTube: link da playlist + rótulo do atalho ── */}
+      {!isSpecial && form.blockType === "playlist" && (
+        <PanelSection label="Playlist do YouTube" icon={ListVideo}>
+          <input value={form.playlistUrl} onChange={(e) => onChange("playlistUrl", e.target.value)}
+            className={INPUT} placeholder="https://www.youtube.com/playlist?list=..." />
+          {form.playlistUrl.trim() !== "" && !parsePlaylistId(form.playlistUrl) && (
+            <p className="text-[11px] text-amber-600 mt-1.5">
+              Link não reconhecido — cole a URL da playlist (com <code>?list=</code>) ou o id dela.
+            </p>
+          )}
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mt-2 mb-1">Texto do atalho</label>
+          <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+            className={INPUT} placeholder="Abrir no YouTube" />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            A playlist precisa ser <strong>pública</strong>. Os vídeos são lidos do feed público do
+            YouTube — nenhuma chave de API é necessária. Use "Itens" para limitar a lista lateral.
+          </p>
         </PanelSection>
       )}
 

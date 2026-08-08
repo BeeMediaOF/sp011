@@ -110,6 +110,9 @@ export interface HomeBlock {
    *  reservar a caixa e não deslocar o layout quando a imagem chega. */
   imageWidth?: number; imageHeight?: number;
   videoUrl?: string; html?: string; embedUrl?: string; adSlot?: string;
+  /** Bloco "playlist": URL/id da playlist do YouTube (a lista sai do feed
+   *  público via /api/youtube/playlist — sem chave de API por blog). */
+  playlistUrl?: string;
   /** Bloco de imagem/HTML marcado "É uma propaganda" — mede impressão/clique
    *  sob a chave block:<id> (ad_daily_stats) e entra nas métricas de anúncios. */
   isAd?: boolean;

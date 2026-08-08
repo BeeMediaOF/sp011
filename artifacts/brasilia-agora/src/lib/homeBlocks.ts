@@ -17,7 +17,7 @@ export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"
   | "ticker" | "newsletter" | "categories" | "quotes" | "social"
   | "html" | "embed" | "map" | "sep" | "weather" | "table" | "counter"
-  | "search";
+  | "search" | "playlist";
 
 /** Ajuste de UMA editoria dentro do bloco "Categorias". */
 export interface CategoryBlockItem {
@@ -61,6 +61,9 @@ export interface HomeBlock {
   caption?: string;
   /** Bloco de vídeo: URL do YouTube/Vimeo ou arquivo .mp4/.webm. */
   videoUrl?: string;
+  /** Bloco de playlist: URL ou id da playlist do YouTube (a lista de vídeos é
+   *  lida do feed público pelo api-server — não precisa de chave de API). */
+  playlistUrl?: string;
   /** Bloco HTML: markup livre (sanitizado no render). */
   html?: string;
   /** Bloco embed/mapa: URL externa exibida em iframe (somente https). */
@@ -158,7 +161,7 @@ export interface HomeTemplate {
 const TYPE_PREFIXES: readonly string[] = [
   "content", "image", "carousel", "video", "advertising", "list", "ticker",
   "newsletter", "categories", "weather", "quotes", "social", "html", "table",
-  "counter", "sep", "map", "embed", "search",
+  "counter", "sep", "map", "embed", "search", "playlist",
 ];
 
 /**
@@ -178,6 +181,7 @@ export function defaultFormatForType(type: string): string {
     case "image":       return "full_width_image";
     case "carousel":    return "carousel_news";
     case "video":       return "video_featured";
+    case "playlist":    return "playlist_player";
     case "advertising": return "banner_970x90";
     case "list":        return "list_compact";
     case "search":      return "search_bar";
@@ -204,6 +208,19 @@ export function parseVideoEmbedUrl(raw: string | null | undefined): string | nul
   if (vimeo?.[1]) return `https://player.vimeo.com/video/${vimeo[1]}`;
   if (/^https?:\/\/[^\s]+\.(mp4|webm|ogg)(\?[^\s]*)?$/i.test(url)) return url;
   return null;
+}
+
+/**
+ * Id da playlist do YouTube a partir do que o operador colar: id cru, URL de
+ * playlist ou URL de vídeo dentro dela. Espelha `parsePlaylistId` do api-server
+ * (lib/youtubePlaylist.ts) — mudar aqui exige mudar lá.
+ */
+export function parsePlaylistId(raw: string | null | undefined): string | null {
+  const input = (raw ?? "").trim();
+  if (!input) return null;
+  if (/^[A-Za-z0-9_-]{12,64}$/.test(input) && !input.includes("/")) return input;
+  const match = input.match(/[?&]list=([A-Za-z0-9_-]{12,64})/);
+  return match?.[1] ?? null;
 }
 
 /** true quando a URL aponta para arquivo de vídeo direto (usar <video>, não iframe). */

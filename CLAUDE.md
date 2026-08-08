@@ -466,6 +466,13 @@ montada no servidor.
   marcado `is_internal`, nunca dropado; `totals.*` do /stats fixos ao agora;
   canal classificado no servidor; migrações de coluna via Drizzle schema E
   ensureSchema. Docs: `docs/ANALYTICS.md`.
+- **Playlist do YouTube** (bloco `playlist`, ago/2026): player + lista lateral
+  no visual do portal. A lista sai do **feed Atom público**
+  (`/feeds/videos.xml?playlist_id=`) via `GET /api/youtube/playlist` — sem chave
+  de API em blog nenhum, cache de 30 min em memória no api-server. Playlist tem
+  que ser pública. O parse é espelhado em dois lugares (`parsePlaylistId` em
+  `api-server/src/lib/youtubePlaylist.ts` E em
+  `brasilia-agora/src/lib/homeBlocks.ts`) — mudar nos DOIS.
 - **Blocos da home**: `blockType` persistido (retrocompat por prefixo do id);
   `itemsLimit` não vale para blocos editoriais no fluxo clássico; rodapé em
   `settings.footerConfig`; zonas main/sidebar/half; ver memória do repo em
