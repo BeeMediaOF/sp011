@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { BRAND } from "../../brand";
+import { brandNameFromHost, blogUrlExample, currentBlogHost } from "../../lib/blogIdentity";
 import { useSearch } from "wouter";
 import AdminLayout from "../../components/admin/AdminLayout";
 import DatabaseCard from "../../components/admin/DatabaseCard";
@@ -186,10 +186,12 @@ export default function Settings() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  /* ── settings state ── */
+  /* ── settings state ──
+     Semente VAZIA: enquanto /api/settings não responde, o formulário não pode
+     mostrar (nem salvar) o nome/tagline de outro blog da rede. */
   const [settings, setSettings] = useState<SiteSettings>({
-    siteName: BRAND.name,
-    tagline: "Notícia. Agora. Sempre.",
+    siteName: "",
+    tagline: "",
     mobileEnabled: true,
     desktopEnabled: true,
     seoDescription: "",
@@ -566,7 +568,7 @@ export default function Settings() {
                   <SectionHeader icon={<Globe size={15}/>} label={t("cfg.tabInfo")}/>
                   <Field label={t("cfg.siteName")}>
                     <input value={settings.siteName} onChange={e => setField("siteName", e.target.value)}
-                      className={INPUT} placeholder={`${t("cfg.eg")} ${BRAND.name}`}/>
+                      className={INPUT} placeholder={`${t("cfg.eg")} ${brandNameFromHost(currentBlogHost()) || "Portal de Notícias"}`}/>
                   </Field>
                   <Field label={t("cfg.tagline")}>
                     <input value={settings.tagline} onChange={e => setField("tagline", e.target.value)}
@@ -686,7 +688,7 @@ export default function Settings() {
                       value={settings.siteUrl ?? ""}
                       onChange={e => setField("siteUrl", e.target.value)}
                       className={INPUT}
-                      placeholder="https://sbcagora.com.br"
+                      placeholder={blogUrlExample()}
                     />
                   </Field>
 

@@ -22,7 +22,9 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch {}
-  const title = data.title || "SBC Agora";
+  // Sem título no payload, usa o host DESTE blog: a marca embutida antiga
+  // notificava o leitor com o nome de outro portal da rede.
+  const title = data.title || self.location.hostname;
   const options = {
     body: data.body || "",
     icon: "/favicon.jpg",

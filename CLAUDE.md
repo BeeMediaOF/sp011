@@ -391,6 +391,16 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
 - Isolamento entre blogs é por infra (container+DB+SESSION_SECRET próprios);
   NÃO existe blogId no app — nunca hardcodar conteúdo por blog na imagem
   compartilhada (usar settings).
+- **Nenhuma marca embutida na imagem** (varredura de 2026-08-08): não existe
+  mais `brand.ts` com nome/domínio fixos. Identidade vem de
+  `settings.siteName`/`contact` e, como reserva, do host da requisição —
+  `brasilia-agora/src/lib/blogIdentity.ts` (painel/site: `blogDisplayName`,
+  `brandNameFromHost`, `blogUrlExample`…) e `api-server/src/lib/brand.ts`
+  (runtime: `siteName()`, `defaultAuthor()`, `adminIssuer()`, lê o store).
+  Defaults de `store.ts` (siteName, tagline, DEFAULT_CONTACT) nascem VAZIOS e
+  o site omite o que não foi configurado; sem logo, cabeçalho e rodapé
+  escrevem o nome do site. Ao criar placeholder/exemplo/preset novo, derivar
+  do próprio blog — nunca citar outro portal da rede.
 
 ## 14. Desenvolvimento local no Windows (limitações intencionais)
 

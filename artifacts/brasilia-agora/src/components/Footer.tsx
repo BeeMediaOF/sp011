@@ -2,8 +2,6 @@ import React, { useState } from "react";
 import { Link } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import logoImg from "../assets/images/logo_sbc_negativo.png";
-import logoColorImg from "../assets/images/logo_sbc_agora.png";
 import { useSite } from "../hooks/useSite";
 import { useT } from "../lib/i18n";
 import { trackNewsletter } from "../hooks/useAnalytics";
@@ -99,18 +97,35 @@ function LegalRow({ links, className, sepClassName }: {
   );
 }
 
+/** Logo do rodapé; sem imagem, o nome do site em texto; sem nome, só o espaço. */
+function FooterBrand({ src, name, height }: { src: string; name: string; height: number }) {
+  if (src) {
+    return (
+      <img src={siteAssetUrl(src, { h: height })} srcSet={siteAssetSrcSet(src, { h: height })}
+        alt={name} style={{ height }} loading="lazy" decoding="async"
+        className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" />
+    );
+  }
+  if (name) {
+    return (
+      <span className="block mb-2 font-black tracking-tight leading-none"
+        style={{ fontSize: Math.max(16, Math.round(height * 0.5)) }}>{name}</span>
+    );
+  }
+  return <span className="block mb-2" style={{ height }} />;
+}
+
 export default function Footer() {
   const { settings } = useSite();
   const { t, lang } = useT();
   const style = settings?.footerStyle ?? "dark";
   const bgColor = settings?.footerBgColor;
   // Logo própria do rodapé (painel → Logo & Imagens) tem prioridade; depois a
-  // logo principal; as imagens do bundle (variante negativa p/ fundo escuro,
-  // colorida p/ fundo claro) ficam só como fallback. Enquanto as settings não
-  // chegam, src vazio → não mostra a marca default (evita o flash da logo do
-  // blog padrão nos blogs replicados).
-  const logoSrc      = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoImg) : "";
-  const logoColorSrc = settings ? (settings.footerLogoBase64 || settings.logoBase64 || logoColorImg) : "";
+  // logo principal. SEM as imagens do bundle como reserva: elas são a marca de
+  // outro portal da rede, e o rodapé de um blog sem logo as exibia como se
+  // fossem dele. Sem logo, o rodapé cai no nome do site (ver abaixo).
+  const logoSrc      = settings?.footerLogoBase64 || settings?.logoBase64 || "";
+  const logoColorSrc = logoSrc;
   // Altura configurável no editor do rodapé (padrão 40px = o antigo h-10). A
   // largura tem teto para uma logo larga em tamanho grande não estourar a
   // coluna no celular (object-contain mantém a proporção dentro do teto).
@@ -160,7 +175,7 @@ export default function Footer() {
         <div className="max-w-[1280px] mx-auto px-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-gray-200">
             <div>
-              {logoColorSrc ? <img src={siteAssetUrl(logoColorSrc, { h: logoH })} srcSet={siteAssetSrcSet(logoColorSrc, { h: logoH })} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+              <FooterBrand src={logoColorSrc} name={settings?.siteName || ""} height={logoH} />
               {f.description && (
                 <p className="text-gray-600 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
               )}
@@ -228,7 +243,7 @@ export default function Footer() {
 
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6 pb-6 border-b border-white/10">
           <div>
-            {logoSrc ? <img src={siteAssetUrl(logoSrc, { h: logoH })} srcSet={siteAssetSrcSet(logoSrc, { h: logoH })} alt={settings?.siteName || ""} style={{ height: logoH }} loading="lazy" decoding="async" className="w-auto max-w-[min(70vw,320px)] object-contain mb-2" /> : <span className="block mb-2" style={{ height: logoH }} />}
+            <FooterBrand src={logoSrc} name={settings?.siteName || ""} height={logoH} />
             {f.description && (
               <p className="text-gray-400 text-xs leading-relaxed max-w-[280px]">{f.description}</p>
             )}

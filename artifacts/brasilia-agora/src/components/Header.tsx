@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { BRAND } from "../brand";
 import { Link, useLocation } from "wouter";
 import { Menu, X, House, ChevronDown } from "lucide-react";
 import { useSite } from "../hooks/useSite";
@@ -12,7 +11,6 @@ import { isDarkBg, inkOn } from "@/lib/colorContrast";
 import { safeLinkUrl } from "../lib/homeBlocks";
 import { useAdImpression, trackClick } from "./ads/useAds";
 import PushSubscribeButton from "./PushSubscribeButton";
-import logoImg from "../assets/images/logo_sbc_agora.png";
 import { siteAssetUrl, siteAssetSrcSet } from "../lib/newsImage";
 
 const FALLBACK_NAV: NavEntry[] = [
@@ -257,9 +255,18 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
   const mh = mobileHeight && mobileHeight > 0
     ? Math.min(mobileHeight, 120)
     : Math.min(height, mobileCap);
-  // Settings ainda carregando (src vazio): reserva o espaço sem mostrar a logo
-  // padrão embutida — num blog replicado ela é a marca errada (flash do sp011).
+  // Sem imagem de logo: com o nome do site já carregado, escreve o nome (é a
+  // identidade DESTE blog); ainda sem settings, só reserva o espaço. Nunca a
+  // logo embutida no bundle — num blog replicado ela é a marca de outro portal.
   if (!desktopSrc) {
+    if (alt) {
+      return (
+        <span className={`font-black tracking-tight leading-none truncate ${centered ? "" : "text-left"}`}
+          style={{ fontSize: Math.max(16, Math.round(mh * 0.5)) }}>
+          {alt}
+        </span>
+      );
+    }
     return (
       <>
         <span aria-hidden="true" className="lg:hidden block w-24" style={{ height: mh }} />
@@ -294,13 +301,12 @@ function HeaderLogo({ desktopSrc, mobileSrc, alt, height, mobileCap, mobileHeigh
 export default function Header() {
   const { settings }            = useSite();
   const { t, lang }             = useT();
-  // Logo configurada no painel (Configurações → logo) tem prioridade; a imagem
-  // empacotada no bundle é só fallback quando nenhuma logo foi enviada.
-  // Sem settings ainda (1º paint frio) o src fica vazio — o HeaderLogo reserva
-  // o espaço em vez de mostrar a logo embutida (que é a marca do blog default).
-  const logoSrc = settings ? (settings.logoBase64 || logoImg) : "";
+  // Logo configurada no painel (Configurações → logo). SEM fallback embutido: a
+  // logo que vinha no bundle é a marca de outro portal da rede. Sem logo, o
+  // HeaderLogo escreve o nome do site (ou reserva o espaço, se ele ainda não veio).
+  const logoSrc = settings?.logoBase64 || "";
   // Variante mobile opcional (Configurações → Logo & Imagens → Logo mobile).
-  const logoMobileSrc = settings ? (settings.logoMobileBase64 || logoSrc) : "";
+  const logoMobileSrc = settings?.logoMobileBase64 || logoSrc;
   const [location]              = useLocation();
   const [menuOpen, setMenu]       = useState(false);
 
@@ -351,7 +357,9 @@ export default function Header() {
   // Margem abaixo do cabeçalho (afasta-o do conteúdo). Mesmo wrapper.
   const headerMarginBottom = settings?.headerMarginBottom ?? 0;
   const wrapStyle: React.CSSProperties = { marginTop: headerMarginTop, marginBottom: headerMarginBottom };
-  const siteName = settings?.siteName ?? BRAND.name;
+  // Só o nome REAL deste blog (alt da logo): antes caía na marca embutida, que
+  // é o nome de outro portal da rede. Vazio até /api/site responder.
+  const siteName = settings?.siteName ?? "";
 
   // ── Menu em faixa + banner do cabeçalho (opcionais; ausentes = layout atual) ─
   // "bar": a navegação sai da linha do logo e vira uma faixa colorida full-width

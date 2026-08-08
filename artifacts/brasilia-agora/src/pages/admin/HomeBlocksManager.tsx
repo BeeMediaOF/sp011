@@ -263,7 +263,7 @@ const KSPORTS_AD_BG = `border:1px solid #232145;border-radius:8px;background:rad
 // espremer o texto central (que estouraria a largura da tela).
 const KSPORTS_AD_BONUS = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;${KSPORTS_AD_BG}">
   ${KSPORTS_AD_BRAND}
-  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">EXCLUSIVE <span style="color:${KSPORTS_PINK};">BONUSES</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">FOR THE KSPORTS COMMUNITY</span></span>
+  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">EXCLUSIVE <span style="color:${KSPORTS_PINK};">BONUSES</span></span><br/><span style="font-size:13px;font-weight:600;color:#c9c7e8;">FOR OUR COMMUNITY</span></span>
   <span style="background:${KSPORTS_PINK};color:#ffffff;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">GET STARTED</span>
 </div>`;
 
@@ -271,7 +271,7 @@ const KSPORTS_AD_BONUS = `<div style="display:flex;flex-wrap:wrap;align-items:ce
 // como no mockup). Só aparece em telas lg+ (o Header esconde no mobile).
 const KSPORTS_AD_HEADER = `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;${KSPORTS_AD_BG}">
   <span style="font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;">K<span style="color:${KSPORTS_PINK};">BET</span></span>
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">BET. WIN. <span style="color:${KSPORTS_PINK};">REPEAT.</span></span><br/><span style="font-size:10px;font-weight:600;color:#c9c7e8;">THE OFFICIAL PARTNER OF KSPORTS</span></span>
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">BET. WIN. <span style="color:${KSPORTS_PINK};">REPEAT.</span></span><br/><span style="font-size:10px;font-weight:600;color:#c9c7e8;">OUR OFFICIAL PARTNER</span></span>
   <span style="background:${KSPORTS_PINK};color:#ffffff;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;">BET NOW</span>
 </div>`;
 
@@ -344,20 +344,22 @@ const EA_PURPLE = "#5b2d8e"; // roxo das letras
 const EA_GREEN  = "#4bce10"; // verde-limão das setas
 const EA_MID    = "#3a1c6e"; // roxo médio (gradientes)
 
-// Marca em texto puro no estilo da logo (Esporte branco + Agora verde);
-// substituível pela PNG branca via upload no Storage + edição do bloco.
-const EA_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;">Esporte<span style="color:${EA_GREEN};">Agora</span></span>`;
+// Marca do ANUNCIANTE em texto puro — neutra de propósito: este starter é
+// aplicável em qualquer blog da rede, e um wordmark de outro portal aqui viraria
+// arte pronta com a marca errada. Substituível pela PNG do patrocinador via
+// upload no Storage + edição do bloco.
+const EA_AD_BRAND = `<span style="font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;">SUA<span style="color:${EA_GREEN};">MARCA</span></span>`;
 const EA_AD_BG = `border:1px solid #3b2a63;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(75,206,16,.32), transparent 42%), radial-gradient(circle at 10% 60%, rgba(91,45,142,.6), transparent 46%), linear-gradient(135deg, ${EA_DARK}, ${EA_MID} 60%, ${EA_DARK});`;
 
 const EA_AD_BONUS = `<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;${EA_AD_BG}">
   ${EA_AD_BRAND}
-  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">ANUNCIE <span style="color:${EA_GREEN};">AQUI</span></span><br/><span style="font-size:13px;font-weight:600;color:#cdc3e8;">SUA MARCA NA TORCIDA DO ESPORTE AGORA</span></span>
+  <span style="flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;"><span style="font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;">ANUNCIE <span style="color:${EA_GREEN};">AQUI</span></span><br/><span style="font-size:13px;font-weight:600;color:#cdc3e8;">SUA MARCA NA TORCIDA DESTE PORTAL</span></span>
   <span style="background:${EA_GREEN};color:#0c2601;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;">FALE CONOSCO</span>
 </div>`;
 
 const EA_AD_HEADER = `<div style="display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;${EA_AD_BG}">
-  <span style="font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;">Esporte<span style="color:${EA_GREEN};">Agora</span></span>
-  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">SUA MARCA <span style="color:${EA_GREEN};">AQUI.</span></span><br/><span style="font-size:10px;font-weight:600;color:#cdc3e8;">SEJA O PARCEIRO OFICIAL DO ESPORTE AGORA</span></span>
+  <span style="font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;">SUA<span style="color:${EA_GREEN};">MARCA</span></span>
+  <span style="flex:1;text-align:center;color:#ffffff;line-height:1.15;"><span style="font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;">SUA MARCA <span style="color:${EA_GREEN};">AQUI.</span></span><br/><span style="font-size:10px;font-weight:600;color:#cdc3e8;">SEJA O PARCEIRO OFICIAL DESTE PORTAL</span></span>
   <span style="background:${EA_GREEN};color:#0c2601;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;">ANUNCIE</span>
 </div>`;
 
@@ -418,7 +420,7 @@ const EA_FOOTER: FooterConfig = {
 const STARTER_TEMPLATES: HomeTemplate[] = [
   {
     id: "starter-ksports",
-    name: "KSports — Portal Esportivo",
+    name: "Portal Esportivo (EN)",
     createdAt: "2026-07-03T00:00:00.000Z",
     accentColor: KSPORTS_PINK,
     builtin: true,
@@ -471,7 +473,7 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
   },
   {
     id: "starter-esporteagora",
-    name: "Esporte Agora — Portal Esportivo (PT)",
+    name: "Portal Esportivo (PT)",
     createdAt: "2026-07-10T00:00:00.000Z",
     accentColor: EA_PURPLE,
     builtin: true,
@@ -3036,6 +3038,22 @@ export default function HomeBlocksManager() {
                           <FontPicker value={b.fontFamily ?? ""} inputClass={`${AINPUT} appearance-none`}
                             onChange={(v) => patchArticleBlock(b.id, { fontFamily: v || undefined })} />
                         )}
+                        <div className="grid grid-cols-3 gap-1">
+                          {([
+                            ["all", "Tudo", Monitor],
+                            ["desktop", "Só desktop", Monitor],
+                            ["mobile", "Só mobile", Smartphone],
+                          ] as const).map(([id, label, Icon]) => (
+                            <button key={id} type="button"
+                              onClick={() => patchArticleBlock(b.id, { devices: id !== "all" ? id : undefined })}
+                              className={`p-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-wide transition-all flex flex-col items-center gap-0.5 ${
+                                (b.devices ?? "all") === id
+                                  ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                                  : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+                              <Icon size={12} /> {label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     );
                   })}

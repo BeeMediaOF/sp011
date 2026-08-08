@@ -7,10 +7,10 @@
  * só um dado errado: o servidor emitiria um `<script type="ld+json">` diferente
  * do que o cliente monta na hidratação → mismatch e React descartando o SSR.
  * O middleware manda o origin da requisição em `__SSR_DATA__` e os dois lados
- * semeiam aqui.
+ * semeiam aqui. Sem semente, devolve string vazia: uma URL relativa é um dado
+ * incompleto, mas o domínio de OUTRO blog seria um dado errado — e sairia
+ * assinado no JSON-LD.
  */
-import { BRAND } from "../brand";
-
 let _origin = "";
 
 export function seedOrigin(origin: string): void {
@@ -19,5 +19,5 @@ export function seedOrigin(origin: string): void {
 
 export function pageOrigin(): string {
   if (typeof window !== "undefined") return window.location.origin;
-  return _origin || BRAND.url;
+  return _origin;
 }

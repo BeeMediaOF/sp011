@@ -58,6 +58,17 @@ export function BlockFontScope({ fontId, devices, children }: {
   return <div style={{ display: "contents", ...style }}>{children}</div>;
 }
 
+/**
+ * Visibilidade por tela para wrappers que JÁ existem e carregam o espaçamento
+ * (lateral da notícia: `space-y-*` no <aside>). Ali as classes .block-only-*
+ * não servem: elas são display:contents, e margem em display:contents é
+ * ignorada — a coluna perderia o respiro entre os blocos. O corte do `lg` do
+ * Tailwind é 1024px, o mesmo das .block-only-*.
+ */
+export function deviceBoxClass(devices?: "all" | "mobile" | "desktop"): string {
+  return devices === "mobile" ? "lg:hidden" : devices === "desktop" ? "hidden lg:block" : "";
+}
+
 export interface BlockArticle {
   id: string;
   slug?: string;

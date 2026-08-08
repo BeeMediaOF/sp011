@@ -4,7 +4,6 @@
  * The canonical page adds <link rel="amphtml"> pointing here.
  */
 import { Router } from "express";
-import { BRAND } from "../lib/brand.js";
 import { store } from "../lib/store.js";
 import { eq, or, sql } from "drizzle-orm";
 import { db, articlesTable } from "@workspace/db";
@@ -71,6 +70,9 @@ router.get("/amp/artigos/:slug", async (req, res) => {
     const publishedIso  = article.publishedAt ? new Date(article.publishedAt).toISOString() : "";
     const modifiedIso   = article.updatedAt   ? new Date(article.updatedAt).toISOString()   : publishedIso;
     const defaultAuthor = siteCfg.bylineName?.trim() || (en ? "Newsroom" : "Redação");
+    // Publisher/cabecalho = nome DESTE blog. Era a constante BRAND, entao o AMP
+    // dos 8 dominios se anunciava como o mesmo portal (e assim ia para o Google).
+    const publisherName = siteCfg.siteName?.trim() || new URL(base).hostname;
     const authorName    = escHtml(article.author || defaultAuthor);
     const imageUrl      = article.imageUrl || "";
 
@@ -94,7 +96,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
       author: { "@type": "Person", name: article.author || defaultAuthor },
       publisher: {
         "@type": "Organization",
-        name: BRAND.name,
+        name: publisherName,
         logo: { "@type": "ImageObject", url: `${base}/favicon.jpg` },
       },
     });
@@ -136,7 +138,7 @@ router.get("/amp/artigos/:slug", async (req, res) => {
 </head>
 <body>
   <header>
-    <a href="${escHtml(base)}">${BRAND.name}</a>
+    <a href="${escHtml(base)}">${escHtml(publisherName)}</a>
   </header>
   <main>
     <span class="chapeu">${escHtml(article.tag || article.category || (en ? "NEWS" : "NOTÍCIA"))}</span>

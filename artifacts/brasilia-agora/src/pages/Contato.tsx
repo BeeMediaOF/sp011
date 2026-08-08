@@ -12,11 +12,13 @@ export default function Contato() {
   const en = lang === "en";
   // Nunca a marca padrão (BRAND.name): vazio até /api/site responder, depois o nome real.
   const siteName = settings?.siteName ?? "";
-  // Contato dirigido por settings (fallback = valores padrão do template).
+  // Contato dirigido por settings. Sem reserva embutida: os antigos padrões
+  // (e-mail, telefone e endereço de Brasília) eram de OUTRO portal da rede e
+  // apareciam como se fossem deste blog. Não configurado = campo omitido.
   const contact = settings?.contact;
-  const contactEmail = contact?.displayEmail || "redacao@brasiliaagora.com.br";
-  const contactPhone = contact?.phone || "(61) 99888-0000";
-  const contactAddress = contact?.address || "Brasília, Distrito Federal";
+  const contactEmail = contact?.displayEmail?.trim() ?? "";
+  const contactPhone = contact?.phone?.trim() ?? "";
+  const contactAddress = contact?.address?.trim() ?? "";
   const privacyEmail = contact?.privacyEmail?.trim();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -95,7 +97,9 @@ export default function Contato() {
                   </div>
                   <div className="text-xs text-gray-400">{en ? "* Required fields" : "* Campos obrigatórios"}</div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">{en ? "Sent to" : "Enviar para"}: <b>{contactEmail}</b></span>
+                    <span className="text-xs text-gray-400">
+                      {contactEmail ? <>{en ? "Sent to" : "Enviar para"}: <b>{contactEmail}</b></> : null}
+                    </span>
                     <button type="submit" disabled={sending} className="flex items-center gap-2 px-6 py-2 bg-[#F5A623] text-[#1a2448] rounded-lg font-semibold text-sm hover:bg-[#e09520] disabled:opacity-50">
                       <Send size={16} /> {sending ? (en ? "Sending..." : "Enviando...") : (en ? "Send Message" : "Enviar Mensagem")}
                     </button>
@@ -106,21 +110,27 @@ export default function Contato() {
 
             {/* Sidebar Info */}
             <div className="space-y-6">
-              <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Mail size={18} /> {en ? "Email" : "E-mail"}</h3>
-                <p className="text-sm text-gray-600">{contactEmail}</p>
-                {privacyEmail && (
-                  <p className="text-sm text-gray-500 mt-1">{en ? "Privacy" : "Privacidade"}: {privacyEmail}</p>
-                )}
-              </div>
-              <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Phone size={18} /> {en ? "Phone" : "Telefone"}</h3>
-                <p className="text-sm text-gray-600">{contactPhone}</p>
-              </div>
-              <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
-                <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><MapPin size={18} /> {en ? "Address" : "Endereço"}</h3>
-                <p className="text-sm text-gray-600">{contactAddress}</p>
-              </div>
+              {(contactEmail || privacyEmail) && (
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                  <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Mail size={18} /> {en ? "Email" : "E-mail"}</h3>
+                  {contactEmail && <p className="text-sm text-gray-600">{contactEmail}</p>}
+                  {privacyEmail && (
+                    <p className="text-sm text-gray-500 mt-1">{en ? "Privacy" : "Privacidade"}: {privacyEmail}</p>
+                  )}
+                </div>
+              )}
+              {contactPhone && (
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                  <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><Phone size={18} /> {en ? "Phone" : "Telefone"}</h3>
+                  <p className="text-sm text-gray-600">{contactPhone}</p>
+                </div>
+              )}
+              {contactAddress && (
+                <div className="bg-gray-50 rounded-xl p-6 border border-gray-100">
+                  <h3 className="font-bold text-[#1a2448] mb-4 flex items-center gap-2"><MapPin size={18} /> {en ? "Address" : "Endereço"}</h3>
+                  <p className="text-sm text-gray-600">{contactAddress}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

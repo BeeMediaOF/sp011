@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { BRAND } from "../../brand";
+import { blogDisplayName, currentBlogHost, handleFromHost } from "../../lib/blogIdentity";
 import {
   Share2, Plus, Trash2, Pencil, CheckCircle, AlertCircle, Loader2, X,
   Play, RefreshCw, ChevronDown, ChevronUp, Image as ImageIcon, Type,
@@ -233,6 +233,14 @@ const SHAPE_KINDS: { kind: ShapeKind; label: AdminTKey; Icon: typeof Square }[] 
   { kind: "corners", label: "soc.shpCorners", Icon: Frame },
 ];
 
+/**
+ * Endereço do PRÓPRIO blog nos modelos de fábrica. Os presets nasceram com o
+ * domínio do portal em que foram desenhados ("sbcagora.com.br", "beesports.bet"
+ * …) e, na imagem compartilhada, isso aparecia como arte pronta de outro site
+ * em todos os blogs da rede — e ia publicado assim.
+ */
+const siteHostText = () => currentBlogHost() || "seudominio.com.br";
+
 function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
   const overrides: Partial<Record<ElementType, Partial<TemplateElement>>> = {
     title:    { x: 40, y: 600, width: 1000, height: 200, fontSize: 64, fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", content: "{{title}}", verticalAlign: "top", autoFit: true },
@@ -242,7 +250,7 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
     gradient: { x: 0,  y: Math.round(canvasH * 0.55), width: 1080, height: Math.round(canvasH * 0.45), fontSize: 0, fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", fill: "gradient", gradient: defaultGradient(), zIndex: 3 },
     logo:     { x: 40, y: 40,  width: 200,  height: 80,  fontSize: 0,  fontWeight: "normal", color: "", backgroundColor: "transparent", content: "", objectFit: "contain", zIndex: 6 },
     cta:      { x: 40, y: 900, width: 400,  height: 80,  fontSize: 28, fontWeight: "bold", color: "#ffffff", backgroundColor: PRIMARY, content: "Leia mais →", textAlign: "center", verticalAlign: "middle" },
-    text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: "sbcagora.com.br" },
+    text:     { x: 40, y: 1100, width: 1000, height: 80, fontSize: 24, fontWeight: "normal", color: "#cccccc", backgroundColor: "transparent", content: siteHostText() },
     shape:    { x: 100, y: 400, width: 320, height: 320, fontSize: 0, fontWeight: "normal", color: "", backgroundColor: PRIMARY, content: "", shapeKind: "rect", fill: "solid", borderWidth: 0, borderColor: "#ffffff", strokeStyle: "solid", sides: 6, points: 5, zIndex: 4 },
   };
   return {
@@ -257,7 +265,7 @@ function makeElement(type: ElementType, canvasH = 1350): TemplateElement {
   };
 }
 
-// ─── Presets de fábrica (marca SBC Agora) ──────────────────────────────────────
+// ─── Presets de fábrica (neutros: marca e endereço saem do próprio blog) ──────
 
 type PresetKind =
   | "feed-photo" | "story-quote" | "sport-card"
@@ -274,12 +282,12 @@ const PRESETS: { kind: PresetKind; label: AdminTKey }[] = [
 ];
 
 function makePreset(kind: PresetKind): SocialTemplate {
-  // ── SP011 — foto emoldurada (tracejado) + barra/rodapé vermelhos ──
+  // ── Foto emoldurada (tracejado) + barra/rodapé coloridos ──
   if (kind === "sp011") {
     const H = 1350;
     const RED = "#E2001A";
     return {
-      id: "", name: "SP011 — Foto + barra", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
+      id: "", name: "Foto + barra colorida", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
       elements: [
         // barra vermelha superior
         { ...makeElement("shape", H), x: 0, y: 0, width: 1080, height: 16, shapeKind: "rect", backgroundColor: RED, borderRadius: 0, borderWidth: 0, zIndex: 7 },
@@ -294,16 +302,16 @@ function makePreset(kind: PresetKind): SocialTemplate {
         // rodapé vermelho
         { ...makeElement("shape", H), x: 0, y: 1284, width: 1080, height: 66, shapeKind: "rect", backgroundColor: RED, borderRadius: 0, borderWidth: 0, zIndex: 7 },
         // URL no rodapé (branco, centralizado)
-        { ...makeElement("text", H), x: 0, y: 1284, width: 1080, height: 66, fontSize: 28, fontFamily: "Archivo", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "center", verticalAlign: "middle", padding: 0, content: "www.SP011.com.br", zIndex: 8 },
+        { ...makeElement("text", H), x: 0, y: 1284, width: 1080, height: 66, fontSize: 28, fontFamily: "Archivo", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "center", verticalAlign: "middle", padding: 0, content: siteHostText(), zIndex: 8 },
       ],
     };
   }
-  // ── BeeSports — esporte: foto cheia + scrim + chevron de marca ──
+  // ── Esporte: foto cheia + scrim + chevrons de acento ──
   if (kind === "bee-sports") {
     const H = 1350;
     const GREEN = "#2EE6A0";
     return {
-      id: "", name: "BeeSports — Esporte", type: "feed", width: 1080, height: H, backgroundColor: "#0d0d0d",
+      id: "", name: "Esporte — Chevron", type: "feed", width: 1080, height: H, backgroundColor: "#0d0d0d",
       elements: [
         // foto de fundo (full-bleed)
         { ...makeElement("image", H), x: 0, y: 0, width: 1080, height: H, objectFit: "cover", zIndex: 1 },
@@ -322,16 +330,16 @@ function makePreset(kind: PresetKind): SocialTemplate {
         // título branco bold
         { ...makeElement("title", H), x: 60, y: 1062, width: 760, height: 178, fontSize: 56, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", autoFit: true, accentColor: GREEN, lineHeight: 1.05, zIndex: 6 },
         // rodapé: "acesse nosso portal" + site (destaque verde)
-        { ...makeElement("text", H), x: 60, y: 1292, width: 960, height: 40, fontSize: 22, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 1, textTransform: "uppercase", content: "ACESSE NOSSO PORTAL  *beesports.bet*", accentColor: GREEN, zIndex: 6 },
+        { ...makeElement("text", H), x: 60, y: 1292, width: 960, height: 40, fontSize: 22, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, letterSpacing: 1, textTransform: "uppercase", content: `ACESSE NOSSO PORTAL  *${siteHostText()}*`, accentColor: GREEN, zIndex: 6 },
       ],
     };
   }
-  // ── Brasília Hoje — foto emoldurada (cantos) + logo/título (fundo claro) ──
+  // ── Portal — foto emoldurada (cantos) + logo/título (fundo claro) ──
   if (kind === "brasilia-hoje") {
     const H = 1350;
     const NAVY = "#0A2A8C";
     return {
-      id: "", name: "Brasília Hoje — Foto emoldurada", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
+      id: "", name: "Portal — Foto emoldurada", type: "feed", width: 1080, height: H, backgroundColor: "#ffffff",
       elements: [
         // foto do artigo (topo, com margem)
         { ...makeElement("image", H), x: 70, y: 92, width: 940, height: 850, objectFit: "cover", zIndex: 1 },
@@ -344,7 +352,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
         // título inferior direito (navy)
         { ...makeElement("title", H), x: 310, y: 1052, width: 710, height: 150, fontSize: 40, fontFamily: "Archivo", fontWeight: "bold", color: NAVY, backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: "{{title}}", autoFit: true, lineHeight: 1.1, zIndex: 6 },
         // URL
-        { ...makeElement("text", H), x: 310, y: 1212, width: 710, height: 40, fontSize: 22, fontFamily: "Archivo", fontWeight: "normal", color: "#555555", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: "acesse: *www.brasiliahoje.com.br*", accentColor: NAVY, zIndex: 6 },
+        { ...makeElement("text", H), x: 310, y: 1212, width: 710, height: 40, fontSize: 22, fontFamily: "Archivo", fontWeight: "normal", color: "#555555", backgroundColor: "transparent", textAlign: "left", verticalAlign: "middle", padding: 0, content: `acesse: *${siteHostText()}*`, accentColor: NAVY, zIndex: 6 },
       ],
     };
   }
@@ -383,7 +391,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
         // título (auto-ajusta p/ nunca cortar; *destaque* em verde)
         { ...makeElement("title", H), x: 258, y: 1138, width: 780, height: 150, fontSize: 42, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", textAlign: "left", padding: 0, content: "{{title}}", autoFit: true, accentColor: "#9EFF00", zIndex: 6 },
         // pílula da URL (borda arredondada; nome do site destacado)
-        { ...makeElement("text", H), x: 150, y: 1292, width: 780, height: 52, fontSize: 24, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", borderWidth: 3, borderColor: "#ffffff", borderRadius: 30, textAlign: "center", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: "WWW.*SEUSITE*.COM.BR", accentColor: "#9EFF00", zIndex: 6 },
+        { ...makeElement("text", H), x: 150, y: 1292, width: 780, height: 52, fontSize: 24, fontFamily: "Oswald", fontWeight: "bold", color: "#ffffff", backgroundColor: "transparent", borderWidth: 3, borderColor: "#ffffff", borderRadius: 30, textAlign: "center", verticalAlign: "middle", padding: 0, letterSpacing: 1, content: `*${siteHostText().toUpperCase()}*`, accentColor: "#9EFF00", zIndex: 6 },
         // bandeira/selo (upload) no canto superior direito
         { ...makeElement("logo", H), x: 878, y: 80, width: 140, height: 95, objectFit: "contain", zIndex: 6, content: "" },
       ],
@@ -396,7 +404,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
       elements: [
         { ...makeElement("category", H), x: 80, y: 360, width: 360, height: 70, fontSize: 30, content: "{{category}}", zIndex: 2 },
         { ...makeElement("title", H),    x: 80, y: 470, width: 920, height: 760, fontSize: 86, fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", autoFit: true, zIndex: 3 },
-        { ...makeElement("text", H),     x: 80, y: 1770, width: 920, height: 60, fontSize: 30, color: "#cbd5e1", content: "sbcagora.com.br", zIndex: 4 },
+        { ...makeElement("text", H),     x: 80, y: 1770, width: 920, height: 60, fontSize: 30, color: "#cbd5e1", content: siteHostText(), zIndex: 4 },
       ],
     };
   }
@@ -409,7 +417,7 @@ function makePreset(kind: PresetKind): SocialTemplate {
       { ...makeElement("text", H),     x: 0,  y: 760, width: 1080, height: 590, backgroundColor: "#0B2A66", opacity: 0.82, content: "", zIndex: 2 },
       { ...makeElement("category", H), x: 60, y: 840, width: 320, height: 64, fontSize: 28, content: "{{category}}", zIndex: 3 },
       { ...makeElement("title", H),    x: 60, y: 930, width: 960, height: 300, fontSize: 66, fontWeight: "bold", fontFamily: "Oswald", color: "#ffffff", content: "{{title}}", autoFit: true, zIndex: 4 },
-      { ...makeElement("text", H),     x: 60, y: 1270, width: 960, height: 50, fontSize: 26, color: "#cbd5e1", content: "@sbcagora · sbcagora.com.br", zIndex: 5 },
+      { ...makeElement("text", H),     x: 60, y: 1270, width: 960, height: 50, fontSize: 26, color: "#cbd5e1", content: `${handleFromHost(currentBlogHost()) || "@seuperfil"} · ${siteHostText()}`, zIndex: 5 },
     ],
   };
 }
@@ -675,7 +683,7 @@ function AccountModal({
 
         <div className="p-6 space-y-4">
           {/* ── Campos principais ── */}
-          <Field fieldKey="name" label={t("soc.accName")} placeholder={`${BRAND.name}`} />
+          <Field fieldKey="name" label={t("soc.accName")} placeholder={blogDisplayName()} />
           <Field fieldKey="metaAppId" label={t("soc.accAppId")} placeholder="123456789012345" />
           <Field fieldKey="metaAppSecret" label={t("soc.accAppSecret")} placeholder="••••••••••••••••" pw />
 
@@ -698,9 +706,9 @@ function AccountModal({
               </p>
               <Field fieldKey="accessToken" label="Page Access Token (long-lived)" placeholder="EAABxx…" pw />
               <Field fieldKey="pageId" label="Facebook Page ID" placeholder="123456789012345" />
-              <Field fieldKey="pageName" label={t("soc.accPageName")} placeholder={BRAND.name} />
+              <Field fieldKey="pageName" label={t("soc.accPageName")} placeholder={blogDisplayName()} />
               <Field fieldKey="instagramId" label="Instagram Business Account ID" placeholder="123456789012345" />
-              <Field fieldKey="instagramName" label={t("soc.accIgName")} placeholder="@sbcagora" />
+              <Field fieldKey="instagramName" label={t("soc.accIgName")} placeholder={handleFromHost(currentBlogHost()) || "@seuperfil"} />
             </div>
           )}
 

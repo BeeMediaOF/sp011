@@ -351,7 +351,9 @@ function socialOgPlugin(apiBase: string): Plugin {
         return;
       }
 
-      const host = req.headers.host ?? "sbcagora.com.br";
+      // Host da requisição — sem reserva embutida: um domínio fixo aqui seria o
+      // de outro blog no canonical/OG da página servida por este.
+      const host = req.headers.host ?? "";
       const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
       const artSlug = article.slug ?? article.id ?? slug;
       const canonicalUrl = `${proto}://${host}/artigo/${artSlug}`;

@@ -8,6 +8,7 @@ import {
 import AdminLayout from "@/components/admin/AdminLayout";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { listHtmlImages, replaceHtmlImageSrc, PLACEHOLDER_SRC } from "../../lib/emailImages";
+import { blogDisplayName, blogTeamName } from "../../lib/blogIdentity";
 import {
   adminApi,
   type NewsletterSettings, type NewsletterCampaign, type NewsletterCampaignStatus,
@@ -201,7 +202,7 @@ function ShellFields({ value, title, onChange, onError }: {
         <ColorField label="Fundo da página" value={value.pageBgColor ?? ""} fallback="#F0F4F8" onChange={(v) => set("pageBgColor", v)} />
         <ColorField label="Cor do texto do corpo" value={value.bodyTextColor ?? ""} fallback="#1A202C" onChange={(v) => set("bodyTextColor", v)} />
         <Field label="Texto do cabeçalho (opcional)" hint="Vazio = nome do remetente."><input className={inputCls} value={value.headerText ?? ""} onChange={(e) => set("headerText", e.target.value)} /></Field>
-        <Field label="Assinatura (opcional)"><input className={inputCls} value={value.signature ?? ""} onChange={(e) => set("signature", e.target.value)} placeholder="Equipe SP011" /></Field>
+        <Field label="Assinatura (opcional)"><input className={inputCls} value={value.signature ?? ""} onChange={(e) => set("signature", e.target.value)} placeholder={blogTeamName()} /></Field>
         <div className="sm:col-span-2">
           <Field label="Texto do rodapé (opcional)"><textarea className={`${inputCls} min-h-[70px] resize-y`} value={value.footerText ?? ""} onChange={(e) => set("footerText", e.target.value)} placeholder="Endereço, CNPJ ou aviso legal…" /></Field>
         </div>
@@ -794,7 +795,7 @@ function ConfigTab() {
           Use uma <strong>senha de app</strong> do Gmail (não a senha da conta). A senha fica criptografada no banco e nunca é exibida.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Nome do remetente"><input className={inputCls} value={form.newsletterFromName} onChange={(e) => set("newsletterFromName", e.target.value)} placeholder="Ex.: SP011 Notícias" /></Field>
+          <Field label="Nome do remetente"><input className={inputCls} value={form.newsletterFromName} onChange={(e) => set("newsletterFromName", e.target.value)} placeholder={`Ex.: ${blogDisplayName()} Notícias`} /></Field>
           <Field label="E-mail do remetente"><input className={inputCls} type="email" value={form.newsletterFromEmail} onChange={(e) => set("newsletterFromEmail", e.target.value)} placeholder="voce@gmail.com" /></Field>
           <Field label="Usuário SMTP" hint="Normalmente o próprio e-mail do Gmail."><input className={inputCls} value={form.newsletterSmtpUser} onChange={(e) => set("newsletterSmtpUser", e.target.value)} placeholder="voce@gmail.com" /></Field>
           <Field label="Senha de app" hint={form.hasNewsletterSmtpPass ? "Já configurada. Deixe como está para manter." : "16 caracteres gerados no Gmail."}>

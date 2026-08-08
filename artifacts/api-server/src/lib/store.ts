@@ -7,7 +7,6 @@
  */
 
 import { createHash, randomUUID } from "crypto";
-import { BRAND } from "./brand.js";
 import type { PaidCampaign } from "./analyticsShared.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -459,8 +458,11 @@ const DEFAULT_HOME_BLOCKS: HomeBlock[] = [
   { id: "ultimas",    name: "Últimas Notícias",    visible: true, order: 10 },
 ];
 
+// Nome/tagline nascem VAZIOS: a imagem é a mesma nos N blogs, e um nome embutido
+// aqui é a marca de outro portal aparecendo no cabeçalho, no <title> e no
+// sitemap de um blog que ainda não se configurou.
 const DEFAULT_SETTINGS: SiteSettings = {
-  siteName: BRAND.name, tagline: BRAND.tagline,
+  siteName: "", tagline: "",
   logoSize: 101, mobileEnabled: true, desktopEnabled: true,
   showTickerBar: true, showHeroStrip: true, homeBlocks: DEFAULT_HOME_BLOCKS,
 };
@@ -487,11 +489,15 @@ const DEFAULT_COLUMNISTS: Columnist[] = [
   { id: "c6", name: "Marcos Vinicius Costa", specialty: "Social", bio: "Assistente social e colunista. Escreve sobre desigualdade e políticas públicas.", avatarBase64: "", active: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
 ];
 
+// Contato NASCE VAZIO. A mesma imagem serve os N blogs da rede: qualquer valor
+// aqui é o contato de outro portal publicado na página de Contato, nos Termos e
+// na Política de Privacidade de um blog que nunca o configurou. O site omite os
+// campos vazios em vez de inventar um endereço.
 const DEFAULT_CONTACT: ContactInfo = {
-  supportEmail: "suporte@beemedia.ai", displayEmail: "redacao@brasiliaagora.com.br",
-  phone: "(61) 99888-0000", whatsapp: "(61) 99888-0000",
+  supportEmail: "", displayEmail: "",
+  phone: "", whatsapp: "",
   facebook: "", instagram: "", x: "", youtube: "", tiktok: "",
-  address: "Brasília, Distrito Federal", cnpj: "", legalInfo: "", privacyPolicy: "", termsOfUse: "",
+  address: "", cnpj: "", legalInfo: "", privacyPolicy: "", termsOfUse: "",
   privacyEmail: "",
 };
 

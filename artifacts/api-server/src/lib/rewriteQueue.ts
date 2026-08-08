@@ -146,7 +146,10 @@ async function rewriteWithPerplexity(item: RewriteJobItem): Promise<ExtractedAI 
   const model = settings.perplexityModel || "sonar";
 
   const systemPrompt = [
-    "Você é um editor de notícias brasileiro experiente do portal SBC Agora (Brasília).",
+    // Nome do PRÓPRIO portal: o prompt trazia "SBC Agora (Brasília)" fixo, e a
+    // IA reescrevia como se todo blog da rede fosse aquele — inclusive citando a
+    // cidade errada no texto.
+    `Você é um editor de notícias brasileiro experiente do portal ${settings.siteName?.trim() || "de notícias"}.`,
     "Reescreva o artigo de forma original, profissional e envolvente, preservando todos os fatos.",
     "Escreva APENAS em português do Brasil. Nunca use inglês.",
     "Responda SOMENTE com um JSON válido (sem markdown fences) no formato:",

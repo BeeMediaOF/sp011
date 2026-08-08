@@ -124,7 +124,9 @@ const DOMAIN_HEADERS: Record<string, Record<string, string>> = {
 };
 
 const DEFAULT_FETCH_HEADERS: Record<string, string> = {
-  "User-Agent": "Mozilla/5.0 (compatible; SBCAgora/2.0; +https://sbcagora.com.br)",
+  // Neutro: a MESMA imagem serve os N blogs, entao um UA com nome/dominio de
+  // um portal especifico se apresenta como o blog errado em todo host de fora.
+  "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/2.0)",
   "Accept":     "image/*,*/*;q=0.8",
 };
 

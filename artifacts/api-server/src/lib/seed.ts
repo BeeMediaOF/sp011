@@ -11,7 +11,9 @@ export async function seedAdminUser(): Promise<void> {
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(usersTable);
     if (count > 0) return;
 
-    const email = (process.env["ADMIN_DEFAULT_EMAIL"] ?? "admin@sbcagora.com.br").toLowerCase();
+    // Sem ADMIN_DEFAULT_EMAIL, um endereco neutro: o padrao antigo era o dominio
+    // de outro portal da rede virando o login do primeiro admin de todo blog novo.
+    const email = (process.env["ADMIN_DEFAULT_EMAIL"] ?? "admin@localhost").toLowerCase();
     let password = process.env["ADMIN_DEFAULT_PASSWORD"];
     let generated = false;
 

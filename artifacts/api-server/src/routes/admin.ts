@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BRAND } from "../lib/brand.js";
+import { adminIssuer, defaultAuthor } from "../lib/brand.js";
 import { eq, like, sql } from "drizzle-orm";
 import { writeFileSync } from "fs";
 import { resolve } from "path";
@@ -146,7 +146,7 @@ router.post("/2fa/setup", authMiddleware, async (req, res) => {
       .from(usersTable).where(eq(usersTable.id, req.userId)).limit(1);
     if (!user) { res.status(404).json({ error: "Usuário não encontrado" }); return; }
     const secret = otpGenerateSecret();
-    const otpauth = otpGenerateURI({ label: user.email, issuer: BRAND.adminIssuer, secret });
+    const otpauth = otpGenerateURI({ label: user.email, issuer: adminIssuer(), secret });
     const qrDataUrl = await QRCode.toDataURL(otpauth);
     // Store secret temporarily (user must verify before it's persisted)
     // PRD-01b/F16: grava o segredo TOTP CIFRADO (o `secret` em claro segue só
@@ -343,7 +343,7 @@ router.post("/articles", requirePermission("articles.create"), async (req, res) 
     category: category ?? "geral",
     tag: tag ?? "GERAL",
     imageUrl: imageUrl ?? "",
-    author: author ?? BRAND.author,
+    author: author ?? defaultAuthor(),
     publishedAt: new Date().toISOString(),
     status: (status === "published" ? "published" : "draft"),
     imageCredit: imageCredit || undefined,
@@ -1207,7 +1207,7 @@ async function scrapeYouTube(url: string): Promise<{ title: string; text: string
           allowHttp: false,
           timeoutMs: 12_000,
           maxBytes: 5 * 1024 * 1024,
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/1.0)" },
         });
         if (pageRes.status >= 200 && pageRes.status < 300) {
           const html = pageRes.body.toString("utf8");
@@ -1306,7 +1306,7 @@ router.post("/article-from-url",
             allowHttp: false,
             timeoutMs: 10_000,
             maxBytes: 5 * 1024 * 1024,
-            headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0)" },
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/1.0)" },
           });
           if (pageRes.status >= 200 && pageRes.status < 300) {
             const html = pageRes.body.toString("utf8");

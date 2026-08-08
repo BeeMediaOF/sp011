@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BRAND } from "../../brand";
+import { blogDisplayName } from "../../lib/blogIdentity";
 import AdminLayout from "../../components/admin/AdminLayout";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, Tooltip,
@@ -319,7 +319,7 @@ export default function Analytics() {
     ${(stats.topCities ?? []).map(c => `<tr><td>${c.name}</td><td>${c.views.toLocaleString(nloc)}</td></tr>`).join("")}
   </table>` : ""}
 
-  <div class="footer">${BRAND.name} · ${t("an.pdfFooter")}</div>
+  <div class="footer">${blogDisplayName()} · ${t("an.pdfFooter")}</div>
 </body>
 </html>`);
     win.document.close();

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { BRAND } from "../lib/brand.js";
+import { defaultAuthor } from "../lib/brand.js";
 import { publishAuth } from "../middlewares/auth.js";
 import { articleService } from "../lib/articleService.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
@@ -64,7 +64,7 @@ function deriveTitle(subtitle?: string, content?: string): string {
  *   category    string  optional  default: "geral"
  *   tag         string  optional  default: "GERAL"
  *   imageUrl    string  optional
- *   author      string  optional  default: BRAND.author
+ *   author      string  optional  default: assinatura do portal (settings.bylineName / "Redação <blog>")
  *   id          string  optional  if provided without title, publishes an existing draft
  */
 router.post("/", publishRateLimit, publishAuth, async (req, res) => {
@@ -153,7 +153,7 @@ router.post("/", publishRateLimit, publishAuth, async (req, res) => {
     category: category?.trim() ?? "geral",
     tag: tag?.trim() ?? "GERAL",
     imageUrl: imageUrl?.trim() ?? "",
-    author: author?.trim() ?? BRAND.author,
+    author: author?.trim() ?? defaultAuthor(),
     publishedAt: new Date().toISOString(),
     status: "published",
   });

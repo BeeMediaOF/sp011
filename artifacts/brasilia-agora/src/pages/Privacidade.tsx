@@ -102,7 +102,7 @@ const SECTIONS: Section[] = [
     • <strong>Eliminação</strong> — solicitar a exclusão dos dados tratados com base no consentimento.<br/>
     • <strong>Informação</strong> — conhecer com quais entidades compartilhamos seus dados.<br/>
     • <strong>Revogação do consentimento</strong> — retirar o consentimento a qualquer momento, sem prejuízo às operações anteriores.<br/><br/>
-    Para exercer qualquer desses direitos, entre em contato pelo e-mail <strong>privacidade@brasiliaagora.com.br</strong>. Responderemos em até <strong>15 dias úteis</strong>.`,
+    Para exercer qualquer desses direitos, entre em contato {{CONTACT_WAY}}. Responderemos em até <strong>15 dias úteis</strong>.`,
   },
   {
     id: "retencao",
@@ -143,8 +143,7 @@ const SECTIONS: Section[] = [
     title: "11. Encarregado pelo tratamento de dados (DPO)",
     content: `{{SITE}} designou um Encarregado pelo Tratamento de Dados (Data Protection Officer) para atender às solicitações dos titulares e comunicar-se com a Autoridade Nacional de Proteção de Dados (ANPD).<br/><br/>
     <strong>Contato do DPO:</strong><br/>
-    • E-mail: <strong>privacidade@brasiliaagora.com.br</strong><br/>
-    • Endereço: Brasília, Distrito Federal, Brasil<br/><br/>
+    {{DPO_CONTACT}}<br/><br/>
     Você também pode encaminhar reclamações diretamente à <strong>Autoridade Nacional de Proteção de Dados (ANPD)</strong> pelo portal <a href="https://www.gov.br/anpd" target="_blank" rel="noopener noreferrer" class="text-[#0B2A66] underline hover:text-[#c8102e]">www.gov.br/anpd</a>.`,
   },
 ];
@@ -279,12 +278,36 @@ export default function Privacidade() {
   // Nome real do blog nos textos padrão (token {{SITE}}); fallback NEUTRO — nunca a
   // marca embutida "SBC Agora" — enquanto /api/site não responde.
   const siteName = settings?.siteName || (en ? "This website" : "Este portal");
+  /* Canal de privacidade DESTE blog (painel → Contato). O texto padrão trazia o
+     e-mail e o endereço de outro portal fixos no código — numa rede de blogs
+     independentes isso manda o titular de dados para a caixa de entrada errada.
+     Sem nada configurado, a política remete ao formulário de contato. */
+  const contact = settings?.contact;
+  const privacyEmail = contact?.privacyEmail?.trim() || contact?.displayEmail?.trim() || "";
+  const contactAddress = contact?.address?.trim() || "";
+  const formLink = `<a href="/contato" class="text-[#0B2A66] underline hover:text-[#c8102e]">${en ? "contact form" : "formulário de contato"}</a>`;
+  const contactWay = privacyEmail
+    ? `${en ? "by e-mail at" : "pelo e-mail"} <strong>${privacyEmail}</strong>`
+    : `${en ? "through our" : "pelo nosso"} ${formLink}`;
+  const dpoContact = [
+    privacyEmail ? `• ${en ? "E-mail" : "E-mail"}: <strong>${privacyEmail}</strong>` : `• ${en ? "Contact" : "Contato"}: ${formLink}`,
+    contactAddress ? `• ${en ? "Address" : "Endereço"}: ${contactAddress}` : "",
+  ].filter(Boolean).join("<br/>");
+  const TOKENS: Record<string, string> = {
+    "{{SITE}}": siteName,
+    "{{CONTACT_WAY}}": contactWay,
+    "{{DPO_CONTACT}}": dpoContact,
+  };
   const rawSections: Section[] = customPolicy
     ? [{ id: "policy", title: en ? "Privacy Policy" : "Política de Privacidade", icon: Shield, color: "#0B2A66", content: sanitizeArticleHtml(customPolicy) }]
     : (en ? SECTIONS_EN : SECTIONS);
-  const sections: Section[] = rawSections.map((s) =>
-    s.content.indexOf("{{SITE}}") === -1 ? s : { ...s, content: s.content.replace(/\{\{SITE\}\}/g, siteName) },
-  );
+  const sections: Section[] = rawSections.map((s) => {
+    let content = s.content;
+    for (const [token, value] of Object.entries(TOKENS)) {
+      if (content.indexOf(token) !== -1) content = content.split(token).join(value);
+    }
+    return content === s.content ? s : { ...s, content };
+  });
   const summary = customPolicy ? [] : (en ? SUMMARY_EN : SUMMARY_PT);
   return (
     <div className="min-h-screen w-full bg-[#f8fafc] flex flex-col">

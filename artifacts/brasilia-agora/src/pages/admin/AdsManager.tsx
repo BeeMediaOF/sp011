@@ -10,6 +10,7 @@ import {
   Plus, Trash2, Pencil, Search, Megaphone,
   MousePointer, Sparkles, ImageIcon, X, Upload,
   ChevronLeft, ChevronRight, Info, BarChart2, Code, LayoutGrid,
+  Monitor, Smartphone,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -38,6 +39,52 @@ function blockLocation(b: HomeBlock): string {
     : b.width === "half" ? "Home · meia largura"
     : b.width === "quarter" ? "Home · 1/4 de largura"
     : "Home · largura total";
+}
+
+// ─── Telas em que a propaganda aparece ────────────────────────────────────────
+type BlockDevices = NonNullable<HomeBlock["devices"]>;
+
+const DEVICE_CHOICES: { id: BlockDevices; label: string; icon: typeof Monitor }[] = [
+  { id: "all",     label: "Tudo",       icon: LayoutGrid },
+  { id: "desktop", label: "Só desktop", icon: Monitor },
+  { id: "mobile",  label: "Só mobile",  icon: Smartphone },
+];
+
+/** Sufixo da coluna "Local" quando a propaganda é exclusiva de uma tela. */
+function deviceSuffix(devices?: BlockDevices): string {
+  return devices === "mobile" ? " · só mobile" : devices === "desktop" ? " · só desktop" : "";
+}
+
+/** Idem para as propagandas clássicas por slot, que guardam uma LISTA de telas. */
+function adDeviceSuffix(list?: readonly string[]): string {
+  if (!list || list.length === 0 || list.length >= 3) return "";
+  return " · só " + list.join("/");
+}
+
+/** Seletor de telas — mesmo trio do editor de Blocos da Home. */
+function DevicePicker({ value, onChange }: { value: BlockDevices; onChange: (v: BlockDevices) => void }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs font-semibold text-[#0F172A]">Aparece em</label>
+      <div className="grid grid-cols-3 gap-2">
+        {DEVICE_CHOICES.map(({ id, label, icon: Icon }) => {
+          const active = value === id;
+          return (
+            <button key={id} type="button" onClick={() => onChange(id)}
+              className={`flex flex-col items-center gap-1.5 py-2.5 border-2 rounded-xl transition-colors select-none ${
+                active ? "border-[#0B2A66] bg-blue-50" : "border-gray-200 hover:border-gray-300"}`}>
+              <Icon size={16} className={active ? "text-[#0B2A66]" : "text-gray-400"} />
+              <span className={`text-[11px] font-semibold ${active ? "text-[#0B2A66]" : "text-gray-500"}`}>{label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[10px] text-gray-400 leading-relaxed">
+        O corte é 1024px, o mesmo do menu. Para artes diferentes em cada tela, crie duas propagandas
+        na mesma posição e marque uma de cada.
+      </p>
+    </div>
+  );
 }
 
 const CARD_SHADOW = "0 8px 24px rgba(15,23,42,0.06)";
@@ -445,6 +492,7 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
   const [imageUrl, setImageUrl] = useState(block?.imageUrl ?? "");
   const [linkUrl, setLinkUrl]   = useState(isHeader ? headerLink : (block?.linkUrl ?? ""));
   const [caption, setCaption]   = useState(block?.caption ?? "");
+  const [devices, setDevices]   = useState<BlockDevices>(block?.devices ?? "all");
   const [visible, setVisible]   = useState(block?.visible ?? true);
   const [saving, setSaving]     = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -473,12 +521,14 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
       } else if (type === "image") {
         await onSaveBlock({
           ...block!, name: name.trim() || block!.name, visible,
+          devices: devices !== "all" ? devices : undefined,
           imageUrl: imageUrl.trim() || undefined, linkUrl: linkUrl.trim() || undefined,
           caption: caption.trim() || undefined,
         });
       } else {
         await onSaveBlock({
           ...block!, name: name.trim() || block!.name, visible,
+          devices: devices !== "all" ? devices : undefined,
           html: html.trim() || undefined, linkUrl: linkUrl.trim() || undefined,
         });
       }
@@ -575,6 +625,8 @@ function HomeAdEditModal({ block, headerHtml, headerLink, onClose, onSaveBlock, 
             </div>
           )}
 
+          {!isHeader && <DevicePicker value={devices} onChange={setDevices} />}
+
           {!isHeader && (
             <div className="flex items-center justify-between py-3 border-t border-gray-100">
               <div>
@@ -620,6 +672,7 @@ function AdCreateModal({ onClose, onCreate }: {
   const [caption, setCaption] = useState("");
   const [html, setHtml]       = useState("");
   const [linkUrl, setLinkUrl] = useState("");
+  const [devices, setDevices] = useState<BlockDevices>("all");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver]   = useState(false);
   const [saving, setSaving]   = useState(false);
@@ -650,6 +703,7 @@ function AdCreateModal({ onClose, onCreate }: {
       const common = {
         name: name.trim(), visible: true, order: 0, custom: true, isAd: true,
         linkUrl: linkUrl.trim() || undefined,
+        devices: devices !== "all" ? devices : undefined,
       };
       const block: HomeBlock = type === "image"
         ? { ...common, id: `image-${Date.now()}`, blockType: "image", format: "full_width_image",
@@ -790,6 +844,8 @@ function AdCreateModal({ onClose, onCreate }: {
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} type="url" placeholder="https://parceiro.com/promo"
               className={INPUT_CLS} />
           </div>
+
+          <DevicePicker value={devices} onChange={setDevices} />
 
           <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-blue-50 border border-blue-100">
             <Info size={13} className="text-blue-500 shrink-0 mt-0.5" />
@@ -1061,7 +1117,7 @@ export default function AdsManager() {
         key: `home-${b.id}`, name: b.name,
         thumbImage: type === "image" ? b.imageUrl : undefined,
         thumbHtml: type === "image" ? undefined : b.html,
-        location: blockLocation(b), typeLabel: type === "image" ? "Imagem" : "HTML",
+        location: blockLocation(b) + deviceSuffix(b.devices), typeLabel: type === "image" ? "Imagem" : "HTML",
         active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
         onEdit: () => setAdEdit({ scope: "home", block: b }),
         onToggle: () => { void setBlockVisible("home", b, b.visible === false); },
@@ -1075,7 +1131,7 @@ export default function AdsManager() {
         key: `art-${b.id}`, name: b.name,
         thumbImage: type === "image" ? b.imageUrl : undefined,
         thumbHtml: type === "image" ? undefined : b.html,
-        location: "Lateral da notícia", typeLabel: type === "image" ? "Imagem" : "HTML",
+        location: "Lateral da notícia" + deviceSuffix(b.devices), typeLabel: type === "image" ? "Imagem" : "HTML",
         active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
         onEdit: () => setAdEdit({ scope: "article", block: b }),
         onToggle: () => { void setBlockVisible("article", b, b.visible === false); },
@@ -1085,7 +1141,7 @@ export default function AdsManager() {
     for (const ad of ads) {
       list.push({
         key: `ad-${ad.id}`, name: ad.name, thumbBase64: ad.imageBase64 || undefined,
-        location: POSITION_LABELS[ad.position] ?? ad.position, typeLabel: "Imagem",
+        location: (POSITION_LABELS[ad.position] ?? ad.position) + adDeviceSuffix(ad.targetDevices), typeLabel: "Imagem",
         active: ad.active, impressions: ad.impressions ?? 0, clicks: ad.clicks ?? 0,
         onEdit: () => openEdit(ad),
         onToggle: () => { void toggleActive(ad); },

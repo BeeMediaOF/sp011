@@ -70,7 +70,7 @@ export function registerRewriteQueue(fn: (item: RewriteJobItem) => void): void {
 
 export const rssParser = new Parser({
   timeout: 10_000,
-  headers: { "User-Agent": "SBC-Agora-RSS-Bot/1.0" },
+  headers: { "User-Agent": "NewsPortal-RSS-Bot/1.0" },
   customFields: {
     item: [
       ["media:content",   "media:content",   { keepArray: false }],
@@ -810,7 +810,7 @@ export async function scrapeArticle(url: string): Promise<{ text: string; imageU
       allowHttp: false,
       timeoutMs: 12_000,
       maxBytes: 5 * 1024 * 1024,
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/1.0)" },
     });
     if (res.status < 200 || res.status >= 300) return { text: "", imageUrl: "", description: "" };
     const html = res.body.toString("utf8");
@@ -1044,7 +1044,7 @@ export function sourceFetchLimit(src: RssSource): number {
 /** Scrape a news site homepage, extract article links and their content */
 async function scrapeNewsHomepage(src: RssSource): Promise<FetchedArticle[]> {
   const res = await fetch(src.url, {
-    headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/1.0)" },
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} ao acessar ${src.url}`);
@@ -1097,7 +1097,7 @@ async function scrapeNewsHomepage(src: RssSource): Promise<FetchedArticle[]> {
   await Promise.allSettled(toScrape.map(async (link) => {
     try {
       const artRes = await fetch(link, {
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; SBC-Agora/1.0; +https://sbcagora.com.br)" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; NewsPortalBot/1.0)" },
         signal: AbortSignal.timeout(12_000),
       });
       if (!artRes.ok) return;

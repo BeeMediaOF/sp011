@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useContext, useLayoutEffect, Suspense, createContext } from "react";
-import { BRAND } from "../../brand";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard, FileText, Menu, Settings, LogOut,
@@ -50,6 +49,7 @@ const LS_ACCENT  = "admin_accent_color";
 // marca padrão embutida (evita o flash de logo de outro blog no 1º acesso);
 // string = logo real deste blog vindo de /api/site.
 let _cachedLogo: string | null = null;
+let _cachedName = "";
 let _fetchPromise: Promise<void> | null = null;
 
 function usePanelTheme() {
@@ -60,25 +60,31 @@ function usePanelTheme() {
     try { return localStorage.getItem(LS_ACCENT) || "#94a3b8"; } catch { return "#94a3b8"; }
   });
   const [logo, setLogo] = useState<string | null>(_cachedLogo);
+  // Nome do PRÓPRIO blog (alt da logo). Vazio até /api/site responder — o alt
+  // nunca pode anunciar a marca de outro portal da rede a um leitor de tela.
+  const [siteName, setSiteName] = useState(_cachedName);
 
   useEffect(() => {
     if (!_fetchPromise) {
       _fetchPromise = fetch("/api/site")
         .then((r) => r.json())
-        .then((data: { adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
+        .then((data: { siteName?: string; adminLogoBase64?: string; logoBase64?: string; adminSidebarColor?: string; adminAccentColor?: string }) => {
           const ac = data.adminAccentColor || "#E71D36";
           _cachedLogo = data.adminLogoBase64 || data.logoBase64 || null;
+          _cachedName = (data.siteName ?? "").trim();
           saveAdminThemeToStorage(data.adminSidebarColor || "#0B2A66", ac);
           setAccent(ac);
           setLogo(_cachedLogo);
+          setSiteName(_cachedName);
         })
         .catch(() => { _fetchPromise = null; });
     } else {
       if (_cachedLogo) setLogo(_cachedLogo);
+      if (_cachedName) setSiteName(_cachedName);
     }
   }, []);
 
-  return { accent, logo };
+  return { accent, logo, siteName };
 }
 
 function formatDate(lang: "pt-BR" | "en") {
@@ -416,7 +422,7 @@ function UserMenu({ onLogout, isDark, onToggleDark }: { onLogout: () => void; is
 function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNode; title: string; topbarExtra?: React.ReactNode }) {
   const [isDark, setIsDark] = useState(() => getAdminDarkMode());
   const [location, navigate] = useLocation();
-  const { accent, logo } = usePanelTheme();
+  const { accent, logo, siteName } = usePanelTheme();
   const user = getStoredUser();
   const role = user?.role || getStoredRole() || "editor";
 
@@ -480,7 +486,7 @@ function AdminChrome({ children, title, topbarExtra }: { children: React.ReactNo
             NUNCA renderiza a marca padrão embutida (evita o flash de logo antigo). */}
         <div className="px-5 py-5 border-b border-slate-100 dark:border-slate-700">
           {logo ? (
-            <img src={logo} alt={BRAND.name} className="h-9 w-auto object-contain" />
+            <img src={logo} alt={siteName} className="h-9 w-auto object-contain" />
           ) : (
             <div className="h-9" aria-hidden="true" />
           )}

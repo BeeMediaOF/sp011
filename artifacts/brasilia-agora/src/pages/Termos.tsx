@@ -12,6 +12,10 @@ export default function Termos() {
   // vazio; ao carregar, exibe o nome real do blog. Corrige o vazamento persistente
   // de "SBC Agora" no corpo pt-BR (que antes usava BRAND.name direto).
   const siteName = settings?.siteName ?? "";
+  // E-mail de contato DESTE blog (painel → Contato). O texto padrão trazia o
+  // endereço de outro portal fixo no código; sem endereço configurado, a frase
+  // simplesmente não cita e-mail nenhum e remete ao formulário.
+  const contactEmail = settings?.contact?.displayEmail?.trim() ?? "";
 
   // Termos próprios do blog definidos no painel → substituem o texto padrão.
   const customTerms = settings?.contact?.termsOfUse?.trim();
@@ -166,11 +170,15 @@ export default function Termos() {
             <h2 className="text-xl font-bold text-[#1a2448] mt-8">6. Contato</h2>
             <p>
               Para esclarecimentos sobre estes termos, entre em contato pelo nosso{" "}
-              <a href="/contato" className="text-[#1d4ed8] hover:underline">formulário de contato</a>{" "}
-              ou pelo e-mail{" "}
-              <a href="mailto:redacao@brasiliaagora.com.br" className="text-[#1d4ed8] hover:underline">
-                redacao@brasiliaagora.com.br
-              </a>.
+              <a href="/contato" className="text-[#1d4ed8] hover:underline">formulário de contato</a>
+              {contactEmail ? (
+                <>
+                  {" "}ou pelo e-mail{" "}
+                  <a href={`mailto:${contactEmail}`} className="text-[#1d4ed8] hover:underline">
+                    {contactEmail}
+                  </a>
+                </>
+              ) : null}.
             </p>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BRAND } from "../../brand";
+import { blogNewsroomName } from "../../lib/blogIdentity";
 import AdminLayout from "../../components/admin/AdminLayout";
 import { Copy, CheckCheck, RefreshCw, Eye, EyeOff, Key, AlertTriangle } from "lucide-react";
 import { adminApi } from "../../lib/adminApi";
@@ -88,7 +88,7 @@ export default function Webhook() {
     "category": "politica",
     "tag": "POLÍTICA",
     "imageUrl": "https://exemplo.com/imagem.jpg",
-    "author": "${BRAND.author}"
+    "author": "${blogNewsroomName()}"
   }'`;
 
   const curlPublishId = `curl -X POST "${publishUrl}/<id-do-artigo>" \\

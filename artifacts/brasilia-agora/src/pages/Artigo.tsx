@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { BRAND } from "../brand";
+import { brandNameFromHost } from "../lib/blogIdentity";
 import { pageOrigin } from "@/lib/pageOrigin";
 import { buildSrcSet, HERO_WIDTHS, siteAssetUrl, siteAssetSrcSet } from "@/lib/newsImage";
 import { useParams, Link } from "wouter";
@@ -15,7 +15,7 @@ import { useT, formatDateTime } from "../lib/i18n";
 import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
 import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
-import { HtmlBlock, ImageBlock, BlockFontScope } from "../components/blocks/HomeCustomBlocks";
+import { HtmlBlock, ImageBlock, BlockFontScope, deviceBoxClass } from "../components/blocks/HomeCustomBlocks";
 import { inferBlockType, type HomeBlock } from "../lib/homeBlocks";
 import type { AdSlotKey } from "../components/ads/useAds";
 
@@ -90,7 +90,7 @@ function ArticleSidebar() {
         else if (type === "html") content = <HtmlBlock block={b} contained={false} />;
         if (!content) return null;
         return (
-          <div key={b.id}>
+          <div key={b.id} className={deviceBoxClass(b.devices)}>
             <BlockFontScope fontId={b.fontFamily}>{content}</BlockFontScope>
           </div>
         );
@@ -123,9 +123,11 @@ export default function Artigo() {
   const { article, loading } = useArticle(slug ?? "");
   const { settings } = useSite();
   /* Identidade DESTE blog para título/OG/JSON-LD. A imagem Docker é a mesma nos 8
-     blogs (CLAUDE.md §13), então a constante BRAND só serve de reserva enquanto o
-     /api/site não respondeu — mesmo padrão do SEOHead. */
-  const siteName = settings?.siteName || BRAND.name;
+     blogs (CLAUDE.md §13): a reserva, enquanto /api/site não responde, sai do
+     domínio da própria página — nunca de uma marca embutida, que seria o nome de
+     outro portal. Vem do origin (e não de window.location) porque esta página
+     também é servida pelo SSR: assim os dois lados chegam ao mesmo texto. */
+  const siteName = settings?.siteName || brandNameFromHost(pageOrigin());
   /* Mesma cascata do byline dos cards (NewsCard/HeroSection/SectionBlockFeatured). */
   const bylineAvatar =
     settings?.bylineLogoBase64 || settings?.logoBase64 || settings?.faviconBase64 || "/favicon.jpg";
@@ -263,7 +265,7 @@ export default function Artigo() {
       hreflangLinks.forEach((el) => el.parentNode?.removeChild(el));
     };
   // siteName nas deps: o /api/site costuma responder DEPOIS do artigo, e sem ele
-  // o título ficaria congelado no fallback BRAND até a próxima navegação.
+  // o título ficaria congelado no nome derivado do domínio até a próxima navegação.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [article?.id, lang, siteName]);
 

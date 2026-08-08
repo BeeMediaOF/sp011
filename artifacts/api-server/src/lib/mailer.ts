@@ -11,18 +11,18 @@
  *   SMTP_PORT   — SMTP port: 587 = STARTTLS, 465 = SSL, 25 = plain
  *   SMTP_USER   — SMTP username / email address
  *   SMTP_PASS   — SMTP password or app password
- *   SMTP_FROM   — Sender address (e.g. "SBC Agora <no-reply@brasiliaagora.com.br>")
+ *   SMTP_FROM   — Sender address (e.g. "Meu Portal <no-reply@meuportal.com.br>")
  *
  * Gmail example:
  *   SMTP_HOST=smtp.gmail.com  SMTP_PORT=587
  *   SMTP_USER=seu@gmail.com   SMTP_PASS=<app-password-16-chars>
- *   SMTP_FROM="SBC Agora <seu@gmail.com>"
+ *   SMTP_FROM="Meu Portal <seu@gmail.com>"
  */
 
 import net from "node:net";
 import tls from "node:tls";
 import { randomUUID } from "node:crypto";
-import { BRAND } from "./brand.js";
+import { siteName } from "./brand.js";
 
 type SocketLike = net.Socket | tls.TLSSocket;
 
@@ -253,13 +253,13 @@ export async function sendEmail(config: SmtpConfig, msg: SendMessage): Promise<v
   });
 }
 
-function welcomeEmailHtml(name: string, email: string, tempPassword: string, portalUrl: string): string {
+function welcomeEmailHtml(name: string, email: string, tempPassword: string, portalUrl: string, brand: string): string {
   return `<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bem-vindo ao ${BRAND.name}</title>
+  <title>Bem-vindo ao ${brand}</title>
 </head>
 <body style="margin:0;padding:0;background:#F0F4F8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F4F8;padding:40px 0;">
@@ -282,7 +282,7 @@ function welcomeEmailHtml(name: string, email: string, tempPassword: string, por
               <p style="margin:0 0 8px;color:#E71D36;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">Acesso ao Painel</p>
               <h1 style="margin:0 0 20px;color:#0B2A66;font-size:24px;font-weight:800;line-height:1.3;">Bem-vindo, ${name}!</h1>
               <p style="margin:0 0 24px;color:#4A5568;font-size:15px;line-height:1.6;">
-                Seu acesso ao painel administrativo do <strong>${BRAND.name}</strong> foi criado com sucesso.
+                Seu acesso ao painel administrativo do <strong>${brand}</strong> foi criado com sucesso.
                 Abaixo estão suas credenciais de acesso.
               </p>
 
@@ -336,7 +336,7 @@ function welcomeEmailHtml(name: string, email: string, tempPassword: string, por
           <tr>
             <td style="background:#F7F9FC;border-top:1px solid #E2E8F0;padding:24px 40px;text-align:center;">
               <p style="margin:0 0 8px;color:#A0AEC0;font-size:12px;">
-                Este e-mail foi enviado automaticamente pelo sistema do <strong style="color:#0B2A66;">${BRAND.name}</strong>.
+                Este e-mail foi enviado automaticamente pelo sistema do <strong style="color:#0B2A66;">${brand}</strong>.
               </p>
               <p style="margin:0;color:#A0AEC0;font-size:12px;">
                 Em caso de dúvidas, entre em contato com o administrador do portal.
@@ -362,8 +362,11 @@ export async function sendWelcomeEmail(to: string, name: string, tempPassword: s
   const port = parseInt(process.env["SMTP_PORT"] ?? "587", 10);
   const user = process.env["SMTP_USER"];
   const pass = process.env["SMTP_PASS"];
-  const from = process.env["SMTP_FROM"] ?? user ?? "no-reply@brasiliaagora.com.br";
-  const baseUrl = process.env["SITE_URL"] ?? "https://brasiliaagora.com.br";
+  // Sem SMTP_FROM, o remetente e a propria conta SMTP; sem SITE_URL, o link do
+  // painel fica relativo. Os antigos padroes eram o dominio de outro blog da
+  // rede: e-mail assinado pelo portal errado e link para um site que nao e este.
+  const baseUrl = (process.env["SITE_URL"] ?? "").replace(/\/+$/, "");
+  const brand = siteName("seu portal");
 
   if (!host || !user || !pass) {
     return {
@@ -371,15 +374,16 @@ export async function sendWelcomeEmail(to: string, name: string, tempPassword: s
       error: "SMTP não configurado (defina SMTP_HOST, SMTP_USER e SMTP_PASS nas variáveis de ambiente)",
     };
   }
+  const from = process.env["SMTP_FROM"] ?? user;
 
   try {
     await sendEmail(
       { host, port, user, pass, from },
       {
         to,
-        subject: `Bem-vindo ao ${BRAND.name} — Suas credenciais de acesso`,
-        html: welcomeEmailHtml(name, to, tempPassword, baseUrl),
-        text: `Bem-vindo ao ${BRAND.name}!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
+        subject: `Bem-vindo ao ${brand} — Suas credenciais de acesso`,
+        html: welcomeEmailHtml(name, to, tempPassword, baseUrl, brand),
+        text: `Bem-vindo ao ${brand}!\n\nSeu acesso foi criado.\n\nE-mail: ${to}\nSenha temporária: ${tempPassword}\n\nAcesse: ${baseUrl}/admin/login\n\nVocê será solicitado a alterar sua senha no primeiro login.`,
       },
     );
     return { sent: true };
