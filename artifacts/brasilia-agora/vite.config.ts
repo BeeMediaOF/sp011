@@ -1,11 +1,11 @@
 import { defineConfig, type Plugin } from "vite";
-import { BRAND } from "./src/brand";
 /* Os módulos abaixo são compartilhados com o app de propósito: o middleware de
    SSR precisa concordar com o App sobre o que é página de editoria e sobre a URL
    exata de cada lista — divergir aqui é renderizar no servidor uma página que o
    cliente hidrata diferente. São TS puro, sem React nem browser. */
 import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } from "./src/lib/categoryRoutes";
 import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
+import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -68,30 +68,31 @@ interface SiteMeta {
  * Identidade do site com cache (~5min). A imagem `blog-web` é COMPARTILHADA
  * entre os blogs — o index.html buildado traz a marca do blog que buildou.
  * Todo <head> servido a crawler precisa vir daqui (API do próprio blog), nunca
- * do template. Falha de API → última leitura boa, ou BRAND como último recurso.
+ * do template. Falha de API → última leitura boa; em último caso, o nome sai do
+ * HOST da requisição (nunca de uma marca embutida, que é a de outro portal).
  */
-function makeSiteMetaResolver(apiBase: string): () => Promise<SiteMeta> {
+function makeSiteMetaResolver(apiBase: string): (host?: string) => Promise<SiteMeta> {
   const TTL_MS = 5 * 60_000;
-  const FALLBACK: SiteMeta = {
+  const fallbackFor = (host?: string): SiteMeta => ({
     lang: "pt-BR",
-    siteName: BRAND.name,
-    tagline: BRAND.tagline,
-    seoDescription: BRAND.description,
+    siteName: brandNameFromHost(host ?? ""),
+    tagline: "",
+    seoDescription: "",
     ogImagePath: "/opengraph.jpg",
-  };
+  });
   let cached: { meta: SiteMeta; at: number } | null = null;
-  return async () => {
+  return async (host?: string) => {
     const now = Date.now();
     if (cached && now - cached.at < TTL_MS) return cached.meta;
     try {
       const r = await fetch(`${apiBase}/api/site`);
       const s = r.ok ? ((await r.json()) as Record<string, unknown>) : null;
       const meta = s ? metaFromSitePayload(s) : null;
-      if (!meta) return cached?.meta ?? FALLBACK;
+      if (!meta) return cached?.meta ?? fallbackFor(host);
       cached = { meta, at: now };
       return meta;
     } catch {
-      return cached?.meta ?? FALLBACK;
+      return cached?.meta ?? fallbackFor(host);
     }
   };
 }
@@ -358,7 +359,7 @@ function socialOgPlugin(apiBase: string): Plugin {
       const artSlug = article.slug ?? article.id ?? slug;
       const canonicalUrl = `${proto}://${host}/artigo/${artSlug}`;
 
-      const meta = await resolveSiteMeta();
+      const meta = await resolveSiteMeta(host);
       const lang = meta.lang;
       const rawTitle = stripHtml(article.title);
       const rawSubtitle = stripHtml(article.subtitle ?? "");
@@ -776,7 +777,7 @@ function ssrPlugin(apiBase: string): Plugin {
       return;
     }
     const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
-    const host = req.headers.host ?? BRAND.domain;
+    const host = req.headers.host ?? "";
     // O host entra na chave: og:url e canonical são absolutos, e um blog
     // alcançável por dois nomes não pode receber o HTML do outro.
     const cacheKey = `${host}|${route.key}`;
@@ -843,9 +844,9 @@ function spaHeadPlugin(apiBase: string): Plugin {
     }
     try {
       if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
-      const meta = await resolveSiteMeta();
       const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
-      const host = req.headers.host ?? BRAND.domain;
+      const host = req.headers.host ?? "";
+      const meta = await resolveSiteMeta(host);
       const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
       sendHtml(res, html, "no-cache, must-revalidate");
     } catch {
@@ -1020,7 +1021,7 @@ function seoTextPlugin(apiBase: string): Plugin {
     }
     try {
       const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
-      const host = req.headers.host ?? BRAND.domain;
+      const host = req.headers.host ?? "";
       const origin = `${proto}://${host}`;
       const key = `${host}|${pathOnly}`;
       const now = Date.now();
