@@ -8,6 +8,7 @@ import OverflowNav from "./OverflowNav";
 import { useT } from "../lib/i18n";
 import { trackSearch } from "../hooks/useAnalytics";
 import { sanitizeArticleHtml } from "../lib/sanitize";
+import { isDarkBg, inkOn } from "@/lib/colorContrast";
 import { safeLinkUrl } from "../lib/homeBlocks";
 import { useAdImpression, trackClick } from "./ads/useAds";
 import PushSubscribeButton from "./PushSubscribeButton";
@@ -347,7 +348,9 @@ export default function Header() {
   const padStyle: React.CSSProperties = { paddingLeft: headerPadX, paddingRight: headerPadX };
   // Margem acima do cabeçalho (afasta-o do topo do site). Aplicada no wrapper.
   const headerMarginTop = settings?.headerMarginTop ?? 0;
-  const wrapStyle: React.CSSProperties = { marginTop: headerMarginTop };
+  // Margem abaixo do cabeçalho (afasta-o do conteúdo). Mesmo wrapper.
+  const headerMarginBottom = settings?.headerMarginBottom ?? 0;
+  const wrapStyle: React.CSSProperties = { marginTop: headerMarginTop, marginBottom: headerMarginBottom };
   const siteName = settings?.siteName ?? BRAND.name;
 
   // ── Menu em faixa + banner do cabeçalho (opcionais; ausentes = layout atual) ─
@@ -355,6 +358,13 @@ export default function Header() {
   // abaixo dela (estilo portal), com a busca dentro da própria faixa no desktop.
   const menuBarStyle: "attached" | "bar" = settings?.menuBarStyle === "bar" ? "bar" : "attached";
   const menuBarBg = settings?.menuBarBgColor || menuActiveColor;
+  // Tinta das barras de menu: decidida pela luminância do fundo escolhido no
+  // painel (antes era branco fixo — sumia quando a barra era clara).
+  const barIsDark = isDarkBg(menuBarBg);
+  const barInk = inkOn(menuBarBg, menuTextColor || "#101418");
+  const centeredBarBg = settings?.menuBarBgColor || "#1a2448";
+  const centeredBarIsDark = isDarkBg(centeredBarBg);
+  const centeredInk = inkOn(centeredBarBg, menuTextColor || "#101418");
   // Overflow do menu (antes era flex-wrap/overflow-x-auto, que crescia em altura
   // ou sumia itens sem afordância): agora TODO nav desktop passa pelo OverflowNav,
   // que mede a largura disponível e joga o excedente num dropdown "Mais ▾". A
@@ -395,8 +405,8 @@ export default function Header() {
     const link = (
       <Link
         href={path}
-        style={{ fontSize: menuFontSize, fontWeight: menuFontWeight }}
-        className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap text-white transition-colors ${isActive(path) ? "bg-black/25" : "hover:bg-black/15"}`}
+        style={{ fontSize: menuFontSize, fontWeight: menuFontWeight, color: barInk }}
+        className={`flex items-center gap-1.5 px-4 py-2.5 uppercase tracking-wide whitespace-nowrap transition-colors ${isActive(path) ? (barIsDark ? "bg-black/25" : "bg-black/10") : (barIsDark ? "hover:bg-black/15" : "hover:bg-black/5")}`}
       >
         {path === "/" && <House size={13} className="shrink-0" />}
         {label}
@@ -435,10 +445,11 @@ export default function Header() {
         style={{
           fontSize: menuFontSize,
           fontWeight: menuFontWeight,
-          color: isActive(path) ? "#ffffff" : "rgba(255,255,255,0.8)",
+          color: centeredInk,
+          opacity: isActive(path) ? 1 : 0.8,
           borderBottom: isActive(path) ? `2px solid ${menuActiveColor}` : undefined,
         }}
-        className={`px-4 py-2 whitespace-nowrap transition-colors hover:text-white hover:bg-white/10${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
+        className={`px-4 py-2 whitespace-nowrap transition-colors hover:opacity-100 ${centeredBarIsDark ? "hover:bg-white/10" : "hover:bg-black/5"}${kids.length > 0 ? " inline-flex items-center gap-1" : ""}`}
       >
         {label}
         {kids.length > 0 && <ChevronDown size={11} className="shrink-0 opacity-70" />}
@@ -555,9 +566,11 @@ export default function Header() {
             </div>
           </div>
 
-          {/* Barra escura própria do estilo centered — cor configurável (menuBarBgColor). */}
+          {/* Barra própria do estilo centered — cor configurável (menuBarBgColor).
+              A tinta acompanha a luminância dela: com barra clara o menu ficava
+              branco sobre branco (invisível). */}
           <div className="hidden lg:block border-t border-gray-100"
-            style={{ backgroundColor: settings?.menuBarBgColor || "#1a2448" }}>
+            style={{ backgroundColor: centeredBarBg }}>
             <OverflowNav
               items={navItems}
               renderItem={renderCenteredItem}
@@ -569,8 +582,8 @@ export default function Header() {
               activeColor={menuActiveColor}
               recomputeKey={navRecomputeKey}
               moreLabel={t("menu.more")}
-              moreButtonStyle={{ fontSize: menuFontSize, fontWeight: menuFontWeight, color: "rgba(255,255,255,0.8)" }}
-              moreButtonClassName="px-4 py-2 whitespace-nowrap inline-flex items-center gap-1 transition-colors text-white/80 hover:text-white hover:bg-white/10"
+              moreButtonStyle={{ fontSize: menuFontSize, fontWeight: menuFontWeight, color: centeredInk, opacity: 0.8 }}
+              moreButtonClassName={`px-4 py-2 whitespace-nowrap inline-flex items-center gap-1 transition-colors hover:opacity-100 ${centeredBarIsDark ? "hover:bg-white/10" : "hover:bg-black/5"}`}
             />
           </div>
 

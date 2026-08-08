@@ -461,6 +461,7 @@ export interface SiteSettings {
   menuFontWeight?: number;
   headerPaddingX?: number;
   headerMarginTop?: number;
+  headerMarginBottom?: number;
   /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */
   showTopBar?: boolean;
   topBarBgColor?: string;

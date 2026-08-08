@@ -7,8 +7,8 @@
 --      (uma por editoria), "Radar da Aviacao" horizontal e "mais noticias".
 --   "O Comandante - Revista" (21 blocos) — clone estrutural do "Credito.vc -
 --      Final" / layout do mock Bee Media: coluna unica clara, hero de
---      boas-vindas com busca, cards revista (layout "mini"), grade das 4
---      editorias com icones, escolha do editor, newsletter em cartao.
+--      boas-vindas com busca, cards revista (layout "mini"), bloco NATIVO de
+--      editorias (blockType "categories"), escolha do editor, newsletter.
 --      EXIGE imagem blog-api/blog-web com os layouts "hero"/"mini" (>= v85).
 -- Os dois ficam salvos em "Meus templates" — aplique um, veja no site, e
 -- troque pelo outro quando quiser (Desfazer restaura o estado anterior).
@@ -673,14 +673,17 @@ $tplp$::jsonb, $tplr$
       "linkUrl": "/arquivo"
     },
     {
-      "id": "html-oc-r-temas",
+      "id": "categories-oc-r-temas",
       "name": "Editorias",
       "order": 2,
+      "color": "#14265e",
       "custom": true,
-      "format": "grid",
+      "format": "cards",
+      "sectionStyle": "revista",
       "visible": true,
-      "blockType": "html",
-      "html": "<div><div style=\"font-size:22px;line-height:1.2;font-weight:800;color:#1a1a1a;margin-bottom:18px;\">Editorias</div><div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;\"><a href=\"/negocios\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">💼</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Negócios</span></a><a href=\"/economia\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📈</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Economia</span></a><a href=\"/aviacao\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">✈️</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Aviação</span></a><a href=\"/turismo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">🧳</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Turismo</span></a><a href=\"/arquivo\" style=\"background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;padding:18px 10px;text-align:center;text-decoration:none;display:block;\"><span style=\"width:54px;height:54px;border-radius:50%;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 8px;\">📰</span><span style=\"display:block;font-weight:600;color:#334155;font-size:13px;\">Todas as editorias</span></a></div></div>"
+      "blockType": "categories",
+      "linkLabel": "Todas as editorias",
+      "linkUrl": "/arquivo"
     },
     {
       "id": "content-oc-r-radar",

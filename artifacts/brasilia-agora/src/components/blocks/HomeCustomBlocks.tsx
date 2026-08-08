@@ -22,7 +22,9 @@ import { useT } from "../../lib/i18n";
 import { safeTitleHtml, sanitizeArticleHtml } from "../../lib/sanitize";
 import {
   type HomeBlock, parseVideoEmbedUrl, isDirectVideoFile, safeEmbedUrl, safeLinkUrl,
+  categoriesBlockSource, resolveCategoryBlockItems,
 } from "../../lib/homeBlocks";
+import { categoryIcon } from "../../lib/categoryIcons";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
 import { proxyUrl, buildSrcSet } from "../../lib/newsImage";
 import { trackSearch, trackNewsletter } from "../../hooks/useAnalytics";
@@ -38,10 +40,21 @@ import { blockFontStyle, ensureFontLoaded } from "../../lib/fonts";
  * fragment puro (render byte-idêntico ao atual). Fontes do Google são
  * carregadas sob demanda no cliente; no SSR sai só o style inline (hidrata igual).
  */
-export function BlockFontScope({ fontId, children }: { fontId?: string; children: React.ReactNode }) {
+export function BlockFontScope({ fontId, devices, children }: {
+  fontId?: string;
+  /** Telas em que o bloco aparece (ausente/"all" = todas). */
+  devices?: "all" | "mobile" | "desktop";
+  children: React.ReactNode;
+}) {
   useEffect(() => { ensureFontLoaded(fontId); }, [fontId]);
   const style = blockFontStyle(fontId);
-  if (!style) return <>{children}</>;
+  // As classes .block-only-* já trazem display:contents e o desligam no media
+  // query — por isso, com elas, o display NÃO pode vir no style inline (inline
+  // venceria o @media e o bloco nunca sumiria).
+  const cls = devices === "mobile" ? "block-only-mobile"
+    : devices === "desktop" ? "block-only-desktop" : undefined;
+  if (!style && !cls) return <>{children}</>;
+  if (cls) return <div className={cls} style={style ?? undefined}>{children}</div>;
   return <div style={{ display: "contents", ...style }}>{children}</div>;
 }
 
@@ -553,27 +566,89 @@ export function SearchBlock({ block, contained = true }: {
   );
 }
 
-// ─── Categorias (navegação) ──────────────────────────────────────────────────
-export function CategoriesBlock({ block }: { block: HomeBlock }) {
+// ─── Categorias (navegação por editoria) ─────────────────────────────────────
+/** Ícone que é fallback de iniciais ("BR"), não emoji: pede fonte menor e cor
+ *  do bloco para não parecer texto solto dentro do círculo. */
+const INITIALS_RE = /^[\p{Lu}\p{N}]{1,2}$/u;
+
+/**
+ * Monta a navegação a partir das CATEGORIAS do blog (painel → Categorias); cai
+ * para os itens do menu quando o blog ainda não salvou a lista, ou quando o
+ * operador escolhe "menu" na origem. Origem "html" entrega o markup livre —
+ * é a saída para quem quer um layout próprio sem trocar o tipo do bloco.
+ *
+ * Cada editoria vira um cartão com a imagem enviada no painel ou, sem imagem,
+ * o ícone padrão do slug (lib/categoryIcons.ts). O formato "pills" preserva o
+ * visual antigo do bloco.
+ */
+export function CategoriesBlock({ block, preview, contained = true }: {
+  block: HomeBlock; preview?: boolean;
+  /** false = sem o wrapper max-w próprio (uso dentro da zona de colunas). */
+  contained?: boolean;
+}) {
   const { settings } = useSite();
-  const items = (settings?.menuItems ?? []).filter((m) => m.path !== "/");
   const color = block.color ?? "#0B2A66";
-  if (items.length === 0) return null;
-  return (
-    <section className="border-t border-gray-200 py-8">
-      <div className="max-w-[1280px] mx-auto px-4">
-        <SectionHeading title={block.name} color={color} />
-        <div className="flex flex-wrap gap-2">
-          {items.map((m) => (
-            <Link key={m.path} href={m.path}
-              className="px-4 py-2 rounded-full border border-gray-200 text-[13px] font-semibold text-gray-700 hover:text-white transition-colors"
-              style={{ ["--hover-bg" as string]: color }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = color; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ""; }}>
-              {m.label}
-            </Link>
-          ))}
+  const source = categoriesBlockSource(block);
+
+  if (source === "html") return <HtmlBlock block={block} preview={preview} contained={contained} />;
+
+  const items = resolveCategoryBlockItems(
+    block, settings?.categories, settings?.menuItems, categoryIcon,
+  );
+  if (items.length === 0) {
+    return <BlockPlaceholder preview={preview} label={`Editorias: ${block.name}`}
+      hint="Cadastre as editorias em Categorias (ou adicione itens ao menu) para exibi-las aqui." />;
+  }
+
+  const allHref = safeLinkUrl(block.linkUrl) ?? "/arquivo";
+  const allLabel = (block.linkLabel ?? "").trim();
+  const wrap = contained ? "max-w-[1280px] mx-auto px-4 py-6" : "";
+  const heading = block.name
+    ? (block.sectionStyle === "revista"
+      ? <h2 className="text-[22px] font-extrabold text-[#1a1a1a] leading-tight mb-5">{block.name}</h2>
+      : <SectionHeading title={block.name} color={color} />)
+    : null;
+
+  if (block.format === "pills") {
+    return (
+      <section className={contained ? "border-t border-gray-200 py-8" : ""}>
+        <div className={contained ? "max-w-[1280px] mx-auto px-4" : ""}>
+          {heading}
+          <div className="flex flex-wrap gap-2">
+            {items.map((c) => (
+              <Link key={c.slug} href={c.href}
+                className="px-4 py-2 rounded-full border border-gray-200 text-[13px] font-semibold text-gray-700 hover:text-white transition-colors"
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = color; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = ""; }}>
+                {c.label}
+              </Link>
+            ))}
+          </div>
         </div>
+      </section>
+    );
+  }
+
+  const card = (href: string, label: string, icon: string, imageUrl?: string) => (
+    <Link key={href} href={href}
+      className="bg-white border border-gray-200 rounded-2xl px-2.5 py-4 text-center block hover:border-gray-300 hover:shadow-[0_8px_28px_rgba(15,23,42,.06)] transition-all">
+      <span className="w-[54px] h-[54px] rounded-full border border-gray-200 bg-[#f8fafc] flex items-center justify-center leading-none mx-auto mb-2 overflow-hidden">
+        {imageUrl
+          ? <img src={imageUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
+          : <span className={INITIALS_RE.test(icon)
+            ? "text-[15px] font-extrabold tracking-tight" : "text-[22px]"}
+            style={INITIALS_RE.test(icon) ? { color } : undefined}>{icon}</span>}
+      </span>
+      <span className="block font-semibold text-[#334155] text-[13px] leading-snug">{label}</span>
+    </Link>
+  );
+
+  return (
+    <section className={wrap}>
+      {heading}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))" }}>
+        {items.map((c) => card(c.href, c.label, c.icon, c.imageUrl))}
+        {allLabel && card(allHref, allLabel, "\u{1F4F0}")}
       </div>
     </section>
   );

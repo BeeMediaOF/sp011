@@ -4,7 +4,8 @@ import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../.
 import { articlesUrl } from "../../lib/articlesQuery";
 import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
-import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, type TemplateMenuItem } from "../../lib/homeBlocks";
+import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, safeEmbedUrl, categoriesBlockSource, type TemplateMenuItem, type CategoryBlockItem } from "../../lib/homeBlocks";
+import { categoryIcon, hasCategoryIcon } from "../../lib/categoryIcons";
 import { FONT_OPTIONS, FONT_GROUP_LABELS, fontCss, ensureFontLoaded, type FontOption } from "../../lib/fonts";
 import type { FooterConfig } from "../../lib/footerConfig";
 import FooterEditor from "./FooterEditor";
@@ -24,7 +25,8 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search";
 type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine" | "mini" | "hero";
-type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity";
+/** "menu"/"html" só valem no bloco Categorias (origem da navegação). */
+type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity" | "menu" | "html";
 type HeaderStyle = "standard" | "compact" | "centered";
 type FooterStyle = "dark" | "light" | "minimal";
 type Tab = "blocks" | "templates" | "header" | "footer" | "settings" | "article";
@@ -549,6 +551,10 @@ interface BlockForm {
   sectionStyle: "" | "revista";
   isAd: boolean;
   fontFamily: string;
+  /** Bloco "Categorias": imagem/rótulo/ocultar por editoria. */
+  categoryItems: CategoryBlockItem[];
+  /** Telas em que o bloco aparece. */
+  devices: "all" | "mobile" | "desktop";
 }
 
 const EMPTY_FORM: BlockForm = {
@@ -563,6 +569,8 @@ const EMPTY_FORM: BlockForm = {
   sectionStyle: "",
   isAd: false,
   fontFamily: "",
+  categoryItems: [],
+  devices: "all",
 };
 
 function blockToForm(block: HomeBlock): BlockForm {
@@ -594,6 +602,8 @@ function blockToForm(block: HomeBlock): BlockForm {
     sectionStyle:  block.sectionStyle ?? "",
     isAd:          block.isAd ?? false,
     fontFamily:    block.fontFamily ?? "",
+    categoryItems: block.categoryItems ?? [],
+    devices:       block.devices ?? "all",
   };
 }
 
@@ -629,6 +639,8 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     sectionStyle: isContent && f.sectionStyle ? "revista" : undefined,
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
     fontFamily: f.fontFamily || undefined,
+    categoryItems: f.blockType === "categories" && f.categoryItems.length > 0 ? f.categoryItems : undefined,
+    devices:    f.devices !== "all" ? f.devices : undefined,
   };
 }
 
@@ -798,6 +810,98 @@ function TemplateCard({ tpl, isPreviewing, busy, onPreview, onConfirm, onCancel,
   );
 }
 
+// ─── Bloco Categorias: imagem/rótulo por editoria ─────────────────────────────
+/**
+ * Lista as editorias que o bloco vai exibir e deixa trocar o ícone padrão por
+ * uma imagem enviada. Grava só o que foi personalizado (`categoryItems`) — a
+ * lista em si continua vindo das Categorias do blog, então criar uma editoria
+ * nova a faz aparecer no bloco sem ninguém editar nada aqui.
+ */
+function CategoryItemsEditor({ categories, items, onChange }: {
+  categories: { value: string; label: string; color: string }[];
+  items: CategoryBlockItem[];
+  onChange: (next: CategoryBlockItem[]) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const targetSlug = useRef<string>("");
+
+  const itemOf = (slug: string): CategoryBlockItem | undefined => items.find((i) => i.slug === slug);
+
+  function patch(slug: string, p: Partial<CategoryBlockItem>) {
+    const merged = items.some((i) => i.slug === slug)
+      ? items.map((i) => (i.slug === slug ? { ...i, ...p } : i))
+      : [...items, { slug, ...p }];
+    // Entrada que voltou ao padrão sai da lista: o bloco fica com o mínimo salvo.
+    onChange(merged.filter((i) =>
+      (i.imageUrl ?? "").trim() !== "" || (i.label ?? "").trim() !== "" || i.hidden === true));
+  }
+
+  async function upload(file: File, slug: string) {
+    setBusy(slug); setErr(false);
+    try {
+      const r = await adminApi.uploadImage(file, `editoria-${slug}`);
+      patch(slug, { imageUrl: r.url });
+    } catch { setErr(true); } finally { setBusy(null); }
+  }
+
+  if (categories.length === 0) {
+    return <p className="text-[11px] text-amber-600">Nenhuma editoria cadastrada — crie em Categorias.</p>;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {categories.map((c) => {
+        const it = itemOf(c.value);
+        const img = (it?.imageUrl ?? "").trim();
+        const hidden = it?.hidden === true;
+        return (
+          <div key={c.value}
+            className={`flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2 py-1.5 ${hidden ? "opacity-50" : ""}`}>
+            <span className="w-9 h-9 shrink-0 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden text-[17px] leading-none">
+              {img
+                ? <img src={img} alt="" className="w-full h-full object-cover" />
+                : categoryIcon(c.value, c.label)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[12px] font-semibold text-slate-700 truncate">{c.label}</p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {img ? "imagem própria" : hasCategoryIcon(c.value) ? "ícone padrão" : "iniciais"} · /{c.value}
+              </p>
+            </div>
+            <button type="button" title={img ? "Trocar imagem" : "Enviar imagem"}
+              disabled={busy !== null}
+              onClick={() => { targetSlug.current = c.value; fileRef.current?.click(); }}
+              className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-100 disabled:opacity-40 transition-colors">
+              {busy === c.value ? <RefreshCw size={13} className="animate-spin" /> : <Upload size={13} />}
+            </button>
+            {img && (
+              <button type="button" title="Voltar ao ícone padrão"
+                onClick={() => patch(c.value, { imageUrl: "" })}
+                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                <X size={13} />
+              </button>
+            )}
+            <button type="button" title={hidden ? "Exibir no bloco" : "Ocultar do bloco"}
+              onClick={() => patch(c.value, { hidden: !hidden })}
+              className="w-7 h-7 shrink-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-[#0B2A66] hover:bg-slate-100 transition-colors">
+              {hidden ? <EyeOff size={13} /> : <Eye size={13} />}
+            </button>
+          </div>
+        );
+      })}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f && targetSlug.current) void upload(f, targetSlug.current);
+          e.target.value = "";
+        }} />
+      {err && <p className="text-[11px] text-red-600">Falha no upload — tente novamente.</p>}
+    </div>
+  );
+}
+
 // ─── Settings panel ───────────────────────────────────────────────────────────
 function SettingsPanel({ block, form, saving, categories, onChange, onApply, onDuplicate, onDelete, onCancel }: {
   block: HomeBlock; form: BlockForm; saving: boolean;
@@ -959,6 +1063,58 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         </>
       )}
 
+      {/* ── Categorias: origem, estilo e imagem por editoria ── */}
+      {!isSpecial && form.blockType === "categories" && (
+        <PanelSection label="Editorias" icon={FolderOpen}>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">De onde vem</label>
+              <select value={categoriesBlockSource(form)} onChange={(e) => onChange("source", e.target.value as SourceType)}
+                className={INPUT}>
+                <option value="categories">Categorias do blog</option>
+                <option value="menu">Itens do menu</option>
+                <option value="html">HTML personalizado</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">Estilo</label>
+              <select value={form.format === "pills" ? "pills" : "cards"} onChange={(e) => onChange("format", e.target.value)}
+                className={INPUT} disabled={categoriesBlockSource(form) === "html"}>
+                <option value="cards">Cartões com ícone</option>
+                <option value="pills">Pílulas</option>
+              </select>
+            </div>
+          </div>
+
+          {categoriesBlockSource(form) === "html" ? (
+            <>
+              <textarea value={form.html} onChange={(e) => onChange("html", e.target.value)}
+                rows={6} spellCheck={false}
+                className={`${INPUT} font-mono text-xs resize-y mt-2`} placeholder="<div>…</div>" />
+              <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+                Markup livre no lugar da navegação automática. Scripts e eventos inline são removidos por segurança.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[10px] text-slate-400 mt-2 mb-1.5 leading-relaxed">
+                {categoriesBlockSource(form) === "menu"
+                  ? "A lista sai dos itens do menu; as imagens abaixo valem para o caminho de mesmo nome."
+                  : "A lista sai das Categorias do blog — criar uma editoria nova já a exibe aqui."}
+              </p>
+              <CategoryItemsEditor categories={categories} items={form.categoryItems}
+                onChange={(next) => onChange("categoryItems", next)} />
+              <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+                className={`${INPUT} mt-2`} placeholder='Cartão final, ex.: "Todas as editorias" (vazio = sem cartão)' />
+              {form.linkLabel.trim() !== "" && (
+                <input value={form.linkUrl} onChange={(e) => onChange("linkUrl", e.target.value)}
+                  className={`${INPUT} mt-1.5`} placeholder="Link do cartão final (padrão: /arquivo)" />
+              )}
+            </>
+          )}
+        </PanelSection>
+      )}
+
       {/* ── HTML livre ── */}
       {!isSpecial && form.blockType === "html" && (
         <PanelSection label="Código HTML" icon={Code}>
@@ -970,6 +1126,29 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">Scripts e eventos inline são removidos por segurança ao exibir. Com o link preenchido, o bloco inteiro vira clicável (abre em nova aba).</p>
         </PanelSection>
       )}
+
+      {/* ── Em que telas o bloco aparece ── */}
+      <PanelSection label="Aparece em" icon={Monitor}>
+        <div className="grid grid-cols-3 gap-1">
+          {([
+            ["all", "Tudo", Monitor],
+            ["desktop", "Só desktop", Monitor],
+            ["mobile", "Só mobile", Smartphone],
+          ] as const).map(([id, label, Icon]) => (
+            <button key={id} type="button" onClick={() => onChange("devices", id)}
+              className={`p-2 rounded-xl border text-[10px] font-bold uppercase tracking-wide transition-all flex flex-col items-center gap-1 ${
+                form.devices === id
+                  ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                  : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+              <Icon size={13} /> {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+          O corte é 1024px, o mesmo do menu. Serve para ter propaganda exclusiva de celular
+          ou de desktop: crie dois blocos com a mesma posição e marque um de cada.
+        </p>
+      </PanelSection>
 
       {/* ── Marcar como propaganda (imagem/HTML) ── */}
       {!isSpecial && (form.blockType === "image" || form.blockType === "html") && (
@@ -1332,6 +1511,7 @@ export default function HomeBlocksManager() {
   const [menuFontWeight, setMenuFontWeight]   = useState(700);
   const [headerPaddingX, setHeaderPaddingX]   = useState(16);
   const [headerMarginTop, setHeaderMarginTop] = useState(0);
+  const [headerMarginBottom, setHeaderMarginBottom] = useState(0);
   const [showTickerBar, setShowTickerBar]     = useState(true);
   const [showHeroStrip, setShowHeroStrip]     = useState(true);
   // Campos "portal" (barra do topo, banner do logo, menu em faixa, acento do rodapé).
@@ -1409,7 +1589,7 @@ export default function HomeBlocksManager() {
     headerBgColor: string; footerBgColor: string;
     menuTextColor?: string; menuActiveColor?: string;
     menuFontSize?: number; menuFontWeight?: number;
-    headerPaddingX?: number; headerMarginTop?: number;
+    headerPaddingX?: number; headerMarginTop?: number; headerMarginBottom?: number;
     showTickerBar?: boolean; showHeroStrip?: boolean;
     /** Menu e rodapé completos (aplicados/restaurados só quando definidos). */
     menuItems?: MenuItem[]; footerConfig?: FooterConfig;
@@ -1478,6 +1658,7 @@ export default function HomeBlocksManager() {
         setMenuFontWeight(r.settings.menuFontWeight ?? 700);
         setHeaderPaddingX(r.settings.headerPaddingX ?? 16);
         setHeaderMarginTop(r.settings.headerMarginTop ?? 0);
+        setHeaderMarginBottom(r.settings.headerMarginBottom ?? 0);
         setShowTickerBar(r.settings.showTickerBar ?? true);
         setShowHeroStrip(r.settings.showHeroStrip ?? true);
         setShowTopBar(r.settings.showTopBar ?? false);
@@ -1614,7 +1795,7 @@ export default function HomeBlocksManager() {
       blocks: blocks.map((b) => ({ ...b })),
       headerStyle, footerStyle, headerBgColor, footerBgColor,
       menuTextColor, menuActiveColor, menuFontSize, menuFontWeight,
-      headerPaddingX, headerMarginTop, showTickerBar, showHeroStrip,
+      headerPaddingX, headerMarginTop, headerMarginBottom, showTickerBar, showHeroStrip,
       showTopBar, topBarBgColor, headerBannerHtml, headerBannerLinkUrl, menuBarStyle, menuBarBgColor,
       footerAccentColor, pageBgColor,
       siteLanguage, siteTimezone,
@@ -1639,6 +1820,7 @@ export default function HomeBlocksManager() {
       ...(snap.menuFontWeight  !== undefined ? { menuFontWeight:  snap.menuFontWeight }  : {}),
       ...(snap.headerPaddingX  !== undefined ? { headerPaddingX:  snap.headerPaddingX }  : {}),
       ...(snap.headerMarginTop !== undefined ? { headerMarginTop: snap.headerMarginTop } : {}),
+      ...(snap.headerMarginBottom !== undefined ? { headerMarginBottom: snap.headerMarginBottom } : {}),
       ...(snap.showTickerBar   !== undefined ? { showTickerBar:   snap.showTickerBar }   : {}),
       ...(snap.showHeroStrip   !== undefined ? { showHeroStrip:   snap.showHeroStrip }   : {}),
       ...(snap.showTopBar        !== undefined ? { showTopBar:        snap.showTopBar }        : {}),
@@ -1666,6 +1848,7 @@ export default function HomeBlocksManager() {
     if (snap.menuFontWeight  !== undefined) setMenuFontWeight(snap.menuFontWeight);
     if (snap.headerPaddingX  !== undefined) setHeaderPaddingX(snap.headerPaddingX);
     if (snap.headerMarginTop !== undefined) setHeaderMarginTop(snap.headerMarginTop);
+    if (snap.headerMarginBottom !== undefined) setHeaderMarginBottom(snap.headerMarginBottom);
     if (snap.showTickerBar   !== undefined) setShowTickerBar(snap.showTickerBar);
     if (snap.showHeroStrip   !== undefined) setShowHeroStrip(snap.showHeroStrip);
     if (snap.showTopBar        !== undefined) setShowTopBar(snap.showTopBar);
@@ -1727,6 +1910,7 @@ export default function HomeBlocksManager() {
         menuTextColor:   tpl.menuTextColor,   menuActiveColor: tpl.menuActiveColor,
         menuFontSize:    tpl.menuFontSize,    menuFontWeight:  tpl.menuFontWeight,
         headerPaddingX:  tpl.headerPaddingX,  headerMarginTop: tpl.headerMarginTop,
+        headerMarginBottom: tpl.headerMarginBottom ?? 0,
         showTickerBar:   tpl.showTickerBar,   showHeroStrip:   tpl.showHeroStrip,
         ...portalFieldsOf(tpl),
         // Menu, rodapé e idioma/fuso: só quando o template os carrega (nunca inventa/zera).
@@ -2530,8 +2714,19 @@ export default function HomeBlocksManager() {
                       onTouchEnd={() => saveSettingsPatch({ headerMarginTop })}
                       className="w-full accent-[#0B2A66]" />
                   </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[11px] font-medium text-[#64748B]">Margem inferior (abaixo)</p>
+                      <span className="text-xs font-bold text-[#0B2A66]">{headerMarginBottom}px</span>
+                    </div>
+                    <input type="range" min={0} max={48} step={2} value={headerMarginBottom}
+                      onChange={(e) => setHeaderMarginBottom(Number(e.target.value))}
+                      onMouseUp={() => saveSettingsPatch({ headerMarginBottom })}
+                      onTouchEnd={() => saveSettingsPatch({ headerMarginBottom })}
+                      className="w-full accent-[#0B2A66]" />
+                  </div>
                   {canManage && (
-                    <button onClick={() => saveSettingsPatch({ headerPaddingX, headerMarginTop })} disabled={saving}
+                    <button onClick={() => saveSettingsPatch({ headerPaddingX, headerMarginTop, headerMarginBottom })} disabled={saving}
                       className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
                       <Save size={13} /> Salvar margem
                     </button>

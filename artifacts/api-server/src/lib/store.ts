@@ -114,6 +114,11 @@ export interface HomeBlock {
   /** Bloco de imagem/HTML marcado "É uma propaganda" — mede impressão/clique
    *  sob a chave block:<id> (ad_daily_stats) e entra nas métricas de anúncios. */
   isAd?: boolean;
+  /** Bloco "categories": ajustes por editoria (imagem enviada, rótulo, ocultar).
+   *  Espelha CategoryBlockItem de brasilia-agora/src/lib/homeBlocks.ts. */
+  categoryItems?: { slug: string; label?: string; imageUrl?: string; hidden?: boolean }[];
+  /** Telas em que o bloco aparece (ausente = todas) — corte por CSS no site. */
+  devices?: "all" | "mobile" | "desktop";
   /** Zona da home (blocos consecutivos formam a zona 2 colunas) e meia largura. */
   area?: "main" | "sidebar"; width?: "full" | "half";
   /** Texto do link do cabeçalho de seção nos renderizadores de zona. */
@@ -141,7 +146,7 @@ export interface HomeTemplate {
   headerBgColor?: string; footerBgColor?: string;
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
-  headerPaddingX?: number; headerMarginTop?: number;
+  headerPaddingX?: number; headerMarginTop?: number; headerMarginBottom?: number;
   showTickerBar?: boolean; showHeroStrip?: boolean;
   /** Menu e rodapé completos do template (aplicados só quando definidos). */
   menuItems?: MenuItem[];
@@ -238,7 +243,7 @@ export interface SiteSettings {
   headerBgColor?: string; footerBgColor?: string;
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
-  headerPaddingX?: number; headerMarginTop?: number;
+  headerPaddingX?: number; headerMarginTop?: number; headerMarginBottom?: number;
   /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */
   showTopBar?: boolean; topBarBgColor?: string;
   /** Botão de notificações push (sino) no cabeçalho (ausente/true = exibido). */

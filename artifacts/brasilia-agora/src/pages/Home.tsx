@@ -507,7 +507,7 @@ function CustomBlock({ block, getArticles, preview }: {
     case "advertising": return <AdSlotBlock block={block} preview={preview} />;
     case "newsletter":  return <NewsletterBlock block={block} />;
     case "search":      return <SearchBlock block={block} />;
-    case "categories":  return <CategoriesBlock block={block} />;
+    case "categories":  return <CategoriesBlock block={block} preview={preview} />;
     case "social":      return <SocialLinksBlock block={block} preview={preview} />;
     case "quotes":      return <QuotesBlock />;
     case "html":        return <HtmlBlock block={block} preview={preview} />;
@@ -895,7 +895,7 @@ export default function Home() {
         {idx === 2 && <AdSlotBand slot="slot_02" className="max-w-[1280px] mx-auto px-4 py-4" />}
         {idx === 4 && <AdSlotBand slot="slot_03" className="max-w-[1280px] mx-auto px-4 py-4" />}
         {idx === 7 && <AdSlotBand slot="slot_04" className="max-w-[1280px] mx-auto px-4 py-4" />}
-        <BlockFontScope fontId={block.fontFamily}>
+        <BlockFontScope fontId={block.fontFamily} devices={block.devices}>
           {block.custom
             ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
             : <PredefinedBlock block={block} getArticles={getArticles} preview={isAdminPreview} />
@@ -938,7 +938,7 @@ export default function Home() {
   function renderZoneItem(entry: SegmentEntry, zone: "main" | "sidebar" | "half"): React.ReactNode {
     const { block, idx } = entry;
     const inner = (
-      <BlockFontScope fontId={block.fontFamily}>
+      <BlockFontScope fontId={block.fontFamily} devices={block.devices}>
         <ZoneBlock block={block} zone={zone} getArticles={getArticles} preview={isAdminPreview}
           fallback={block.custom
             ? <CustomBlock block={block} getArticles={getArticles} preview={isAdminPreview} />

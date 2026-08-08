@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useAds, trackClick, useAdImpression, type AdSlotKey, SLOT_CONFIG } from "./useAds";
+import {
+  useAds, trackClick, useAdImpression, useAdDevice, adMatchesDevice,
+  type AdSlotKey, SLOT_CONFIG,
+} from "./useAds";
 
 interface Props {
   slot: AdSlotKey;
@@ -34,7 +37,12 @@ export default function AdBanner({
   const aspectRatio = aspectRatioProp ?? cfg?.aspectRatio ?? "970/90";
   const { imgWidth, imgHeight } = cfg ?? { imgWidth: 970, imgHeight: 90 };
 
-  const items = adId ? ads.filter((a) => a.id === adId) : getSlotAll(slot);
+  // Propaganda restrita a mobile/desktop no cadastro não entra no rodízio da
+  // tela em que foi excluída (esconder por CSS contaria impressão do que
+  // ninguém viu e deixaria o slot vazio na vez dela).
+  const device = useAdDevice();
+  const items = (adId ? ads.filter((a) => a.id === adId) : getSlotAll(slot))
+    .filter((a) => adMatchesDevice(a, device));
 
   const goTo = useCallback((next: number) => {
     setFading(true);

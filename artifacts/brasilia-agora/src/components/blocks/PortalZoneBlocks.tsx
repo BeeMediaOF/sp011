@@ -21,7 +21,7 @@ import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
 import { safeTitleHtml } from "../../lib/sanitize";
 import { useT } from "../../lib/i18n";
 import { inferBlockType, sampleForPreview, type HomeBlock } from "../../lib/homeBlocks";
-import { AD_SLOTS, BlockPlaceholder, HtmlBlock, SearchBlock, TickerBlock } from "./HomeCustomBlocks";
+import { AD_SLOTS, BlockPlaceholder, CategoriesBlock, HtmlBlock, SearchBlock, TickerBlock } from "./HomeCustomBlocks";
 
 /** Mesmo shape do SectionArticle da Home (mapeado de useArticles). */
 export interface ZoneArticle {
@@ -759,6 +759,8 @@ export function ZoneBlock({ block, zone, getArticles, preview, fallback }: {
       return <HtmlBlock block={block} preview={preview} contained={false} />;
     case "search":
       return <SearchBlock block={block} contained={false} />;
+    case "categories":
+      return <CategoriesBlock block={block} preview={preview} contained={false} />;
     case "advertising": {
       const slot = AD_SLOTS.includes(block.adSlot ?? "") ? (block.adSlot as AdSlotKey) : "slot_05";
       return <div className="py-1"><AdBanner slot={slot} /></div>;

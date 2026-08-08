@@ -102,6 +102,8 @@ export interface SiteSettings {
   headerPaddingX?: number;
   /** Margem acima do cabeçalho, em px (padrão 0). */
   headerMarginTop?: number;
+  /** Espaço abaixo do cabeçalho, em px (ausente = 0). */
+  headerMarginBottom?: number;
   customHeadCode?: string;
   customBodyCode?: string;
   /** Configuração editável do rodapé (painel → aba Rodapé). */

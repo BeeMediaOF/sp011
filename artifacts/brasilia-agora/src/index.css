@@ -253,6 +253,23 @@
   }
 }
 
+/* ── Visibilidade por dispositivo dos blocos (painel → bloco → "Aparece em") ──
+   Quando o bloco aparece, o wrapper é display:contents e NÃO existe para o
+   layout (idêntico ao BlockFontScope sem fonte). O corte é 1024px, o mesmo
+   breakpoint que separa o menu mobile do desktop. */
+.block-only-mobile,
+.block-only-desktop {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  .block-only-mobile { display: none; }
+}
+
+@media (max-width: 1023.98px) {
+  .block-only-desktop { display: none; }
+}
+
 /* ── Article HTML body (AI rewrite output with WordPress HTML) ─────────────── */
 .article-body {
   --chapeu: #c8102e;
@@ -266,6 +283,24 @@
 .article-body video,
 .article-body iframe {
   max-width: 100%;
+}
+
+/* Vídeo do editor (@tiptap/extension-youtube grava o iframe com width/height
+   fixos de 720x405): só max-width deixaria a altura travada em 405px e a
+   proporção errada no celular. Depois da sanitização, todo iframe que sobra
+   aqui é player de vídeo — daí a regra valer para todos. */
+.article-body iframe {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  display: block;
+  border: 0;
+  margin: 1.25rem auto;
+  border-radius: 6px;
+}
+
+.article-body div[data-youtube-video] {
+  margin: 1.25rem 0;
 }
 
 /* Tabelas e blocos pré-formatados rolam dentro da própria caixa no mobile. */

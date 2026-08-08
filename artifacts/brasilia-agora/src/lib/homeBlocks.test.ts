@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
   isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks, sampleForPreview,
+  categoriesBlockSource, resolveCategoryBlockItems,
   type HomeBlock,
 } from "./homeBlocks";
 
@@ -164,4 +165,67 @@ test("sampleForPreview: determinística por seed, com limite e chapéu EXEMPLO",
   assert.notDeepEqual(s1.map((a) => a.id), s3.map((a) => a.id));       // varia por bloco
   assert.ok(s1.every((a) => a.chapeu === "EXEMPLO"));
   assert.deepEqual(sampleForPreview([], "x", 4), []);                   // pool vazio
+});
+
+// ─── Bloco "Categorias" ──────────────────────────────────────────────────────
+
+const CATS = [
+  { slug: "negocios", name: "Negócios" },
+  { slug: "economia", name: "Economia" },
+  { slug: "aviacao", name: "Aviação", visible: true },
+  { slug: "oculta", name: "Oculta", visible: false },
+];
+const MENU = [
+  { label: "HOME", path: "/" },
+  { label: "TURISMO", path: "/turismo" },
+  { label: "Externo", path: "https://exemplo.com" },
+];
+const icon = (slug: string) => `i:${slug}`;
+
+test("categoriesBlockSource: só menu/html saem do padrão", () => {
+  assert.equal(categoriesBlockSource({}), "categories");
+  assert.equal(categoriesBlockSource({ source: "automatic_by_category" }), "categories");
+  assert.equal(categoriesBlockSource({ source: "menu" }), "menu");
+  assert.equal(categoriesBlockSource({ source: "html" }), "html");
+});
+
+test("resolveCategoryBlockItems: categorias do blog, sem as invisíveis", () => {
+  const out = resolveCategoryBlockItems({}, CATS, MENU, icon);
+  assert.deepEqual(out.map((c) => c.slug), ["negocios", "economia", "aviacao"]);
+  assert.equal(out[0]!.href, "/negocios");
+  assert.equal(out[0]!.label, "Negócios");
+  assert.equal(out[0]!.icon, "i:negocios");
+  assert.equal(out[0]!.imageUrl, undefined);
+});
+
+test("resolveCategoryBlockItems: blog sem categorias salvas cai no menu", () => {
+  const out = resolveCategoryBlockItems({}, [], MENU, icon);
+  // "/" e link externo não são editoria
+  assert.deepEqual(out.map((c) => c.slug), ["turismo"]);
+  assert.equal(out[0]!.label, "TURISMO");
+});
+
+test("resolveCategoryBlockItems: origem menu ignora as categorias", () => {
+  const out = resolveCategoryBlockItems({ source: "menu" }, CATS, MENU, icon);
+  assert.deepEqual(out.map((c) => c.slug), ["turismo"]);
+});
+
+test("resolveCategoryBlockItems: ajustes por editoria (imagem, rótulo, ocultar)", () => {
+  const out = resolveCategoryBlockItems({
+    categoryItems: [
+      { slug: "negocios", imageUrl: "/api/uploads/x.jpg" },
+      { slug: "economia", label: "Mercado" },
+      { slug: "aviacao", hidden: true },
+      { slug: "inexistente", imageUrl: "/api/uploads/y.jpg" },
+    ],
+  }, CATS, MENU, icon);
+  assert.deepEqual(out.map((c) => c.slug), ["negocios", "economia"]);
+  assert.equal(out[0]!.imageUrl, "/api/uploads/x.jpg");
+  assert.equal(out[1]!.label, "Mercado");
+  assert.equal(out[1]!.icon, "i:economia");
+});
+
+test("resolveCategoryBlockItems: itemsLimit corta e lista vazia devolve []", () => {
+  assert.equal(resolveCategoryBlockItems({ itemsLimit: 2 }, CATS, MENU, icon).length, 2);
+  assert.deepEqual(resolveCategoryBlockItems({}, [], [], icon), []);
 });

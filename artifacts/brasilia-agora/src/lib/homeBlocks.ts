@@ -19,6 +19,17 @@ export type HomeBlockType =
   | "html" | "embed" | "map" | "sep" | "weather" | "table" | "counter"
   | "search";
 
+/** Ajuste de UMA editoria dentro do bloco "Categorias". */
+export interface CategoryBlockItem {
+  slug: string;
+  /** Rótulo próprio (vazio = o nome cadastrado da categoria). */
+  label?: string;
+  /** Imagem enviada no painel (vazio = ícone padrão do slug). */
+  imageUrl?: string;
+  /** Não exibir esta editoria no bloco. */
+  hidden?: boolean;
+}
+
 export interface HomeBlock {
   id: string;
   name: string;
@@ -73,8 +84,15 @@ export interface HomeBlock {
   sectionStyle?: "revista";
   /** Bloco de imagem/HTML marcado como propaganda — listado na aba Propagandas do admin. */
   isAd?: boolean;
+  /** Bloco "categories": ajustes por editoria (imagem própria, rótulo, ocultar).
+   *  Ausente = todas as categorias do blog com o ícone padrão do slug. */
+  categoryItems?: CategoryBlockItem[];
   /** Fonte do texto do bloco: id do registro em lib/fonts.ts. Ausente = padrão do site. */
   fontFamily?: string;
+  /** Em que telas o bloco aparece (ausente/"all" = todas). O corte é o mesmo
+   *  breakpoint do menu (1024px) e é feito por CSS — ver .block-only-* no
+   *  index.css. Serve para propaganda exclusiva de mobile/desktop. */
+  devices?: "all" | "mobile" | "desktop";
 }
 
 /** Item de menu carregado por um template (mesmo shape do menu do site). */
@@ -111,6 +129,8 @@ export interface HomeTemplate {
   menuFontWeight?: number;
   headerPaddingX?: number;
   headerMarginTop?: number;
+  /** Espaço abaixo do cabeçalho (campo "portal": reset neutro ao aplicar). */
+  headerMarginBottom?: number;
   showTickerBar?: boolean;
   showHeroStrip?: boolean;
   /** Itens de menu instalados ao aplicar (ausente = menu do site não é tocado). */
@@ -161,6 +181,7 @@ export function defaultFormatForType(type: string): string {
     case "advertising": return "banner_970x90";
     case "list":        return "list_compact";
     case "search":      return "search_bar";
+    case "categories":  return "cards";
     default:            return "grid";
   }
 }
@@ -280,6 +301,83 @@ export function sampleForPreview<T extends { id: string; chapeu: string }>(
     .sort((a, b) => mix(a.id) - mix(b.id))
     .slice(0, limit)
     .map((a) => ({ ...a, chapeu: "EXEMPLO" }));
+}
+
+// ─── Bloco "Categorias" ──────────────────────────────────────────────────────
+
+/** De onde o bloco de editorias tira a lista. */
+export type CategoriesSource = "categories" | "menu" | "html";
+
+/**
+ * Origem do bloco. O padrão é `categories` (as editorias cadastradas em
+ * painel → Categorias): blocos antigos carregam `source: "automatic_by_category"`,
+ * herdado do formulário, e caem no padrão. `menu` reproduz o comportamento
+ * histórico (itens do menu) e `html` entrega o markup livre do operador.
+ */
+export function categoriesBlockSource(block: Pick<HomeBlock, "source">): CategoriesSource {
+  return block.source === "menu" || block.source === "html" ? block.source : "categories";
+}
+
+export interface ResolvedCategoryItem {
+  slug: string;
+  label: string;
+  href: string;
+  /** Imagem enviada no painel; ausente = desenhar o `icon`. */
+  imageUrl?: string;
+  /** Emoji do slug ou as iniciais do rótulo (ver lib/categoryIcons.ts). */
+  icon: string;
+}
+
+export interface CategorySourceEntry { slug: string; name: string; visible?: boolean }
+export interface MenuSourceEntry { label: string; path: string; visible?: boolean }
+
+/**
+ * Lista final de editorias do bloco: base (categorias do blog ou itens do
+ * menu) + ajustes de `categoryItems` (rótulo, imagem, ocultar), cortada por
+ * `itemsLimit`.
+ *
+ * Um blog que nunca salvou Categorias cai no menu — sem isso o bloco sumiria
+ * da home justamente nos blogs recém-instalados. Ajuste de slug que não existe
+ * mais na base é ignorado (categoria apagada não volta pelo bloco).
+ */
+export function resolveCategoryBlockItems(
+  block: Pick<HomeBlock, "source" | "itemsLimit" | "categoryItems">,
+  categories: readonly CategorySourceEntry[] | undefined,
+  menuItems: readonly MenuSourceEntry[] | undefined,
+  iconOf: (slug: string, label: string) => string,
+): ResolvedCategoryItem[] {
+  const fromCategories = (categories ?? [])
+    .filter((c) => c.visible !== false && (c.slug ?? "").trim() !== "")
+    .map((c) => ({ slug: c.slug.trim(), label: (c.name ?? "").trim() || c.slug.trim() }));
+
+  const fromMenu = (menuItems ?? [])
+    .filter((m) => m.visible !== false && (m.path ?? "").startsWith("/") && m.path !== "/")
+    .map((m) => ({ slug: m.path.replace(/^\//, "").replace(/\/+$/, ""), label: (m.label ?? "").trim() }))
+    .filter((m) => m.slug !== "" && !m.slug.includes("/"));
+
+  const useMenu = categoriesBlockSource(block) === "menu" || fromCategories.length === 0;
+  const base = useMenu ? fromMenu : fromCategories;
+
+  const overrides = new Map((block.categoryItems ?? []).map((i) => [i.slug, i]));
+  const seen = new Set<string>();
+  const out: ResolvedCategoryItem[] = [];
+  for (const entry of base) {
+    if (seen.has(entry.slug)) continue;
+    seen.add(entry.slug);
+    const ov = overrides.get(entry.slug);
+    if (ov?.hidden) continue;
+    const label = (ov?.label ?? "").trim() || entry.label || entry.slug;
+    const imageUrl = (ov?.imageUrl ?? "").trim();
+    out.push({
+      slug: entry.slug,
+      label,
+      href: `/${entry.slug}`,
+      ...(imageUrl ? { imageUrl } : {}),
+      icon: iconOf(entry.slug, label),
+    });
+  }
+  const limit = block.itemsLimit ?? 0;
+  return limit > 0 ? out.slice(0, limit) : out;
 }
 
 /** Links clicáveis (imagem/banner): http(s) ou caminho relativo do site. Nunca javascript:. */

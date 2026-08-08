@@ -27,11 +27,46 @@ export const SLOT_CONFIG: Record<AdSlotKey, SlotConfig> = {
   slot_11: { label: "Sidebar do arquivo",     format: "250×350", aspectRatio: "250/350", imgWidth: 250,  imgHeight: 350 },
 };
 
+export type AdDevice = "desktop" | "mobile" | "tablet";
+
 export interface AdItem {
   id: string;
   imageUrl: string;
   link: string;
   position: string;
+  /** Telas escolhidas no cadastro (Propagandas → Dispositivos). Ausente/vazio
+   *  = todas, que é como os anúncios antigos ficam. */
+  targetDevices?: AdDevice[];
+}
+
+/** Faixa do viewport atual. Mesmos cortes do Tailwind (md=768, lg=1024). */
+export function deviceOfWidth(width: number): AdDevice {
+  if (width < 768) return "mobile";
+  return width < 1024 ? "tablet" : "desktop";
+}
+
+/** O anúncio pode aparecer neste dispositivo? Sem lista = aparece em todos. */
+export function adMatchesDevice(ad: Pick<AdItem, "targetDevices">, device: AdDevice): boolean {
+  const list = ad.targetDevices;
+  return !Array.isArray(list) || list.length === 0 || list.includes(device);
+}
+
+/**
+ * Dispositivo atual, para o AdBanner filtrar o que o painel restringiu.
+ * Começa em "desktop" e corrige no efeito: os anúncios só chegam por fetch no
+ * cliente (o SSR nunca tem lista), então isso não gera mismatch de hidratação.
+ */
+export function useAdDevice(): AdDevice {
+  const [device, setDevice] = useState<AdDevice>(
+    () => (typeof window === "undefined" ? "desktop" : deviceOfWidth(window.innerWidth)),
+  );
+  useEffect(() => {
+    const onResize = () => setDevice(deviceOfWidth(window.innerWidth));
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return device;
 }
 
 // ─── Cache singleton compartilhado (evita N fetches: há ~6 AdBanner na home) ───
