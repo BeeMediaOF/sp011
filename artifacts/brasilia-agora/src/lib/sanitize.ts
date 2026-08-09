@@ -106,7 +106,11 @@ export function sanitizeArticleHtml(html: string | null | undefined): string {
   const clean = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
     ADD_TAGS: ["iframe"],
-    ADD_ATTR: ["allow", "allowfullscreen", "frameborder", "loading", "referrerpolicy"],
+    ADD_ATTR: [
+      "allow", "allowfullscreen", "frameborder", "loading", "referrerpolicy",
+      // <video> de upload próprio (o perfil html já aceita a tag)
+      "controls", "playsinline", "poster", "preload",
+    ],
     FORBID_ATTR: ["srcdoc"],
   });
   if (!clean.includes("<iframe")) return clean;

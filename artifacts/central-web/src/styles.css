@@ -664,3 +664,59 @@ html.dark .chipsel.on .name { color: var(--text); }
 }
 .chipsel-inline { display: flex; gap: 8px; flex-wrap: wrap; }
 .chipsel-inline .chipsel { flex: 0 0 auto; }
+
+/* ─────────────────────────────────────────────────────────────
+   Blocos de mídia do editor de notícias (espelho do index.css do blog).
+   O sanitizador do ingest apaga `style` inline e preserva `class`, então é
+   esta regra que segura o layout do player no artigo entregue ao blog.
+   ───────────────────────────────────────────────────────────── */
+.video-embed {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  margin: 20px 0;
+}
+
+.video-embed iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 10px;
+}
+
+.video-embed-file {
+  display: block;
+  width: 100%;
+  margin: 20px 0;
+  border-radius: 10px;
+}
+
+.article-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.article-gallery img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.article-quote {
+  border-left: 4px solid #0b2a66;
+  padding: 14px 18px;
+  margin: 20px 0;
+  background: #eef2ff;
+  border-radius: 0 10px 10px 0;
+  color: #1e3a8a;
+}
+
+.article-quote p:last-child {
+  margin-bottom: 0;
+}

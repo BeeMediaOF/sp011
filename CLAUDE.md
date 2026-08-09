@@ -478,6 +478,23 @@ montada no servidor.
   `settings.footerConfig`; zonas main/sidebar/half; ver memória do repo em
   `HomeBlocksManager.tsx` ao criar tipo novo (renderer + case + painel +
   tipos nos dois stores).
+- **Blocos do corpo do artigo** (vídeo, galeria, citação, imagem no texto —
+  ago/2026): o corpo é editado pelo **TipTap**, que DESCARTA em silêncio toda
+  tag sem nó no schema. Quem gera o HTML é `lib/articleEmbeds.ts` (puro,
+  testado) e quem ensina o schema é `components/admin/editorBlocks.ts`
+  (`iframeEmbed`, `videoEmbed`, `blockDiv` só para `div[data-block]`,
+  `image` com `style`) — **os dois espelhados em `central-web`**
+  (`src/lib/articleEmbeds.ts`, `src/components/editorBlocks.ts`). Tag nova sem
+  nó = bloco somem do editor sem erro nenhum (foi o bug do vídeo). O bloco leva
+  `class` ALÉM do `style` porque o sanitizador do ingest apaga `style` inline:
+  o layout real vem de `.video-embed`/`.article-gallery`/`.article-quote`
+  (`index.css` do blog e `styles.css` da central).
+- **Player de vídeo é a única exceção a iframe** nas TRÊS sanitizações
+  (`brasilia-agora/src/lib/sanitize.ts`, `central-web/src/lib/sanitize.ts` e a
+  canônica `lib/news-engine/src/sanitizeHtml.ts`): só https e só
+  youtube.com/embed, youtube-nocookie.com/embed e player.vimeo.com/video.
+  A allowlist está escrita nos três — mudar nos TRÊS. `srcdoc` cai sempre.
+  E-mail e AMP continuam sem iframe nem `<video>`.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 

@@ -93,3 +93,72 @@ test("sanitizeAmpHtml converte img->amp-img e neutraliza bypass", () => {
     assert.equal(containsDangerousHtml(sanitizeAmpHtml(vetor)), false, `AMP nao neutralizou: ${vetor}`);
   }
 });
+
+/**
+ * Bloco de video do editor (PRD do "Adicionar video"): o iframe de player e a
+ * UNICA excecao a DANGEROUS_TAGS no corpo de artigo. Sem isto o video aparecia
+ * no editor da central e sumia do blog, apagado aqui na entrega do ingest.
+ */
+const VIDEO_BLOCK =
+  '<div data-block="video" class="video-embed" style="position:relative;padding-bottom:56.25%;">' +
+  '<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Video" loading="lazy" ' +
+  'frameborder="0" allow="autoplay; encrypted-media" allowfullscreen ' +
+  'style="position:absolute;width:100%;height:100%;"></iframe></div>';
+
+test("artigo: player do YouTube/Vimeo sobrevive com a classe do layout", () => {
+  const limpo = sanitizeArticleHtml(VIDEO_BLOCK);
+  assert.ok(limpo.includes("<iframe"), `perdeu o player: ${limpo}`);
+  assert.ok(limpo.includes('src="https://www.youtube.com/embed/dQw4w9WgXcQ"'), limpo);
+  assert.ok(limpo.includes("allowfullscreen"), limpo);
+  // `class` segura o layout porque o `style` inline morre aqui (por design)
+  assert.ok(limpo.includes('class="video-embed"'), `perdeu a classe: ${limpo}`);
+  assert.ok(!limpo.includes("style="), `artigo nao deveria manter style: ${limpo}`);
+  // ...e o gate nao pode flagrar a propria saida do sanitizador
+  assert.equal(containsDangerousHtml(limpo), false, limpo);
+
+  const vimeo = sanitizeArticleHtml('<iframe src="https://player.vimeo.com/video/76979871"></iframe>');
+  assert.ok(vimeo.includes("<iframe"), vimeo);
+});
+
+test("artigo: iframe de qualquer outro host continua caindo", () => {
+  for (const src of [
+    "https://evil.com/x",
+    "http://www.youtube.com/embed/x",              // http nao vale
+    "https://youtube.com.evil.com/embed/x",        // host parecido
+    "/local",
+    "javascript:alert(1)",
+  ]) {
+    const limpo = sanitizeArticleHtml(`<p>ok</p><iframe src="${src}"></iframe>`);
+    assert.ok(!limpo.includes("<iframe"), `deveria remover iframe de ${src}: ${limpo}`);
+  }
+  assert.ok(!sanitizeArticleHtml("<iframe>sem src</iframe>").includes("<iframe"));
+});
+
+test("artigo: srcdoc e handlers caem mesmo no player permitido", () => {
+  const limpo = sanitizeArticleHtml(
+    '<iframe src="https://www.youtube.com/embed/x" srcdoc="<script>alert(1)</script>" onload="alert(2)"></iframe>',
+  );
+  assert.ok(limpo.includes("<iframe"), limpo);
+  assert.ok(!limpo.includes("srcdoc"), `srcdoc sobreviveu: ${limpo}`);
+  assert.ok(!limpo.includes("onload"), `handler sobreviveu: ${limpo}`);
+  assert.equal(containsDangerousHtml(limpo), false, limpo);
+});
+
+test("artigo: <video> de upload proprio sobrevive; URL insegura perde o src", () => {
+  const limpo = sanitizeArticleHtml(
+    '<video class="video-embed-file" src="https://cdn.exemplo.com/a.mp4" controls playsinline></video>',
+  );
+  assert.ok(limpo.includes("<video"), limpo);
+  assert.ok(limpo.includes('src="https://cdn.exemplo.com/a.mp4"'), limpo);
+  assert.ok(limpo.includes("controls"), limpo);
+  assert.ok(!sanitizeArticleHtml('<video src="javascript:alert(1)"></video>').includes("javascript:"));
+});
+
+test("e-mail e AMP NAO ganham player nem video (so o corpo de artigo ganhou)", () => {
+  const email = sanitizeEmailHtml(VIDEO_BLOCK);
+  assert.ok(!email.includes("<iframe"), `e-mail nao deveria ter iframe: ${email}`);
+  const amp = sanitizeAmpHtml(VIDEO_BLOCK);
+  assert.ok(!amp.includes("<iframe"), `AMP nao deveria ter iframe: ${amp}`);
+  assert.ok(!sanitizeAmpHtml('<video src="https://cdn.exemplo.com/a.mp4"></video>').includes("<video"));
+  assert.ok(!sanitizeEmailHtml('<video src="https://cdn.exemplo.com/a.mp4"></video>').includes("<video"));
+});

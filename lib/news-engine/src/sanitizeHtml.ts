@@ -33,24 +33,51 @@ const DANGEROUS_TAGS = [
   "link", "meta", "base", "noscript", "template", "frame", "frameset", "applet",
 ];
 
+/**
+ * Players cujo `<iframe>` e a UNICA excecao a `DANGEROUS_TAGS` no corpo de
+ * artigo. O bloco "Adicionar video" do editor grava um iframe no corpo; sem
+ * esta excecao ele morria aqui, na entrega, e o video sumia do site depois de
+ * aparecer no editor. So https e so estes hosts.
+ * ESPELHADO em `brasilia-agora/src/lib/sanitize.ts` (isVideoEmbedSrc), que faz
+ * o mesmo filtro na hora de exibir — mudar nos DOIS.
+ */
+const VIDEO_EMBED_SRC =
+  /^https:\/\/(?:www\.)?(?:youtube\.com\/embed\/|youtube-nocookie\.com\/embed\/|player\.vimeo\.com\/video\/)/i;
+
+/** `true` so para src de player permitido (o resto do iframe continua caindo). */
+export function isVideoEmbedSrc(src: string | null | undefined): boolean {
+  return VIDEO_EMBED_SRC.test((src ?? "").trim());
+}
+
 /** Atributos seguros permitidos em qualquer tag (nao executaveis). */
 const GLOBAL_SAFE_ATTRS = new Set(["class", "id", "title", "dir", "lang", "role", "align"]);
 
-/** Allowlist de tags de conteudo editorial. */
-const ARTICLE_TAGS = new Set([
+/** Allowlist de tags de conteudo editorial (texto puro, sem media incorporada). */
+const TEXT_TAGS = [
   "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li",
   "dl", "dt", "dd", "a", "img", "b", "strong", "i", "em", "u", "s", "strike",
   "del", "ins", "sub", "sup", "blockquote", "q", "cite", "figure", "figcaption",
   "span", "div", "section", "article", "table", "thead", "tbody", "tfoot",
   "tr", "th", "td", "caption", "colgroup", "col", "pre", "code", "mark",
   "small", "abbr", "time",
-]);
+];
+
+/**
+ * Corpo de artigo: texto + media passiva. `iframe` entra na allowlist mas so
+ * chega aqui o que passou pelo filtro de host; `video` e media sem execucao,
+ * do mesmo naipe de `img` (a URL ainda passa por `isSafeUrl`).
+ */
+const ARTICLE_TAGS = new Set([...TEXT_TAGS, "iframe", "video"]);
 
 /** Atributos por tag (alem dos globais seguros). */
 const ARTICLE_ATTRS: Record<string, Set<string>> = {
   a: new Set(["href", "title", "rel", "target"]),
   img: new Set(["src", "alt", "width", "height", "loading"]),
   "amp-img": new Set(["src", "alt", "width", "height", "layout"]),
+  // `srcdoc` fica DE FORA de proposito: com ele um host permitido executaria
+  // markup arbitrario.
+  iframe: new Set(["src", "width", "height", "allow", "allowfullscreen", "frameborder", "loading", "referrerpolicy"]),
+  video: new Set(["src", "controls", "poster", "width", "height", "preload", "playsinline"]),
   td: new Set(["colspan", "rowspan"]),
   th: new Set(["colspan", "rowspan", "scope"]),
   time: new Set(["datetime"]),
@@ -58,8 +85,11 @@ const ARTICLE_ATTRS: Record<string, Set<string>> = {
   colgroup: new Set(["span"]),
 };
 
-/** AMP: mesma base editorial, mas `img` vira `amp-img` (sem `img` cru). */
-const AMP_TAGS = new Set(Array.from(ARTICLE_TAGS).filter((t) => t !== "img").concat("amp-img"));
+/** AMP: base de texto, `img` vira `amp-img` e media incorporada nao existe. */
+const AMP_TAGS = new Set(TEXT_TAGS.filter((t) => t !== "img").concat("amp-img"));
+
+/** E-mail: base de texto. Cliente de e-mail nao roda iframe nem video. */
+const EMAIL_TAGS = new Set(TEXT_TAGS);
 
 /**
  * Extrai o esquema de uma URL para inspecao, removendo espacos e quebras
@@ -126,7 +156,11 @@ function unwrapDisallowed($: cheerio.CheerioAPI, allowed: Set<string>): void {
 export function sanitizeArticleHtml(html: string | null | undefined): string {
   if (!html) return "";
   const $ = cheerio.load(html, undefined, false);
-  $(DANGEROUS_TAGS.join(",")).remove();
+  // `iframe` sai do lote e e tratado por host logo abaixo — os outros caem todos.
+  $(DANGEROUS_TAGS.filter((t) => t !== "iframe").join(",")).remove();
+  $("iframe").each((_, el) => {
+    if (!isVideoEmbedSrc((el as El).attribs?.["src"])) $(el as never).remove();
+  });
   unwrapDisallowed($, ARTICLE_TAGS);
   $("*").each((_, el) => cleanAttrs($, el, ARTICLE_ATTRS));
   return $.html();
@@ -163,7 +197,7 @@ export function sanitizeEmailHtml(html: string | null | undefined): string {
   if (!html) return "";
   const $ = cheerio.load(html, undefined, false);
   $(DANGEROUS_TAGS.join(",")).remove();
-  unwrapDisallowed($, ARTICLE_TAGS);
+  unwrapDisallowed($, EMAIL_TAGS);
   $("*").each((_, el) => {
     const e = el as El;
     const tag = tagOf(el);
@@ -215,7 +249,12 @@ export function sanitizeAmpHtml(html: string | null | undefined): string {
 export function containsDangerousHtml(html: string | null | undefined): boolean {
   if (!html) return false;
   const $ = cheerio.load(html, undefined, false);
-  if ($(DANGEROUS_TAGS.join(",")).length > 0) return true;
+  // Player permitido nao e flagrado — senao a saida de sanitizeArticleHtml, que
+  // preserva esses iframes, seria detectada como perigosa pelo proprio gate.
+  const perigosas = $(DANGEROUS_TAGS.join(","))
+    .toArray()
+    .filter((el) => !(tagOf(el) === "iframe" && isVideoEmbedSrc((el as El).attribs?.["src"])));
+  if (perigosas.length > 0) return true;
   let bad = false;
   $("*").each((_, el) => {
     if (bad) return;

@@ -1,10 +1,10 @@
 import React, { useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Youtube from "@tiptap/extension-youtube";
+import { IframeEmbed, VideoEmbed, BlockDiv, StyledImage } from "./editorBlocks";
 import {
   Bold, Italic, Heading1, Heading2, Heading3,
   List, ListOrdered, Quote, Code, Link as LinkIcon,
@@ -91,10 +91,14 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
     const editor = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: { languageClassPrefix: "language-" } }),
-        Image.configure({ inline: false, allowBase64: true }),
+        StyledImage.configure({ inline: false, allowBase64: true }),
         Link.configure({ openOnClick: false, HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" } }),
         Placeholder.configure({ placeholder }),
         Youtube.configure({ width: 720, height: 405 }),
+        // Sem estes o ProseMirror descarta os blocos do painel (ver editorBlocks.ts).
+        IframeEmbed,
+        VideoEmbed,
+        BlockDiv,
       ],
       content: value,
       onUpdate({ editor }) { onChange(editor.getHTML()); },
@@ -223,8 +227,10 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
       try {
         const { url, mediaType } = await onUploadFile(file);
         if (mediaType === "video") {
+          // Sem wrapper <p>: `video` é nó de bloco (editorBlocks.ts) e dentro de
+          // um parágrafo o ProseMirror o jogaria fora ao reabrir o conteúdo.
           editor.chain().focus().insertContent(
-            `<p><video src="${url}" controls style="width:100%;max-width:100%;border-radius:10px;margin:12px 0;display:block;"></video></p>`
+            `<video class="video-embed-file" src="${escAttr(url)}" controls playsinline style="width:100%;max-width:100%;border-radius:10px;margin:12px 0;display:block;"></video>`
           ).run();
         } else {
           editor.chain().focus().insertContent(
@@ -510,7 +516,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
                     <div style={frame.bodyStyle}>
                       <EditorContent
                         editor={editor}
-                        className="prose-editor outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none"
+                        className="prose-editor outline-none [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:outline-none [&_.ProseMirror_iframe]:pointer-events-none [&_.ProseMirror_video]:pointer-events-none"
                       />
                     </div>
                     {frame.footer}
@@ -526,7 +532,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
               {toolbar}
               <EditorContent
                 editor={editor}
-                className="prose-editor min-h-[280px] px-4 py-3 text-sm outline-none bg-white [&_.ProseMirror]:min-h-[280px] [&_.ProseMirror]:outline-none"
+                className="prose-editor min-h-[280px] px-4 py-3 text-sm outline-none bg-white [&_.ProseMirror]:min-h-[280px] [&_.ProseMirror]:outline-none [&_.ProseMirror_iframe]:pointer-events-none [&_.ProseMirror_video]:pointer-events-none"
               />
               <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 bg-slate-50">
                 <span className="text-[11px] text-slate-400 font-mono">html</span>

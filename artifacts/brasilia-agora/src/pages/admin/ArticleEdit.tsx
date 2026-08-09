@@ -9,6 +9,10 @@ import { getStoredRole } from "../Admin";
 import { useSite } from "../../hooks/useSite";
 import { invalidateArticlesCache } from "../../hooks/useArticles";
 import {
+  buildVideoEmbed, buildGalleryBlock, buildCitationBlock, buildInlineImage,
+  getYoutubeId, getVimeoId,
+} from "../../lib/articleEmbeds";
+import {
   Save, Send, Eye, ChevronDown, ChevronRight,
   Image as ImageIcon, X, CheckCircle, Sparkles, Loader2,
   Bold, Italic, Underline, Strikethrough, Link as LinkIcon,
@@ -359,51 +363,24 @@ export default function ArticleEdit() {
   }
 
   function insertGallery() {
-    const valid = galleryImages.filter((u) => u.trim());
-    if (!valid.length) return;
-    const imgs = valid
-      .map((u) => `<img src="${u.trim()}" alt="" style="width:100%;height:200px;object-fit:cover;border-radius:8px;" />`)
-      .join("\n  ");
-    const block = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;margin:20px 0;">\n  ${imgs}\n</div>`;
+    const block = buildGalleryBlock(galleryImages);
+    if (!block) return;
     appendToContent(block);
     setGalleryOpen(false);
     setGalleryImages([""]);
   }
 
-  function getYoutubeId(url: string) {
-    const m = url.match(/(?:youtu\.be\/|v=|embed\/)([A-Za-z0-9_-]{11})/);
-    return m?.[1] ?? null;
-  }
-  function getVimeoId(url: string) {
-    const m = url.match(/vimeo\.com\/(\d+)/);
-    return m?.[1] ?? null;
-  }
-
   function insertVideo() {
-    const url = videoUrl.trim();
-    if (!url) return;
-    let embed = "";
-    const ytId = getYoutubeId(url);
-    const vimeoId = getVimeoId(url);
-    if (ytId) {
-      embed = `<div style="position:relative;padding-bottom:56.25%;height:0;margin:20px 0;"><iframe src="https://www.youtube.com/embed/${ytId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:10px;border:0;" allowfullscreen></iframe></div>`;
-    } else if (vimeoId) {
-      embed = `<div style="position:relative;padding-bottom:56.25%;height:0;margin:20px 0;"><iframe src="https://player.vimeo.com/video/${vimeoId}" style="position:absolute;top:0;left:0;width:100%;height:100%;border-radius:10px;border:0;" allowfullscreen></iframe></div>`;
-    } else {
-      embed = `<div style="margin:20px 0;"><video src="${url}" controls style="width:100%;border-radius:10px;"></video></div>`;
-    }
+    const embed = buildVideoEmbed(videoUrl);
+    if (!embed) return;
     appendToContent(embed);
     setVideoOpen(false);
     setVideoUrl("");
   }
 
   function insertCitation() {
-    const text = citationText.trim();
-    if (!text) return;
-    const footer = citationAuthor.trim()
-      ? `\n  <footer style="margin-top:10px;font-size:0.85em;color:#64748b;font-style:normal;">— ${citationAuthor.trim()}</footer>`
-      : "";
-    const block = `<blockquote style="border-left:4px solid #0B2A66;padding:14px 18px;margin:20px 0;background:#EEF2FF;border-radius:0 10px 10px 0;">\n  <p style="font-style:italic;color:#1e3a8a;margin:0;">"${text}"</p>${footer}\n</blockquote>`;
+    const block = buildCitationBlock(citationText, citationAuthor);
+    if (!block) return;
     appendToContent(block);
     setCitationOpen(false);
     setCitationText("");
@@ -411,14 +388,8 @@ export default function ArticleEdit() {
   }
 
   function insertInlineImage() {
-    const url = inlineImgUrl.trim();
-    if (!url) return;
-    const alt = inlineImgAlt.trim();
-    let style = "";
-    if (inlineImgAlign === "center") style = "display:block;margin:20px auto;max-width:100%;border-radius:8px;";
-    else if (inlineImgAlign === "left") style = "float:left;margin:0 18px 12px 0;max-width:48%;border-radius:8px;";
-    else style = "float:right;margin:0 0 12px 18px;max-width:48%;border-radius:8px;";
-    const block = `<img src="${url}" alt="${alt}" style="${style}" />`;
+    const block = buildInlineImage(inlineImgUrl, inlineImgAlt, inlineImgAlign);
+    if (!block) return;
     appendToContent(block);
     setInlineImgOpen(false);
     setInlineImgUrl("");
