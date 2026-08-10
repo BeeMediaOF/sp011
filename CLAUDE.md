@@ -161,6 +161,13 @@ o build do sp011 é o que gera a imagem dos blogs. Cada blog replicado fixa a
 sua tag em `BLOG_IMAGE_TAG` no `.env` próprio. Rollout padrão (bump + build +
 sp011 + canário + demais):
 
+⚠️ **Bump de `BLOG_IMAGE_VERSION` SEMPRE builda `api` E `web` juntos**, mesmo
+que a mudança seja só de frontend: a versão tagueia as DUAS imagens e `web`
+tem `depends_on: api`, então `up -d web` com a tag nova encontra
+`blog-api:<N>` inexistente e dispara um build implícito do api no meio do
+`up` (2026-08-10: +733 s em cima dos 1182 s, em série em vez de paralelo).
+Rebuild direcionado a um só serviço (§5) só vale SEM bump.
+
 ```bash
 cd /opt/sp011
 git pull
