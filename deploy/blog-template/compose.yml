@@ -53,6 +53,11 @@ services:
       default: {}
       blogs:
         aliases: ["${BLOG_ID}-web"]
+    # O comando é `pnpm run serve` (→ vite preview): como PID 1 e SEM handler de
+    # sinal, o kernel IGNORA o SIGTERM do `docker stop` e o container só morre no
+    # SIGKILL, 10 s depois — 10 dos ~25 s de cada blog no rollout de 2026-08-10.
+    # Com o init o PID 1 vira o tini, e aí o SIGTERM tem efeito padrão de novo.
+    init: true
     # PRD-07: espelha o hardening do web da raiz (serve estático).
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]

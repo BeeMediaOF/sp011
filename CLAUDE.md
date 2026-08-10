@@ -188,14 +188,17 @@ curl -s https://resenhavip.midia.run/api/site | grep -o '"siteName":"[^"]*"'
 ```
 
 ```bash
-# demais blogs (pula os que ainda não existem)
+# demais blogs (pula os que ainda não existem) — EM PARALELO: são projetos
+# compose independentes, e em série cada blog custa o seu próprio stop+start
+# (~25 s × N; 2026-08-10 foram 4 min para 9 blogs).
 N=$(grep -m1 '^BLOG_IMAGE_VERSION=' /opt/sp011/.env | cut -d= -f2)
 for b in ksports esporteagora oleysports beeesportes; do
   [ -d "/opt/blogs/$b" ] || continue
-  cd "/opt/blogs/$b"
-  sed -i "s|^BLOG_IMAGE_TAG=.*|BLOG_IMAGE_TAG=$N|" .env
-  docker compose up -d
+  ( cd "/opt/blogs/$b" \
+    && sed -i "s|^BLOG_IMAGE_TAG=.*|BLOG_IMAGE_TAG=$N|" .env \
+    && docker compose up -d ) &
 done
+wait
 cd /opt/sp011
 ```
 

@@ -69,6 +69,10 @@ services:
         aliases: ["sp011-web"]   # alias único p/ o Caddy (mesmo motivo do api)
     depends_on:
       - api
+    # `pnpm run serve` como PID 1 e sem handler: o kernel ignora o SIGTERM do
+    # `docker stop` e o container só morre no SIGKILL, 10 s depois. Com o init
+    # o PID 1 vira o tini e o SIGTERM volta a ter efeito padrão.
+    init: true
     # PRD-07: serve estático (vite preview) — bom candidato a read_only (validar no canário).
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
@@ -122,6 +126,9 @@ services:
       - "3001"
     depends_on:
       - central-api
+    # Mesmo motivo do `web`: `pnpm run start` (vite preview) como PID 1 ignora
+    # o SIGTERM; com o init o `docker stop` volta a ser imediato.
+    init: true
     # PRD-07: serve estático — candidato a read_only (validar no canário).
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
