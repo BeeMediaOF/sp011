@@ -720,3 +720,82 @@ html.dark .chipsel.on .name { color: var(--text); }
 .article-quote p:last-child {
   margin-bottom: 0;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Barra de Editar/Excluir dos blocos DENTRO do editor.
+
+   `.pm-block` só existe no node view (components/editorBlocks.ts) — nada disto
+   vai para o HTML salvo nem para os blogs. A barra fica escondida até o
+   ponteiro entrar no bloco para não poluir a leitura do texto.
+   ───────────────────────────────────────────────────────────── */
+.pm-block {
+  position: relative;
+}
+
+.pm-block > .pm-block-tools {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.pm-block:hover > .pm-block-tools,
+.pm-block:focus-within > .pm-block-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.pm-block:hover {
+  outline: 2px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.pm-block-tools button {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.97);
+  color: #334155;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 6px 9px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.16);
+}
+
+.pm-block-tools button:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.pm-block-tools button[data-act="del"]:hover {
+  background: #fee2e2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+/* Banner com link: o <a> não é renderizado no editor (engoliria o clique),
+   então o aviso de que a imagem é clicável fica na moldura. */
+.pm-block-linked::after {
+  content: "link";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgba(11, 42, 102, 0.85);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  pointer-events: none;
+}

@@ -1,16 +1,19 @@
-import React, { useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react";
+import React, { useCallback, useEffect, useImperativeHandle, forwardRef, useRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import Youtube from "@tiptap/extension-youtube";
-import { IframeEmbed, VideoEmbed, BlockDiv, StyledImage } from "./editorBlocks";
+import { IframeEmbed, VideoEmbed, BlockDiv, StyledImage, type BlockEditRequest } from "./editorBlocks";
+import {
+  buildVideoEmbed, inlineImageStyle, alignFromStyle, type InlineImageAlign,
+} from "../lib/articleEmbeds";
 import {
   Bold, Italic, Heading1, Heading2, Heading3,
   List, ListOrdered, Quote, Code, Link as LinkIcon,
   Image as ImageIcon, Youtube as YoutubeIcon,
   Undo, Redo, ClipboardPaste, AlignLeft, Upload, Loader2, X,
-  ExternalLink, Video,
+  ExternalLink, Video, AlignCenter, AlignRight,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────
@@ -68,17 +71,38 @@ type ModalKind = "image" | "youtube" | null;
 const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
   ({ value, onChange, onPasteClick, onFormatClick, onUploadFile, placeholder = "Escreva o conteúdo da matéria aqui..." }, ref) => {
 
+    /* Estado do modal de edição — aberto pelo lápis da barra de cada bloco. */
+    const [editReq, setEditReq] = useState<BlockEditRequest | null>(null);
+    const [edUrl,   setEdUrl]   = useState("");
+    const [edAlt,   setEdAlt]   = useState("");
+    const [edHref,  setEdHref]  = useState("");
+    const [edAlign, setEdAlign] = useState<InlineImageAlign>("center");
+    // Só reescreve o style da imagem se o autor mexer no alinhamento: senão uma
+    // foto de galeria (grade) sairia do modal virando imagem solta.
+    const [edAlignTouched, setEdAlignTouched] = useState(false);
+    const [edUploadBusy, setEdUploadBusy] = useState(false);
+    const edFileRef = useRef<HTMLInputElement>(null);
+
+    const abrirEdicao = useCallback((req: BlockEditRequest) => {
+      setEdUrl(String(req.attrs.src ?? ""));
+      setEdAlt(String(req.attrs.alt ?? ""));
+      setEdHref(String(req.attrs.href ?? ""));
+      setEdAlign(alignFromStyle(req.attrs.style as string | null));
+      setEdAlignTouched(false);
+      setEditReq(req);
+    }, []);
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({ codeBlock: { languageClassPrefix: "language-" } }),
-        StyledImage.configure({ inline: false, allowBase64: true }),
+        StyledImage.configure({ inline: false, allowBase64: true, onEdit: abrirEdicao }),
         Link.configure({ openOnClick: false, HTMLAttributes: { rel: "noopener noreferrer", target: "_blank" } }),
         Placeholder.configure({ placeholder }),
         Youtube.configure({ width: 720, height: 405 }),
         // Sem estes o ProseMirror descarta os blocos do painel (ver editorBlocks.ts).
         IframeEmbed,
-        VideoEmbed,
-        BlockDiv,
+        VideoEmbed.configure({ onEdit: abrirEdicao }),
+        BlockDiv.configure({ onEdit: abrirEdicao }),
       ],
       content: value,
       onUpdate({ editor }) { onChange(editor.getHTML()); },
@@ -171,8 +195,59 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
     /* ── confirm youtube ── */
     function confirmYoutube() {
       if (!ytUrl || !editor) return;
-      editor.commands.setYoutubeVideo({ src: ytUrl });
+      // Mesmo bloco do botão "Adicionar vídeo" do painel (moldura 16:9 + barra
+      // de Editar/Excluir), em vez do nó próprio do @tiptap/extension-youtube.
+      const bloco = buildVideoEmbed(ytUrl);
+      if (bloco) editor.chain().focus().insertContent(bloco).run();
       setModal(null);
+    }
+
+    /* ── salva o modal de edição de um bloco (lápis da barra) ── */
+    function salvarEdicao() {
+      if (!editor || !editReq) return;
+      const { pos, kind } = editReq;
+      const alvo = editor.state.doc.nodeAt(pos);
+      if (!alvo) { setEditReq(null); return; }
+
+      if (kind === "video") {
+        const bloco = buildVideoEmbed(edUrl);
+        if (!bloco) return;
+        editor.chain().focus()
+          .deleteRange({ from: pos, to: pos + alvo.nodeSize })
+          .insertContentAt(pos, bloco)
+          .run();
+      } else {
+        const src = edUrl.trim();
+        if (!src) return;
+        const attrs: Record<string, unknown> = {
+          ...alvo.attrs,
+          src,
+          alt: edAlt.trim() || null,
+          href: edHref.trim() || null,
+        };
+        if (edAlignTouched) attrs.style = inlineImageStyle(edAlign);
+        editor.chain().focus().command(({ tr }) => {
+          tr.setNodeMarkup(pos, undefined, attrs);
+          return true;
+        }).run();
+      }
+      setEditReq(null);
+    }
+
+    /* ── upload dentro do modal de edição ── */
+    async function handleEditUpload(e: React.ChangeEvent<HTMLInputElement>) {
+      const file = e.target.files?.[0];
+      if (!file || !onUploadFile) return;
+      e.target.value = "";
+      setEdUploadBusy(true);
+      try {
+        const { url } = await onUploadFile(file);
+        setEdUrl(url);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Erro no upload");
+      } finally {
+        setEdUploadBusy(false);
+      }
     }
 
     /* ── video/file upload from toolbar ── */
@@ -315,6 +390,106 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, Props>(
                 className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50"
               >
                 Incorporar
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Editar bloco (lápis da barra do vídeo / da imagem) ── */}
+        {editReq && (
+          <Modal
+            title={editReq.kind === "video" ? "Editar vídeo" : "Editar imagem"}
+            onClose={() => setEditReq(null)}
+          >
+            <Field label={editReq.kind === "video" ? "URL do vídeo" : "URL da imagem"}>
+              <div className="flex gap-2">
+                <input
+                  className={INPUT}
+                  value={edUrl}
+                  onChange={e => setEdUrl(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); salvarEdicao(); } }}
+                />
+                {editReq.kind === "image" && onUploadFile && (
+                  <>
+                    <input ref={edFileRef} type="file" accept="image/*" className="hidden" onChange={handleEditUpload} />
+                    <button
+                      type="button"
+                      disabled={edUploadBusy}
+                      onMouseDown={e => { e.preventDefault(); edFileRef.current?.click(); }}
+                      className="shrink-0 flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors disabled:opacity-60 border border-emerald-200"
+                    >
+                      {edUploadBusy ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
+                      {edUploadBusy ? "…" : "Trocar"}
+                    </button>
+                  </>
+                )}
+              </div>
+              {editReq.kind === "image" && edUrl && (
+                <img src={edUrl} alt="preview" className="mt-2 max-h-28 w-auto rounded-lg border border-slate-200 object-cover" />
+              )}
+            </Field>
+
+            {editReq.kind === "video" && (
+              <p className="text-[11px] text-slate-400">
+                Cole outro link do YouTube, Vimeo ou uma URL direta de vídeo — o bloco é refeito no mesmo lugar.
+              </p>
+            )}
+
+            {editReq.kind === "image" && (
+              <>
+                <Field label="Texto alternativo (alt)">
+                  <input className={INPUT} placeholder="Descrição da imagem" value={edAlt} onChange={e => setEdAlt(e.target.value)} />
+                </Field>
+                <Field label="Link ao clicar (opcional)">
+                  <div className="flex items-center gap-2">
+                    <ExternalLink size={14} className="shrink-0 text-slate-400" />
+                    <input className={INPUT} placeholder="https://anunciante.com.br" value={edHref} onChange={e => setEdHref(e.target.value)} />
+                  </div>
+                </Field>
+                {editReq.context !== "galeria" && (
+                  <Field label="Alinhamento">
+                    <div className="flex gap-2">
+                      {([
+                        ["left", AlignLeft, "Esquerda"],
+                        ["center", AlignCenter, "Centro"],
+                        ["right", AlignRight, "Direita"],
+                      ] as const).map(([val, Icon, rotulo]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          title={rotulo}
+                          onMouseDown={e => { e.preventDefault(); setEdAlign(val); setEdAlignTouched(true); }}
+                          className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                            edAlign === val
+                              ? "bg-[#0B2A66] text-white border-[#0B2A66]"
+                              : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Icon size={13} /> {rotulo}
+                        </button>
+                      ))}
+                    </div>
+                  </Field>
+                )}
+              </>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onMouseDown={e => { e.preventDefault(); setEditReq(null); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!edUrl.trim()}
+                onMouseDown={e => { e.preventDefault(); salvarEdicao(); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold text-white bg-[#0B2A66] hover:bg-[#0a2459] transition-colors disabled:opacity-50"
+              >
+                Salvar
               </button>
             </div>
           </Modal>

@@ -120,6 +120,19 @@ const INLINE_IMAGE_STYLE: Record<InlineImageAlign, string> = {
   right: "float:right;margin:0 0 12px 18px;max-width:48%;border-radius:8px;",
 };
 
+/** Style de alinhamento de imagem no texto — usado ao inserir e ao editar. */
+export function inlineImageStyle(align: InlineImageAlign): string {
+  return INLINE_IMAGE_STYLE[align];
+}
+
+/** Lê o alinhamento de volta a partir do style da imagem (para abrir o modal). */
+export function alignFromStyle(style: string | null | undefined): InlineImageAlign {
+  const s = (style ?? "").replace(/\s+/g, "").toLowerCase();
+  if (s.includes("float:left")) return "left";
+  if (s.includes("float:right")) return "right";
+  return "center";
+}
+
 /** Imagem solta no corpo do texto, com alinhamento. Devolve "" sem URL. */
 export function buildInlineImage(rawUrl: string, alt: string, align: InlineImageAlign): string {
   const url = rawUrl.trim();

@@ -488,7 +488,22 @@ montada no servidor.
   nó = bloco somem do editor sem erro nenhum (foi o bug do vídeo). O bloco leva
   `class` ALÉM do `style` porque o sanitizador do ingest apaga `style` inline:
   o layout real vem de `.video-embed`/`.article-gallery`/`.article-quote`
-  (`index.css` do blog e `styles.css` da central).
+  (`index.css` do blog e `styles.css` da central). O round-trip de verdade
+  (parse+serialize do ProseMirror, com jsdom) é testado em
+  `brasilia-agora/src/components/admin/editorBlocks.test.ts` — bloco novo
+  entra lá, é o único jeito de provar que ele sobrevive.
+- **Barra Editar/Excluir dos blocos** (ago/2026): cada `blockDiv`/`videoEmbed`/
+  `image` tem node view com barra flutuante (`.pm-block`/`.pm-block-tools`, CSS
+  no `index.css`/`styles.css`; nada disso vai para o HTML salvo). O lápis
+  chama `options.onEdit` → modal no RichTextEditor (vídeo: refaz o bloco pela
+  URL; imagem: src/alt/href/alinhamento, e o alinhamento só reescreve o `style`
+  se o autor tocar nele, senão quebra a célula da galeria). Excluir apaga o
+  bloco inteiro quando o nó é filho único de um `blockDiv`. O botão YouTube da
+  barra do editor usa `buildVideoEmbed` (o nó `youtube` do TipTap ficou só para
+  ler conteúdo antigo). Imagem carrega `href` como ATRIBUTO (`<a>` em volta não
+  é nó nenhum e sumia — era o banner de anúncio perdendo o clique); o `<a>`
+  volta no `renderHTML` e só é lido do DOM quando a imagem é o único conteúdo
+  do link.
 - **Player de vídeo é a única exceção a iframe** nas TRÊS sanitizações
   (`brasilia-agora/src/lib/sanitize.ts`, `central-web/src/lib/sanitize.ts` e a
   canônica `lib/news-engine/src/sanitizeHtml.ts`): só https e só

@@ -102,6 +102,21 @@ test("div SEM data-block continua sendo achatada (HTML colado de fora)", () => {
   assert.ok(!saida.includes("do-outro-site"), `arrastou a div de fora: ${saida}`);
 });
 
+test("banner com link mantem o <a> (o anuncio perdia o clique)", () => {
+  const saida = roundtrip(
+    '<a href="https://anunciante.com.br" target="_blank" rel="noopener noreferrer" style="display:inline-block">' +
+      '<img src="https://x/banner.jpg" alt="anuncio" style="max-width:100%;display:block;"></a>',
+  );
+  assert.ok(saida.includes('href="https://anunciante.com.br"'), `perdeu o link: ${saida}`);
+  assert.ok(saida.includes('src="https://x/banner.jpg"'), saida);
+  assert.ok(saida.includes('rel="noopener noreferrer"'), saida);
+});
+
+test("link de texto com imagem junto NAO vira banner clicavel", () => {
+  const saida = roundtrip('<p><a href="https://x.com">titulo <img src="https://x/i.png"></a></p>');
+  assert.ok(!/<a[^>]*>\s*<img/.test(saida), `carimbou href na imagem errada: ${saida}`);
+});
+
 test("embed do proprio @tiptap/extension-youtube continua sendo dele", () => {
   const saida = roundtrip(
     '<div data-youtube-video=""><iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ"></iframe></div>',
