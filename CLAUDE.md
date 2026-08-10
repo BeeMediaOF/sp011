@@ -202,6 +202,26 @@ wait
 cd /opt/sp011
 ```
 
+⚠️ **`compose.yml` de blog replicado é CÓPIA do template, não um link.** Mudar
+`deploy/blog-template/compose.yml` não muda blog nenhum — tem que propagar
+(`cp` + `up -d`, no mesmo loop paralelo). Sem isso a rede deriva em silêncio:
+em 2026-08-10 sete blogs ainda rodavam o template PRÉ-PRD-07 (sem `mem_limit`,
+`cap_drop`, `no-new-privileges` nem healthcheck) porque foram criados antes de
+`82f9dc8` — os 10 foram alinhados nesse dia. Para auditar a deriva, comparar
+com a versão ANTERIOR do template (`git show <commit>~1:deploy/blog-template/
+compose.yml`); comparar com a atual acusa todos depois de um `git pull`.
+
+```bash
+cd /opt/sp011
+for b in ocomandante ksports esporteagora resenhavip oleysports beeesportes \
+         apostaganha recebabet pontofarma creditovc; do
+  [ -d "/opt/blogs/$b" ] || continue
+  cp deploy/blog-template/compose.yml /opt/blogs/$b/compose.yml
+  ( cd /opt/blogs/$b && docker compose up -d ) &
+done
+wait
+```
+
 Diagnóstico de mistura de blogs (incidente clássico):
 `curl -s https://<dominio>/api/site | grep -o '"siteName":"[^"]*"'` em cada
 domínio — cada um deve devolver o próprio nome.
