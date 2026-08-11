@@ -11,13 +11,13 @@
     "test": "node --test \"test/**/*.test.ts\""
   },
   "dependencies": {
-    "@google/genai": "^2.8.0",
+    "@google/genai": "^2.16.0",
     "@workspace/central-db": "workspace:*",
     "@workspace/news-engine": "workspace:*",
     "cors": "^2.8.6",
     "drizzle-orm": "catalog:",
     "express": "^5.2.1",
-    "helmet": "^8.2.0",
+    "helmet": "^8.3.0",
     "pino": "^9.14.0",
     "pino-http": "^10.5.0"
   },
