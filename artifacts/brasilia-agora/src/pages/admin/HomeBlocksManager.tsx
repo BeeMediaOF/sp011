@@ -28,7 +28,7 @@ type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete"
 /** "menu"/"html" só valem no bloco Categorias (origem da navegação). */
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity" | "menu" | "html";
 type HeaderStyle = "standard" | "compact" | "centered";
-type FooterStyle = "dark" | "light" | "minimal";
+type FooterStyle = "dark" | "light" | "minimal" | "portal";
 type Tab = "blocks" | "templates" | "header" | "footer" | "settings" | "article";
 
 // ── Página de notícia: lateral padrão + classe de input do editor ────────────
@@ -233,6 +233,7 @@ const HEADER_PRESETS: { id: HeaderStyle; label: string; desc: string }[] = [
 ];
 const FOOTER_PRESETS: { id: FooterStyle; label: string; desc: string }[] = [
   { id: "dark",    label: "Escuro",  desc: "Fundo preto, colunas com links, newsletter" },
+  { id: "portal",  label: "Portal",  desc: "Marca + descrição na 1ª coluna, 3 colunas de links, CNPJ na barra final" },
   { id: "light",   label: "Claro",   desc: "Fundo branco, colunas com links, borda vermelha" },
   { id: "minimal", label: "Minimal", desc: "Apenas uma linha com copyright e links" },
 ];
@@ -525,7 +526,7 @@ const STARTER_TEMPLATES: HomeTemplate[] = [
 ];
 
 const HEADER_STYLE_LABEL: Record<HeaderStyle, string> = { standard: "Padrão", compact: "Compacto", centered: "Centralizado" };
-const FOOTER_STYLE_LABEL: Record<FooterStyle, string> = { dark: "Escuro", light: "Claro", minimal: "Minimal" };
+const FOOTER_STYLE_LABEL: Record<FooterStyle, string> = { dark: "Escuro", portal: "Portal", light: "Claro", minimal: "Minimal" };
 
 // ─── Extended block form ──────────────────────────────────────────────────────
 interface BlockForm {
@@ -553,6 +554,8 @@ interface BlockForm {
   linkLabel: string;
   buttonLabel: string;
   sectionStyle: "" | "revista";
+  /** "Modo hero": esconde o cabeçalho da seção (título + "Ver mais"). */
+  hideHeader: boolean;
   isAd: boolean;
   fontFamily: string;
   /** Bloco "Categorias": imagem/rótulo/ocultar por editoria. */
@@ -571,6 +574,7 @@ const EMPTY_FORM: BlockForm = {
   area: "", width: "", linkLabel: "",
   buttonLabel: "",
   sectionStyle: "",
+  hideHeader: false,
   isAd: false,
   fontFamily: "",
   categoryItems: [],
@@ -605,6 +609,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     linkLabel:     block.linkLabel ?? "",
     buttonLabel:   block.buttonLabel ?? "",
     sectionStyle:  block.sectionStyle ?? "",
+    hideHeader:    block.hideHeader ?? false,
     isAd:          block.isAd ?? false,
     fontFamily:    block.fontFamily ?? "",
     categoryItems: block.categoryItems ?? [],
@@ -628,7 +633,11 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     color:      f.color,
     reverse:    f.reverse,
     source:     f.source,
-    itemsLimit: f.itemsLimit,
+    // Só os tipos que exibem artigos têm "Quantidade de itens" na tela. Gravar
+    // para todos criava campo fantasma: o bloco Categorias, que não tem esse
+    // controle, saía de qualquer edição com itemsLimit=4 (o default do
+    // blockToForm) e a home passava a mostrar 4 editorias sem ninguém pedir.
+    itemsLimit: ARTICLE_TYPES.has(f.blockType) ? f.itemsLimit : undefined,
     imageUrl:   f.imageUrl.trim() || undefined,
     linkUrl:    f.linkUrl.trim() || undefined,
     caption:    f.caption.trim() || undefined,
@@ -643,6 +652,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     linkLabel:  f.linkLabel.trim() || undefined,
     buttonLabel: f.blockType === "newsletter" ? (f.buttonLabel.trim() || undefined) : undefined,
     sectionStyle: isContent && f.sectionStyle ? "revista" : undefined,
+    hideHeader: f.hideHeader ? true : undefined,
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
     fontFamily: f.fontFamily || undefined,
     categoryItems: f.blockType === "categories" && f.categoryItems.length > 0 ? f.categoryItems : undefined,
@@ -1349,21 +1359,38 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
         </PanelSection>
       )}
 
-      {/* Cabeçalho estilo revista (título grande + link colorido, sem barra) */}
-      {!isSpecial && form.blockType === "content" && form.layout !== "mini" && form.layout !== "hero" && (
+      {/* Cabeçalho da seção: esconder de vez ("modo hero") ou trocar o estilo */}
+      {!isSpecial && (
         <PanelSection label="Cabeçalho da seção" icon={Type}>
           <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
             <div className="flex items-center gap-2">
-              <Type size={12} className="text-slate-400" />
-              <span className="text-[12px] font-medium text-slate-700">Estilo revista (título grande + link colorido)</span>
+              <EyeOff size={12} className="text-slate-400" />
+              <span className="text-[12px] font-medium text-slate-700">Sem cabeçalho (modo hero)</span>
             </div>
-            <Toggle checked={form.sectionStyle === "revista"}
-              onChange={() => onChange("sectionStyle", form.sectionStyle === "revista" ? "" : "revista")}
+            <Toggle checked={form.hideHeader}
+              onChange={() => onChange("hideHeader", !form.hideHeader)}
               accent={form.color} />
           </div>
-          <p className="text-[10px] mt-1.5 text-slate-400 leading-relaxed">
-            Os layouts Cards Revista e Hero Revista já usam este cabeçalho.
+          <p className="text-[10px] mt-1.5 mb-2 text-slate-400 leading-relaxed">
+            Esconde o título e o "Ver mais" — o bloco fica só com o conteúdo, como
+            o destaque principal. O nome continua identificando o bloco nesta lista.
           </p>
+          {form.blockType === "content" && form.layout !== "mini" && form.layout !== "hero" && !form.hideHeader && (
+            <>
+              <div className="flex items-center justify-between py-1.5 px-3 rounded-xl bg-white border border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Type size={12} className="text-slate-400" />
+                  <span className="text-[12px] font-medium text-slate-700">Estilo revista (título grande + link colorido)</span>
+                </div>
+                <Toggle checked={form.sectionStyle === "revista"}
+                  onChange={() => onChange("sectionStyle", form.sectionStyle === "revista" ? "" : "revista")}
+                  accent={form.color} />
+              </div>
+              <p className="text-[10px] mt-1.5 text-slate-400 leading-relaxed">
+                Os layouts Cards Revista e Hero Revista já usam este cabeçalho.
+              </p>
+            </>
+          )}
         </PanelSection>
       )}
 

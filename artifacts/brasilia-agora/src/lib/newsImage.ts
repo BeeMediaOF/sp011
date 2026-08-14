@@ -188,6 +188,24 @@ export function siteAssetSrcSet(
 /** Larguras para cards de notícia (thumbnails e destaques médios). */
 export const CARD_WIDTHS = [320, 480, 640, 960];
 
+/**
+ * Larguras para caixas que RECORTAM a foto (`object-cover`) — cards retrato e
+ * faixas panorâmicas.
+ *
+ * Nessas caixas o `sizes` não pode ser a largura do card: o navegador escolhe o
+ * candidato pela largura, mas o recorte precisa cobrir também a ALTURA. Num
+ * card 3:4 de 296x395 preenchido por uma foto 16:10, a origem precisa ter
+ * `395 x 1,6 = 632 px` de largura — pedir 320 fazia o navegador ampliar ~2x e
+ * era a borra vista na home do credito.vc (2026-08-14). Por isso a menor
+ * largura aqui é 480 e existe um degrau de 1280 (a faixa 16:6 do layout
+ * revista ocupa os 1248 px inteiros do container).
+ */
+export const COVER_WIDTHS = [480, 640, 960, 1280];
+
+/** Qualidade WebP das caixas de recorte: a foto É o card, sem texto ao redor
+ *  para disfarçar artefato. 82 continua o padrão do resto da home. */
+export const COVER_Q = 86;
+
 /** Larguras para imagens hero (ocupam 33–100% da viewport). */
 export const HERO_WIDTHS = [480, 768, 1024, 1280];
 

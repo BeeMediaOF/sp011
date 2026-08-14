@@ -21,9 +21,11 @@ interface Props {
   color: string;
   href: string;
   articles: Article[];
+  /** "Modo hero": esconde o título da seção e o "Ver mais". */
+  hideHeader?: boolean;
 }
 
-export default function SectionBlockFeatured({ title, color, href, articles }: Props) {
+export default function SectionBlockFeatured({ title, color, href, articles, hideHeader }: Props) {
   const { settings } = useSite();
   const { t } = useT();
   const bylineName = settings?.bylineName || settings?.siteName || t("common.newsroom");
@@ -46,21 +48,23 @@ export default function SectionBlockFeatured({ title, color, href, articles }: P
       <div className="max-w-[1280px] mx-auto px-4">
 
         {/* Cabeçalho da seção */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-5" style={{ backgroundColor: color }} />
-            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
-              {title}
-            </h2>
+        {!hideHeader && (
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-5" style={{ backgroundColor: color }} />
+              <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">
+                {title}
+              </h2>
+            </div>
+            <Link
+              href={href}
+              className="text-[11px] font-bold hover:underline uppercase tracking-wider"
+              style={{ color }}
+            >
+              {t("common.seeMoreArrow")}
+            </Link>
           </div>
-          <Link
-            href={href}
-            className="text-[11px] font-bold hover:underline uppercase tracking-wider"
-            style={{ color }}
-          >
-            {t("common.seeMoreArrow")}
-          </Link>
-        </div>
+        )}
 
         {/* Layout: destaque (esq) + lista (dir) */}
         <div className="flex flex-col lg:flex-row gap-6">

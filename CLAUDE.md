@@ -445,6 +445,16 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
 - Isolamento entre blogs é por infra (container+DB+SESSION_SECRET próprios);
   NÃO existe blogId no app — nunca hardcodar conteúdo por blog na imagem
   compartilhada (usar settings).
+- **Fontes RSS padrão = espelho do painel central** (2026-08-14): a imagem
+  instalava 25 feeds do sp011 (Agência Brasil, Metrópoles, Jovem Pan…) em todo
+  blog novo — marca de outro portal. Agora `DEFAULT_RSS_SOURCES` deriva de
+  `api-server/src/lib/centralSourcesCatalog.ts` (ARQUIVO GERADO, 91 fontes),
+  tudo `active:false`/`autoMode:"none"`: quem coleta continua sendo a central.
+  `reconcileRssCatalog()` (boot, flag `settings.rss_catalog_v2`) troca as
+  antigas nos blogs que já existiam — apaga SÓ o que casa URL antiga **E**
+  inativa **E** `last_fetched_at IS NULL`, e insere deduplicando por URL em
+  código (a tabela não tem UNIQUE em `url`). Regenerar o catálogo a partir do
+  banco central: comando no cabeçalho do próprio arquivo.
 - **Nenhuma marca embutida na imagem** (varredura de 2026-08-08): não existe
   mais `brand.ts` com nome/domínio fixos. Identidade vem de
   `settings.siteName`/`contact` e, como reserva, do host da requisição —
@@ -534,6 +544,33 @@ montada no servidor.
   `settings.footerConfig`; zonas main/sidebar/half; ver memória do repo em
   `HomeBlocksManager.tsx` ao criar tipo novo (renderer + case + painel +
   tipos nos dois stores).
+  - `hideHeader` (2026-08-14) é o "modo hero" de QUALQUER bloco: esconde
+    título + "Ver mais". Cada layout tem markup de cabeçalho próprio, então o
+    campo é honrado em 13 lugares (4 inline no `Home.tsx`, o
+    `SectionHeaderClassic`, os 6 `components/SectionBlock*.tsx`, o
+    `ZoneSectionHeader` e o `SectionHeading` dos blocos custom) — layout novo
+    tem que respeitá-lo também.
+  - `formToBlockPatch` só grava `itemsLimit` para `ARTICLE_TYPES`. Gravar para
+    todos criava campo fantasma: o bloco Categorias, que não tem esse controle
+    na tela, saía de qualquer edição com `itemsLimit: 4` (default do
+    `blockToForm`) e a home exibia 4 editorias sem ninguém pedir. O corte por
+    `itemsLimit` saiu do `resolveCategoryBlockItems` — quem quer menos usa o
+    olho (`hidden`) de cada editoria.
+- **`sizes` de caixa que RECORTA a foto** (`object-cover`): o navegador escolhe
+  o candidato do `srcset` pela LARGURA, mas o recorte precisa cobrir a ALTURA —
+  num card 3:4 de 296x395 com foto 16:10 a origem precisa ter `395 x 1,6 = 632`
+  px. Pedir a largura da caixa (320) fazia o navegador ampliar 2x e borrar
+  (item do credito.vc, 2026-08-14). Essas caixas usam `COVER_WIDTHS`/`COVER_Q`
+  de `lib/newsImage.ts` (degrau de 1280 para telas 2x) e `sizes` calculado pela
+  altura, não pela largura.
+- **Rodapé**: 4 estilos (`dark`, `portal`, `light`, `minimal`). O `portal`
+  (2026-08-14) é o modelo da rede: marca + descrição na 1ª coluna do grid, 3
+  colunas de links, e barra final com copyright | `CNPJ … • endereço` (do hub
+  de Contato; sem os dois, cai nos links legais). O tipo está escrito em 6
+  lugares (`store.ts` ×2, `homeBlocks.ts`, `adminApi.ts`, `useSite.ts`,
+  `HomeBlocksManager.tsx`) — mudar nos SEIS. Kit do credito.vc:
+  `deploy/creditovc/footer_final.sql` (rodar DEPOIS do template, que
+  sobrescreve o rodapé).
 - **Blocos do corpo do artigo** (vídeo, galeria, citação, imagem no texto —
   ago/2026): o corpo é editado pelo **TipTap**, que DESCARTA em silêncio toda
   tag sem nó no schema. Quem gera o HTML é `lib/articleEmbeds.ts` (puro,

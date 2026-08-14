@@ -20,9 +20,11 @@ interface SectionBlockProps {
   href: string;
   articles: SectionArticle[];
   pageSize?: number;
+  /** "Modo hero": esconde título, paginação e "Ver mais". */
+  hideHeader?: boolean;
 }
 
-export default function SectionBlock({ title, color, href, articles, pageSize = 3 }: SectionBlockProps) {
+export default function SectionBlock({ title, color, href, articles, pageSize = 3, hideHeader }: SectionBlockProps) {
   const { t } = useT();
   const [page, setPage] = useState(0);
   const totalPages = Math.ceil(articles.length / pageSize);
@@ -31,6 +33,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
+        {!hideHeader && (
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -67,6 +70,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
             </Link>
           </div>
         </div>
+        )}
 
         {/* ── Mobile: horizontal carousel ── */}
         <div className="flex sm:hidden overflow-x-auto snap-x snap-mandatory gap-4 -mx-4 px-4 pb-3 scrollbar-none"

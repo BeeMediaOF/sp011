@@ -21,6 +21,7 @@ import {
   articleViewsTable,
 } from "@workspace/db";
 import { logger } from "./logger.js";
+import { CENTRAL_SOURCES_CATALOG } from "./centralSourcesCatalog.js";
 import {
   encryptSecret,
   decryptSecret,
@@ -144,7 +145,7 @@ export interface HomeTemplate {
   builtin?: boolean;
   blocks: HomeBlock[];
   headerStyle?: "standard" | "compact" | "centered";
-  footerStyle?: "dark" | "light" | "minimal";
+  footerStyle?: "dark" | "light" | "minimal" | "portal";
   headerBgColor?: string; footerBgColor?: string;
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
@@ -241,7 +242,7 @@ export interface SiteSettings {
   mobileEnabled: boolean; desktopEnabled: boolean;
   showTickerBar?: boolean; showHeroStrip?: boolean;
   headerStyle?: "standard" | "compact" | "centered";
-  footerStyle?: "dark" | "light" | "minimal";
+  footerStyle?: "dark" | "light" | "minimal" | "portal";
   headerBgColor?: string; footerBgColor?: string;
   menuTextColor?: string; menuActiveColor?: string;
   menuFontSize?: number; menuFontWeight?: number;
@@ -504,33 +505,54 @@ const DEFAULT_CONTACT: ContactInfo = {
   privacyEmail: "",
 };
 
-const DEFAULT_RSS_SOURCES: Omit<RssSource, "id" | "createdAt">[] = [
-  { name: "Agência Brasil – Política",      url: "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml",               category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Correio Braziliense – Política", url: "https://www.correiobraziliense.com.br/politica/feed",                   category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jovem Pan – Política",           url: "https://jovempan.com.br/noticias/politica/feed",                         category: "politica",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Agência Brasil – Internacional", url: "https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml",           category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Carta Capital – Mundo",          url: "https://www.cartacapital.com.br/mundo/feed/",                            category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jovem Pan – Mundo",              url: "https://jovempan.com.br/noticias/mundo/feed",                            category: "mundo",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Agência Brasil – Economia",      url: "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",                category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "InfoMoney – Economia",           url: "https://www.infomoney.com.br/economia/feed/",                            category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jovem Pan – Economia",           url: "https://jovempan.com.br/noticias/economia/feed",                         category: "economia",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Agência Brasil – Esportes",      url: "https://agenciabrasil.ebc.com.br/rss/esportes/feed.xml",                category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jovem Pan – Esportes",           url: "https://jovempan.com.br/esportes/feed",                                  category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Esportes",          url: "https://www.metropoles.com/esportes/feed",                               category: "esportes",   active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Agência Brasil – Cultura",       url: "https://agenciabrasil.ebc.com.br/radioagencia-nacional/rss/cultura/feed.xml", category: "cultura", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Entretenimento",    url: "https://www.metropoles.com/entretenimento/feed",                         category: "cultura",    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Agência Brasil – Justiça",       url: "https://agenciabrasil.ebc.com.br/rss/justica/feed.xml",                 category: "seguranca",  active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Correio Braziliense – Saúde",    url: "https://www.correiobraziliense.com.br/ciencia-e-saude/feed",             category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Saúde",             url: "https://www.metropoles.com/saude/feed",                                  category: "saude",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Notícias ao Minuto – Tech",      url: "https://www.noticiasaominuto.com.br/rss/tech",                          category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Ciência",           url: "https://www.metropoles.com/ciencia/feed",                                category: "tecnologia", active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Correio Braziliense (geral)",    url: "https://www.correiobraziliense.com.br/feed",                             category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jornal de Brasília – DF",        url: "https://jornaldebrasilia.com.br/brasilia/feed/",                         category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Distrito Federal",  url: "https://www.metropoles.com/distrito-federal/feed",                      category: "cidade",     active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Correio Braziliense – Brasil",   url: "https://www.correiobraziliense.com.br/brasil/feed",                     category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Jovem Pan – Brasil",             url: "https://jovempan.com.br/noticias/brasil/feed",                           category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
-  { name: "Metrópoles – Brasil",            url: "https://www.metropoles.com/brasil/feed",                                 category: "geral",      active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" },
+/**
+ * Fontes que a imagem instalava por padrão até 2026-08-13: 25 feeds do sp011
+ * (Agência Brasil, Metrópoles, Jovem Pan, Correio Braziliense…). Eram marca de
+ * OUTRO portal dentro da imagem compartilhada — todo blog da rede nascia com
+ * elas, contra a regra do CLAUDE.md §13.
+ *
+ * A lista SOBREVIVE aqui só para a reconciliação saber o que remover dos blogs
+ * que já as receberam (ver reconcileRssCatalog). Nada nesta lista é instalado.
+ */
+const LEGACY_DEFAULT_SOURCE_URLS: readonly string[] = [
+  "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml",
+  "https://www.correiobraziliense.com.br/politica/feed",
+  "https://jovempan.com.br/noticias/politica/feed",
+  "https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml",
+  "https://www.cartacapital.com.br/mundo/feed/",
+  "https://jovempan.com.br/noticias/mundo/feed",
+  "https://agenciabrasil.ebc.com.br/rss/economia/feed.xml",
+  "https://www.infomoney.com.br/economia/feed/",
+  "https://jovempan.com.br/noticias/economia/feed",
+  "https://agenciabrasil.ebc.com.br/rss/esportes/feed.xml",
+  "https://jovempan.com.br/esportes/feed",
+  "https://www.metropoles.com/esportes/feed",
+  "https://agenciabrasil.ebc.com.br/radioagencia-nacional/rss/cultura/feed.xml",
+  "https://www.metropoles.com/entretenimento/feed",
+  "https://agenciabrasil.ebc.com.br/rss/justica/feed.xml",
+  "https://www.correiobraziliense.com.br/ciencia-e-saude/feed",
+  "https://www.metropoles.com/saude/feed",
+  "https://www.noticiasaominuto.com.br/rss/tech",
+  "https://www.metropoles.com/ciencia/feed",
+  "https://www.correiobraziliense.com.br/feed",
+  "https://jornaldebrasilia.com.br/brasilia/feed/",
+  "https://www.metropoles.com/distrito-federal/feed",
+  "https://www.correiobraziliense.com.br/brasil/feed",
+  "https://jovempan.com.br/noticias/brasil/feed",
+  "https://www.metropoles.com/brasil/feed",
 ];
+
+/**
+ * Fontes instaladas num blog novo: o espelho do catálogo do painel central,
+ * TUDO INATIVO (active:false, autoMode:"none", sem agendamento). Quem
+ * coleta continua sendo a central — o pipeline interno do blog segue dormente
+ * (CLAUDE.md §11) — mas o operador vê no painel as mesmas fontes da rede.
+ */
+const DEFAULT_RSS_SOURCES: Omit<RssSource, "id" | "createdAt">[] =
+  CENTRAL_SOURCES_CATALOG.map((s) => ({
+    name: s.name, url: s.url, category: s.category,
+    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" as const,
+  }));
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 
@@ -864,6 +886,75 @@ export async function seedDefaultRssSources(): Promise<void> {
     lastFetchedAt: undefined,
   }));
   logger.info({ count: rows.length }, "store: seeded default RSS sources");
+}
+
+/** Marca de que a reconciliação abaixo já rodou neste blog. */
+const RSS_CATALOG_FLAG = "rss_catalog_v2";
+
+/**
+ * Troca as 25 fontes padrão antigas (do sp011) pelo catálogo da central nos
+ * blogs que JÁ existem. O seed acima só age com a tabela vazia, então sem isto
+ * os 10 blogs no ar ficariam para sempre com feeds de outro portal no painel.
+ *
+ * Regras de segurança do que é REMOVIDO — só sai a linha que atende às três:
+ *   1. a URL está na lista antiga (nada cadastrado à mão é tocado);
+ *   2. `active = false` (fonte ligada é decisão de alguém, fica);
+ *   3. `last_fetched_at IS NULL` (nunca coletou — o que já rodou tem histórico
+ *      e pode estar amarrado a artigos; protege o sp011 e o fallback de
+ *      emergência do ksports).
+ *
+ * A INSERÇÃO deduplica por URL em código de propósito: `rss_sources` não tem
+ * UNIQUE em `url`, então o `onConflictDoNothing` (que só cobre a PK) duplicaria
+ * o catálogo inteiro numa segunda passada.
+ *
+ * Roda uma vez por blog; a flag mora numa chave própria de `settings` para não
+ * disputar o blob de site_settings com o painel.
+ */
+export async function reconcileRssCatalog(): Promise<void> {
+  try {
+    const flag = await db.select().from(settingsTable).where(eq(settingsTable.key, RSS_CATALOG_FLAG));
+    if (flag.length > 0) return;
+
+    const legacy = new Set(LEGACY_DEFAULT_SOURCE_URLS);
+    const existing = await db.select().from(rssSourcesTable);
+
+    const removeIds = existing
+      .filter((r) => legacy.has(r.url) && !r.active && r.lastFetchedAt === null)
+      .map((r) => r.id);
+    for (const id of removeIds) {
+      await db.delete(rssSourcesTable).where(eq(rssSourcesTable.id, id));
+    }
+
+    const keptUrls = new Set(
+      existing.filter((r) => !removeIds.includes(r.id)).map((r) => r.url),
+    );
+    const toInsert = DEFAULT_RSS_SOURCES.filter((s) => !keptUrls.has(s.url));
+    for (const s of toInsert) {
+      await db.insert(rssSourcesTable).values({
+        ...s, id: randomUUID(), createdAt: new Date(),
+        fetchLimit: s.fetchLimit ?? null, customPrompt: null, lastFetchedAt: null,
+      });
+    }
+
+    await db.insert(settingsTable)
+      .values({ key: RSS_CATALOG_FLAG, value: JSON.stringify({ at: new Date().toISOString() }), updatedAt: new Date() })
+      .onConflictDoNothing();
+
+    // Recarrega o cache: o painel e o scheduler leem daqui.
+    const fresh = await db.select().from(rssSourcesTable);
+    _cache.rssSources = fresh.map((r) => ({
+      ...r, createdAt: r.createdAt.toISOString(), autoMode: r.autoMode as RssAutoMode,
+      fetchLimit: r.fetchLimit ?? undefined, customPrompt: r.customPrompt ?? undefined,
+      lastFetchedAt: r.lastFetchedAt?.toISOString(),
+    }));
+    logger.info(
+      { removidas: removeIds.length, inseridas: toInsert.length, total: fresh.length },
+      "store: catálogo de fontes RSS alinhado ao painel central",
+    );
+  } catch (err) {
+    // Não-fatal: um blog sem as fontes novas continua no ar (a coleta é da central).
+    logger.warn({ err }, "store: reconciliação do catálogo de fontes falhou (não-fatal)");
+  }
 }
 
 // ─── Assets das settings servidos como URL ────────────────────────────────────

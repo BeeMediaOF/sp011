@@ -225,8 +225,16 @@ test("resolveCategoryBlockItems: ajustes por editoria (imagem, rótulo, ocultar)
   assert.equal(out[1]!.icon, "i:economia");
 });
 
-test("resolveCategoryBlockItems: itemsLimit corta e lista vazia devolve []", () => {
-  assert.equal(resolveCategoryBlockItems({ itemsLimit: 2 }, CATS, MENU, icon).length, 2);
+// Regressão do "só aparece 4" (2026-08-14): o painel do bloco Categorias nunca
+// teve campo de quantidade, mas o formulário gravava itemsLimit=4 em qualquer
+// bloco salvo — abrir o bloco uma vez cortava a home em 4 editorias sem controle
+// nenhum para desfazer. Quem quer menos usa o `hidden` (teste acima).
+test("resolveCategoryBlockItems: itemsLimit NÃO corta o bloco de editorias", () => {
+  const out = resolveCategoryBlockItems({ itemsLimit: 2 } as never, CATS, MENU, icon);
+  assert.deepEqual(out.map((c) => c.slug), ["negocios", "economia", "aviacao"]);
+});
+
+test("resolveCategoryBlockItems: lista vazia devolve []", () => {
   assert.deepEqual(resolveCategoryBlockItems({}, [], [], icon), []);
 });
 

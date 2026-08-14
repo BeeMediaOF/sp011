@@ -164,6 +164,79 @@ export default function Footer() {
     );
   }
 
+  // ── Portal ────────────────────────────────────────────────────────────────
+  // Modelo dos portais de conteúdo: a MARCA é a 1ª coluna do grid (não uma
+  // faixa própria acima dele, como no dark) e a barra final troca os links
+  // legais por CNPJ/endereço. Tudo vem das settings do blog — CNPJ e endereço
+  // saem do hub de Contato, e sem eles a barra volta para os links legais.
+  if (style === "portal") {
+    const portalAccent = settings?.footerAccentColor || "#22d3a0";
+    const info = [
+      settings?.contact?.cnpj ? `CNPJ ${settings.contact.cnpj}` : "",
+      settings?.contact?.address ?? "",
+    ].filter(Boolean).join(" • ");
+    return (
+      <footer className="text-white pt-10 pb-5 border-t-[3px]"
+        style={{ backgroundColor: bgColor ?? "#0a1220", borderTopColor: portalAccent }}>
+        <div className="max-w-[1280px] mx-auto px-4">
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)] gap-8 lg:gap-6 pb-8">
+            <div className="min-w-0">
+              <FooterBrand src={logoColorSrc} name={settings?.siteName || ""} height={logoH} />
+              {f.description && (
+                <p className="text-gray-400 text-[13px] leading-relaxed max-w-[320px] mt-2">{f.description}</p>
+              )}
+              {f.showSocial && f.social.length > 0 && (
+                <div className="mt-5">
+                  <SocialIcons social={f.social}
+                    className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" />
+                </div>
+              )}
+            </div>
+
+            {f.columns.slice(0, 3).map((col) => (
+              <div key={col.id} className="min-w-0">
+                <h3 className="font-bold mb-4 uppercase text-[12px] tracking-wider text-white">{col.title}</h3>
+                <ul className="flex flex-col gap-2.5 text-[13px] text-gray-400">
+                  {col.links.map((l) => (
+                    <li key={l.id}>
+                      <FooterAnchor href={l.href} className="hover:text-white transition-colors">{l.label}</FooterAnchor>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          {(f.showContact || f.showNewsletter) && (
+            <div className="border-t border-white/10 pt-6 pb-2 flex flex-col sm:flex-row sm:items-end gap-4 justify-between">
+              {f.showContact && (
+                <div className="text-gray-400 text-[13px] space-y-1">
+                  {f.phone && <p className="text-white font-bold">{f.phone}</p>}
+                  {f.email && <p>{f.email}</p>}
+                </div>
+              )}
+              {f.showNewsletter && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider mb-2 text-gray-400">{f.newsletterTitle}</p>
+                  <NewsletterForm dark accent={portalAccent} />
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="border-t border-white/10 pt-5 flex flex-col sm:flex-row justify-between items-center gap-2 text-[12px] text-gray-500">
+            <p>{settings ? f.copyright : ""}</p>
+            {info
+              ? <p>{info}</p>
+              : <LegalRow links={f.legalLinks} className="hover:text-white transition-colors" sepClassName="text-gray-700" />}
+          </div>
+
+        </div>
+      </footer>
+    );
+  }
+
   // ── Light ─────────────────────────────────────────────────────────────────
   // Acento configurável (borda superior, títulos das colunas e botão da
   // newsletter) — ausente = vermelho original.

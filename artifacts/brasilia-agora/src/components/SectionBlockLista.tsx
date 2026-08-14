@@ -19,6 +19,8 @@ interface Props {
   color: string;
   href: string;
   articles: Article[];
+  /** "Modo hero": esconde o título da seção e o "Ver mais". */
+  hideHeader?: boolean;
 }
 
 function imgSrc(img: unknown): string {
@@ -26,7 +28,7 @@ function imgSrc(img: unknown): string {
   return (img as { src?: string })?.src ?? "";
 }
 
-export default function SectionBlockLista({ title, color, href, articles }: Props) {
+export default function SectionBlockLista({ title, color, href, articles, hideHeader }: Props) {
   const { t } = useT();
   const items = articles.slice(0, 7);
   if (items.length === 0) return null;
@@ -35,15 +37,17 @@ export default function SectionBlockLista({ title, color, href, articles }: Prop
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
 
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-5" style={{ backgroundColor: color }} />
-            <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+        {!hideHeader && (
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-5" style={{ backgroundColor: color }} />
+              <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
+            </div>
+            <Link href={href} className="text-[11px] font-bold hover:underline uppercase tracking-wider" style={{ color }}>
+              {t("common.seeMoreArrow")}
+            </Link>
           </div>
-          <Link href={href} className="text-[11px] font-bold hover:underline uppercase tracking-wider" style={{ color }}>
-            {t("common.seeMoreArrow")}
-          </Link>
-        </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-0 divide-y divide-gray-100 md:divide-y-0">
           {items.map((item, idx) => {

@@ -17,7 +17,7 @@ import { useArticles } from "../hooks/useArticles";
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { useT, formatDayMonth } from "../lib/i18n";
-import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS, COVER_WIDTHS, COVER_Q } from "@/lib/newsImage";
 import { inferBlockType, segmentBlocks, sampleForPreview, safeLinkUrl, type SegmentEntry } from "../lib/homeBlocks";
 import { sanitizeArticleHtml, safeTitleHtml } from "../lib/sanitize";
 import {
@@ -84,13 +84,22 @@ function sortByViews(list: SectionArticle[]): SectionArticle[] {
    lenta esperando para ser reintroduzida por engano. */
 
 // ─── Extra layout components ──────────────────────────────────────────────────
-function SectionBlockTrio({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+/** Props comuns dos layouts de seção do fluxo clássico.
+ *  `hideHeader` é o "modo hero" do bloco: esconde título e "Ver mais" sem mexer
+ *  no resto do layout (o `name` do bloco continua identificando-o no painel). */
+interface SectionLayoutProps {
+  title: string; color: string; href: string; articles: SectionArticle[];
+  hideHeader?: boolean;
+}
+
+function SectionBlockTrio({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const { t } = useT();
   const items = articles.slice(0, 3);
   if (items.length === 0) return null;
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
+        {!hideHeader && (
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -98,6 +107,7 @@ function SectionBlockTrio({ title, color, href, articles }: { title: string; col
           </div>
           <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {items.map((a) => (
             <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="group flex flex-col">
@@ -113,13 +123,14 @@ function SectionBlockTrio({ title, color, href, articles }: { title: string; col
   );
 }
 
-function SectionBlockCompact({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockCompact({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const { t } = useT();
   const items = articles.slice(0, 6);
   if (items.length === 0) return null;
   return (
     <section className="border-t border-gray-200 py-6">
       <div className="max-w-[1280px] mx-auto px-4">
+        {!hideHeader && (
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -127,6 +138,7 @@ function SectionBlockCompact({ title, color, href, articles }: { title: string; 
           </div>
           <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
+        )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
           {items.map((a) => (
             <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className="flex gap-3 items-start group border-b border-gray-100 pb-3 last:border-0">
@@ -144,13 +156,14 @@ function SectionBlockCompact({ title, color, href, articles }: { title: string; 
   );
 }
 
-function SectionBlockBigStory({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockBigStory({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const { t } = useT();
   const [main, ...rest] = articles;
   if (!main) return null;
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
+        {!hideHeader && (
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -158,6 +171,7 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
           </div>
           <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
+        )}
         <div className="flex flex-col lg:flex-row gap-6">
           <Link href={`/artigo/${main.slug ?? main.id}`} className="flex-[3] relative group overflow-hidden rounded-xl">
             <div className="relative w-full aspect-[16/7] overflow-hidden rounded-xl">
@@ -190,13 +204,14 @@ function SectionBlockBigStory({ title, color, href, articles }: { title: string;
   );
 }
 
-function SectionBlockTimeline({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockTimeline({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const { t } = useT();
   const items = articles.slice(0, 6);
   if (items.length === 0) return null;
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
+        {!hideHeader && (
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -204,6 +219,7 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
           </div>
           <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
         </div>
+        )}
         <div className="relative pl-6 border-l-2" style={{ borderColor: color + "40" }}>
           {items.map((a, i) => (
             <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`} className={`flex gap-4 items-start group relative ${i < items.length - 1 ? "mb-5" : ""}`}>
@@ -221,8 +237,11 @@ function SectionBlockTimeline({ title, color, href, articles }: { title: string;
   );
 }
 
-function SectionHeaderClassic({ title, color, href }: { title: string; color: string; href: string }) {
+function SectionHeaderClassic({ title, color, href, hideHeader }: {
+  title: string; color: string; href: string; hideHeader?: boolean;
+}) {
   const { t } = useT();
+  if (hideHeader) return null;
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-3">
@@ -234,16 +253,24 @@ function SectionHeaderClassic({ title, color, href }: { title: string; color: st
   );
 }
 
-/** Card com título sobre a imagem (usado por overlay/mosaico/magazine). */
-function OverlayCardClassic({ a, color, big = false, className = "" }: {
+/**
+ * Card com título sobre a imagem (usado por overlay/mosaico/magazine).
+ *
+ * `sizes` é OBRIGATÓRIO nos chamadores com caixa recortada: aqui a foto é
+ * posicionada em absoluto com `object-cover`, então quem manda no tamanho de
+ * origem é o maior entre a largura da caixa e `altura x proporção da foto` —
+ * ver o comentário de COVER_WIDTHS em lib/newsImage.
+ */
+function OverlayCardClassic({ a, color, big = false, className = "", sizes, widths = COVER_WIDTHS }: {
   a: SectionArticle; color: string; big?: boolean; className?: string;
+  sizes?: string; widths?: number[];
 }) {
   return (
     <Link href={`/artigo/${a.slug ?? a.id}`}
       className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${className}`}>
       {a.image && (
-        <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
-          sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px"}
+        <img src={a.image} srcSet={buildSrcSet(a.image, widths, COVER_Q) || undefined}
+          sizes={sizes ?? (big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px")}
           alt={a.title} width={640} height={400} loading="lazy" decoding="async"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       )}
@@ -257,20 +284,24 @@ function OverlayCardClassic({ a, color, big = false, className = "" }: {
   );
 }
 
-function SectionBlockMosaico({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockMosaico({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const [big, ...tiles] = articles.slice(0, 5);
   if (!big) return null;
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
-        <SectionHeaderClassic title={title} color={color} href={href} />
+        <SectionHeaderClassic title={title} color={color} href={href} hideHeader={hideHeader} />
         {/* Altura travada em md+; a linha implícita precisa de minmax(0,1fr)
             para imagens verticais não estourarem o bloco. */}
+        {/* Alturas travadas em md+ (420px o grande, 204px cada tile): o recorte
+            precisa de ~1,6x a altura em largura de origem, não da largura da caixa. */}
         <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)] gap-3 md:h-[420px]">
-          <OverlayCardClassic a={big} color={color} big className="aspect-[16/10] md:aspect-auto md:h-full min-h-0" />
+          <OverlayCardClassic a={big} color={color} big className="aspect-[16/10] md:aspect-auto md:h-full min-h-0"
+            sizes="(max-width: 768px) 100vw, 700px" />
           <div className="grid grid-cols-2 grid-rows-2 gap-3 min-h-0">
             {tiles.slice(0, 4).map((a) => (
-              <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[16/10] md:aspect-auto md:h-full min-h-0" />
+              <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[16/10] md:aspect-auto md:h-full min-h-0"
+                sizes="(max-width: 768px) 50vw, 340px" />
             ))}
           </div>
         </div>
@@ -279,16 +310,19 @@ function SectionBlockMosaico({ title, color, href, articles }: { title: string; 
   );
 }
 
-function SectionBlockOverlay({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockOverlay({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const items = articles.slice(0, 4);
   if (items.length === 0) return null;
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
-        <SectionHeaderClassic title={title} color={color} href={href} />
+        <SectionHeaderClassic title={title} color={color} href={href} hideHeader={hideHeader} />
+        {/* Card RETRATO: ~296x395 no desktop. Uma foto 16:10 só cobre 395px de
+            altura se a origem tiver ~632px de largura — daí o sizes de 640. */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {items.map((a) => (
-            <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[3/4]" />
+            <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[3/4]"
+              sizes="(max-width: 768px) 70vw, 640px" />
           ))}
         </div>
       </div>
@@ -296,15 +330,18 @@ function SectionBlockOverlay({ title, color, href, articles }: { title: string; 
   );
 }
 
-function SectionBlockMagazine({ title, color, href, articles }: { title: string; color: string; href: string; articles: SectionArticle[] }) {
+function SectionBlockMagazine({ title, color, href, articles, hideHeader }: SectionLayoutProps) {
   const [main, ...rest] = articles;
   if (!main) return null;
   const grid = rest.slice(0, 4);
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
-        <SectionHeaderClassic title={title} color={color} href={href} />
-        <OverlayCardClassic a={main} color={color} big className="aspect-[16/9] md:aspect-[16/6]" />
+        <SectionHeaderClassic title={title} color={color} href={href} hideHeader={hideHeader} />
+        {/* Faixa panorâmica: ocupa os 1248px do container — pedir 640 entregava
+            metade da resolução necessária. */}
+        <OverlayCardClassic a={main} color={color} big className="aspect-[16/9] md:aspect-[16/6]"
+          sizes="(max-width: 1280px) 100vw, 1248px" />
         {grid.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-5">
             {grid.map((a) => (
@@ -343,10 +380,11 @@ function SectionBlockMini({ block, color, articles }: {
   const items = articles.slice(0, block.itemsLimit ?? 5);
   if (items.length === 0) return null;
   const destaque = block.format === "destaque" && items.length >= 2;
+  const hideHeader = block.hideHeader === true;
   return (
     <section className="max-w-[1280px] mx-auto px-4 py-6">
-      <ZoneSectionHeader variant="revista" title={block.name} color={color}
-        href={href} linkLabel={block.linkLabel} />
+      <ZoneSectionHeader variant="revista" title={hideHeader ? "" : block.name} color={color}
+        href={hideHeader ? undefined : href} linkLabel={block.linkLabel} />
       {destaque ? (
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] gap-5 items-stretch">
           <HeroOverlayCard a={items[0]} color={color} big eager={false}
@@ -376,7 +414,9 @@ function HeroOverlayCard({ a, color, big = false, minRead, className = "", eager
     <Link href={`/artigo/${a.slug ?? a.id}`}
       className={`group relative block overflow-hidden rounded-2xl bg-gray-200 ${className}`}>
       {a.image && (
-        <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+        // Caixa de recorte (h-full/min-h): larguras COVER para o degrau de 1280
+        // das telas 2x — o CARD_WIDTHS parava em 960 e serrilhava o destaque.
+        <img src={a.image} srcSet={buildSrcSet(a.image, COVER_WIDTHS, COVER_Q) || undefined}
           sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 100vw, 300px"}
           alt={a.title} width={640} height={400} loading={eager ? "eager" : "lazy"} decoding="async"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -440,7 +480,9 @@ function SectionBlockHero({ block, color, articles }: {
           <Link href={`/artigo/${main.slug ?? main.id}`}
             className="group relative block overflow-hidden rounded-2xl bg-gray-200 aspect-[16/10] lg:aspect-auto lg:h-full lg:min-h-[400px]">
             {main.image && (
-              <img src={main.image} srcSet={buildSrcSet(main.image, CARD_WIDTHS) || undefined}
+              // Destaque do hero: caixa de recorte de ~568x400 → precisa de 640
+              // de origem (400 x 1,6), e do degrau 1280 nas telas 2x.
+              <img src={main.image} srcSet={buildSrcSet(main.image, COVER_WIDTHS, COVER_Q) || undefined}
                 sizes="(max-width: 1024px) 100vw, 640px" alt={main.title}
                 width={640} height={400} loading="eager" fetchPriority="high" decoding="sync"
                 className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -498,6 +540,8 @@ function CustomBlock({ block, getArticles, preview }: {
   // "mini"/"hero", que fatiam por conta própria) — os demais layouts editoriais
   // (featured, duplo, mosaico…) definem as próprias contagens.
   const limited = block.itemsLimit ? byCategory.slice(0, block.itemsLimit) : byCategory;
+  // "Modo hero": some o cabeçalho de seção (título + "Ver mais") deste bloco.
+  const hd = block.hideHeader === true;
 
   // ── Tipos não-editoriais: cada bloco renderiza o SEU conteúdo ──
   switch (type) {
@@ -518,7 +562,7 @@ function CustomBlock({ block, getArticles, preview }: {
     case "sep":         return <SeparatorBlock block={block} />;
     case "list":
       return limited.length > 0
-        ? <SectionBlockLista title={block.name} color={color} href={href} articles={limited} />
+        ? <SectionBlockLista title={block.name} color={color} href={href} articles={limited} hideHeader={hd} />
         : <BlockPlaceholder preview={preview} label={`Lista: ${block.name}`}
             hint="Nenhum artigo encontrado para a categoria configurada." />;
     case "weather":
@@ -538,36 +582,36 @@ function CustomBlock({ block, getArticles, preview }: {
 
   switch (block.layout) {
     case "featured":
-      return <SectionBlockFeatured title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockFeatured title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "duplo":
-      return <SectionBlockDuploDestaque title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockDuploDestaque title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "cultura":
-      return <SectionBlockCulturaLayout title={block.name} color={color} href={href} articles={articles} reverse={block.reverse} />;
+      return <SectionBlockCulturaLayout title={block.name} color={color} href={href} articles={articles} reverse={block.reverse} hideHeader={hd} />;
     case "lista":
-      return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockLista title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "manchete":
-      return <SectionBlockManchete title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockManchete title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "mosaico":
-      return <SectionBlockMosaico title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockMosaico title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "overlay":
-      return <SectionBlockOverlay title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockOverlay title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "magazine":
-      return <SectionBlockMagazine title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockMagazine title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "trio":
-      return <SectionBlockTrio title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockTrio title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "compact":
-      return <SectionBlockCompact title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockCompact title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "bigstory":
-      return <SectionBlockBigStory title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockBigStory title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "timeline":
-      return <SectionBlockTimeline title={block.name} color={color} href={href} articles={articles} />;
+      return <SectionBlockTimeline title={block.name} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "mini":
       return <SectionBlockMini block={block} color={color} articles={articles} />;
     case "hero":
       return <SectionBlockHero block={block} color={color} articles={articles} />;
     case "grid":
     default:
-      return <SectionBlock title={block.name} color={color} href={href} articles={articles} pageSize={4} />;
+      return <SectionBlock title={block.name} color={color} href={href} articles={articles} pageSize={4} hideHeader={hd} />;
   }
 }
 
@@ -601,6 +645,7 @@ function ConfigurableBlock({ block, getArticles, preview }: {
   const layout = block.layout   ?? defaults?.layout   ?? "grid";
   const href   = `/${cat}`;
   const title  = block.name;
+  const hd     = block.hideHeader === true;
   let articles = getArticles(cat);
 
   // Preview do admin: categoria vazia mostra amostra "EXEMPLO" (público: null).
@@ -611,36 +656,36 @@ function ConfigurableBlock({ block, getArticles, preview }: {
 
   switch (layout) {
     case "featured":
-      return <SectionBlockFeatured title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockFeatured title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "duplo":
-      return <SectionBlockDuploDestaque title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockDuploDestaque title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "cultura":
-      return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} reverse={block.reverse ?? defaults?.reverse} />;
+      return <SectionBlockCulturaLayout title={title} color={color} href={href} articles={articles} reverse={block.reverse ?? defaults?.reverse} hideHeader={hd} />;
     case "lista":
-      return <SectionBlockLista title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockLista title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "manchete":
-      return <SectionBlockManchete title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockManchete title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "mosaico":
-      return <SectionBlockMosaico title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockMosaico title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "overlay":
-      return <SectionBlockOverlay title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockOverlay title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "magazine":
-      return <SectionBlockMagazine title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockMagazine title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "trio":
-      return <SectionBlockTrio title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockTrio title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "compact":
-      return <SectionBlockCompact title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockCompact title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "bigstory":
-      return <SectionBlockBigStory title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockBigStory title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "timeline":
-      return <SectionBlockTimeline title={title} color={color} href={href} articles={articles} />;
+      return <SectionBlockTimeline title={title} color={color} href={href} articles={articles} hideHeader={hd} />;
     case "mini":
       return <SectionBlockMini block={block} color={color} articles={articles} />;
     case "hero":
       return <SectionBlockHero block={block} color={color} articles={articles} />;
     case "grid":
     default:
-      return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} />;
+      return <SectionBlock title={title} color={color} href={href} articles={articles} pageSize={4} hideHeader={hd} />;
   }
 }
 

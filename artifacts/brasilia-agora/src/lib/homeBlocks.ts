@@ -85,6 +85,10 @@ export interface HomeBlock {
   /** Cabeçalho de seção estilo "revista" (título grande + link colorido, sem
    *  barra/uppercase). Os layouts "mini" e "hero" já usam revista por padrão. */
   sectionStyle?: "revista";
+  /** Esconde o cabeçalho da seção (título + "Ver mais") — o "modo hero" de
+   *  qualquer bloco. O `name` continua existindo: é o identificador do bloco na
+   *  lista do painel e nos templates, então esvaziá-lo não é alternativa. */
+  hideHeader?: boolean;
   /** Bloco de imagem/HTML marcado como propaganda — listado na aba Propagandas do admin. */
   isAd?: boolean;
   /** Bloco "categories": ajustes por editoria (imagem própria, rótulo, ocultar).
@@ -123,7 +127,7 @@ export interface HomeTemplate {
   builtin?: boolean;
   blocks: HomeBlock[];
   headerStyle?: "standard" | "compact" | "centered";
-  footerStyle?: "dark" | "light" | "minimal";
+  footerStyle?: "dark" | "light" | "minimal" | "portal";
   headerBgColor?: string;
   footerBgColor?: string;
   menuTextColor?: string;
@@ -350,15 +354,20 @@ export interface MenuSourceEntry { label: string; path: string; visible?: boolea
 
 /**
  * Lista final de editorias do bloco: base (categorias do blog ou itens do
- * menu) + ajustes de `categoryItems` (rótulo, imagem, ocultar), cortada por
- * `itemsLimit`.
+ * menu) + ajustes de `categoryItems` (rótulo, imagem, ocultar).
  *
  * Um blog que nunca salvou Categorias cai no menu — sem isso o bloco sumiria
  * da home justamente nos blogs recém-instalados. Ajuste de slug que não existe
  * mais na base é ignorado (categoria apagada não volta pelo bloco).
+ *
+ * NÃO corta por `itemsLimit` (2026-08-14): o painel do bloco Categorias nunca
+ * teve campo de quantidade, mas o formulário gravava `itemsLimit: 4` em TODO
+ * bloco salvo — bastava abrir o bloco uma vez para a home passar a exibir 4
+ * editorias, sem controle nenhum na tela para desfazer. Quem quer menos usa o
+ * olho (`hidden`) de cada editoria, que já existe no CategoryItemsEditor.
  */
 export function resolveCategoryBlockItems(
-  block: Pick<HomeBlock, "source" | "itemsLimit" | "categoryItems">,
+  block: Pick<HomeBlock, "source" | "categoryItems">,
   categories: readonly CategorySourceEntry[] | undefined,
   menuItems: readonly MenuSourceEntry[] | undefined,
   iconOf: (slug: string, label: string) => string,
@@ -393,8 +402,7 @@ export function resolveCategoryBlockItems(
       icon: iconOf(entry.slug, label),
     });
   }
-  const limit = block.itemsLimit ?? 0;
-  return limit > 0 ? out.slice(0, limit) : out;
+  return out;
 }
 
 /** Links clicáveis (imagem/banner): http(s) ou caminho relativo do site. Nunca javascript:. */

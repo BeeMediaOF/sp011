@@ -56,7 +56,7 @@ export interface SiteSettings {
   bylineName?: string;
   bylineLogoBase64?: string;
   headerStyle?: "standard" | "compact" | "centered";
-  footerStyle?: "dark" | "light" | "minimal";
+  footerStyle?: "dark" | "light" | "minimal" | "portal";
   headerBgColor?: string;
   footerBgColor?: string;
   /** Barra utilitária acima do cabeçalho (data + manchete trending + redes). */

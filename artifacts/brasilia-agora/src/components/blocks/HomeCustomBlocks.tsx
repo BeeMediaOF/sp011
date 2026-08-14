@@ -98,8 +98,8 @@ export function BlockPlaceholder({ label, hint, preview }: { label: string; hint
 }
 
 // ─── Cabeçalho de seção padrão ───────────────────────────────────────────────
-function SectionHeading({ title, color }: { title: string; color: string }) {
-  if (!title) return null;
+function SectionHeading({ title, color, hideHeader }: { title: string; color: string; hideHeader?: boolean }) {
+  if (!title || hideHeader) return null;
   return (
     <div className="flex items-center gap-3 mb-4">
       <div className="w-1 h-5" style={{ backgroundColor: color }} />
@@ -758,7 +758,7 @@ export function CategoriesBlock({ block, preview, contained = true }: {
   const allHref = safeLinkUrl(block.linkUrl) ?? "/arquivo";
   const allLabel = (block.linkLabel ?? "").trim();
   const wrap = contained ? "max-w-[1280px] mx-auto px-4 py-6" : "";
-  const heading = block.name
+  const heading = block.name && !block.hideHeader
     ? (block.sectionStyle === "revista"
       ? <h2 className="text-[22px] font-extrabold text-[#1a1a1a] leading-tight mb-5">{block.name}</h2>
       : <SectionHeading title={block.name} color={color} />)
@@ -830,7 +830,7 @@ export function SocialLinksBlock({ block, preview }: { block: HomeBlock; preview
   return (
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4 flex flex-col items-center gap-4">
-        <SectionHeading title={block.name} color={color} />
+        <SectionHeading title={block.name} color={color} hideHeader={block.hideHeader} />
         <div className="flex flex-wrap justify-center gap-3">
           {links.map(({ key, href }) => {
             const Icon = SOCIAL_ICONS[key];

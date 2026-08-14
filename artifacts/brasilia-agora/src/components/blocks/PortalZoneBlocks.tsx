@@ -554,7 +554,8 @@ function ZoneContent({ block, articles, color, href, zone, preview }: {
 
   return (
     <section className="min-w-0">
-      <ZoneSectionHeader title={block.name} color={color} href={href} linkLabel={block.linkLabel}
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color}
+        href={block.hideHeader ? undefined : href} linkLabel={block.linkLabel}
         variant={revista ? "revista" : "classic"} />
       {body}
     </section>
@@ -574,7 +575,7 @@ function SidebarMostRead({ block, articles, color, preview }: {
   }
   return (
     <section className="border border-gray-200 rounded-lg p-4">
-      <ZoneSectionHeader title={block.name} color={color} />
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <div className="flex flex-col">
         {items.map((a, i) => (
           <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`}
@@ -606,7 +607,7 @@ function SidebarHeadlines({ block, articles, color, preview }: {
   }
   return (
     <section className="border border-gray-200 rounded-lg p-4">
-      <ZoneSectionHeader title={block.name} color={color} />
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <div className="flex flex-col">
         {items.map((a) => (
           <Link key={a.id} href={`/artigo/${a.slug ?? a.id}`}
@@ -632,7 +633,7 @@ function SidebarCards({ block, articles, color, preview, overlay = false }: {
   }
   return (
     <section className="border border-gray-200 rounded-lg p-4">
-      <ZoneSectionHeader title={block.name} color={color} />
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <div className="flex flex-col gap-4">
         {items.map((a) => overlay
           ? <OverlayCard key={a.id} a={a} color={color} className="aspect-[16/9]" />
@@ -654,7 +655,7 @@ function SidebarFeatured({ block, articles, color, preview }: {
   }
   return (
     <section className="border border-gray-200 rounded-lg p-4">
-      <ZoneSectionHeader title={block.name} color={color} />
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <CardItem a={main} color={color} ratio="aspect-[16/10]" titleCls="text-[14px]" sizes="288px" summary={false} />
       {rest.length > 0 && (
         <div className="flex flex-col mt-3 pt-2 border-t border-gray-100">
@@ -676,7 +677,7 @@ function SidebarCompact({ block, articles, color, preview }: {
   }
   return (
     <section className="border border-gray-200 rounded-lg p-4">
-      <ZoneSectionHeader title={block.name} color={color} />
+      <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <div className="flex flex-col">
         {items.map((a) => <ThumbRow key={a.id} a={a} chapeu color={color} small />)}
       </div>
@@ -776,7 +777,7 @@ export function ZoneBlock({ block, zone, getArticles, preview, fallback }: {
       }
       return (
         <section className="min-w-0">
-          <ZoneSectionHeader title={block.name} color={color} href={href} linkLabel={block.linkLabel} />
+          <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} href={block.hideHeader ? undefined : href} linkLabel={block.linkLabel} />
           <NumListZone items={items} color={color} cols={zone === "half" ? 1 : 2} />
         </section>
       );
