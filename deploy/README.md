@@ -193,7 +193,37 @@ consegue emitir certificado nenhum nessa configuração** — o sintoma é HTTP 
 (falha de handshake TLS entre Cloudflare e origem; 522 seria o Cloudflare nem
 alcançar a VPS).
 
-Saída: certificado de ORIGEM emitido pelo próprio Cloudflare (15 anos, sem
+O 525 ainda diz uma coisa útil: o modo SSL de lá é **Full** ou **Full (strict)**
+(Flexible daria laço de redirect, não 525). E a diferença entre os dois decide
+qual saída serve:
+
+| Modo no Cloudflare | Valida o certificado da origem? | O que basta |
+|---|---|---|
+| Full | não — aceita qualquer um, inclusive auto-assinado | `tls internal` |
+| Full (strict) | sim — só publicamente confiável ou Origin CA | certificado de origem |
+
+### Sem acesso ao painel do Cloudflare (caso comum: quem aponta é o cliente)
+
+Tente primeiro o `tls internal`: a CA interna do Caddy emite o certificado, e
+ele mesmo renova (não expira na nossa mão). Nenhum arquivo, nenhum painel.
+
+```
+<dominio> {
+	tls internal
+	import blog-cf <id>
+}
+```
+
+Se o site subir, o modo era Full e acabou aqui. Se continuar 525, é Full
+(strict) e aí não há o que fazer do nosso lado — precisa de UMA ação de quem
+tem o painel: nuvem cinza (melhor), ou um Origin Certificate enviado para nós,
+ou o modo em Full. O `tls internal` cifra o tráfego Cloudflare↔origem mas não
+autentica; quem escolheu esse nível de garantia foi o modo Full do Cloudflare,
+não a nossa configuração.
+
+### Com acesso ao painel
+
+Certificado de ORIGEM emitido pelo próprio Cloudflare (15 anos, sem
 renovação) + snippet `(blog-cf)` do `Caddyfile`.
 
 1. Cloudflare → SSL/TLS → Origin Server → Create Certificate, para
