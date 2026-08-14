@@ -13,24 +13,26 @@ import assert from "node:assert/strict";
 import { CENTRAL_SOURCES_CATALOG } from "../src/lib/centralSourcesCatalog.ts";
 
 /**
- * Feeds do sp011 que a imagem instalava por padrão — não podem voltar.
+ * Os 11 feeds do antigo `DEFAULT_RSS_SOURCES` que a central NÃO coleta — esses
+ * eram exclusividade do sp011 e não podem voltar por catálogo nenhum.
  *
- * A lista de fora é PARCIAL de propósito: a central também coleta InfoMoney
- * (`/feed/`, categoria "financas" do Crédito.vc) e Agência Brasil – Saúde/
- * Economia (PontoFarma e Crédito.vc). Coincidir de veículo é legítimo; o que
- * não pode voltar são os feeds de EDITORIA do sp011 (política do DF, cidade,
- * tecnologia…), que é o que aparecia no painel de blog de esporte.
+ * Os outros 14 da lista antiga (Agência Brasil – Política/Internacional/
+ * Economia/Cultura/Justiça, Carta Capital – Mundo, Metrópoles – Esportes/
+ * Entretenimento/Saúde/Ciência/DF/Brasil, Correio Braziliense geral, InfoMoney
+ * – Economia) CONTINUAM aparecendo no painel dos blogs de propósito: a central
+ * os coleta de verdade, então espelhá-los é justamente o que foi pedido. Eles
+ * chegam com o nome e a categoria da CENTRAL, não com os do sp011.
  */
-const FEEDS_SP011 = [
-  "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml",
-  "https://agenciabrasil.ebc.com.br/rss/internacional/feed.xml",
+const FEEDS_SO_DO_SP011 = [
   "https://www.correiobraziliense.com.br/politica/feed",
-  "https://www.correiobraziliense.com.br/feed",
+  "https://www.correiobraziliense.com.br/brasil/feed",
+  "https://www.correiobraziliense.com.br/ciencia-e-saude/feed",
   "https://jovempan.com.br/noticias/politica/feed",
+  "https://jovempan.com.br/noticias/mundo/feed",
+  "https://jovempan.com.br/noticias/economia/feed",
   "https://jovempan.com.br/noticias/brasil/feed",
-  "https://www.metropoles.com/distrito-federal/feed",
-  "https://www.metropoles.com/brasil/feed",
-  "https://www.metropoles.com/entretenimento/feed",
+  "https://jovempan.com.br/esportes/feed",
+  "https://agenciabrasil.ebc.com.br/rss/esportes/feed.xml",
   "https://jornaldebrasilia.com.br/brasilia/feed/",
   "https://www.noticiasaominuto.com.br/rss/tech",
 ];
@@ -46,10 +48,10 @@ test("nenhuma URL repetida (a tabela do blog não tem UNIQUE em url)", () => {
   assert.deepEqual(dup, [], `URLs duplicadas: ${dup.join(", ")}`);
 });
 
-test("os feeds padrão do sp011 não voltam pelo catálogo", () => {
+test("os feeds exclusivos do sp011 não voltam pelo catálogo", () => {
   const urls = new Set(CENTRAL_SOURCES_CATALOG.map((s) => s.url));
-  for (const feed of FEEDS_SP011) {
-    assert.equal(urls.has(feed), false, `feed do sp011 no catálogo: ${feed}`);
+  for (const feed of FEEDS_SO_DO_SP011) {
+    assert.equal(urls.has(feed), false, `feed exclusivo do sp011 no catálogo: ${feed}`);
   }
 });
 

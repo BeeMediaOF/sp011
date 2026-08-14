@@ -448,8 +448,13 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
 - **Fontes RSS padrão = espelho do painel central** (2026-08-14): a imagem
   instalava 25 feeds do sp011 (Agência Brasil, Metrópoles, Jovem Pan…) em todo
   blog novo — marca de outro portal. Agora `DEFAULT_RSS_SOURCES` deriva de
-  `api-server/src/lib/centralSourcesCatalog.ts` (ARQUIVO GERADO, 91 fontes),
-  tudo `active:false`/`autoMode:"none"`: quem coleta continua sendo a central.
+  `api-server/src/lib/centralSourcesCatalog.ts` (ARQUIVO GERADO do dump do
+  `central_sources`: 127 linhas → 126 URLs únicas), tudo `active:false`/
+  `autoMode:"none"`: quem coleta continua sendo a central. Atenção: 14 das 25
+  fontes antigas (Agência Brasil, Metrópoles, Carta Capital, InfoMoney…)
+  CONTINUAM no painel — não por herança do sp011, mas porque a central as
+  coleta; somem as 11 que eram só do sp011 (Jovem Pan, Correio Braziliense por
+  editoria, Jornal de Brasília – DF, Notícias ao Minuto – Tech).
   `reconcileRssCatalog()` (boot, flag `settings.rss_catalog_v2`) troca as
   antigas nos blogs que já existiam — apaga SÓ o que casa URL antiga **E**
   inativa **E** `last_fetched_at IS NULL`, e insere deduplicando por URL em
