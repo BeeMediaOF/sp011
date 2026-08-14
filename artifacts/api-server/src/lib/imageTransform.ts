@@ -27,6 +27,45 @@ export const MAX_Q = 100;
 const CACHE_DIR = path.join(os.tmpdir(), "img-proxy-cache");
 const MEM_MAX = 500; // entradas no LRU em memória
 
+/**
+ * Teto de memória do libvips (2026-08-14). Dois OOM-kills de api de blog em
+ * 2026-08-12/13 nasceram aqui: `libvips worker invoked oom-killer`, ~2 GiB de
+ * RSS, com uma dezena de `/api/image` disparados no mesmo segundo pelo
+ * carregamento de uma página.
+ *
+ * - `concurrency`: o default é o número de vCPUs (8 na VPS) de threads POR
+ *   operação — e são 10 blogs no mesmo host, cada um com o seu processo. 2 é o
+ *   suficiente para uma imagem editorial de 1600px.
+ * - `cache`: o default de 50 MB é por processo; ×10 blogs vira meio giga parado.
+ */
+sharp.concurrency(2);
+sharp.cache({ memory: 32 });
+
+/**
+ * Transformações simultâneas por processo. O `concurrency` acima limita as
+ * threads DENTRO de uma operação, não quantas operações existem ao mesmo tempo —
+ * sem esta fila, dez requisições viram dez decodificações concorrentes e a soma
+ * dos buffers é o que estourou o cgroup. As requisições excedentes esperam a
+ * vaga (o coalescing por chave já colapsa as repetidas).
+ */
+const MAX_CONCURRENT_TRANSFORMS = 2;
+let emAndamento = 0;
+const esperando: Array<() => void> = [];
+
+/** Executa `fn` ocupando uma das vagas de transformação. */
+export async function withTransformSlot<T>(fn: () => Promise<T>): Promise<T> {
+  if (emAndamento < MAX_CONCURRENT_TRANSFORMS) emAndamento++;
+  else await new Promise<void>((resolve) => esperando.push(resolve));
+  try {
+    return await fn();
+  } finally {
+    const proximo = esperando.shift();
+    // A vaga passa direto para quem esperava: `emAndamento` não muda.
+    if (proximo) proximo();
+    else emAndamento--;
+  }
+}
+
 // ── LRU em memória simples ────────────────────────────────────────────────────
 const memCache = new Map<string, Buffer>();
 
@@ -119,27 +158,29 @@ export async function transformImage(
   // exige saber a proporção, que só o servidor conhece: a do KSports é 1080x300
   // (3,6:1) e, exibida a 120 px de altura, ocupa 432 px — pedir w=320 fazia o
   // navegador dar UPSCALE e borrava a marca (observado em 2026-07-28).
-  const pipeline = sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
-    .resize(h ? { height: h, withoutEnlargement: true } : { width: w, withoutEnlargement: true })
-    .timeout({ seconds: SHARP_TIMEOUT_S });
-  if (profile === "artwork") {
-    /* Lossless e lossy q95/effort 4, servindo o MENOR. Em arte de identidade os
-       dois são visualmente indistinguíveis do original nesse nível, mas qual
-       vence em bytes depende do conteúdo: lossless ganha em logo chapada de
-       poucas cores, o lossy ganha quando há gradiente (a do KSports tem). Custa
-       duas passadas de sharp uma única vez — o resultado é cacheado como
-       immutable em memória e disco. AVIF fica de fora: no lossless costuma sair
-       maior que o WebP nesse tipo de arte. */
-    const [lossless, lossy] = await Promise.all([
-      pipeline.clone().webp({ lossless: true, effort: 4 }).toBuffer(),
-      pipeline.clone().webp({ quality: 95, effort: 4 }).toBuffer(),
-    ]);
-    return lossless.length <= lossy.length ? lossless : lossy;
-  }
-  if (fmt === "avif") {
-    return pipeline.avif({ quality: q, effort: 1 }).toBuffer();
-  }
-  return pipeline.webp({ quality: q, effort: 1 }).toBuffer();
+  return withTransformSlot(async () => {
+    const pipeline = sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
+      .resize(h ? { height: h, withoutEnlargement: true } : { width: w, withoutEnlargement: true })
+      .timeout({ seconds: SHARP_TIMEOUT_S });
+    if (profile === "artwork") {
+      /* Lossless e lossy q95/effort 4, servindo o MENOR. Em arte de identidade os
+         dois são visualmente indistinguíveis do original nesse nível, mas qual
+         vence em bytes depende do conteúdo: lossless ganha em logo chapada de
+         poucas cores, o lossy ganha quando há gradiente (a do KSports tem). Custa
+         duas passadas de sharp uma única vez — o resultado é cacheado como
+         immutable em memória e disco. AVIF fica de fora: no lossless costuma sair
+         maior que o WebP nesse tipo de arte. */
+      const [lossless, lossy] = await Promise.all([
+        pipeline.clone().webp({ lossless: true, effort: 4 }).toBuffer(),
+        pipeline.clone().webp({ quality: 95, effort: 4 }).toBuffer(),
+      ]);
+      return lossless.length <= lossy.length ? lossless : lossy;
+    }
+    if (fmt === "avif") {
+      return pipeline.avif({ quality: q, effort: 1 }).toBuffer();
+    }
+    return pipeline.webp({ quality: q, effort: 1 }).toBuffer();
+  });
 }
 
 // ── Resolução com cache + coalescing ──────────────────────────────────────────

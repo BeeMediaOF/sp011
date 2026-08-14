@@ -492,6 +492,19 @@ montada no servidor.
   prefixo); allowlist do proxy de imagem espelhada em `routes` do api-server
   E `brasilia-agora/src/lib/newsImage.ts` (mudar nos DOIS); HTML com
   `no-cache` (NUNCA `no-store` — mata bfcache).
+- **Memória do proxy de imagem** (ago/2026): o `sharp`/libvips é o maior
+  consumidor do api e foi quem levou dois blogs a OOM-kill do cgroup (12 e
+  13/08, ~2 GiB, `libvips worker invoked oom-killer`) — uma dezena de
+  `/api/image` do mesmo carregamento de página virava uma dezena de
+  decodificações concorrentes. Três travas em `lib/imageTransform.ts`:
+  `sharp.concurrency(2)` (o default é 1 thread por vCPU, e são 10 blogs no
+  mesmo host), `sharp.cache({memory:32})` e o semáforo `withTransformSlot`
+  (2 transformações simultâneas por processo; `uploads.ts` divide a mesma
+  fila). Falha PERMANENTE de origem (4xx, não-imagem, acima do cap de 12 MiB)
+  não é re-tentada e entra no cache negativo de 10 min
+  (`lib/originFailures.ts`) — sem isso a mesma foto reprovada era rebaixada a
+  cada visita. Transitória (5xx/timeout) continua com retry: a capa da central
+  engasga sob carga e precisa da segunda chance.
 - **Analytics**: heartbeat cumulativo agregado por MAX; tráfego interno
   marcado `is_internal`, nunca dropado; `totals.*` do /stats fixos ao agora;
   canal classificado no servidor; migrações de coluna via Drizzle schema E

@@ -39,6 +39,9 @@ import {
   type ImageFormat,
 } from "../lib/imageTransform.js";
 import { safeFetch } from "../lib/safeFetch.js";
+import {
+  isPermanentOriginError, isNegativeCached, rememberOriginFailure,
+} from "../lib/originFailures.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 
 const router = Router();
@@ -187,16 +190,13 @@ async function fetchOriginRaw(url: string): Promise<Buffer> {
  * single-thread que engasga por instantes sob carga (enxurrada do
  * `facebookexternalhit` + fila de IA) → o Caddy devolve um 502 pontual. Sem
  * retry, um engasgo de ~1 s virava placeholder cacheado (imagem "sumida").
- * NÃO retenta erro PERMANENTE (4xx, não-imagem, URL inválida) — só 5xx/rede.
+ * NÃO retenta erro PERMANENTE — só 5xx/rede.
  */
 async function fetchOriginWithRetry(url: string): Promise<Buffer> {
   try {
     return await fetchOriginRaw(url);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    const permanent =
-      /^origin_error:4\d\d$/.test(msg) || msg === "not_an_image" || msg === "invalid_url";
-    if (permanent) throw err;
+    if (isPermanentOriginError(err)) throw err;
     await new Promise((r) => setTimeout(r, 250));
     return await fetchOriginRaw(url);
   }
@@ -296,9 +296,19 @@ router.get("/image", imageRateLimit, async (req, res) => {
 
   let processed: Buffer;
   try {
-    processed = memHit ?? (await resolveImage(key, () => fetchOriginWithRetry(rawUrl), w, q, fmt));
+    // O cache negativo corta só a IDA À ORIGEM: entra dentro do produceRaw para
+    // que o resolveImage ainda consulte memória e disco antes (uma imagem que já
+    // foi processada continua sendo servida mesmo que a origem tenha caído).
+    processed = memHit ?? (await resolveImage(key, () => {
+      if (isNegativeCached(rawUrl)) throw new Error("negative_cache");
+      return fetchOriginWithRetry(rawUrl);
+    }, w, q, fmt));
   } catch (err) {
-    req.log.warn({ err, url: rawUrl }, "image-proxy: fetch/process failed — serving placeholder");
+    const jaConhecida = err instanceof Error && err.message === "negative_cache";
+    if (!jaConhecida) {
+      req.log.warn({ err, url: rawUrl }, "image-proxy: fetch/process failed — serving placeholder");
+      if (isPermanentOriginError(err)) rememberOriginFailure(rawUrl);
+    }
     // Return a neutral placeholder instead of a 502, so the browser never
     // shows a broken-image box. Short cache so the real image is retried soon.
     try {
@@ -309,7 +319,9 @@ router.get("/image", imageRateLimit, async (req, res) => {
         // transitório do upstream — a próxima requisição tem que re-tentar a
         // imagem de verdade logo, não ficar 5 min presa no placeholder.
         .set("Cache-Control", "public, max-age=60")
-        .set("X-Image-Cache", "PLACEHOLDER")
+        // NEG = servido pelo cache negativo, sem tocar na origem (dá para
+        // conferir por curl que a URL problemática parou de ser baixada).
+        .set("X-Image-Cache", jaConhecida ? "PLACEHOLDER-NEG" : "PLACEHOLDER")
         .end(placeholder);
     } catch {
       res.status(502).json({ error: "Imagem indisponível." });
