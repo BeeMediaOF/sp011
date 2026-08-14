@@ -49,8 +49,15 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 - **Rede** `blogs_shared`: Caddy e `API_URL` usam SÓ aliases únicos
   `<id>-api`/`<id>-web` (o alias automático `api` é ambíguo — incidente
   2026-07-07 servia o blog errado). IDs reservados: `sp011`, `central`.
-- **Caddy**: `Caddyfile` raiz com snippet `(blog)` + `import
+- **Caddy**: `Caddyfile` raiz com snippets `(blog)` e `(blog-cf)` + `import
   /etc/caddy/sites/*.caddy`; um arquivo por blog em `caddy/sites/`.
+  `(blog-cf)` é para blog atrás do **Cloudflare** (hoje só o credito.vc): lá o
+  Caddy NÃO consegue emitir certificado (o CF fala HTTPS com a origem até nas
+  requisições do ACME → HTTP 525), então o site usa `tls` explícito com o
+  certificado de origem do Cloudflare em `/opt/certs` (fora do repo, montado
+  `:ro`) e o snippet reescreve o `X-Forwarded-For` a partir do
+  `Cf-Connecting-Ip` — sem isso o `trust proxy 1` do api entrega o IP do edge
+  como se fosse o do leitor. Detalhes e runbook: `deploy/README.md`.
   GOTCHA: o Caddyfile é bind de arquivo único — `git pull` troca o inode e
   `caddy reload` relê o arquivo VELHO → pull que muda o Caddyfile exige
   `docker compose up -d --force-recreate caddy`. O diretório `caddy/sites/`
@@ -84,13 +91,13 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 | `ksports` | ksports.bebee.me (migração p/ ksports.midia.run decidida) | EN, esporte, foco Nigéria | dark blue `#0e0d2a`, K-Pink `#ff2b74`, K-Purple `#6600b8` (brandbook KBET) | No ar. NDPA/permissões/idioma entregues (deploy v23 + SQL do go-live pendentes) |
 | `esporteagora` | esporteagora.midia.run | pt-BR, esporte | roxo `#5b2d8e`, verde `#4bce10`, dark `#241243` | Kit completo em `deploy/esporteagora/`; go-live operacional pendente |
 | `resenhavip` | resenhavip.midia.run | pt-BR, esporte | verde `#1e7a3f`, amarelo `#fdb913`, dark `#0d3b1f` | Kit completo; ⚠️ flag "Páginas enganosas" no Search Console — revisão solicitada (ver §19) |
-| `oleysports` | oleysports.midia.run | pt-BR, esporte (parceria OleyBet) | azul vivo `#2563ff`, royal `#1936c4`, navy `#0a0e27` | Kit completo; go-live pendente; banners viram OleyBet quando chegar a logo branca |
+| `oleysports` | **oleysports.com.br** (zona própria desde 2026-08-14; `oleysports.midia.run` → 301) | pt-BR, esporte (parceria OleyBet) | azul vivo `#2563ff`, royal `#1936c4`, navy `#0a0e27` | No ar. Banners viram OleyBet quando chegar a logo branca |
 | `beeesportes` | beeesportes.midia.run | pt-BR, esporte | verde menta `#57c785`, profundo `#18754e`, dark `#0e1412` | Kit completo; go-live pendente |
 | `pontofarma` | pontofarma.com (zona própria; ou .midia.run provisório) | pt-BR, B2B setor farmacêutico | verde `#18a957`/`#0c8b46` + navy `#0e2341`, rodapé `#0c1630`, tagline "conteúdo que gera resultado" | Kit completo em `deploy/pontofarma/` (GO_LIVE + sources_farma + template); go-live pendente; sem backfill (nicho novo) |
-| `creditovc` | credito.vc (zona própria; ou .midia.run provisório) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | Kit completo em `deploy/creditovc/` (GO_LIVE + sources_financas + template); go-live pendente; sem backfill (nicho novo) |
+| `creditovc` | **credito.vc** (zona própria, **atrás do Cloudflare** — único da rede; ver §3) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | No ar. Kit em `deploy/creditovc/`; sem backfill (nicho novo) |
 | `apostaganha` | apostaganha.midia.run | pt-BR, esporte (marca Aposta Ganha) | laranja vivo `#ff6a00` (só sobre fundo escuro) + laranja queimado `#c24500` (blocos/menu ativo) + preto `#111111`, rodapé `#080808` | Kit completo em `deploy/apostaganha/`; go-live pendente |
 | `recebabet` | recebabet.midia.run | pt-BR, esporte (marca Receba Bet) | azul-céu `#3d9bff` + azul royal `#0f62d6` + navy `#071b3d`, rodapé `#040f26` | Kit completo em `deploy/recebabet/`; go-live pendente |
-| `ocomandante` | ocomandante.midia.run (ou zona própria) | pt-BR, negócios/economia/aviação/turismo | navy `#14265e` (wordmark) + azul royal `#1657d0` (emblema) + royal claro `#2f6fe0` + azul claro `#4d8dff` (só sobre escuro) + vermelho `#d81f26` (bloco "NEWS", só com tinta branca), dark `#0a1740`, rodapé `#060e26`, tagline "No comando da notícia" | Blog no ar (ago/2026). Kit em `deploy/ocomandante/` (GO_LIVE + template com 2 homes + sources + rules_keywords); falta aplicar template/fontes e as logos |
+| `ocomandante` | **ocomandantenews.com.br** (zona própria desde 2026-08-14; `ocomandante.midia.run` → 301) | pt-BR, negócios/economia/aviação/turismo | navy `#14265e` (wordmark) + azul royal `#1657d0` (emblema) + royal claro `#2f6fe0` + azul claro `#4d8dff` (só sobre escuro) + vermelho `#d81f26` (bloco "NEWS", só com tinta branca), dark `#0a1740`, rodapé `#060e26`, tagline "No comando da notícia" | Blog no ar (ago/2026). Kit em `deploy/ocomandante/` (GO_LIVE + template com 2 homes + sources + rules_keywords); falta aplicar template/fontes e as logos |
 
 - Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee/Aposta
   Ganha/Receba Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,

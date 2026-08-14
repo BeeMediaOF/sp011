@@ -138,10 +138,89 @@ rm -rf /opt/blogs/$ID
 
 ## Domínio próprio depois (upgrade de um blog)
 
-1. DNS do cliente → IP da VPS.
-2. `caddy/sites/<id>.caddy`: `dominio-proprio.com.br, cliente-a.seudominio.com.br { import blog cliente-a }` + reload.
-3. `.env` do blog: `APP_URL/SITE_URL/ALLOWED_ORIGINS` → novo domínio; `docker compose up -d` no dir do blog.
-4. Painel central: atualizar domain/apiUrl do blog.
+Feito em 2026-08-14 para oleysports.com.br, ocomandantenews.com.br e credito.vc.
+
+**Nunca troque o `.midia.run` por redirect no mesmo passo que sobe o domínio
+novo**: se o certificado do domínio novo falhar, o blog fica inacessível nos
+DOIS hosts ao mesmo tempo. Passo A põe o domínio novo no ar com o host antigo
+ainda servindo; passo B só troca depois do `200` confirmado.
+
+1. **DNS** → IP da VPS. Confirme que chega até nós antes de mexer em qualquer
+   coisa: `curl -sI http://<dominio>/ | grep -i server` tem que dizer
+   `Server: Caddy` (um host sem bloco de site cai no 308 genérico do Caddy —
+   é justamente o que prova que o pacote chegou aqui).
+2. **Passo A** — `caddy/sites/<id>.caddy` com três blocos: domínio novo
+   (`import blog <id>`), `www.<dominio>` (`redir` permanente para o apex) e o
+   `<id>.midia.run` ainda com `import blog <id>`. `caddy validate` + `reload`.
+3. `.env` do blog: `APP_URL`/`SITE_URL` → domínio novo; `ALLOWED_ORIGINS` com
+   o novo, o `www` e o antigo. `docker compose up -d --force-recreate api` no
+   dir do blog (só o `api` lê o `.env`; `restart` NÃO relê `env_file`).
+4. Verifique o domínio novo em `200` e o `siteName` correto antes de seguir.
+5. **Passo B** — troque o bloco do `<id>.midia.run` por redirect permanente
+   **preservando o `/api/*`**:
+
+   ```
+   <id>.midia.run {
+   	handle /api/* {
+   		reverse_proxy <id>-api:8080
+   	}
+   	handle {
+   		redir https://<dominio-novo>{uri} permanent
+   	}
+   }
+   ```
+
+   O `/api/*` fica de fora do redirect de propósito: um 301 num
+   `POST /api/ingest` faz o `fetch` do deliveryWorker virar GET e a entrega
+   quebra em silêncio. Assim a ordem entre Caddy e painel central deixa de
+   importar. O redirect do resto é o que consolida o SEO — o canonical e o
+   `sitemap.xml` saem do HOST DA REQUISIÇÃO (`req.get("host")`), então dois
+   hosts servindo = duas cópias do site indexadas.
+6. Painel central: `domain`/`api_url` do blog. Use `replace()` no UPDATE em
+   vez de escrever a URL inteira — preserva o sufixo (`/api` ou não) que já
+   estiver gravado.
+7. Pontas soltas: callback do Meta é `{APP_URL}/meta-auth-complete.html` (tem
+   que ser registrado no Meta for Developers e a conta reconectada); as
+   assinaturas de Web Push são por origem e nascem zeradas no domínio novo.
+
+### Variante: domínio atrás do Cloudflare (nuvem laranja)
+
+Com a nuvem laranja em modo Full, o Cloudflare fala HTTPS com a origem em TODA
+requisição — inclusive nas do Let's Encrypt. O desafio HTTP-01 chega pelo mesmo
+caminho que está falhando por falta de certificado, e o TLS-ALPN-01 nunca
+funciona atrás de proxy (o Cloudflare termina o TLS na borda). **O Caddy não
+consegue emitir certificado nenhum nessa configuração** — o sintoma é HTTP 525
+(falha de handshake TLS entre Cloudflare e origem; 522 seria o Cloudflare nem
+alcançar a VPS).
+
+Saída: certificado de ORIGEM emitido pelo próprio Cloudflare (15 anos, sem
+renovação) + snippet `(blog-cf)` do `Caddyfile`.
+
+1. Cloudflare → SSL/TLS → Origin Server → Create Certificate, para
+   `<dominio>` e `*.<dominio>`. A chave privada aparece UMA vez.
+2. Na VPS, `/opt/certs/<dominio>.pem` e `.key` (`mkdir -p /opt/certs`,
+   `chmod 600` na chave). **Fora do repositório** — chave privada não se
+   commita; o `docker-compose.yml` monta `/opt/certs:/etc/caddy/certs:ro`.
+3. `caddy/sites/<id>.caddy` usa `tls` explícito + `import blog-cf <id>`:
+
+   ```
+   <dominio> {
+   	tls /etc/caddy/certs/<dominio>.pem /etc/caddy/certs/<dominio>.key
+   	import blog-cf <id>
+   }
+   ```
+
+   O `tls` explícito também desliga o HTTPS automático para esse nome, que é o
+   que encerra o impasse do ACME.
+4. Cloudflare → SSL/TLS → **Full (strict)**. E desligue Rocket Loader e Auto
+   Minify: os dois reescrevem o HTML servido, e a home tem SSR — HTML alterado
+   na borda vira mismatch de hidratação (React #418).
+5. O snippet `(blog-cf)` reescreve o `X-Forwarded-For` a partir do
+   `Cf-Connecting-Ip` **só quando o peer é um IP do Cloudflare**. Sem isso o
+   `app.set("trust proxy", 1)` do api-server entrega o IP do EDGE como se
+   fosse o do leitor, e analytics/`is_internal`/rate limit decidem em cima
+   dele. Subir o `trust proxy` para 2 corrigiria este blog e abriria os
+   outros nove — a correção é por site, nunca na imagem compartilhada.
 
 ## Atualizar/reverter versão (fluxo por tag)
 

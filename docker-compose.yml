@@ -216,6 +216,10 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/sites:/etc/caddy/sites:ro   # 1 arquivo .caddy por blog replicado
+      # Certificados de ORIGEM de blogs atrás do Cloudflare (snippet blog-cf).
+      # FORA do repositório de propósito: a chave privada nunca pode ser
+      # commitada. Só é lido; quem não usa Cloudflare não tem arquivo aqui.
+      - /opt/certs:/etc/caddy/certs:ro
       - caddy_data:/data       # certificados Let's Encrypt (persistente)
       - caddy_config:/config
       # Capas re-hospedadas da central servidas ESTÁTICAS pelo Caddy (bypass do

@@ -30,6 +30,63 @@
 	}
 }
 
+# ── Blog atrás do Cloudflare (nuvem laranja) ────────────────────────────────
+# Idêntico ao (blog), com UMA diferença: o X-Forwarded-For enviado ao app é
+# reescrito a partir do Cf-Connecting-Ip.
+#
+# Por quê: o app roda com `app.set("trust proxy", 1)` (api-server/src/app.ts) —
+# ele desconta exatamente UM hop do XFF. Sem Cloudflare a cadeia é
+# cliente → caddy → app e o XFF chega como "cliente": o Express acerta. Com o
+# Cloudflare vira cliente → CF → caddy → app e o XFF chega como
+# "cliente, edge-do-CF": o Express desconta o caddy e devolve o EDGE. Toda a
+# analytics, o is_internal e os rate limits passariam a decidir pelo IP errado.
+# Subir o trust proxy para 2 corrigiria aqui e ABRIRIA os outros 9 blogs, onde
+# o primeiro elemento do XFF é forjável pelo próprio visitante — por isso a
+# correção mora no proxy do site, não na imagem compartilhada.
+#
+# O matcher @cf existe para que um Cf-Connecting-Ip forjado por quem bater
+# DIRETO no IP da VPS (contornando o Cloudflare) seja ignorado. Se o Cloudflare
+# lançar um range novo que não esteja nesta lista, o site continua no ar — só
+# aquele tráfego volta a registrar o IP do edge até a lista ser atualizada.
+# Fonte da lista: https://www.cloudflare.com/ips/
+(blog-cf) {
+	encode gzip zstd
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	@cf remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+
+	handle /api/* {
+		handle @cf {
+			reverse_proxy {args[0]}-api:8080 {
+				header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+			}
+		}
+		handle {
+			reverse_proxy {args[0]}-api:8080
+		}
+	}
+
+	handle {
+		header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		handle @cf {
+			reverse_proxy {args[0]}-web:3000 {
+				header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+			}
+		}
+		handle {
+			reverse_proxy {args[0]}-web:3000
+		}
+	}
+}
+
 {$SITE_DOMAIN} {
 	encode gzip zstd
 
