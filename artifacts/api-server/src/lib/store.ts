@@ -21,7 +21,10 @@ import {
   articleViewsTable,
 } from "@workspace/db";
 import { logger } from "./logger.js";
-import { CENTRAL_SOURCES_CATALOG } from "./centralSourcesCatalog.js";
+import {
+  normalizeCentralSources, rssSourcesToRemove, type CentralSourceInput,
+} from "./rssCatalog.js";
+export type { CentralSourceInput } from "./rssCatalog.js";
 import {
   encryptSecret,
   decryptSecret,
@@ -509,10 +512,12 @@ const DEFAULT_CONTACT: ContactInfo = {
  * Fontes que a imagem instalava por padrão até 2026-08-13: 25 feeds do sp011
  * (Agência Brasil, Metrópoles, Jovem Pan, Correio Braziliense…). Eram marca de
  * OUTRO portal dentro da imagem compartilhada — todo blog da rede nascia com
- * elas, contra a regra do CLAUDE.md §13.
+ * elas, contra a regra do CLAUDE.md §13, e um blog de esporte exibia no painel
+ * feeds de política do DF.
  *
- * A lista SOBREVIVE aqui só para a reconciliação saber o que remover dos blogs
- * que já as receberam (ver reconcileRssCatalog). Nada nesta lista é instalado.
+ * A lista SOBREVIVE só para `pruneLegacyRssSources()` saber o que remover dos
+ * blogs que já as receberam. Nada aqui é instalado em blog nenhum: quem manda
+ * as fontes de cada blog é o PAINEL CENTRAL, via `syncCentralSources()`.
  */
 const LEGACY_DEFAULT_SOURCE_URLS: readonly string[] = [
   "https://agenciabrasil.ebc.com.br/rss/politica/feed.xml",
@@ -543,16 +548,16 @@ const LEGACY_DEFAULT_SOURCE_URLS: readonly string[] = [
 ];
 
 /**
- * Fontes instaladas num blog novo: o espelho do catálogo do painel central,
- * TUDO INATIVO (active:false, autoMode:"none", sem agendamento). Quem
- * coleta continua sendo a central — o pipeline interno do blog segue dormente
- * (CLAUDE.md §11) — mas o operador vê no painel as mesmas fontes da rede.
+ * A imagem NÃO instala fonte nenhuma. Ela é compartilhada pelos N blogs e não
+ * tem como saber qual deles está rodando (CLAUDE.md §13: não existe blogId no
+ * app) — qualquer lista fixa aqui seria a lista errada para quase todo mundo.
+ *
+ * Quem sabe é a central: as regras de distribuição dizem exatamente quais
+ * fontes alimentam cada blog (`sourceMatchesAnyRule` em central-hub/lib/rules).
+ * Ela empurra essa lista para cá em `POST /api/ingest/sources` →
+ * `syncCentralSources()`. Até a 1ª sincronização o painel fica vazio, que é
+ * honesto: melhor nenhuma fonte do que as de outro portal.
  */
-const DEFAULT_RSS_SOURCES: Omit<RssSource, "id" | "createdAt">[] =
-  CENTRAL_SOURCES_CATALOG.map((s) => ({
-    name: s.name, url: s.url, category: s.category,
-    active: false, scheduleHours: 0, giveCredit: true, autoMode: "none" as const,
-  }));
 
 // ─── In-memory cache ──────────────────────────────────────────────────────────
 
@@ -868,93 +873,144 @@ async function migrateFromJsonFile(): Promise<void> {
   }
 }
 
-// ─── Seed default RSS sources (once) ─────────────────────────────────────────
+// ─── Fontes RSS: poda do legado + sincronização vinda da central ─────────────
 
-export async function seedDefaultRssSources(): Promise<void> {
-  if (_cache.rssSources.length > 0) return;
-  const rows = DEFAULT_RSS_SOURCES.map((s) => ({
-    ...s, id: randomUUID(), createdAt: new Date(),
-    fetchLimit: s.fetchLimit ?? null, customPrompt: null,
-    lastFetchedAt: null,
-  }));
-  for (const row of rows) {
-    await db.insert(rssSourcesTable).values(row).onConflictDoNothing();
-  }
-  _cache.rssSources = rows.map((r) => ({
-    ...r, createdAt: r.createdAt.toISOString(),
+/** Marca de que a poda já rodou neste blog. */
+const RSS_LEGACY_PRUNED_FLAG = "rss_legacy_pruned";
+/** URLs instaladas pela última sincronização da central (para saber o que podar). */
+const RSS_SYNCED_URLS_KEY = "rss_central_synced_urls";
+
+/** Recarrega `_cache.rssSources` do banco (painel e scheduler leem daqui). */
+async function reloadRssCache(): Promise<number> {
+  const fresh = await db.select().from(rssSourcesTable);
+  _cache.rssSources = fresh.map((r) => ({
+    ...r, createdAt: r.createdAt.toISOString(), autoMode: r.autoMode as RssAutoMode,
     fetchLimit: r.fetchLimit ?? undefined, customPrompt: r.customPrompt ?? undefined,
-    lastFetchedAt: undefined,
+    lastFetchedAt: r.lastFetchedAt?.toISOString(),
   }));
-  logger.info({ count: rows.length }, "store: seeded default RSS sources");
+  return fresh.length;
 }
 
-/** Marca de que a reconciliação abaixo já rodou neste blog. */
-const RSS_CATALOG_FLAG = "rss_catalog_v2";
+/** Lê um array de strings de uma chave própria de `settings`. */
+async function readUrlSet(key: string): Promise<Set<string>> {
+  const [row] = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+  if (!row) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(row.value);
+    return new Set(Array.isArray(parsed) ? parsed.filter((u): u is string => typeof u === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
 
 /**
- * Troca as 25 fontes padrão antigas (do sp011) pelo catálogo da central nos
- * blogs que JÁ existem. O seed acima só age com a tabela vazia, então sem isto
- * os 10 blogs no ar ficariam para sempre com feeds de outro portal no painel.
+ * Remove as 25 fontes padrão antigas (do sp011) dos blogs que já as receberam.
+ * Roda uma vez por blog no boot; a flag mora numa chave PRÓPRIA de `settings`
+ * para não disputar o blob de site_settings com o painel.
  *
- * Regras de segurança do que é REMOVIDO — só sai a linha que atende às três:
+ * Só sai a linha que atende às TRÊS condições:
  *   1. a URL está na lista antiga (nada cadastrado à mão é tocado);
  *   2. `active = false` (fonte ligada é decisão de alguém, fica);
- *   3. `last_fetched_at IS NULL` (nunca coletou — o que já rodou tem histórico
- *      e pode estar amarrado a artigos; protege o sp011 e o fallback de
- *      emergência do ksports).
+ *   3. `last_fetched_at IS NULL` (o que já coletou tem histórico e pode estar
+ *      amarrado a artigos; protege o sp011 e o fallback do ksports).
  *
- * A INSERÇÃO deduplica por URL em código de propósito: `rss_sources` não tem
- * UNIQUE em `url`, então o `onConflictDoNothing` (que só cobre a PK) duplicaria
- * o catálogo inteiro numa segunda passada.
- *
- * Roda uma vez por blog; a flag mora numa chave própria de `settings` para não
- * disputar o blob de site_settings com o painel.
+ * Nada é inserido no lugar: quem instala as fontes certas de cada blog é a
+ * central, em `syncCentralSources()`.
  */
-export async function reconcileRssCatalog(): Promise<void> {
+export async function pruneLegacyRssSources(): Promise<void> {
   try {
-    const flag = await db.select().from(settingsTable).where(eq(settingsTable.key, RSS_CATALOG_FLAG));
+    const flag = await db.select().from(settingsTable).where(eq(settingsTable.key, RSS_LEGACY_PRUNED_FLAG));
     if (flag.length > 0) return;
 
-    const legacy = new Set(LEGACY_DEFAULT_SOURCE_URLS);
+    // Mesma regra da sincronização: "plantadas" = as 25 antigas, "desejadas" =
+    // nenhuma (elas não são substituídas por nada aqui — quem instala é a central).
     const existing = await db.select().from(rssSourcesTable);
-
-    const removeIds = existing
-      .filter((r) => legacy.has(r.url) && !r.active && r.lastFetchedAt === null)
-      .map((r) => r.id);
+    const removeIds = rssSourcesToRemove(existing, new Set(), new Set(LEGACY_DEFAULT_SOURCE_URLS));
     for (const id of removeIds) {
       await db.delete(rssSourcesTable).where(eq(rssSourcesTable.id, id));
     }
 
-    const keptUrls = new Set(
-      existing.filter((r) => !removeIds.includes(r.id)).map((r) => r.url),
-    );
-    const toInsert = DEFAULT_RSS_SOURCES.filter((s) => !keptUrls.has(s.url));
-    for (const s of toInsert) {
-      await db.insert(rssSourcesTable).values({
-        ...s, id: randomUUID(), createdAt: new Date(),
-        fetchLimit: s.fetchLimit ?? null, customPrompt: null, lastFetchedAt: null,
-      });
-    }
-
     await db.insert(settingsTable)
-      .values({ key: RSS_CATALOG_FLAG, value: JSON.stringify({ at: new Date().toISOString() }), updatedAt: new Date() })
+      .values({ key: RSS_LEGACY_PRUNED_FLAG, value: JSON.stringify({ at: new Date().toISOString() }), updatedAt: new Date() })
       .onConflictDoNothing();
 
-    // Recarrega o cache: o painel e o scheduler leem daqui.
-    const fresh = await db.select().from(rssSourcesTable);
-    _cache.rssSources = fresh.map((r) => ({
-      ...r, createdAt: r.createdAt.toISOString(), autoMode: r.autoMode as RssAutoMode,
-      fetchLimit: r.fetchLimit ?? undefined, customPrompt: r.customPrompt ?? undefined,
-      lastFetchedAt: r.lastFetchedAt?.toISOString(),
-    }));
-    logger.info(
-      { removidas: removeIds.length, inseridas: toInsert.length, total: fresh.length },
-      "store: catálogo de fontes RSS alinhado ao painel central",
-    );
+    const total = await reloadRssCache();
+    logger.info({ removidas: removeIds.length, total }, "store: fontes padrão antigas removidas");
   } catch (err) {
-    // Não-fatal: um blog sem as fontes novas continua no ar (a coleta é da central).
-    logger.warn({ err }, "store: reconciliação do catálogo de fontes falhou (não-fatal)");
+    // Não-fatal: o blog continua no ar (a coleta é da central de qualquer jeito).
+    logger.warn({ err }, "store: poda das fontes antigas falhou (não-fatal)");
   }
+}
+
+export interface SyncSourcesResult {
+  removidas: number;
+  inseridas: number;
+  atualizadas: number;
+  total: number;
+}
+
+/**
+ * Aplica a lista de fontes que a CENTRAL diz alimentarem este blog.
+ *
+ * Idempotente e conservadora:
+ *   - INSERE o que falta (sempre `active:false` / `autoMode:"none"` — o blog não
+ *     coleta nada sozinho, CLAUDE.md §11);
+ *   - ATUALIZA nome/categoria do que já veio de uma sincronização anterior
+ *     (renomear a fonte na central se reflete aqui);
+ *   - REMOVE só o que ESTA sincronização instalou antes e agora saiu da lista —
+ *     e ainda assim apenas se continuar inativa e sem coleta. Fonte cadastrada
+ *     à mão pelo operador nunca é tocada, porque não está no conjunto gravado
+ *     em `rss_central_synced_urls`.
+ *
+ * A dedupe é por URL em código de propósito: `rss_sources` não tem UNIQUE em
+ * `url` (o `onConflictDoNothing` só cobre a PK e duplicaria tudo na 2ª vez).
+ */
+export async function syncCentralSources(entrada: readonly CentralSourceInput[]): Promise<SyncSourcesResult> {
+  const desejadas = normalizeCentralSources(entrada);
+  const anteriores = await readUrlSet(RSS_SYNCED_URLS_KEY);
+  const existentes = await db.select().from(rssSourcesTable);
+  const porUrl = new Map(existentes.map((r) => [r.url, r]));
+
+  // Remoção: só o que ESTA sincronização plantou e a central não manda mais.
+  const removerIds = rssSourcesToRemove(existentes, new Set(desejadas.keys()), anteriores);
+  for (const id of removerIds) {
+    await db.delete(rssSourcesTable).where(eq(rssSourcesTable.id, id));
+  }
+  const removidas = removerIds.length;
+
+  let inseridas = 0;
+  let atualizadas = 0;
+  for (const [url, s] of desejadas) {
+    const atual = porUrl.get(url);
+    if (!atual) {
+      await db.insert(rssSourcesTable).values({
+        id: randomUUID(), name: s.name, url,
+        category: (s.category ?? "").trim() || "geral",
+        active: false, scheduleHours: 0, fetchLimit: null,
+        giveCredit: true, autoMode: "none",
+        customPrompt: null, lastFetchedAt: null, createdAt: new Date(),
+      });
+      inseridas++;
+      continue;
+    }
+    // Só realinha o que a central controla, e só se veio de uma sync anterior.
+    const categoria = (s.category ?? "").trim() || "geral";
+    if (anteriores.has(url) && (atual.name !== s.name || atual.category !== categoria)) {
+      await db.update(rssSourcesTable)
+        .set({ name: s.name, category: categoria })
+        .where(eq(rssSourcesTable.id, atual.id));
+      atualizadas++;
+    }
+  }
+
+  const urls = JSON.stringify([...desejadas.keys()]);
+  await db.insert(settingsTable)
+    .values({ key: RSS_SYNCED_URLS_KEY, value: urls, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: settingsTable.key, set: { value: urls, updatedAt: new Date() } });
+
+  const total = await reloadRssCache();
+  logger.info({ removidas, inseridas, atualizadas, total }, "store: fontes sincronizadas com o painel central");
+  return { removidas, inseridas, atualizadas, total };
 }
 
 // ─── Assets das settings servidos como URL ────────────────────────────────────

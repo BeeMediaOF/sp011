@@ -1,7 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { seedAdminUser } from "./lib/seed.js";
-import { initStore, isStoreHydrated, seedDefaultRssSources, reconcileRssCatalog, startSettingsSync } from "./lib/store.js";
+import { initStore, isStoreHydrated, pruneLegacyRssSources, startSettingsSync } from "./lib/store.js";
 import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
@@ -169,10 +169,10 @@ async function bootWithDb(): Promise<void> {
   // Re-read editable settings from DB periodically so multiple processes
   // (Replit + VPS sharing one database) stay in sync without a restart.
   startSettingsSync();
-  await seedDefaultRssSources();
-  // Blogs que já existiam com as 25 fontes antigas do sp011: troca única pelo
-  // catálogo do painel central (uma vez por blog, guardada por flag).
-  await reconcileRssCatalog();
+  // Blogs que já existiam com as 25 fontes padrão do sp011: remoção única
+  // (guardada por flag). Quem instala as fontes CERTAS de cada blog é a
+  // central, empurrando em POST /api/ingest/sources.
+  await pruneLegacyRssSources();
   await seedAdminUser();
   // Molduras de e-mail de exemplo (uma vez por blog; não-fatal). Só depois do
   // store hidratado (lê/marca settings) e do ensureSchema (tabela criada).

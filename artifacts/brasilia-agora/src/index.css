@@ -270,6 +270,24 @@
   .block-only-desktop { display: none; }
 }
 
+/* ── Grade do bloco "Categorias" (painel → bloco → "Editorias por fileira") ───
+   Sem escolha, a fileira enche sozinha pela largura disponível. Com escolha, o
+   DESKTOP passa a ter exatamente `--cat-cols` cartões por fileira; abaixo de
+   1024px a grade continua automática, senão 8 colunas espremeriam o celular.
+   Mora aqui, e não em estilo inline, porque estilo inline não tem media query
+   (e venceria a regra do breakpoint por especificidade). */
+.category-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+
+@media (min-width: 1024px) {
+  .category-grid--fixed {
+    grid-template-columns: repeat(var(--cat-cols, 8), minmax(0, 1fr));
+  }
+}
+
 /* ── Article HTML body (AI rewrite output with WordPress HTML) ─────────────── */
 .article-body {
   --chapeu: #c8102e;

@@ -798,10 +798,17 @@ export function CategoriesBlock({ block, preview, contained = true }: {
     </Link>
   );
 
+  // Quebra de linha: sem `columns`, a fileira enche sozinha (auto-fit). Com
+  // ele, o desktop passa a ter exatamente N por fileira — a conta vive no CSS
+  // (.category-grid--fixed no index.css) porque estilo inline não tem media
+  // query, e forçar 8 colunas no celular espremeria os cartões.
+  const cols = Math.min(10, Math.max(2, Math.round(block.columns ?? 0)));
+  const fixed = (block.columns ?? 0) >= 2;
   return (
     <section className={wrap}>
       {heading}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit,minmax(130px,1fr))" }}>
+      <div className={`category-grid${fixed ? " category-grid--fixed" : ""}`}
+        style={fixed ? ({ "--cat-cols": cols } as React.CSSProperties) : undefined}>
         {items.map((c) => card(c.href, c.label, c.icon, c.imageUrl))}
         {allLabel && card(allHref, allLabel, "\u{1F4F0}")}
       </div>

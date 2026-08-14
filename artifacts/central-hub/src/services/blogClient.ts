@@ -3,9 +3,12 @@
  * fala com o endpoint /api/ingest de cada blog. Timeout 30s.
  */
 import { decryptSecret, signIngestRequest } from "@workspace/news-engine";
-import { db, blogsTable, type BlogRow } from "@workspace/central-db";
+import {
+  db, blogsTable, centralSourcesTable, distributionRulesTable, type BlogRow,
+} from "@workspace/central-db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
+import { sourceMatchesAnyRule } from "../lib/rules.js";
 
 export const INGEST_API_VERSION = 1;
 
@@ -71,6 +74,47 @@ export async function sendSigned(
       durationMs: Date.now() - started,
     };
   }
+}
+
+export interface SyncSourcesOutcome extends BlogCallResult {
+  /** Quantas fontes a central calculou para este blog. */
+  enviadas: number;
+}
+
+/**
+ * Manda para o blog a lista de fontes que REALMENTE o alimentam.
+ *
+ * A conta é a mesma do filtro "fontes por blog" da página Fontes
+ * (`sourceMatchesAnyRule`): uma fonte pertence ao blog quando alguma regra
+ * ativa dele pode casar itens vindos dela. Sem isso o painel do blog só
+ * conseguia mostrar uma lista fixa na imagem — que é compartilhada pelos N
+ * blogs e por isso estaria errada para quase todos.
+ *
+ * O blog recebe tudo INATIVO: a lista é informativa/operável, a coleta
+ * continua sendo daqui.
+ */
+export async function syncBlogSources(blog: BlogRow): Promise<SyncSourcesOutcome> {
+  const [sources, rules] = await Promise.all([
+    db.select().from(centralSourcesTable),
+    db.select().from(distributionRulesTable).where(eq(distributionRulesTable.blogId, blog.id)),
+  ]);
+
+  const doBlog = sources.filter((s) => sourceMatchesAnyRule(rules, { id: s.id, category: s.category }));
+  const payload = {
+    v: INGEST_API_VERSION,
+    sources: doBlog.map((s) => ({
+      name: s.name, url: s.url, category: s.category, language: s.language,
+    })),
+  };
+
+  const result = await sendSigned(blog, "/sources", payload, 30_000);
+  if (!result.ok) {
+    logger.warn(
+      { blog: blog.name, httpStatus: result.httpStatus, error: result.error },
+      "sincronização de fontes falhou",
+    );
+  }
+  return { ...result, enviadas: doBlog.length };
 }
 
 /** Testa a conexão com um blog e atualiza status/lastSeenAt/lastError. */

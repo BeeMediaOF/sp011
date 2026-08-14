@@ -560,6 +560,8 @@ interface BlockForm {
   fontFamily: string;
   /** Bloco "Categorias": imagem/rótulo/ocultar por editoria. */
   categoryItems: CategoryBlockItem[];
+  /** Bloco "Categorias": cartões por fileira no desktop (0 = automático). */
+  columns: number;
   /** Telas em que o bloco aparece. */
   devices: "all" | "mobile" | "desktop";
 }
@@ -578,6 +580,7 @@ const EMPTY_FORM: BlockForm = {
   isAd: false,
   fontFamily: "",
   categoryItems: [],
+  columns: 0,
   devices: "all",
 };
 
@@ -613,6 +616,7 @@ function blockToForm(block: HomeBlock): BlockForm {
     isAd:          block.isAd ?? false,
     fontFamily:    block.fontFamily ?? "",
     categoryItems: block.categoryItems ?? [],
+    columns:       block.columns ?? 0,
     devices:       block.devices ?? "all",
   };
 }
@@ -656,6 +660,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     isAd:       (f.blockType === "html" || f.blockType === "image") && f.isAd ? true : undefined,
     fontFamily: f.fontFamily || undefined,
     categoryItems: f.blockType === "categories" && f.categoryItems.length > 0 ? f.categoryItems : undefined,
+    columns:    f.blockType === "categories" && f.columns >= 2 ? f.columns : undefined,
     devices:    f.devices !== "all" ? f.devices : undefined,
   };
 }
@@ -1139,6 +1144,22 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
                   ? "A lista sai dos itens do menu; as imagens abaixo valem para o caminho de mesmo nome."
                   : "A lista sai das Categorias do blog — criar uma editoria nova já a exibe aqui."}
               </p>
+              <div className="mb-2">
+                <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">
+                  Editorias por fileira (desktop)
+                </label>
+                <select value={form.columns} onChange={(e) => onChange("columns", Number(e.target.value))}
+                  className={INPUT}>
+                  <option value={0}>Automático (enche a fileira)</option>
+                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+                    <option key={n} value={n}>{n} por fileira</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                  Onde a linha quebra. No celular a grade continua se ajustando à
+                  tela — a escolha vale de 1024px para cima.
+                </p>
+              </div>
               <CategoryItemsEditor categories={categories} items={form.categoryItems}
                 onChange={(next) => onChange("categoryItems", next)} />
               <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}

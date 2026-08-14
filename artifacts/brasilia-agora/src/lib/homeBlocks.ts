@@ -94,6 +94,11 @@ export interface HomeBlock {
   /** Bloco "categories": ajustes por editoria (imagem própria, rótulo, ocultar).
    *  Ausente = todas as categorias do blog com o ícone padrão do slug. */
   categoryItems?: CategoryBlockItem[];
+  /** Bloco "categories": quantos cartões por fileira no DESKTOP (2–10).
+   *  Ausente/0 = automático (a fileira enche sozinha, ~8 num container de
+   *  1280). Só vale de 1024px para cima — no celular a grade continua
+   *  respondendo à largura da tela. */
+  columns?: number;
   /** Fonte do texto do bloco: id do registro em lib/fonts.ts. Ausente = padrão do site. */
   fontFamily?: string;
   /** Em que telas o bloco aparece (ausente/"all" = todas). O corte é o mesmo

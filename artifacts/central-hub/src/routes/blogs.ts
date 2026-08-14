@@ -4,7 +4,7 @@ import { db, blogsTable, type BlogRow, type BlogCategory } from "@workspace/cent
 import { encryptSecret } from "@workspace/news-engine";
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
-import { testBlogConnection } from "../services/blogClient.js";
+import { testBlogConnection, syncBlogSources } from "../services/blogClient.js";
 import { logEvent } from "../lib/eventLog.js";
 import { logAudit } from "../lib/auditLog.js";
 import { normalizeTitleCaseMode } from "../lib/titleCase.js";
@@ -153,6 +153,52 @@ router.post("/:id/test", async (req, res) => {
     meta: { httpStatus: result.httpStatus, error: result.error },
   });
   res.json(result);
+});
+
+/**
+ * Empurra para UM blog a lista de fontes que as regras dele casam.
+ * Idempotente do lado do blog — pode rodar quantas vezes quiser.
+ */
+router.post("/:id/sync-sources", requireCentralRole("admin"), async (req, res) => {
+  const rows = await db.select().from(blogsTable).where(eq(blogsTable.id, (req.params.id as string))).limit(1);
+  const blog = rows[0];
+  if (!blog) {
+    res.status(404).json({ error: "Blog não encontrado." });
+    return;
+  }
+  const result = await syncBlogSources(blog);
+  logEvent({
+    module: "api", refType: "blog", refId: blog.id,
+    level: result.ok ? "info" : "warn",
+    message: `Fontes ${result.ok ? "sincronizadas" : "NÃO sincronizadas"}: ${blog.name} (${result.enviadas})`,
+    meta: { httpStatus: result.httpStatus, error: result.error, enviadas: result.enviadas },
+  });
+  logAudit(req, {
+    action: "blog.sync_sources", targetType: "blog", targetId: blog.id,
+    meta: { blogName: blog.name, ok: result.ok, enviadas: result.enviadas, httpStatus: result.httpStatus },
+  });
+  res.json(result);
+});
+
+/** Sincroniza TODOS os blogs ativos de uma vez (botão "Sincronizar todos"). */
+router.post("/sync-sources", requireCentralRole("admin"), async (_req, res) => {
+  const blogs = await db.select().from(blogsTable).where(eq(blogsTable.isActive, true));
+  const resultados: { id: string; name: string; ok: boolean; enviadas: number; error?: string }[] = [];
+  for (const blog of blogs) {
+    const r = await syncBlogSources(blog);
+    resultados.push({
+      id: blog.id, name: blog.name, ok: r.ok, enviadas: r.enviadas,
+      ...(r.error ? { error: r.error } : {}),
+    });
+  }
+  const okCount = resultados.filter((r) => r.ok).length;
+  logEvent({
+    module: "api", refType: "blog",
+    level: okCount === resultados.length ? "info" : "warn",
+    message: `Sincronização de fontes em lote: ${okCount}/${resultados.length} blogs`,
+    meta: { resultados },
+  });
+  res.json({ total: resultados.length, ok: okCount, resultados });
 });
 
 export default router;

@@ -445,16 +445,23 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
 - Isolamento entre blogs é por infra (container+DB+SESSION_SECRET próprios);
   NÃO existe blogId no app — nunca hardcodar conteúdo por blog na imagem
   compartilhada (usar settings).
-- **Fontes RSS padrão = espelho do painel central** (2026-08-14): a imagem
-  instalava 25 feeds do sp011 (Agência Brasil, Metrópoles, Jovem Pan…) em todo
-  blog novo — marca de outro portal. Agora `DEFAULT_RSS_SOURCES` deriva de
-  `api-server/src/lib/centralSourcesCatalog.ts` (ARQUIVO GERADO do dump do
-  `central_sources`: 127 linhas → 126 URLs únicas), tudo `active:false`/
-  `autoMode:"none"`: quem coleta continua sendo a central. Atenção: 14 das 25
-  fontes antigas (Agência Brasil, Metrópoles, Carta Capital, InfoMoney…)
-  CONTINUAM no painel — não por herança do sp011, mas porque a central as
-  coleta; somem as 11 que eram só do sp011 (Jovem Pan, Correio Braziliense por
-  editoria, Jornal de Brasília – DF, Notícias ao Minuto – Tech).
+- **Fontes RSS de cada blog vêm da CENTRAL, por push** (2026-08-14): a imagem
+  instalava 25 feeds do sp011 em todo blog — um blog de esporte exibia política
+  do DF no painel. A imagem é compartilhada e não sabe qual blog está rodando,
+  então **ela não instala fonte nenhuma**. Quem sabe é a central: as regras de
+  distribuição dizem quais fontes alimentam cada blog (`sourceMatchesAnyRule`,
+  `central-hub/src/lib/rules.ts` — a mesma conta do filtro "fontes por blog" da
+  página Fontes). Fluxo: `POST /blogs/:id/sync-sources` (ou `/blogs/sync-sources`
+  para todos; botões na página Blogs) → `syncBlogSources()` → `sendSigned()` no
+  mesmo canal HMAC do ingest → `POST /api/ingest/sources` no blog →
+  `syncCentralSources()`. Tudo chega `active:false`/`autoMode:"none"` — a coleta
+  segue na central (§11). Idempotente; a lista instalada fica em
+  `settings.rss_central_synced_urls`, e é ela que autoriza remover depois: fonte
+  cadastrada à mão, ligada ou que já coletou NUNCA é apagada
+  (`rssSourcesToRemove` em `lib/rssCatalog.ts`, puro e testado). No boot,
+  `pruneLegacyRssSources()` (flag `settings.rss_legacy_pruned`) remove as 25
+  antigas com a mesma regra. **Go-live de blog novo: depois das regras, clicar
+  "Fontes" no card do blog** — sem isso o painel dele nasce vazio.
   `reconcileRssCatalog()` (boot, flag `settings.rss_catalog_v2`) troca as
   antigas nos blogs que já existiam — apaga SÓ o que casa URL antiga **E**
   inativa **E** `last_fetched_at IS NULL`, e insere deduplicando por URL em
@@ -561,6 +568,11 @@ montada no servidor.
     `blockToForm`) e a home exibia 4 editorias sem ninguém pedir. O corte por
     `itemsLimit` saiu do `resolveCategoryBlockItems` — quem quer menos usa o
     olho (`hidden`) de cada editoria.
+  - `columns` (bloco Categorias) escolhe onde a fileira quebra no desktop
+    (2–10; ausente = automático). A regra mora no `index.css`
+    (`.category-grid--fixed` + var `--cat-cols`), não em estilo inline: inline
+    não tem media query e venceria o breakpoint por especificidade — no celular
+    a grade tem que continuar automática.
 - **`sizes` de caixa que RECORTA a foto** (`object-cover`): o navegador escolhe
   o candidato do `srcset` pela LARGURA, mas o recorte precisa cobrir a ALTURA —
   num card 3:4 de 296x395 com foto 16:10 a origem precisa ter `395 x 1,6 = 632`

@@ -19,7 +19,7 @@ import { verifyIngestSignature } from "@workspace/news-engine/signing";
 import { sanitizeSocialTitle, stripInlineHtml } from "@workspace/social-template";
 import { sanitizeIngestHtml } from "../lib/ingestSanitize.js";
 import { articleService } from "../lib/articleService.js";
-import { store } from "../lib/store.js";
+import { store, syncCentralSources, type CentralSourceInput } from "../lib/store.js";
 import { TAG_MAP } from "../lib/rssProcessor.js";
 import { endpointRateLimit } from "../middlewares/endpointRateLimit.js";
 import { sendPushToAll } from "./push.js";
@@ -102,6 +102,52 @@ router.get("/", (_req, res) => {
 router.post("/test", ingestRateLimit, centralIngestAuth, (req, res) => {
   const body = (req.body ?? {}) as { ping?: unknown };
   res.json({ ok: true, version: INGEST_VERSION, pong: body.ping ?? Date.now() });
+});
+
+/**
+ * POST /api/ingest/sources — a central manda as fontes que alimentam ESTE blog.
+ *
+ * Por que o blog não decide sozinho: a imagem é compartilhada pelos N blogs e
+ * não sabe qual deles está rodando (CLAUDE.md §13). Quem sabe são as regras de
+ * distribuição da central. Tudo entra INATIVO — a lista é para o operador ver e
+ * ligar se quiser; a coleta continua sendo da central (§11).
+ *
+ * Mesma credencial e mesma assinatura do /api/ingest (nonce anti-replay junto).
+ */
+router.post("/sources", ingestRateLimit, centralIngestAuth, async (req, res) => {
+  const { sources } = (req.body ?? {}) as { sources?: unknown };
+  if (!Array.isArray(sources)) {
+    res.status(422).json({ ok: false, error: "payload_invalido", message: "Campo obrigatório: sources[]." });
+    return;
+  }
+  // Teto defensivo: a central hoje tem ~130 fontes no total.
+  if (sources.length > 1000) {
+    res.status(413).json({ ok: false, error: "lista_grande_demais" });
+    return;
+  }
+
+  const limpas = (sources as CentralSourceInput[])
+    .filter((s) => typeof s?.url === "string" && typeof s?.name === "string")
+    .map((s) => ({
+      name: stripInlineHtml(String(s.name)).slice(0, 200),
+      url: String(s.url).trim().slice(0, 500),
+      category: typeof s.category === "string" ? s.category.trim().slice(0, 80) : undefined,
+      language: typeof s.language === "string" ? s.language.trim().slice(0, 10) : undefined,
+    }));
+
+  const result = await syncCentralSources(limpas);
+  req.log.info(result, "POST /api/ingest/sources aplicado");
+
+  await logAudit({
+    action: "update",
+    module: "ingest",
+    description: `Fontes RSS sincronizadas com o painel central (${result.total} no total)`,
+    ipAddress: getClientIp(req),
+    userAgent: req.headers["user-agent"],
+    metadata: { source: "central_sources_sync", ...result },
+  });
+
+  res.json({ ok: true, ...result });
 });
 
 interface IngestArticle {

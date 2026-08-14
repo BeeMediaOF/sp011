@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   Plus, Globe, ExternalLink, Pencil, Trash2, KeyRound, PlugZap, RefreshCw,
   ShieldCheck, Languages, Gauge, Timer, Radio, Eye, Share2, AlertTriangle, Power,
+  Rss,
 } from "lucide-react";
 import { api } from "../api";
 import { nameColor, statusLabel, timeAgo, useLoad } from "../hooks";
@@ -138,6 +139,36 @@ export default function Blogs() {
     }
   };
 
+  /**
+   * Manda para o blog a lista de fontes que as REGRAS dele casam — é o que o
+   * painel de Fontes RSS do blog passa a exibir (tudo inativo; quem coleta
+   * continua sendo a central). Idempotente: pode rodar quantas vezes quiser.
+   */
+  const syncSources = async (b: Blog) => {
+    setMsg(`Sincronizando fontes de ${b.name}…`);
+    try {
+      const res = await api<{ ok: boolean; enviadas: number; httpStatus: number; error?: string; body?: { inseridas?: number; removidas?: number } }>(
+        `/blogs/${b.id}/sync-sources`, { method: "POST" },
+      );
+      setMsg(res.ok
+        ? `✔ ${b.name}: ${res.enviadas} fontes (${res.body?.inseridas ?? 0} novas, ${res.body?.removidas ?? 0} removidas)`
+        : `✖ ${b.name}: ${res.error ?? `HTTP ${res.httpStatus}`}`);
+    } catch (err) {
+      setMsg(String((err as Error).message));
+    }
+  };
+
+  const syncAll = async () => {
+    if (!confirm("Sincronizar as fontes de TODOS os blogs ativos com as regras de distribuição?")) return;
+    setMsg("Sincronizando fontes de todos os blogs…");
+    try {
+      const res = await api<{ total: number; ok: number }>("/blogs/sync-sources", { method: "POST" });
+      setMsg(`✔ Fontes sincronizadas em ${res.ok}/${res.total} blogs`);
+    } catch (err) {
+      setMsg(String((err as Error).message));
+    }
+  };
+
   const rotate = async (b: Blog) => {
     if (!confirm(`Gerar um NOVO segredo para "${b.name}"? O segredo atual deixa de funcionar imediatamente.`)) return;
     const res = await api<{ ingestSecret: string }>(`/blogs/${b.id}/rotate-secret`, { method: "POST" });
@@ -167,6 +198,10 @@ export default function Blogs() {
         <div className="grow" />
         <button className="iconbtn" title="Atualizar" aria-label="Atualizar lista" onClick={reload}>
           <RefreshCw size={15} className={loading ? "spin-anim" : undefined} />
+        </button>
+        <button className="secondary" title="Enviar a cada blog as fontes que as regras dele casam"
+          onClick={() => void syncAll()}>
+          <Rss size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Sincronizar fontes
         </button>
         <button onClick={openNew}><Plus size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Novo blog</button>
       </div>
@@ -275,6 +310,10 @@ export default function Blogs() {
               <div className="bc-actions">
                 <button className="secondary small" onClick={() => void test(b)}>
                   <PlugZap size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Testar
+                </button>
+                <button className="secondary small" title="Enviar ao blog as fontes que as regras dele casam (tudo inativo lá)"
+                  onClick={() => void syncSources(b)}>
+                  <Rss size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Fontes
                 </button>
                 <button className="secondary small" onClick={() => openEdit(b)}>
                   <Pencil size={13} style={{ verticalAlign: "-2px", marginRight: 5 }} />Editar
