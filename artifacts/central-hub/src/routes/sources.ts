@@ -4,14 +4,15 @@ import { db, centralSourcesTable, distributionRulesTable, type CentralSourceRow 
 import { desc, eq } from "drizzle-orm";
 import { authMiddleware, requireCentralRole } from "../middlewares/auth.js";
 import { collectSourceById, runCollectorCycle } from "../services/collector.js";
-import { sourceMatchesAnyRule } from "../lib/rules.js";
+import { sourceBelongsToBlog } from "../lib/rules.js";
 import { logEvent } from "../lib/eventLog.js";
 
 const router = Router();
 router.use(authMiddleware);
 
-// ?blogId= filtra pelas regras ativas do blog: só as fontes que ALGUMA regra
-// dele pode casar (categoria/fonte; keywords são por notícia e não excluem).
+// ?blogId= filtra pelas regras ativas do blog: as fontes que alguma regra dele
+// NOMEIA (por categoria ou por id). Mesma conta que a sincronização manda para
+// o painel do blog — as duas telas têm que dizer a mesma coisa.
 router.get("/", async (req, res) => {
   const rows = await db.select().from(centralSourcesTable).orderBy(desc(centralSourcesTable.createdAt));
   const blogId = typeof req.query["blogId"] === "string" ? req.query["blogId"].trim() : "";
@@ -21,7 +22,7 @@ router.get("/", async (req, res) => {
   }
   const rules = await db.select().from(distributionRulesTable)
     .where(eq(distributionRulesTable.blogId, blogId));
-  res.json(rows.filter((s) => sourceMatchesAnyRule(rules, { id: s.id, category: s.category })));
+  res.json(rows.filter((s) => sourceBelongsToBlog(rules, { id: s.id, category: s.category })));
 });
 
 router.post("/", requireCentralRole("admin"), async (req, res) => {

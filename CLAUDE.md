@@ -449,9 +449,15 @@ de um blog: `docker compose restart api` do blog (store lê fontes no boot).
   instalava 25 feeds do sp011 em todo blog — um blog de esporte exibia política
   do DF no painel. A imagem é compartilhada e não sabe qual blog está rodando,
   então **ela não instala fonte nenhuma**. Quem sabe é a central: as regras de
-  distribuição dizem quais fontes alimentam cada blog (`sourceMatchesAnyRule`,
+  distribuição dizem quais fontes alimentam cada blog (`sourceBelongsToBlog`,
   `central-hub/src/lib/rules.ts` — a mesma conta do filtro "fontes por blog" da
-  página Fontes). Fluxo: `POST /blogs/:id/sync-sources` (ou `/blogs/sync-sources`
+  página Fontes). Esse critério é o ESTRITO: só conta a regra ativa que NOMEIA
+  a categoria da fonte ou a própria fonte. O permissivo (`sourceMatchesAnyRule`,
+  usado por quem avalia notícia a notícia) trata regra por keyword e catch-all
+  como "casa tudo" — com ele o credito.vc recebeu 112 fontes com football,
+  oc-aviacao e farmacia (2026-08-14), porque basta UMA regra por keyword para
+  arrastar o catálogo inteiro. Quando nenhuma regra ativa nomeia nada (blog só
+  com catch-all, caso do sp011), o escopo volta a ser tudo menos os excludes. Fluxo: `POST /blogs/:id/sync-sources` (ou `/blogs/sync-sources`
   para todos; botões na página Blogs) → `syncBlogSources()` → `sendSigned()` no
   mesmo canal HMAC do ingest → `POST /api/ingest/sources` no blog →
   `syncCentralSources()`. Tudo chega `active:false`/`autoMode:"none"` — a coleta

@@ -82,6 +82,28 @@ export function sourceMatchesAnyRule(rules: RuleForMatch[], src: SourceForMatch)
   return rules.some((r) => sourceCouldMatchRule(r, src));
 }
 
+/**
+ * Escopo ESTRITO: quais fontes de fato alimentam o blog. É o que vale para
+ * montar o painel de Fontes RSS dele e para o filtro "fontes por blog".
+ *
+ * A diferença para `sourceMatchesAnyRule` é o tratamento da regra que não
+ * nomeia fonte nem categoria (catch-all, ou só por keyword): lá ela casa TUDO,
+ * porque no nível da fonte não dá para saber quais itens teriam a keyword. Foi
+ * assim que o painel do credito.vc amanheceu com football, oc-aviacao e
+ * farmacia em 2026-08-14 — uma única regra por keyword arrastou o catálogo
+ * inteiro.
+ *
+ * Aqui, quando ALGUMA regra ativa nomeia categoria ou fonte, só essas contam —
+ * o escopo explícito vence o catch-all. Se nenhuma nomeia (blog alimentado só
+ * por catch-all, caso do sp011), o escopo volta a ser tudo menos os excludes;
+ * senão o painel dele nasceria vazio, que seria pior.
+ */
+export function sourceBelongsToBlog(rules: RuleForMatch[], src: SourceForMatch): boolean {
+  const ativas = rules.filter((r) => r.isActive);
+  const nomeiam = ativas.filter((r) => hasAny(r.categoriesInclude) || hasAny(r.sourcesInclude));
+  return (nomeiam.length > 0 ? nomeiam : ativas).some((r) => sourceCouldMatchRule(r, src));
+}
+
 export interface BlogMatchResult {
   matched: boolean;
   targetCategory?: string;

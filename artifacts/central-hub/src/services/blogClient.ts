@@ -8,7 +8,7 @@ import {
 } from "@workspace/central-db";
 import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
-import { sourceMatchesAnyRule } from "../lib/rules.js";
+import { sourceBelongsToBlog } from "../lib/rules.js";
 
 export const INGEST_API_VERSION = 1;
 
@@ -85,10 +85,14 @@ export interface SyncSourcesOutcome extends BlogCallResult {
  * Manda para o blog a lista de fontes que REALMENTE o alimentam.
  *
  * A conta é a mesma do filtro "fontes por blog" da página Fontes
- * (`sourceMatchesAnyRule`): uma fonte pertence ao blog quando alguma regra
- * ativa dele pode casar itens vindos dela. Sem isso o painel do blog só
- * conseguia mostrar uma lista fixa na imagem — que é compartilhada pelos N
- * blogs e por isso estaria errada para quase todos.
+ * (`sourceBelongsToBlog`): vale a regra ativa que NOMEIA a categoria da fonte
+ * ou a própria fonte. Sem isso o painel do blog só conseguia mostrar uma lista
+ * fixa na imagem — que é compartilhada pelos N blogs e por isso estaria errada
+ * para quase todos.
+ *
+ * O critério é o estrito de propósito: com o permissivo, uma única regra por
+ * keyword (que no nível da fonte casa tudo) despejava o catálogo inteiro no
+ * painel do blog.
  *
  * O blog recebe tudo INATIVO: a lista é informativa/operável, a coleta
  * continua sendo daqui.
@@ -99,7 +103,7 @@ export async function syncBlogSources(blog: BlogRow): Promise<SyncSourcesOutcome
     db.select().from(distributionRulesTable).where(eq(distributionRulesTable.blogId, blog.id)),
   ]);
 
-  const doBlog = sources.filter((s) => sourceMatchesAnyRule(rules, { id: s.id, category: s.category }));
+  const doBlog = sources.filter((s) => sourceBelongsToBlog(rules, { id: s.id, category: s.category }));
   const payload = {
     v: INGEST_API_VERSION,
     sources: doBlog.map((s) => ({

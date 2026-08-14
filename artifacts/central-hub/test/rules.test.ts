@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
-  matchBlogRules, ruleMatches, sourceCouldMatchRule, sourceMatchesAnyRule,
+  matchBlogRules, ruleMatches, sourceBelongsToBlog, sourceCouldMatchRule, sourceMatchesAnyRule,
   type RuleForMatch,
 } from "../src/lib/rules.ts";
 
@@ -118,5 +118,56 @@ describe("sourceCouldMatchRule (filtro fontes-por-blog)", () => {
     assert.equal(sourceMatchesAnyRule([rule({ categoriesInclude: ["financas"] }), rule({ categoriesInclude: ["farmacia"] })], SRC), true);
     assert.equal(sourceMatchesAnyRule([rule({ categoriesInclude: ["financas"] })], SRC), false);
     assert.equal(sourceMatchesAnyRule([], SRC), false);
+  });
+});
+
+/**
+ * Escopo estrito — é ele que decide o que aparece no painel de Fontes RSS do
+ * blog. O caso 1 é o incidente de 2026-08-14: o credito.vc recebeu 112 fontes
+ * (football, oc-aviacao, farmacia) porque tinha regra por keyword, que no
+ * critério permissivo casa qualquer fonte.
+ */
+describe("sourceBelongsToBlog (escopo estrito do painel do blog)", () => {
+  const ESPORTE = { id: "fonte-esporte", category: "futebol" };
+  const FINANCAS = { id: "fonte-financas", category: "financas" };
+
+  const REGRAS_CREDITOVC = [
+    rule({ categoriesInclude: ["financas"], priority: 10 }),
+    rule({ keywordsInclude: ["serasa", "score"], priority: 28 }), // sem categoria
+  ];
+
+  it("regra por keyword NAO arrasta fonte de outro nicho", () => {
+    assert.equal(sourceBelongsToBlog(REGRAS_CREDITOVC, FINANCAS), true);
+    assert.equal(sourceBelongsToBlog(REGRAS_CREDITOVC, ESPORTE), false);
+    // o critério permissivo (página Fontes, antes) deixava as duas passarem
+    assert.equal(sourceMatchesAnyRule(REGRAS_CREDITOVC, ESPORTE), true);
+  });
+
+  it("escopo explicito vence catch-all no mesmo blog", () => {
+    const regras = [rule({ categoriesInclude: ["financas"] }), rule({})];
+    assert.equal(sourceBelongsToBlog(regras, ESPORTE), false);
+    assert.equal(sourceBelongsToBlog(regras, FINANCAS), true);
+  });
+
+  it("blog SO com catch-all (sp011) fica com tudo menos os excludes", () => {
+    const regras = [rule({ categoriesExclude: ["financas"] })];
+    assert.equal(sourceBelongsToBlog(regras, ESPORTE), true);
+    assert.equal(sourceBelongsToBlog(regras, FINANCAS), false);
+  });
+
+  it("regra que nomeia mas esta INATIVA nao define o escopo", () => {
+    // só a inativa nomeia categoria: quem manda é a catch-all ativa
+    const regras = [rule({ categoriesInclude: ["financas"], isActive: false }), rule({})];
+    assert.equal(sourceBelongsToBlog(regras, ESPORTE), true);
+  });
+
+  it("include por id de fonte tambem define escopo explicito", () => {
+    const regras = [rule({ sourcesInclude: ["fonte-financas"] }), rule({ keywordsInclude: ["pix"] })];
+    assert.equal(sourceBelongsToBlog(regras, FINANCAS), true);
+    assert.equal(sourceBelongsToBlog(regras, ESPORTE), false);
+  });
+
+  it("blog sem regra nenhuma nao recebe fonte nenhuma", () => {
+    assert.equal(sourceBelongsToBlog([], ESPORTE), false);
   });
 });
