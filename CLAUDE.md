@@ -52,12 +52,18 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 - **Caddy**: `Caddyfile` raiz com snippets `(blog)` e `(blog-cf)` + `import
   /etc/caddy/sites/*.caddy`; um arquivo por blog em `caddy/sites/`.
   `(blog-cf)` é para blog atrás do **Cloudflare** (hoje só o credito.vc): lá o
-  Caddy NÃO consegue emitir certificado (o CF fala HTTPS com a origem até nas
-  requisições do ACME → HTTP 525), então o site usa `tls` explícito com o
-  certificado de origem do Cloudflare em `/opt/certs` (fora do repo, montado
-  `:ro`) e o snippet reescreve o `X-Forwarded-For` a partir do
-  `Cf-Connecting-Ip` — sem isso o `trust proxy 1` do api entrega o IP do edge
-  como se fosse o do leitor. Detalhes e runbook: `deploy/README.md`.
+  Caddy NÃO consegue emitir certificado PÚBLICO (o CF fala HTTPS com a origem
+  até nas requisições do ACME → HTTP 525). O credito.vc roda com **`tls
+  internal`** (CA interna do Caddy, que renova sozinha) — aceito porque o modo
+  do Cloudflare é **Full**, que não valida o certificado da origem; se um dia
+  virar Full (strict), aí sim precisa de Origin Certificate, e é para isso que
+  `/opt/certs` já está montado `:ro` (fora do repo — chave privada não se
+  commita). O snippet reescreve o `X-Forwarded-For` a partir do
+  `Cf-Connecting-Ip` só quando o peer é IP do Cloudflare: sem isso o `trust
+  proxy 1` do api entrega o IP do EDGE como se fosse o do leitor e, como IP de
+  edge carrega flag `hosting`, TODA visita nasceria `is_internal` e o painel de
+  audiência do blog ficaria zerado sem erro nenhum aparecendo. Runbook:
+  `deploy/README.md`.
   GOTCHA: o Caddyfile é bind de arquivo único — `git pull` troca o inode e
   `caddy reload` relê o arquivo VELHO → pull que muda o Caddyfile exige
   `docker compose up -d --force-recreate caddy`. O diretório `caddy/sites/`
