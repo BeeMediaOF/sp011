@@ -7,6 +7,7 @@ import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } fro
 import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
 import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
+import { sanitizeGtmId, injectGtm } from "./src/lib/gtmSnippet";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import path from "path";
@@ -62,6 +63,8 @@ interface SiteMeta {
   seoDescription: string;
   /** Caminho relativo da imagem OG (asset das settings ou /opengraph.jpg). */
   ogImagePath: string;
+  /** Container do Google Tag Manager deste blog ("" = sem GTM). */
+  gtmId: string;
 }
 
 /**
@@ -79,6 +82,7 @@ function makeSiteMetaResolver(apiBase: string): (host?: string) => Promise<SiteM
     tagline: "",
     seoDescription: "",
     ogImagePath: "/opengraph.jpg",
+    gtmId: "",
   });
   let cached: { meta: SiteMeta; at: number } | null = null;
   return async (host?: string) => {
@@ -118,6 +122,9 @@ function metaFromSitePayload(s: Record<string, unknown>): SiteMeta | null {
     tagline,
     seoDescription,
     ogImagePath: ogRaw.startsWith("/") ? ogRaw : logoRaw.startsWith("/") ? logoRaw : "/opengraph.jpg",
+    // Cada blog tem o SEU container: o valor vem do /api/site do próprio blog,
+    // nunca do index.html buildado (que é do blog que gerou a imagem Docker).
+    gtmId: sanitizeGtmId(typeof s["gtmId"] === "string" ? (s["gtmId"] as string) : ""),
   };
 }
 
@@ -137,6 +144,8 @@ interface HeadFields {
   socialTitle?: string;
   /** Tags extras injetadas antes de </head> (canonical, article:*). */
   extraTags?: readonly string[];
+  /** Container do GTM. Injetado no <head> e no <body> — ver gtmSnippet.ts. */
+  gtmId?: string;
 }
 
 /**
@@ -159,10 +168,19 @@ function applyHead(html: string, f: HeadFields): string {
     .replace(/(<meta name="twitter:title" content=")[^"]*(")/, `$1${esc(social)}$2`)
     .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
     .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(f.image)}$2`);
-  const extra = f.extraTags ?? [];
-  if (extra.length === 0) return out;
-  // O `</head>` do template já vem indentado; as tags entram antes dele.
-  return out.replace("</head>", `${extra.join("\n    ")}\n  </head>`);
+  const extra = [...(f.extraTags ?? [])];
+
+  /* GTM no HTML SERVIDO (2026-08-14). Antes o container só era montado no
+     cliente, depois do consentimento — o verificador do GTM, que faz um GET
+     simples, nunca via nada e acusava "container não encontrado". Entra aqui
+     porque `applyHead` é o funil por onde passa TODO HTML servido: home, artigo,
+     editoria e o fallback SPA de qualquer outra rota. */
+  const comExtra = extra.length === 0
+    ? out
+    // O `</head>` do template já vem indentado; as tags entram antes dele.
+    : out.replace("</head>", `${extra.join("\n    ")}\n  </head>`);
+
+  return injectGtm(comExtra, f.gtmId ?? "");
 }
 
 /**
@@ -184,6 +202,7 @@ function rewriteHeadMeta(
     url: `${origin}${pathOnly}`,
     image: `${origin}${meta.ogImagePath}`,
     extraTags,
+    gtmId: meta.gtmId,
   });
 }
 
@@ -683,6 +702,7 @@ function ssrPlugin(apiBase: string): Plugin {
         image,
         ogType: "article",
         extraTags,
+        gtmId: meta.gtmId,
       });
     });
   }
@@ -732,6 +752,7 @@ function ssrPlugin(apiBase: string): Plugin {
             url: `${origin}${route.path}`,
             image: `${origin}${meta.ogImagePath}`,
             extraTags: [`<link rel="canonical" href="${esc(`${origin}${route.path}`)}">`],
+            gtmId: meta.gtmId,
           })
         : langOnly(html, site));
   }

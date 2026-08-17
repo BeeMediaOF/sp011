@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useSite } from "../hooks/useSite";
+import { containsGtmContainer } from "../lib/gtmSnippet";
 
 // Consentimento de cookies (mesma chave/evento do banner LGPDConsent). Scripts de
 // terceiros (GTM/GA4/Pixel/código custom) só carregam após "Aceitar" — exigência
@@ -136,6 +137,23 @@ export default function SEOHead() {
     link.href = window.location.origin + location;
   }, [location]);
 
+  /* Consent Mode: o container do GTM vem do servidor em toda página e já nasce
+     com ad_storage/analytics_storage NEGADOS (lib/gtmSnippet.ts). Quem levanta
+     a restrição é este efeito, no "Aceitar" do banner — sem ele o container
+     carrega, é detectável por um GET, e mesmo assim não rastreia ninguém. */
+  useEffect(() => {
+    if (!consented || isAdmin) return;
+    // `gtag` é definido pelo próprio snippet do servidor. Não existe quando o
+    // blog está sem GTM configurado — aí não há consentimento a atualizar.
+    const w = window as unknown as { gtag?: (...args: unknown[]) => void };
+    w.gtag?.("consent", "update", {
+      ad_storage: "granted",
+      ad_user_data: "granted",
+      ad_personalization: "granted",
+      analytics_storage: "granted",
+    });
+  }, [consented, isAdmin]);
+
   // ── Scripts de terceiros (pesados) → adiados para o idle, fora do TBT ────────
   useEffect(() => {
     if (!settings || isAdmin) return;
@@ -148,24 +166,10 @@ export default function SEOHead() {
         && !settings.customHeadCode && !settings.customBodyCode) return;
 
     const cancel = onIdle(() => {
-    // ── Google Tag Manager ────────────────────────────────────────────────────
-    if (gtmId) {
-      const gid = gtmId;
-      if (!document.getElementById("gtm-init")) {
-        injectScript("gtm-init", `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','${gid}');`);
-        // noscript iframe
-        if (!document.getElementById("gtm-noscript")) {
-          const ns = document.createElement("noscript");
-          ns.id = "gtm-noscript";
-          ns.innerHTML = `<iframe src="https://www.googletagmanager.com/ns.html?id=${gid}" height="0" width="0" style="display:none;visibility:hidden"></iframe>`;
-          document.body.prepend(ns);
-        }
-      }
-    }
+    /* O container do GTM NÃO é injetado aqui desde 2026-08-14 — ele vem no HTML
+       servido (vite.config.ts → applyHead → lib/gtmSnippet.ts). Injetar daqui
+       carregaria o mesmo container duas vezes. O que continua sendo daqui é o
+       `consent update`, no efeito logo abaixo. */
 
     // ── Google Analytics 4 ────────────────────────────────────────────────────
     if (ga4Id) {
@@ -192,15 +196,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       `);
     }
 
-    // ── Código personalizado do <head> ───────────────────────────────────────
-    if (settings.customHeadCode && !document.getElementById("custom-head-code")) {
+    /* Código personalizado: pulado quando repete o container que o servidor já
+       injetou. É o caso comum — o operador preenche o "Container ID" E cola o
+       snippet inteiro do GTM no campo de código (foi assim no oleysports), o
+       que carregaria o mesmo container duas vezes e dobraria o pageview. */
+    if (settings.customHeadCode && !containsGtmContainer(settings.customHeadCode, gtmId)
+        && !document.getElementById("custom-head-code")) {
       try {
         injectHtmlSnippet("custom-head-code", settings.customHeadCode, document.head, "append");
       } catch { /* snippet inválido — ignorar silenciosamente */ }
     }
 
-    // ── Código personalizado do <body> ───────────────────────────────────────
-    if (settings.customBodyCode && !document.getElementById("custom-body-code")) {
+    if (settings.customBodyCode && !containsGtmContainer(settings.customBodyCode, gtmId)
+        && !document.getElementById("custom-body-code")) {
       try {
         injectHtmlSnippet("custom-body-code", settings.customBodyCode, document.body, "prepend");
       } catch { /* snippet inválido — ignorar silenciosamente */ }
