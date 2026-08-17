@@ -4,8 +4,11 @@
  * Parâmetros query:
  *   url  — URL da imagem de origem (obrigatório, deve ser de domínio permitido)
  *   w    — largura alvo em px (padrão 800, máx 1600)
+ *   h    — altura alvo em px (máx 1600); só vale com fit=cover
  *   q    — qualidade 1-100 (padrão 82)
  *   f    — formato: "webp" (padrão) | "avif"
+ *   fit  — "cover" recorta na proporção w×h (caixas object-cover); ausente =
+ *          comportamento antigo (redimensiona pela largura, CSS recorta)
  *
  * Cache:
  *   1. In-memory LRU (500 entradas) — sub-ms
@@ -35,8 +38,10 @@ import {
   DEFAULT_W,
   DEFAULT_Q,
   MAX_WIDTH,
+  MAX_HEIGHT,
   MAX_Q,
   type ImageFormat,
+  type ImageFit,
 } from "../lib/imageTransform.js";
 import { safeFetch } from "../lib/safeFetch.js";
 import {
@@ -246,8 +251,10 @@ export async function warmImageCache(
 router.get("/image", imageRateLimit, async (req, res) => {
   const rawUrl = req.query["url"];
   const rawW   = req.query["w"];
+  const rawH   = req.query["h"];
   const rawQ   = req.query["q"];
   const rawF   = req.query["f"];
+  const rawFit = req.query["fit"];
 
   if (!rawUrl || typeof rawUrl !== "string") {
     res.status(400).json({ error: "Parâmetro 'url' é obrigatório." });
@@ -283,7 +290,22 @@ router.get("/image", imageRateLimit, async (req, res) => {
   const fmt: ImageFormat = (typeof rawF === "string" && rawF === "avif") ? "avif" : "webp";
   const mime = fmt === "avif" ? "image/avif" : "image/webp";
 
-  const key  = cacheKey(rawUrl, w, q, fmt);
+  // `fit=cover` + `h`: o SERVIDOR recorta na proporção da caixa. É para as
+  // caixas `object-cover` de proporção fixa (card retrato, faixa panorâmica),
+  // onde pedir só a largura obriga o navegador a AMPLIAR para cobrir a altura —
+  // um card 3:4 de 296x395 preenchido por foto 16:9 precisa de ~702px de
+  // origem, e o `sizes` de 320px do grid de zonas ampliava 2,2x (borrão
+  // observado no oleysports em 2026-08-14). Recortando aqui, os pixels que o
+  // CSS jogaria fora param de ser baixados: 70 KB no lugar de 155 KB por card.
+  //
+  // Sem `fit=cover` nada muda — inclusive a chave de cache, que continua
+  // idêntica à antiga para não invalidar o cache em disco já gravado.
+  const fit: ImageFit = rawFit === "cover" ? "cover" : "inside";
+  const h = fit === "cover"
+    ? Math.min(Math.max(parseInt(typeof rawH === "string" ? rawH : "0", 10) || 0, 1), MAX_HEIGHT)
+    : undefined;
+
+  const key  = cacheKey(rawUrl, w, q, fmt, h, fit);
   const etag = `"${key.slice(0, 16)}"`;
 
   if (req.headers["if-none-match"] === etag) {
@@ -302,7 +324,7 @@ router.get("/image", imageRateLimit, async (req, res) => {
     processed = memHit ?? (await resolveImage(key, () => {
       if (isNegativeCached(rawUrl)) throw new Error("negative_cache");
       return fetchOriginWithRetry(rawUrl);
-    }, w, q, fmt));
+    }, w, q, fmt, "photo", h, fit));
   } catch (err) {
     const jaConhecida = err instanceof Error && err.message === "negative_cache";
     if (!jaConhecida) {

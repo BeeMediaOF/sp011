@@ -17,7 +17,9 @@ import { Link } from "wouter";
 import HeroSection from "../HeroSection";
 import AdBanner from "../ads/AdBanner";
 import type { AdSlotKey } from "../ads/useAds";
-import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS } from "@/lib/newsImage";
+import {
+  buildSrcSet, coverSrcSet, aspectClass, CARD_WIDTHS, THUMB_WIDTHS, type CoverAspect,
+} from "@/lib/newsImage";
 import { safeTitleHtml } from "../../lib/sanitize";
 import { useT } from "../../lib/i18n";
 import { inferBlockType, sampleForPreview, type HomeBlock } from "../../lib/homeBlocks";
@@ -94,14 +96,14 @@ export function ZoneSectionHeader({ title, color, href, linkLabel, variant = "cl
 // ─── Peças reutilizáveis ──────────────────────────────────────────────────────
 
 /** Card vertical: imagem com pill de categoria + título + resumo + data. */
-function CardItem({ a, color, ratio = "aspect-[3/2]", titleCls = "text-[14px]", sizes = "(max-width: 1024px) 50vw, 230px", summary = true }: {
-  a: ZoneArticle; color: string; ratio?: string; titleCls?: string; sizes?: string; summary?: boolean;
+function CardItem({ a, color, aspect = "3/2", titleCls = "text-[14px]", sizes = "(max-width: 1024px) 50vw, 230px", summary = true }: {
+  a: ZoneArticle; color: string; aspect?: CoverAspect; titleCls?: string; sizes?: string; summary?: boolean;
 }) {
   return (
     <Link href={`/artigo/${a.slug ?? a.id}`} className="group flex flex-col min-w-0">
-      <div className={`relative w-full ${ratio} overflow-hidden rounded-lg bg-gray-100 mb-2`}>
+      <div className={`relative w-full ${aspectClass(aspect)} overflow-hidden rounded-lg bg-gray-100 mb-2`}>
         {a.image && (
-          <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+          <img src={a.image} srcSet={coverSrcSet(a.image, aspect) || undefined}
             sizes={sizes} alt={stripTags(a.title)}
             width={460} height={307} loading="lazy" decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -121,16 +123,28 @@ function CardItem({ a, color, ratio = "aspect-[3/2]", titleCls = "text-[14px]", 
  * Card com título sobre a imagem (gradiente). A imagem preenche por posição
  * absoluta, então o tamanho vem do className (aspect-* ou h-full em grades de
  * altura fixa).
+ *
+ * Com `aspect`, a caixa tem proporção FIXA e o servidor entrega a foto já
+ * recortada nela (`coverSrcSet`): o `sizes` passa a ser a largura CSS da caixa,
+ * sem o acréscimo para cobrir a altura. Sem `aspect` (grade de altura fixa,
+ * onde a proporção muda com o breakpoint) segue o caminho por largura.
  */
-function OverlayCard({ a, color, big = false, className = "" }: {
-  a: ZoneArticle; color: string; big?: boolean; className?: string;
+function OverlayCard({ a, color, big = false, aspect, sizes, className = "" }: {
+  a: ZoneArticle; color: string; big?: boolean;
+  aspect?: CoverAspect; sizes?: string; className?: string;
 }) {
+  // coverSrcSet e buildSrcSet têm a MESMA condição de host: ou os dois
+  // devolvem candidatos, ou nenhum devolve e o `src` inteiro é usado. Por isso
+  // o `sizes` abaixo pode assumir a largura da caixa sem caso intermediário.
+  const srcSet = a.image
+    ? (aspect ? coverSrcSet(a.image, aspect) : buildSrcSet(a.image, CARD_WIDTHS)) || undefined
+    : undefined;
   return (
     <Link href={`/artigo/${a.slug ?? a.id}`}
-      className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${className}`}>
+      className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${aspect ? `${aspectClass(aspect)} ` : ""}${className}`}>
       {a.image && (
-        <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
-          sizes={big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px"}
+        <img src={a.image} srcSet={srcSet}
+          sizes={sizes ?? (big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px")}
           alt={stripTags(a.title)} width={640} height={400} loading="lazy" decoding="async"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       )}
@@ -201,7 +215,7 @@ function MiniCard({ a, color, sizes = "(max-width: 640px) 50vw, (max-width: 1280
       className="group flex flex-col min-w-0 bg-white border border-gray-200 rounded-2xl shadow-[0_8px_28px_rgba(15,23,42,.06)] overflow-hidden">
       <div className="relative w-full aspect-[4/3] overflow-hidden bg-gray-100">
         {a.image && (
-          <img src={a.image} srcSet={buildSrcSet(a.image, CARD_WIDTHS) || undefined}
+          <img src={a.image} srcSet={coverSrcSet(a.image, "4/3") || undefined}
             sizes={sizes} alt={stripTags(a.title)}
             width={460} height={345} loading="lazy" decoding="async"
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -241,7 +255,13 @@ function OverlayGrid({ items, color, cols }: { items: ZoneArticle[]; color: stri
   const colsCls = cols === 4 ? "grid-cols-2 lg:grid-cols-4" : "grid-cols-1 sm:grid-cols-2";
   return (
     <div className={`grid ${colsCls} gap-4`}>
-      {items.map((a) => <OverlayCard key={a.id} a={a} color={color} className="aspect-[3/4]" />)}
+      {/* Card RETRATO: o pior caso do recorte — uma foto 16:9 só cobre a altura
+          se a origem tiver ~2,4x a largura da caixa. Era aqui que o `sizes` de
+          320px ampliava 2,2x; agora o servidor entrega já em 3:4. */}
+      {items.map((a) => (
+        <OverlayCard key={a.id} a={a} color={color} aspect="3/4"
+          sizes={cols === 4 ? "(max-width: 1024px) 50vw, 300px" : "(max-width: 640px) 100vw, 616px"} />
+      ))}
     </div>
   );
 }
@@ -254,7 +274,7 @@ function DuploZone({ items, color, narrow }: { items: ZoneArticle[]; color: stri
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {big.map((a) => (
-          <CardItem key={a.id} a={a} color={color} ratio="aspect-[16/10]"
+          <CardItem key={a.id} a={a} color={color} aspect="16/10"
             titleCls={narrow ? "text-[15px]" : "text-[17px]"}
             sizes="(max-width: 1024px) 100vw, 440px" />
         ))}
@@ -280,7 +300,7 @@ function FeaturedZone({ items, color }: { items: ZoneArticle[]; color: string })
   const [main, ...rest] = items;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-5">
-      <CardItem a={main} color={color} ratio="aspect-[16/10]" titleCls="text-[18px]"
+      <CardItem a={main} color={color} aspect="16/10" titleCls="text-[18px]"
         sizes="(max-width: 1024px) 100vw, 580px" />
       {rest.length > 0 && (
         <div className="flex flex-col min-w-0">
@@ -296,7 +316,7 @@ function FeaturedStack({ items, color }: { items: ZoneArticle[]; color: string }
   const [main, ...rest] = items;
   return (
     <div className="flex flex-col">
-      <CardItem a={main} color={color} ratio="aspect-[16/9]" titleCls="text-[16px]"
+      <CardItem a={main} color={color} aspect="16/9" titleCls="text-[16px]"
         sizes="(max-width: 1024px) 100vw, 600px" />
       {rest.length > 0 && (
         <div className="flex flex-col mt-3 pt-1 border-t border-gray-100">
@@ -312,7 +332,8 @@ function BigStoryZone({ items, color }: { items: ZoneArticle[]; color: string })
   const [main, ...rest] = items;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-5 items-start">
-      <OverlayCard a={main} color={color} big className="aspect-[16/9]" />
+      <OverlayCard a={main} color={color} big aspect="16/9"
+        sizes="(max-width: 1024px) 100vw, 740px" />
       {rest.length > 0 && (
         <div className="flex flex-col min-w-0">
           {rest.slice(0, 4).map((a) => <ThumbRow key={a.id} a={a} chapeu color={color} />)}
@@ -336,7 +357,7 @@ function FotoListaBody({ block, articles, color, revista = false }: {
       <Link href={`/artigo/${main.slug ?? main.id}`} className="group block min-w-0">
         <div className="relative w-full aspect-[16/10] overflow-hidden rounded-lg bg-gray-100 mb-2.5">
           {main.image && (
-            <img src={main.image} srcSet={buildSrcSet(main.image, CARD_WIDTHS) || undefined}
+            <img src={main.image} srcSet={coverSrcSet(main.image, "16/10") || undefined}
               sizes="(max-width: 1024px) 100vw, 360px" alt={stripTags(main.title)}
               width={640} height={400} loading="lazy" decoding="async"
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -379,10 +400,14 @@ function MancheteZone({ items, color, narrow }: { items: ZoneArticle[]; color: s
   const row = tiles.slice(0, narrow ? 2 : 3);
   return (
     <div className="flex flex-col gap-3">
-      <OverlayCard a={main} color={color} big className={narrow ? "aspect-[16/9]" : "aspect-[16/7]"} />
+      <OverlayCard a={main} color={color} big aspect={narrow ? "16/9" : "16/7"}
+        sizes={narrow ? "(max-width: 1024px) 100vw, 400px" : "(max-width: 1024px) 100vw, 830px"} />
       {row.length > 0 && (
         <div className={`grid ${narrow ? "grid-cols-2" : "grid-cols-3"} gap-3`}>
-          {row.map((a) => <OverlayCard key={a.id} a={a} color={color} className="aspect-[16/10]" />)}
+          {row.map((a) => (
+            <OverlayCard key={a.id} a={a} color={color} aspect="16/10"
+              sizes={narrow ? "(max-width: 1024px) 50vw, 200px" : "(max-width: 1024px) 33vw, 272px"} />
+          ))}
         </div>
       )}
     </div>
@@ -395,7 +420,8 @@ function MagazineZone({ items, color, narrow }: { items: ZoneArticle[]; color: s
   const grid = rest.slice(0, narrow ? 2 : 4);
   return (
     <div>
-      <OverlayCard a={main} color={color} big className={narrow ? "aspect-[16/9]" : "aspect-[16/7]"} />
+      <OverlayCard a={main} color={color} big aspect={narrow ? "16/9" : "16/7"}
+        sizes={narrow ? "(max-width: 1024px) 100vw, 400px" : "(max-width: 1024px) 100vw, 830px"} />
       {grid.length > 0 && (
         <div className={`grid ${narrow ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4"} gap-4 mt-4`}>
           {grid.map((a) => (
@@ -636,8 +662,8 @@ function SidebarCards({ block, articles, color, preview, overlay = false }: {
       <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
       <div className="flex flex-col gap-4">
         {items.map((a) => overlay
-          ? <OverlayCard key={a.id} a={a} color={color} className="aspect-[16/9]" />
-          : <CardItem key={a.id} a={a} color={color} ratio="aspect-[16/9]" titleCls="text-[13.5px]"
+          ? <OverlayCard key={a.id} a={a} color={color} aspect="16/9" sizes="288px" />
+          : <CardItem key={a.id} a={a} color={color} aspect="16/9" titleCls="text-[13.5px]"
               sizes="288px" summary={false} />)}
       </div>
     </section>
@@ -656,7 +682,7 @@ function SidebarFeatured({ block, articles, color, preview }: {
   return (
     <section className="border border-gray-200 rounded-lg p-4">
       <ZoneSectionHeader title={block.hideHeader ? "" : block.name} color={color} />
-      <CardItem a={main} color={color} ratio="aspect-[16/10]" titleCls="text-[14px]" sizes="288px" summary={false} />
+      <CardItem a={main} color={color} aspect="16/10" titleCls="text-[14px]" sizes="288px" summary={false} />
       {rest.length > 0 && (
         <div className="flex flex-col mt-3 pt-2 border-t border-gray-100">
           {rest.slice(0, 3).map((a) => <ThumbRow key={a.id} a={a} small />)}

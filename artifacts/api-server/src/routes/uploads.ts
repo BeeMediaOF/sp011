@@ -39,9 +39,11 @@ import {
   resolveImage,
   DEFAULT_Q,
   MAX_WIDTH,
+  MAX_HEIGHT,
   MAX_Q,
   MAX_INPUT_PIXELS,
   type ImageFormat,
+  type ImageFit,
 } from "../lib/imageTransform.js";
 
 /** Rate limit de upload (PRD-11): 60/min por IP nas rotas de POST. */
@@ -225,7 +227,15 @@ router.get("/:filename", async (req, res) => {
     const fmt: ImageFormat = req.query["f"] === "avif" ? "avif" : "webp";
     const mime = fmt === "avif" ? "image/avif" : "image/webp";
 
-    const key  = cacheKey(`upload:${filename}`, w, q, fmt);
+    // `fit=cover` + `h`: recorte na proporção da caixa, igual ao /api/image.
+    // Capa enviada pelo painel usa este caminho — sem isso ela seria a única
+    // imagem da home a continuar sendo ampliada pelo navegador.
+    const fit: ImageFit = req.query["fit"] === "cover" ? "cover" : "inside";
+    const h = fit === "cover"
+      ? Math.min(Math.max(parseInt(typeof req.query["h"] === "string" ? (req.query["h"] as string) : "0", 10) || 0, 1), MAX_HEIGHT)
+      : undefined;
+
+    const key  = cacheKey(`upload:${filename}`, w, q, fmt, h, fit);
     const etag = `"${key.slice(0, 16)}"`;
     if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
 
@@ -246,7 +256,7 @@ router.get("/:filename", async (req, res) => {
           if (!TRANSFORMABLE.has(raw.contentType)) throw new Error(`skip:${raw.contentType}`);
           return raw.buffer;
         },
-        w, q, fmt,
+        w, q, fmt, "photo", h, fit,
       );
       res.set("Content-Type", mime)
         .set("Cache-Control", "public, max-age=31536000, immutable")

@@ -18,8 +18,20 @@ import os from "os";
 
 export type ImageFormat = "webp" | "avif";
 
+/**
+ * Como a imagem encaixa na medida pedida.
+ *
+ * - `inside` (padrão, histórico): redimensiona por largura (ou por altura, no
+ *   caso da logo) mantendo a proporção da origem. Quem recorta é o CSS.
+ * - `cover`: o SERVIDOR recorta na proporção pedida (`w`×`h`). É para as caixas
+ *   `object-cover` de proporção fixa — card retrato, faixa panorâmica. Ver
+ *   `escalaCover` para o porquê de não existir `withoutEnlargement` aqui.
+ */
+export type ImageFit = "inside" | "cover";
+
 // ── Config ───────────────────────────────────────────────────────────────────
 export const MAX_WIDTH = 1600;
+export const MAX_HEIGHT = 1600;
 export const DEFAULT_W = 800;
 export const DEFAULT_Q = 82;
 export const MAX_Q = 100;
@@ -87,8 +99,20 @@ export function memSet(key: string, buf: Buffer): void {
 }
 
 // ── Cache em disco ────────────────────────────────────────────────────────────
-export function cacheKey(source: string, w: number, q: number, fmt: string): string {
-  return createHash("sha256").update(`${source}|${w}|${q}|${fmt}`).digest("hex");
+/**
+ * Chave de cache. Sem `h`/`fit` a string é IDÊNTICA à de antes do recorte no
+ * servidor — o cache em disco já gravado (milhares de arquivos por blog)
+ * continua valendo depois do deploy, em vez de ser reconstruído do zero.
+ */
+export function cacheKey(
+  source: string, w: number, q: number, fmt: string,
+  h?: number, fit?: ImageFit,
+): string {
+  const base = `${source}|${w}|${q}|${fmt}`;
+  const completa = h !== undefined || (fit !== undefined && fit !== "inside")
+    ? `${base}|${h ?? ""}|${fit ?? ""}`
+    : base;
+  return createHash("sha256").update(completa).digest("hex");
 }
 
 function cachePath(key: string): string {
@@ -141,6 +165,36 @@ const SHARP_TIMEOUT_S = 15;
  */
 export type ImageProfile = "photo" | "artwork";
 
+/**
+ * Maior recorte NA PROPORÇÃO PEDIDA que a origem consegue entregar sem ampliar.
+ *
+ * Existe porque `withoutEnlargement` é INCOMPATÍVEL com `fit: "cover"`: quando o
+ * alvo é mais alto que a origem, o sharp devolve a imagem com a proporção
+ * ERRADA em vez de encolher o pedido — uma origem 1280x720 pedida em 592x790
+ * volta 592x720 (medido em 2026-08-14). Aí o `object-cover` do navegador
+ * recortaria de novo, e o ganho todo do recorte no servidor se perdia.
+ *
+ * Com o fator aplicado aos DOIS lados, a proporção pedida é sempre respeitada e
+ * nunca se amplia: 1280x720 pedido em 592x790 vira 539x720 (exatamente 3:4).
+ * Origem menor que a caixa devolve a caixa inteira em escala reduzida — o
+ * navegador amplia, mas sem recortar de novo.
+ */
+export function escalaCover(
+  origem: { width?: number | undefined; height?: number | undefined },
+  w: number,
+  h: number,
+): { width: number; height: number } {
+  const ow = origem.width ?? 0;
+  const oh = origem.height ?? 0;
+  // Origem sem metadata legível: entrega o pedido como veio.
+  if (ow <= 0 || oh <= 0) return { width: w, height: h };
+  const fator = Math.min(1, ow / w, oh / h);
+  return {
+    width: Math.max(1, Math.round(w * fator)),
+    height: Math.max(1, Math.round(h * fator)),
+  };
+}
+
 export async function transformImage(
   raw: Buffer,
   w: number,
@@ -148,6 +202,7 @@ export async function transformImage(
   fmt: ImageFormat,
   profile: ImageProfile = "photo",
   h?: number,
+  fit: ImageFit = "inside",
 ): Promise<Buffer> {
   // limitInputPixels + timeout: um input acima do cap (ou que trava a decodificação)
   // faz o sharp LANÇAR — tratado a montante (proxy → placeholder; upload GET →
@@ -159,8 +214,24 @@ export async function transformImage(
   // (3,6:1) e, exibida a 120 px de altura, ocupa 432 px — pedir w=320 fazia o
   // navegador dar UPSCALE e borrava a marca (observado em 2026-07-28).
   return withTransformSlot(async () => {
-    const pipeline = sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" })
-      .resize(h ? { height: h, withoutEnlargement: true } : { width: w, withoutEnlargement: true })
+    const entrada = () => sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" });
+
+    // Recorte na proporção da caixa: o alvo é reduzido ao que a origem cobre
+    // (ver escalaCover), e `position: centre` reproduz exatamente o
+    // enquadramento que o `object-cover` do navegador já fazia — o que muda é
+    // que os pixels descartados param de ser baixados.
+    const alvo = fit === "cover" && h
+      ? escalaCover(await entrada().metadata(), w, h)
+      : null;
+
+    const pipeline = entrada()
+      .resize(
+        alvo
+          ? { width: alvo.width, height: alvo.height, fit: "cover", position: "centre" }
+          : h
+            ? { height: h, withoutEnlargement: true }
+            : { width: w, withoutEnlargement: true },
+      )
       .timeout({ seconds: SHARP_TIMEOUT_S });
     if (profile === "artwork") {
       /* Lossless e lossy q95/effort 4, servindo o MENOR. Em arte de identidade os
@@ -200,6 +271,7 @@ export async function resolveImage(
   fmt: ImageFormat,
   profile: ImageProfile = "photo",
   h?: number,
+  fit: ImageFit = "inside",
 ): Promise<Buffer> {
   // 1. Mem
   const memHit = memGet(key);
@@ -218,7 +290,7 @@ export async function resolveImage(
   if (!pending) {
     pending = (async () => {
       const raw = await produceRaw();
-      return transformImage(raw, w, q, fmt, profile, h);
+      return transformImage(raw, w, q, fmt, profile, h, fit);
     })()
       .then((buf) => {
         memSet(key, buf);

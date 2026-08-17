@@ -7,7 +7,7 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { siteAssetUrl, siteAssetSrcSet } from "./newsImage";
+import { siteAssetUrl, siteAssetSrcSet, coverSrcSet, buildSrcSet, aspectClass } from "./newsImage";
 
 const ASSET = "/api/site-asset/logo?v=15f61d3a53";
 
@@ -79,4 +79,59 @@ test("a URL derivada continua casando com a guarda do updateSettings", () => {
       assert.ok(cand.split(" ")[0]!.startsWith(SITE_ASSET_PREFIX));
     }
   }
+});
+
+/* ── Recorte no servidor (coverSrcSet) ──────────────────────────────────────
+   O card 3:4 preenchido por foto 16:9 precisa de ~2,4x a largura da caixa para
+   cobrir a altura. Enquanto o srcSet pedia só a largura, o navegador ampliava
+   2,2x — foi o borrão do oleysports. Pedindo w+h+fit=cover, o servidor devolve
+   a caixa pronta. */
+
+const CENTRAL = "https://central.midia.run/api/news/image/abc-123.jpg";
+
+test("coverSrcSet: cada candidato leva h na proporcao da caixa e fit=cover", () => {
+  const set = coverSrcSet(CENTRAL, "3/4", [320, 640]);
+  const partes = set.split(", ");
+  assert.equal(partes.length, 2);
+  assert.match(partes[0]!, /[?&]w=320&h=427&q=86&fit=cover 320w$/);
+  assert.match(partes[1]!, /[?&]w=640&h=853&q=86&fit=cover 640w$/);
+  // a URL de origem vai escapada (querystring dentro de querystring)
+  assert.ok(partes[0]!.includes(encodeURIComponent(CENTRAL)));
+});
+
+test("coverSrcSet: a altura acompanha a proporcao pedida", () => {
+  assert.match(coverSrcSet(CENTRAL, "16/9", [640]), /h=360&/);
+  assert.match(coverSrcSet(CENTRAL, "4/3", [640]), /h=480&/);
+  assert.match(coverSrcSet(CENTRAL, "16/6", [1280]), /h=480&/);
+});
+
+test("coverSrcSet: acende exatamente nos mesmos casos que buildSrcSet", () => {
+  /* Os componentes assumem isso: como os dois têm a MESMA condição de host, o
+     `sizes` pode ser sempre a largura da caixa. Se um acendesse sem o outro,
+     existiria um caso com srcSet por largura e sizes de caixa — borrão de novo. */
+  for (const src of [
+    CENTRAL,
+    "https://a1.espncdn.com/foto.jpg",
+    "https://dominio-nao-permitido.com/foto.jpg",
+    "/api/uploads/capa.jpg",
+    "/assets/estatico.png",
+    "data:image/png;base64,AAAA",
+    "",
+  ]) {
+    assert.equal(
+      coverSrcSet(src, "3/4") === "",
+      buildSrcSet(src, [320, 640]) === "",
+      `divergiram em ${src || "(vazio)"}`,
+    );
+  }
+});
+
+test("coverSrcSet: upload do painel usa o resize do proprio /api/uploads", () => {
+  const set = coverSrcSet("/api/uploads/capa.jpg", "3/4", [320]);
+  assert.equal(set, "/api/uploads/capa.jpg?w=320&h=427&q=86&f=webp&fit=cover 320w");
+});
+
+test("aspectClass: a classe do Tailwind sai da MESMA fonte do srcSet", () => {
+  assert.equal(aspectClass("3/4"), "aspect-[3/4]");
+  assert.equal(aspectClass("16/10"), "aspect-[16/10]");
 });

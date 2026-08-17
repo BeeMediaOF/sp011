@@ -206,6 +206,85 @@ export const COVER_WIDTHS = [480, 640, 960, 1280];
  *  para disfarçar artefato. 82 continua o padrão do resto da home. */
 export const COVER_Q = 86;
 
+/**
+ * Proporções das caixas que RECORTAM a foto, como `altura ÷ largura`.
+ *
+ * A mesma entrada alimenta a classe `aspect-[…]` do Tailwind e o `srcSet` —
+ * é de propósito: enquanto os dois eram escritos à mão em lugares diferentes,
+ * o card 3:4 do grid de zonas ficou pedindo `sizes="320px"` para uma caixa que
+ * precisa de ~700 px, e a foto subia 2,2x (borrão do oleysports, 2026-08-14).
+ */
+export const COVER_ASPECTS = {
+  "3/4": 4 / 3,
+  "4/3": 3 / 4,
+  "3/2": 2 / 3,
+  "16/9": 9 / 16,
+  "16/10": 10 / 16,
+  "16/7": 7 / 16,
+  "16/6": 6 / 16,
+} as const;
+
+export type CoverAspect = keyof typeof COVER_ASPECTS;
+
+/**
+ * Escada de larguras do recorte no servidor. Começa mais baixa que
+ * `COVER_WIDTHS` porque aqui o candidato JÁ é a largura da caixa: sumiu o
+ * acréscimo que existia só para cobrir a altura. Um card de 296 px pega 320 na
+ * tela 1x e 640 na 2x.
+ */
+export const COVER_CROP_WIDTHS = [240, 320, 480, 640, 960, 1280];
+
+/** Classe Tailwind da proporção — a fonte é a mesma do `srcSet`. */
+export function aspectClass(a: CoverAspect): string {
+  return `aspect-[${a}]`;
+}
+
+/**
+ * `srcSet` de uma caixa de proporção FIXA preenchida com `object-cover`.
+ *
+ * Cada candidato já vem do servidor recortado na proporção da caixa
+ * (`&h=&fit=cover`), então o navegador não amplia nem descarta pixel — o
+ * `sizes` do chamador passa a ser simplesmente a largura CSS da caixa, que é a
+ * conta que todo mundo já faz certo.
+ *
+ * Ganha nos dois lados: um card 3:4 de foto 16:9 saía em 1280x720 (155 KB) para
+ * mostrar a faixa central; agora sai em 539x720 (70 KB) e sem ampliação.
+ *
+ * Devolve "" quando a origem não passa pelo proxy (o `<img>` cai no `src`
+ * inteiro, como já fazia) — recorte no servidor exige servidor.
+ */
+export function coverSrcSet(
+  src: string,
+  aspect: CoverAspect,
+  widths: number[] = COVER_CROP_WIDTHS,
+  q = COVER_Q,
+): string {
+  if (!src || src.startsWith("data:") || src.startsWith("blob:")) return "";
+  const razao = COVER_ASPECTS[aspect];
+
+  const monta = (w: number): string => {
+    const h = Math.round(w * razao);
+    return src.startsWith("/api/uploads/")
+      ? `${src}?w=${w}&h=${h}&q=${q}&f=webp&fit=cover`
+      : `/api/image?url=${encodeURIComponent(src)}&w=${w}&h=${h}&q=${q}&fit=cover`;
+  };
+
+  if (src.startsWith("/api/uploads/")) {
+    return widths.map((w) => `${monta(w)} ${w}w`).join(", ");
+  }
+  if (src.startsWith("/")) return "";
+
+  let hostname: string;
+  try {
+    hostname = new URL(src).hostname;
+  } catch {
+    return "";
+  }
+  if (!isProxyableHost(hostname)) return "";
+
+  return widths.map((w) => `${monta(w)} ${w}w`).join(", ");
+}
+
 /** Larguras para imagens hero (ocupam 33–100% da viewport). */
 export const HERO_WIDTHS = [480, 768, 1024, 1280];
 

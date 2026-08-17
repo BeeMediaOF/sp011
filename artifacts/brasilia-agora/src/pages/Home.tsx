@@ -17,7 +17,10 @@ import { useArticles } from "../hooks/useArticles";
 import { Link } from "wouter";
 import { useSite, type HomeBlock } from "../hooks/useSite";
 import { useT, formatDayMonth } from "../lib/i18n";
-import { buildSrcSet, CARD_WIDTHS, THUMB_WIDTHS, COVER_WIDTHS, COVER_Q } from "@/lib/newsImage";
+import {
+  buildSrcSet, coverSrcSet, aspectClass, CARD_WIDTHS, THUMB_WIDTHS, COVER_WIDTHS, COVER_Q,
+  type CoverAspect,
+} from "@/lib/newsImage";
 import { inferBlockType, segmentBlocks, sampleForPreview, safeLinkUrl, type SegmentEntry } from "../lib/homeBlocks";
 import { sanitizeArticleHtml, safeTitleHtml } from "../lib/sanitize";
 import {
@@ -261,15 +264,22 @@ function SectionHeaderClassic({ title, color, href, hideHeader }: {
  * origem é o maior entre a largura da caixa e `altura x proporção da foto` —
  * ver o comentário de COVER_WIDTHS em lib/newsImage.
  */
-function OverlayCardClassic({ a, color, big = false, className = "", sizes, widths = COVER_WIDTHS }: {
+function OverlayCardClassic({ a, color, big = false, className = "", sizes, widths = COVER_WIDTHS, aspect }: {
   a: SectionArticle; color: string; big?: boolean; className?: string;
-  sizes?: string; widths?: number[];
+  sizes?: string; widths?: number[]; aspect?: CoverAspect;
 }) {
+  // Com `aspect` (proporção fixa em TODO breakpoint) o servidor entrega a foto
+  // já recortada e o `sizes` é a largura CSS da caixa. Sem ele — caixa que muda
+  // de proporção no md, como o mosaico e a faixa revista — segue o caminho por
+  // largura, com o `sizes` corrigido pela altura.
+  const srcSet = a.image
+    ? (aspect ? coverSrcSet(a.image, aspect) : buildSrcSet(a.image, widths, COVER_Q)) || undefined
+    : undefined;
   return (
     <Link href={`/artigo/${a.slug ?? a.id}`}
-      className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${className}`}>
+      className={`group relative block overflow-hidden rounded-lg bg-gray-200 ${aspect ? `${aspectClass(aspect)} ` : ""}${className}`}>
       {a.image && (
-        <img src={a.image} srcSet={buildSrcSet(a.image, widths, COVER_Q) || undefined}
+        <img src={a.image} srcSet={srcSet}
           sizes={sizes ?? (big ? "(max-width: 1024px) 100vw, 640px" : "(max-width: 1024px) 50vw, 320px")}
           alt={a.title} width={640} height={400} loading="lazy" decoding="async"
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -317,12 +327,12 @@ function SectionBlockOverlay({ title, color, href, articles, hideHeader }: Secti
     <section className="border-t border-gray-200 py-8">
       <div className="max-w-[1280px] mx-auto px-4">
         <SectionHeaderClassic title={title} color={color} href={href} hideHeader={hideHeader} />
-        {/* Card RETRATO: ~296x395 no desktop. Uma foto 16:10 só cobre 395px de
-            altura se a origem tiver ~632px de largura — daí o sizes de 640. */}
+        {/* Card RETRATO ~296x395: o servidor entrega já em 3:4, então o sizes
+            volta a ser a largura da caixa (era 640 para cobrir a altura). */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {items.map((a) => (
-            <OverlayCardClassic key={a.id} a={a} color={color} className="aspect-[3/4]"
-              sizes="(max-width: 768px) 70vw, 640px" />
+            <OverlayCardClassic key={a.id} a={a} color={color} aspect="3/4"
+              sizes="(max-width: 768px) 50vw, 296px" />
           ))}
         </div>
       </div>
