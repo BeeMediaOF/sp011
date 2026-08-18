@@ -52,3 +52,23 @@ GROUP BY category
 ORDER BY artigos DESC;
 
 SELECT count(*) AS total_restante FROM articles;
+
+\echo ''
+\echo '=== QUANTO SOBROU DE NOTICIA DE MERCADO EM "investimentos" ==='
+\echo '(NAO apaga nada aqui — e so o numero para decidir a etapa seguinte.'
+\echo ' "com_ticker" casa (BBAS3), (VALE3), (CURY3): balanco de empresa listada,'
+\echo ' que e jornalismo de mercado, nao educacao financeira.)'
+SELECT count(*) FILTER (WHERE title ~ '\([A-Z]{4}[0-9]{1,2}\)')                     AS com_ticker,
+       count(*) FILTER (WHERE title || ' ' || coalesce(subtitle,'') ~* '(ibovespa|ifix|dividendos|balan[cç]o|lucro l[ií]quido|trimestre|day trade|bolsa de valores|mercado de a[cç][oõ]es|copom)') AS vocab_mercado,
+       count(*)                                                                      AS total_investimentos
+FROM articles WHERE category = 'investimentos';
+
+\echo ''
+\echo '--- amostra do que seria removido nessa etapa ---'
+SELECT left(title, 74) AS titulo
+FROM articles
+WHERE category = 'investimentos'
+  AND (title ~ '\([A-Z]{4}[0-9]{1,2}\)'
+       OR title || ' ' || coalesce(subtitle,'') ~* '(ibovespa|ifix|dividendos|balan[cç]o|lucro l[ií]quido|trimestre|day trade|bolsa de valores|mercado de a[cç][oõ]es|copom)')
+ORDER BY published_at DESC NULLS LAST
+LIMIT 12;

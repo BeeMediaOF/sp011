@@ -110,6 +110,14 @@ WHERE (b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '
 ORDER BY b.name, r.priority DESC, r.name;
 
 \echo ''
+\echo '=== TAXONOMIA DO BLOG NA CENTRAL (blogs.categories, jsonb) ==='
+\echo '(NAO existe tabela blog_categories — a taxonomia e uma coluna jsonb)'
+SELECT c->>'slug' AS slug
+FROM blogs b, jsonb_array_elements(coalesce(b.categories, '[]'::jsonb)) c
+WHERE (b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '%credito%')
+ORDER BY 1;
+
+\echo ''
 \echo '=== REGRA APONTANDO PARA CATEGORIA QUE NAO EXISTE NA TAXONOMIA ==='
 \echo '(o targetCategory de uma regra NAO e validado pelo localizer — e por aqui'
 \echo ' que um slug inventado, tipo "otros", vira pagina orfa no blog)'
@@ -119,12 +127,7 @@ JOIN blogs b ON b.id = r.blog_id
 WHERE (b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '%credito%')
   AND r.target_category IS NOT NULL
   AND NOT EXISTS (
-    SELECT 1 FROM blog_categories c
-    WHERE c.blog_id = b.id AND c.slug = r.target_category
+    SELECT 1
+    FROM jsonb_array_elements(coalesce(b.categories, '[]'::jsonb)) c
+    WHERE c->>'slug' = r.target_category
   );
-
-\echo ''
-\echo '=== TAXONOMIA CADASTRADA (o que o blog aceita como categoria) ==='
-SELECT c.slug FROM blog_categories c JOIN blogs b ON b.id = c.blog_id
-WHERE (b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '%credito%')
-ORDER BY c.slug;
