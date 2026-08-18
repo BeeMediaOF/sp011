@@ -8,6 +8,7 @@ import { testBlogConnection, syncBlogSources } from "../services/blogClient.js";
 import { logEvent } from "../lib/eventLog.js";
 import { logAudit } from "../lib/auditLog.js";
 import { normalizeTitleCaseMode } from "../lib/titleCase.js";
+import { normalizeCategories } from "../lib/taxonomy.js";
 
 const router = Router();
 router.use(authMiddleware);
@@ -22,23 +23,6 @@ function newSecret(): string {
   return randomBytes(32).toString("hex");
 }
 
-/** Normaliza a taxonomia vinda do painel: slugs kebab-case, sem vazios; null = sem classificação. */
-function normalizeCategories(input: unknown): BlogCategory[] | null {
-  if (!Array.isArray(input)) return null;
-  const out: BlogCategory[] = [];
-  for (const item of input) {
-    if (!item || typeof item !== "object") continue;
-    const slug = String((item as { slug?: unknown }).slug ?? "")
-      .trim().toLowerCase()
-      .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
-      .replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-")
-      .replace(/^-+|-+$/g, "").slice(0, 60);
-    if (!slug || out.some((c) => c.slug === slug)) continue;
-    const hint = String((item as { hint?: unknown }).hint ?? "").trim().slice(0, 200);
-    out.push(hint ? { slug, hint } : { slug });
-  }
-  return out.length > 0 ? out : null;
-}
 
 router.get("/", async (_req, res) => {
   const rows = await db.select().from(blogsTable).orderBy(desc(blogsTable.createdAt));
