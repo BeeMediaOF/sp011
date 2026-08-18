@@ -443,6 +443,23 @@ export const articleService = {
   },
 
   /**
+   * Exclusao em lote (selecao multipla do painel). Um unico DELETE ... IN (...)
+   * em vez de N requisicoes: apagar 300 artigos pelo endpoint de um em um sao
+   * 300 round-trips e 300 bustCache(). Devolve os ids REALMENTE removidos --
+   * id inexistente simplesmente nao volta, e a tela usa isso para saber o que
+   * tirar da lista sem recarregar tudo.
+   */
+  async deleteArticles(ids: string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    bustCache();
+    const rows = await db
+      .delete(articlesTable)
+      .where(inArray(articlesTable.id, ids))
+      .returning({ id: articlesTable.id });
+    return rows.map((r) => r.id);
+  },
+
+  /**
    * Prévia da limpeza automática: quantos artigos seriam excluídos com a regra
    * atual, sem apagar nada. `count` já considera o teto `maxPerRun`; `total` é o
    * nº de artigos no banco. `cutoff` é a data-limite (ISO) aplicada.

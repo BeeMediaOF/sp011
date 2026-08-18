@@ -3,10 +3,14 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import { adminApi, type Article } from "../../lib/adminApi";
 import { useCan } from "../../lib/permissionsCache";
 import {
+  toggleId, setMany, allSelected, someSelected, pruneSelection,
+  chunk, BULK_DELETE_MAX,
+} from "../../lib/bulkSelection";
+import {
   Plus, Pencil, Trash2, Send, Search, Rss, Wand2,
   FileText, FileArchive, Calendar, Archive,
   Eye, ChevronLeft, ChevronRight, ArrowUpRight,
-  Loader2, Clock,
+  Loader2, Clock, X, CheckSquare,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -85,6 +89,11 @@ export default function Articles() {
   const [publishing, setPublishing] = useState<string | null>(null);
   const [rewriting, setRewriting]   = useState<string | null>(null);
   const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+  // Selecao multipla. Guardada por ID (nao por indice): a lista se reordena a
+  // cada load e indice viraria selecao errada.
+  const [selected, setSelected]     = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy]     = useState(false);
+  const [bulkMsg, setBulkMsg]       = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -114,6 +123,17 @@ export default function Articles() {
     return () => clearInterval(iv);
   }, [load, loadQueue]);
 
+  // Trocar filtro zera a selecao. Sem isso o operador filtra "otros", marca
+  // todos, troca para "credito" e o botao continua oferecendo excluir 117 itens
+  // que ele nao esta mais vendo.
+  useEffect(() => { setSelected(new Set()); }, [search, statusFilter, catFilter]);
+
+  // A lista mudou (recarga, exclusao): descarta id que nao existe mais, senao o
+  // contador do botao mente e o POST leva id fantasma.
+  useEffect(() => {
+    setSelected((prev) => (prev.size === 0 ? prev : pruneSelection(prev, articles.map((a) => a.id))));
+  }, [articles]);
+
   async function handleDelete(id: string) {
     if (!confirm("Excluir este artigo permanentemente?")) return;
     setDeleting(id);
@@ -129,6 +149,41 @@ export default function Articles() {
       const { article } = await adminApi.publishArticle(id);
       setArticles((prev) => prev.map((a) => a.id === id ? { ...article, views: a.views } as ArticleWithViews : a));
     } catch { } finally { setPublishing(null); }
+  }
+
+  /**
+   * Exclusao em lote. Manda em levas de BULK_DELETE_MAX porque "selecionar todos"
+   * num blog de 600 artigos passa do teto do servidor. Cada leva ja tira os ids
+   * apagados da tela, entao uma falha no meio deixa o estado coerente com o que
+   * o banco tem — nao com o que a tela achava que ia acontecer.
+   */
+  async function handleBulkDelete() {
+    const ids = [...selected];
+    if (ids.length === 0 || bulkBusy) return;
+    if (!confirm(
+      `Excluir ${ids.length} artigo${ids.length !== 1 ? "s" : ""} permanentemente?
+
+` +
+      "Esta acao nao pode ser desfeita.",
+    )) return;
+
+    setBulkBusy(true);
+    setBulkMsg("");
+    let total = 0;
+    try {
+      for (const leva of chunk(ids, BULK_DELETE_MAX)) {
+        const r = await adminApi.deleteArticles(leva);
+        const foram = new Set(r.ids);
+        total += r.ids.length;
+        setArticles((prev) => prev.filter((a) => !foram.has(a.id)));
+        setSelected((prev) => setMany(prev, r.ids, false));
+      }
+      setBulkMsg(`${total} artigo${total !== 1 ? "s" : ""} excluido${total !== 1 ? "s" : ""}.`);
+    } catch (e) {
+      setBulkMsg(`Falha ao excluir (${total} ja removido${total !== 1 ? "s" : ""}): ${String(e)}`);
+    } finally {
+      setBulkBusy(false);
+    }
   }
 
   async function handleRewriteOne(id: string, title: string, content: string) {
@@ -164,6 +219,24 @@ export default function Articles() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const queuedSet  = new Set(queueStatus?.queuedIds ?? []);
+
+  // -- Selecao multipla (derivados) --------------------------------------
+  const canDelete   = can("articles.delete");
+  const pageIds     = paginated.map((a) => a.id);
+  const filteredIds = filtered.map((a) => a.id);
+  const pageAll     = allSelected(selected, pageIds);
+  const pageSome    = someSelected(selected, pageIds);
+  const selCount    = selected.size;
+  // "Selecionar todos do filtro" so aparece quando o filtro tem mais do que cabe
+  // na pagina E a pagina inteira ja esta marcada (padrao do Gmail): sem essa
+  // condicao, uma caixinha unica no cabecalho apagaria 600 artigos com um clique
+  // de quem so queria os 12 da tela.
+  const showSelectAllFiltered = pageAll && filtered.length > pageIds.length && selCount < filtered.length;
+
+  // Apagar a ultima pagina inteira deixaria `page` alem do fim e a tabela em
+  // branco, com a paginacao dizendo "Mostrando 49-48 de 48".
+  useEffect(() => { if (page > totalPages) setPage(totalPages); }, [page, totalPages]);
+
 
   const kpis = [
     { label: "Publicados",  value: published.length, icon: FileText,    bg: "#ECFDF5", clr: "#16A34A" },
@@ -241,6 +314,50 @@ export default function Articles() {
             )}
           </div>
 
+          {/* Barra da selecao multipla — so existe quando ha algo marcado */}
+          {canDelete && selCount > 0 && (
+            <div className="px-6 py-3 bg-[#EEF2FF] border-b border-[#C7D2FE] flex flex-wrap items-center gap-3">
+              <CheckSquare size={15} className="text-[#0B2A66] shrink-0" />
+              <span className="text-sm font-semibold text-[#0B2A66]">
+                {selCount} artigo{selCount !== 1 ? "s" : ""} selecionado{selCount !== 1 ? "s" : ""}
+              </span>
+              {showSelectAllFiltered && (
+                <button
+                  onClick={() => setSelected(setMany(selected, filteredIds, true))}
+                  className="text-xs font-semibold text-[#2563EB] hover:underline"
+                >
+                  Selecionar {filtered.length} do filtro
+                </button>
+              )}
+              <button
+                onClick={() => setSelected(new Set())}
+                className="text-xs font-medium text-slate-500 hover:text-slate-700"
+              >
+                Limpar selecao
+              </button>
+              <div className="flex-1" />
+              <button
+                onClick={() => { void handleBulkDelete(); }}
+                disabled={bulkBusy}
+                className="flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50"
+                style={{ background: "#DC2626" }}
+              >
+                {bulkBusy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {bulkBusy ? "Excluindo…" : `Excluir ${selCount}`}
+              </button>
+            </div>
+          )}
+
+          {/* Resultado do ultimo lote */}
+          {bulkMsg && (
+            <div className="px-6 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <span className="flex-1 text-xs text-slate-600">{bulkMsg}</span>
+              <button onClick={() => setBulkMsg("")} className="text-slate-400 hover:text-slate-600">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
           {/* Table */}
           {loading ? (
             <div className="p-12 text-center">
@@ -257,6 +374,20 @@ export default function Articles() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-100">
+                    {canDelete && (
+                      <th className="w-10 pl-6 pr-0 py-3">
+                        <input
+                          type="checkbox"
+                          checked={pageAll}
+                          // indeterminate nao existe como atributo JSX — so via DOM.
+                          ref={(el) => { if (el) el.indeterminate = pageSome; }}
+                          onChange={(e) => setSelected(setMany(selected, pageIds, e.target.checked))}
+                          title="Selecionar os desta página"
+                          aria-label="Selecionar os desta página"
+                          className="w-4 h-4 rounded border-slate-300 accent-[#0B2A66] cursor-pointer align-middle"
+                        />
+                      </th>
+                    )}
                     <th className="text-left px-6 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Título</th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wide hidden lg:table-cell">Categoria</th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-slate-400 uppercase tracking-wide hidden md:table-cell">Data</th>
@@ -273,8 +404,21 @@ export default function Articles() {
                     return (
                       <tr
                         key={a.id}
-                        className={`border-b border-slate-50 hover:bg-slate-50/70 transition-colors group ${inQueue ? "bg-amber-50/30" : ""}`}
+                        className={`border-b border-slate-50 hover:bg-slate-50/70 transition-colors group ${
+                          selected.has(a.id) ? "bg-[#EEF2FF]" : inQueue ? "bg-amber-50/30" : ""
+                        }`}
                       >
+                        {canDelete && (
+                          <td className="w-10 pl-6 pr-0 py-3.5">
+                            <input
+                              type="checkbox"
+                              checked={selected.has(a.id)}
+                              onChange={() => setSelected(toggleId(selected, a.id))}
+                              aria-label={`Selecionar ${a.title.replace(/<[^>]*>/g, "")}`}
+                              className="w-4 h-4 rounded border-slate-300 accent-[#0B2A66] cursor-pointer align-middle"
+                            />
+                          </td>
+                        )}
                         {/* Title + thumbnail */}
                         <td className="px-6 py-3.5">
                           <div className="flex items-center gap-3">

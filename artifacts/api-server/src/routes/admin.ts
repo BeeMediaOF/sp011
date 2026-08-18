@@ -23,6 +23,13 @@ import { YoutubeTranscript } from "youtube-transcript";
 
 const router = Router();
 
+/**
+ * Teto de uma exclusao em lote. Nao e limite de banco (o DELETE ... IN aguenta
+ * muito mais) -- e limite de PAYLOAD e de arrependimento: mantem o corpo do POST
+ * pequeno e obriga quem quer varrer o blog inteiro a fazer isso em levas.
+ */
+const BULK_DELETE_MAX = 500;
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/login */
@@ -403,6 +410,41 @@ router.delete("/articles/:id", requirePermission("articles.delete"), async (req,
   const deleted = await articleService.deleteArticle(id);
   if (!deleted) { res.status(404).json({ error: "Article not found" }); return; }
   res.json({ success: true });
+});
+
+/**
+ * POST /api/admin/articles/bulk-delete  { ids: string[] }
+ *
+ * Exclusao em lote da selecao multipla. Existe como rota propria (e nao como N
+ * chamadas do DELETE /articles/:id) por tres motivos: um unico DELETE no banco,
+ * uma unica checagem de permissao, e o escopo do colunista aplicado no SERVIDOR
+ * -- mandar 300 DELETEs deixaria a filtragem na mao da tela, que e exatamente
+ * onde ela nao pode morar.
+ *
+ * Devolve os ids REALMENTE apagados. Id inexistente nao e erro: some da lista.
+ */
+router.post("/articles/bulk-delete", requirePermission("articles.delete"), async (req, res) => {
+  const brutos = (req.body as { ids?: unknown }).ids;
+  if (!Array.isArray(brutos)) { res.status(400).json({ error: "ids deve ser um array" }); return; }
+
+  const ids = [...new Set(brutos.map((v) => String(v ?? "")).filter(Boolean))];
+  if (ids.length === 0) { res.json({ deleted: 0, ids: [] }); return; }
+  if (ids.length > BULK_DELETE_MAX) {
+    res.status(400).json({ error: `maximo de ${BULK_DELETE_MAX} artigos por vez` });
+    return;
+  }
+
+  // Colunista so apaga o que assina — conferido no banco, nunca no payload.
+  let permitidos = ids;
+  const scope = columnistScope(req);
+  if (scope) {
+    const donos = await Promise.all(ids.map((id) => articleService.getArticle(id)));
+    permitidos = donos.filter((a) => a && a.columnistId === scope).map((a) => a!.id);
+  }
+
+  const apagados = await articleService.deleteArticles(permitidos);
+  req.log.info({ pedidos: ids.length, apagados: apagados.length }, "admin: bulk delete de artigos");
+  res.json({ deleted: apagados.length, ids: apagados });
 });
 
 /** POST /api/admin/articles/:id/rewrite — re-run AI rewrite on any article */

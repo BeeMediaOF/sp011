@@ -115,8 +115,14 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   economia, cultura, esportes, cidade, saude, tecnologia, seguranca, nfl.
 - Slugs do **pontofarma**: `gestao, fiscal-tributario, legislacao, mercado,
   vendas, equipe, tecnologia, saude-categorias, outros`. Slugs do
-  **creditovc**: `sair-das-dividas, credito, score, organizar-financas,
-  renda-extra, planejar-o-futuro, investimentos, outros`. Identidades e
+  **creditovc**: `credito, sair-das-dividas, score, organizar-financas,
+  renda-extra, planejar-o-futuro, investimentos` — **sem `outros`** desde
+  2026-08-18: balão de escape do classificador é o oposto de blog focado, e
+  a categoria nem existia no admin do blog (199 artigos viraram página
+  órfã). Sem balde, quem barra pauta alheia são as REGRAS: as 7 do
+  credito.vc têm `targetCategory` fixo e o catch-all está desligado — se
+  alguma regra ativa ficar sem target, o que a IA não classificar cai no
+  ÚLTIMO slug da lista (`investimentos`). Identidades e
   editorias vêm das propostas Bee Media (PDFs "Proposta_PontoFarma" e
   "Proposta_Portal_CreditoVC"); mock HTML/JSON de referência em
   `docs/Guia_Claude_Code_Base.md` (movido de public/ — ali seria servido no
@@ -626,6 +632,19 @@ montada no servidor.
   youtube.com/embed, youtube-nocookie.com/embed e player.vimeo.com/video.
   A allowlist está escrita nos três — mudar nos TRÊS. `srcdoc` cai sempre.
   E-mail e AMP continuam sem iframe nem `<video>`.
+- **Seleção múltipla / exclusão em lote** (2026-08-18, Artigos e Fontes RSS): a
+  aritmética de conjunto mora em `brasilia-agora/src/lib/bulkSelection.ts` (puro,
+  testado) — as telas só desenham. Um `Set` nunca é mutado no lugar (mesma
+  referência = React não redesenha). Dois efeitos por tela são obrigatórios:
+  zerar a seleção quando o filtro muda (senão o botão oferece apagar o que saiu
+  da tela) e `pruneSelection` quando a lista muda (senão o contador mente e o
+  POST leva id fantasma). Servidor: `POST /api/admin/articles/bulk-delete` e
+  `POST /api/admin/rss/sources/bulk-delete` — UM `DELETE ... IN (...)`, teto
+  `BULK_DELETE_MAX = 500` por requisição (a tela divide em levas com `chunk`,
+  e o valor está escrito nos DOIS lados). O escopo do colunista é aplicado no
+  SERVIDOR relendo o dono de cada artigo — nunca confiar no payload. Na tela de
+  Artigos a caixinha do cabeçalho marca só A PÁGINA; "selecionar os N do filtro"
+  é um segundo clique (padrão do Gmail), senão um clique apagaria 600 artigos.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 

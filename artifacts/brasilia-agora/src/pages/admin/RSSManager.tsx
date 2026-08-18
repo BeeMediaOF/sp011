@@ -3,6 +3,10 @@ import AdminLayout from "../../components/admin/AdminLayout";
 import RewriteQueueCard from "../../components/admin/RewriteQueueCard";
 import { useCan } from "../../lib/permissionsCache";
 import {
+  toggleId, setMany, allSelected, someSelected, pruneSelection,
+  chunk, BULK_DELETE_MAX,
+} from "../../lib/bulkSelection";
+import {
   Plus, Trash2, RefreshCw, Wand2, Send, CheckCircle,
   AlertCircle, ChevronDown, ChevronUp, Rss, ExternalLink,
   Settings, Key, Brain, Clock, BadgeCheck, Zap, Eye, EyeOff,
@@ -317,6 +321,10 @@ export default function RSSManager() {
   const [runningId, setRunningId]     = useState<string | null>(null);
   const [sourceError, setSourceError] = useState("");
   const [runSuccess, setRunSuccess]   = useState<{ id: string; count: number } | null>(null);
+  // Selecao multipla das fontes (mesmo modulo puro da tela de Artigos).
+  const [selectedSrc, setSelectedSrc] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy]       = useState(false);
+  const [bulkMsg, setBulkMsg]         = useState("");
 
   // ── Prompts ──
   const [prompts, setPrompts]             = useState<RssPrompts>({});
@@ -681,6 +689,56 @@ export default function RSSManager() {
   const promptTabLabel   = promptIsGlobal
     ? "geral"
     : (allCategories.find((c) => c.slug === promptTab)?.label ?? promptTab);
+
+  // -- Selecao multipla de fontes ------------------------------------------
+  const filteredSrcIds = useMemo(() => filteredSources.map((s) => s.id), [filteredSources]);
+  const allFilteredSelected = allSelected(selectedSrc, filteredSrcIds);
+  const selSrcCount = selectedSrc.size;
+
+  // Trocar filtro zera a selecao — o operador nao pode apagar o que saiu da tela.
+  useEffect(() => { setSelectedSrc(new Set()); }, [sourceSearch, statusFilter, categoryFilter]);
+
+  // Fonte que sumiu (exclusao, recarga) sai da selecao: contador nao mente.
+  useEffect(() => {
+    setSelectedSrc((prev) => (prev.size === 0 ? prev : pruneSelection(prev, sources.map((s) => s.id))));
+  }, [sources]);
+
+  /**
+   * Exclusao em lote das fontes. Mesma divisao em levas da tela de Artigos: um
+   * blog recem-sincronizado com a central tem mais de 100 fontes, e "selecionar
+   * todas" precisa caber no teto do servidor.
+   */
+  async function bulkDeleteSources() {
+    const ids = [...selectedSrc];
+    if (!canManage || ids.length === 0 || bulkBusy) return;
+    if (!confirm(
+      `Remover ${ids.length} fonte${ids.length !== 1 ? "s" : ""} RSS?
+
+` +
+      "Os artigos ja coletados NAO sao apagados.",
+    )) return;
+
+    setBulkBusy(true);
+    setBulkMsg("");
+    setSourceError("");
+    let total = 0;
+    try {
+      for (const leva of chunk(ids, BULK_DELETE_MAX)) {
+        const r = await apiFetch<{ deleted: number; ids: string[] }>("/sources/bulk-delete", {
+          method: "POST", body: JSON.stringify({ ids: leva }),
+        });
+        total += r.ids.length;
+        setSelectedSrc((prev) => setMany(prev, r.ids, false));
+      }
+      await loadSources();
+      setBulkMsg(`${total} fonte${total !== 1 ? "s" : ""} removida${total !== 1 ? "s" : ""}.`);
+    } catch (e) {
+      setSourceError(String(e));
+      await loadSources();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
   function toggleGroup(pub: string) {
     setExpandedGroups((prev) => {
@@ -1283,6 +1341,47 @@ export default function RSSManager() {
               </div>
             )}
 
+            {/* Barra da selecao multipla */}
+            {canManage && selSrcCount > 0 && (
+              <div className="flex flex-wrap items-center gap-3 bg-[#EEF2FF] border border-[#C7D2FE] rounded-xl px-4 py-2.5 mb-4">
+                <CheckSquare size={15} className="text-[#0B2A66] shrink-0" />
+                <span className="text-sm font-semibold text-[#0B2A66]">
+                  {selSrcCount} fonte{selSrcCount !== 1 ? "s" : ""} selecionada{selSrcCount !== 1 ? "s" : ""}
+                </span>
+                {!allFilteredSelected && filteredSources.length > selSrcCount && (
+                  <button
+                    onClick={() => setSelectedSrc(setMany(selectedSrc, filteredSrcIds, true))}
+                    className="text-xs font-semibold text-[#2563EB] hover:underline"
+                  >
+                    Selecionar as {filteredSources.length} do filtro
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedSrc(new Set())}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-700"
+                >
+                  Limpar selecao
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={() => { void bulkDeleteSources(); }}
+                  disabled={bulkBusy}
+                  className="flex items-center gap-2 text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50"
+                  style={{ background: "#DC2626" }}
+                >
+                  {bulkBusy ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {bulkBusy ? "Removendo…" : `Remover ${selSrcCount}`}
+                </button>
+              </div>
+            )}
+
+            {bulkMsg && (
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-xs text-slate-600 mb-4">
+                <span className="flex-1">{bulkMsg}</span>
+                <button onClick={() => setBulkMsg("")} className="text-slate-400 hover:text-slate-600"><X size={13} /></button>
+              </div>
+            )}
+
             {/* Grouped sources list */}
             {sources.length === 0 ? (
               <div className="text-center py-16">
@@ -1305,7 +1404,20 @@ export default function RSSManager() {
             ) : (
               <>
                 {/* Summary bar */}
-                <p className="text-xs text-slate-400 mb-3">
+                <p className="text-xs text-slate-400 mb-3 flex items-center gap-2">
+                  {/* Caixinha mestra: os grupos nascem fechados, entao sem ela
+                      marcar tudo exigiria abrir marca por marca. */}
+                  {canManage && (
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      ref={(el) => { if (el) el.indeterminate = someSelected(selectedSrc, filteredSrcIds); }}
+                      onChange={(e) => setSelectedSrc(setMany(selectedSrc, filteredSrcIds, e.target.checked))}
+                      title="Selecionar todas as fontes do filtro"
+                      aria-label="Selecionar todas as fontes do filtro"
+                      className="w-4 h-4 rounded border-slate-300 accent-[#0B2A66] cursor-pointer"
+                    />
+                  )}
                   {groupedSources.length} marca{groupedSources.length !== 1 ? "s" : ""} · {filteredSources.length} fonte{filteredSources.length !== 1 ? "s" : ""}
                   {(sourceSearch || categoryFilter !== "Todas" || statusFilter !== "Todos") && (
                     <button
@@ -1324,45 +1436,61 @@ export default function RSSManager() {
                     const brandColor = srcColor(grpSrcs[0]!.id);
                     const brandInit  = srcInitials(publisher);
                     const activeCount = grpSrcs.filter((s) => s.active).length;
+                    const grpIds  = grpSrcs.map((s) => s.id);
+                    const grpAll  = allSelected(selectedSrc, grpIds);
+                    const grpSome = someSelected(selectedSrc, grpIds);
 
                     return (
                       <div key={publisher} className="border border-slate-100 rounded-xl overflow-hidden">
 
                         {/* ── Group header ─────────────────────────────── */}
-                        <button
-                          onClick={() => toggleGroup(publisher)}
-                          className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50/70 transition-colors text-left"
-                        >
-                          <div
-                            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
-                            style={{ background: brandColor }}
+                        <div className="w-full flex items-center gap-3 px-4 py-3 bg-white hover:bg-slate-50/70 transition-colors">
+                          {canManage && (
+                            <input
+                              type="checkbox"
+                              checked={grpAll}
+                              ref={(el) => { if (el) el.indeterminate = grpSome; }}
+                              onChange={(e) => setSelectedSrc(setMany(selectedSrc, grpIds, e.target.checked))}
+                              title={`Selecionar as ${grpIds.length} fontes de ${publisher}`}
+                              aria-label={`Selecionar as ${grpIds.length} fontes de ${publisher}`}
+                              className="w-4 h-4 shrink-0 rounded border-slate-300 accent-[#0B2A66] cursor-pointer"
+                            />
+                          )}
+                          <button
+                            onClick={() => toggleGroup(publisher)}
+                            className="flex-1 min-w-0 flex items-center gap-3 text-left"
                           >
-                            {brandInit}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-slate-800">{publisher}</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {grpSrcs.map((s) => (
-                                <span
-                                  key={s.id}
-                                  className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
-                                    s.active
-                                      ? "bg-green-100 text-green-700"
-                                      : "bg-slate-100 text-slate-400 line-through"
-                                  }`}
-                                >
-                                  {TAG_MAP[s.category] ?? s.category}
-                                </span>
-                              ))}
+                            <div
+                              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[11px] font-bold shrink-0"
+                              style={{ background: brandColor }}
+                            >
+                              {brandInit}
                             </div>
-                          </div>
-                          <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mr-1">
-                            {activeCount}/{grpSrcs.length} ativa{grpSrcs.length !== 1 ? "s" : ""}
-                          </span>
-                          {isOpen
-                            ? <ChevronUp size={14} className="text-slate-400 shrink-0" />
-                            : <ChevronDown size={14} className="text-slate-400 shrink-0" />}
-                        </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-800">{publisher}</p>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {grpSrcs.map((s) => (
+                                  <span
+                                    key={s.id}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                      s.active
+                                        ? "bg-green-100 text-green-700"
+                                        : "bg-slate-100 text-slate-400 line-through"
+                                    }`}
+                                  >
+                                    {TAG_MAP[s.category] ?? s.category}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <span className="text-[11px] text-slate-400 whitespace-nowrap shrink-0 mr-1">
+                              {activeCount}/{grpSrcs.length} ativa{grpSrcs.length !== 1 ? "s" : ""}
+                            </span>
+                            {isOpen
+                              ? <ChevronUp size={14} className="text-slate-400 shrink-0" />
+                              : <ChevronDown size={14} className="text-slate-400 shrink-0" />}
+                          </button>
+                        </div>
 
                         {/* ── Expanded rows ─────────────────────────────── */}
                         {isOpen && (
@@ -1371,6 +1499,7 @@ export default function RSSManager() {
                               <table className="w-full min-w-[580px]">
                                 <thead>
                                   <tr className="bg-slate-50/60">
+                                    {canManage && <th className="w-9 pl-4 pr-0 py-2" />}
                                     {["Feed", "Categoria", "Última coleta", "Status", "Modo", "Ações"].map((h) => (
                                       <th key={h} className="px-4 py-2 text-left text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{h}</th>
                                     ))}
@@ -1381,7 +1510,7 @@ export default function RSSManager() {
                                     if (editingSource?.id === src.id) {
                                       return (
                                         <tr key={src.id}>
-                                          <td colSpan={6} className="px-4 py-4">
+                                          <td colSpan={canManage ? 7 : 6} className="px-4 py-4">
                                             <div className="bg-[#EEF2FF] rounded-xl p-4 border border-[#C7D2FE] space-y-3">
                                               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                                 <div>
@@ -1476,7 +1605,23 @@ export default function RSSManager() {
                                       : src.name;
 
                                     return (
-                                      <tr key={src.id} className="hover:bg-slate-50/60 transition-colors group">
+                                      <tr
+                                        key={src.id}
+                                        className={`transition-colors group ${
+                                          selectedSrc.has(src.id) ? "bg-[#EEF2FF]" : "hover:bg-slate-50/60"
+                                        }`}
+                                      >
+                                        {canManage && (
+                                          <td className="w-9 pl-4 pr-0 py-3">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedSrc.has(src.id)}
+                                              onChange={() => setSelectedSrc(toggleId(selectedSrc, src.id))}
+                                              aria-label={`Selecionar ${src.name}`}
+                                              className="w-4 h-4 rounded border-slate-300 accent-[#0B2A66] cursor-pointer align-middle"
+                                            />
+                                          </td>
+                                        )}
                                         {/* Feed name (category part only inside a group) */}
                                         <td className="px-4 py-3">
                                           <div className="min-w-0">

@@ -11,7 +11,7 @@ import type { PaidCampaign } from "./analyticsShared.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   settingsTable,
@@ -1232,6 +1232,23 @@ export const store = {
         .catch((err: unknown) => logger.error({ err }, "store: failed to delete RSS source"));
     }
     return deleted;
+  },
+
+  /**
+   * Exclusao em lote das fontes (selecao multipla do painel). Devolve os ids
+   * removidos de fato. O cache em memoria e a verdade da leitura (o store le as
+   * fontes no boot), entao ele e filtrado ANTES do DELETE -- a tela nao precisa
+   * esperar o banco para parar de listar a fonte.
+   */
+  deleteRssSources: (ids: string[]): string[] => {
+    if (ids.length === 0) return [];
+    const alvo = new Set(ids);
+    const removidos = _cache.rssSources.filter((s) => alvo.has(s.id)).map((s) => s.id);
+    if (removidos.length === 0) return [];
+    _cache.rssSources = _cache.rssSources.filter((s) => !alvo.has(s.id));
+    db.delete(rssSourcesTable).where(inArray(rssSourcesTable.id, removidos))
+      .catch((err: unknown) => logger.error({ err }, "store: failed to bulk delete RSS sources"));
+    return removidos;
   },
 
   // ── Perplexity Topics (authoritative in DB) ───────────────────────────────

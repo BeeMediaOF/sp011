@@ -49,6 +49,8 @@ export const adminApi = {
   createArticle: (data: Partial<Article>) => req<{ article: Article }>("POST", "/articles", data),
   updateArticle: (id: string, data: Partial<Article>) => req<{ article: Article }>("PUT", `/articles/${id}`, data),
   deleteArticle: (id: string) => req<{ success: boolean }>("DELETE", `/articles/${id}`),
+  deleteArticles: (ids: string[]) =>
+    req<{ deleted: number; ids: string[] }>("POST", "/articles/bulk-delete", { ids }),
   publishArticle: (id: string) => req<{ article: Article }>("POST", `/publish/${id}`, {}),
   rewriteArticle: (id: string) => req<{ article: Article }>("POST", `/articles/${id}/rewrite`, {}),
   repairContent: () => req<{ fixed: number; skipped: number; total: number }>("POST", "/articles/repair-content", {}),

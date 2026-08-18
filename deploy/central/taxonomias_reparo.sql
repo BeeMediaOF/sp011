@@ -36,16 +36,32 @@ GROUP BY b.name ORDER BY b.name;
 
 BEGIN;
 
--- Crédito.vc — lista do kit (deploy/creditovc/sources_financas.sql), com hints.
+-- Crédito.vc — SEM `outros` (decisão de 2026-08-18).
+--
+-- O `outros` era o balde do classificador: tudo que a IA não soubesse encaixar
+-- caía nele. Isso e o oposto de "blog focado" — e, pior, `outros` nem existe em
+-- Categorias no admin do blog, entao os 199 artigos que foram parar la viraram
+-- pagina orfa (o leitor nao chega neles por link nenhum).
+--
+-- COM A LISTA SEM BALDE, O QUE IMPEDE PAUTA ALHEIA DE CHEGAR SAO AS REGRAS, NAO
+-- ESTA LISTA. A conta e a seguinte (`resolveDeliveryCategory`, central-hub/src/
+-- lib/localization.ts):
+--   * entrega COM target_category  -> usa o target, nem chama a IA;
+--   * entrega SEM target_category  -> IA classifica; se nada casar, cai no
+--     ULTIMO slug da lista (aqui: `investimentos`) — exatamente o que nao se
+--     quer.
+-- Por isso as 7 regras do credito.vc tem target FIXO e o catch-all esta
+-- DESLIGADO (deploy/creditovc/rules_keywords.sql, v3). As duas conferencias no
+-- fim deste arquivo provam isso; se a de "regras ativas SEM target" voltar com
+-- linha, o balde volta a ser necessario ANTES de tirar o `outros`.
 UPDATE blogs SET categories = '[
+  {"slug":"credito","hint":"empréstimos, financiamentos, cartão de crédito, consignado, juros, CET, golpes financeiros, direitos do consumidor"},
   {"slug":"sair-das-dividas","hint":"dívidas, nome sujo, negociação/renegociação, mutirões, Serasa/SPC"},
-  {"slug":"credito","hint":"empréstimos, financiamentos, cartão de crédito, juros, CET, golpes financeiros, direitos do consumidor"},
   {"slug":"score","hint":"score de crédito, consulta de CPF, cadastro positivo"},
   {"slug":"organizar-financas","hint":"orçamento doméstico, economizar dinheiro, planilhas, contas de casa"},
   {"slug":"renda-extra","hint":"renda extra, MEI, freelas, bicos, pequenos negócios próprios"},
   {"slug":"planejar-o-futuro","hint":"reserva de emergência, previdência, aposentadoria, juntar dinheiro para objetivos"},
-  {"slug":"investimentos","hint":"investimentos, renda fixa, CDB, poupança, bolsa, franquias e negócios para investir"},
-  {"slug":"outros","hint":"o que não couber acima (ex.: macroeconomia, Selic, impostos, benefícios sociais, FGTS, 13º)"}
+  {"slug":"investimentos","hint":"investimentos EDUCATIVOS: renda fixa, CDB, poupança, primeiro investimento. NAO e noticia de mercado/balanco"}
 ]'::jsonb, updated_at = now()
 WHERE name ILIKE '%credito%' OR name ILIKE '%crédito%' OR domain ILIKE '%credito%';
 
@@ -58,6 +74,16 @@ FROM blogs b
 LEFT JOIN LATERAL jsonb_array_elements(coalesce(b.categories,'[]'::jsonb)) WITH ORDINALITY AS t(c, ord) ON true
 WHERE b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '%credito%'
 GROUP BY b.name;
+
+\echo ''
+\echo '=== CREDITO.VC: REGRA ATIVA SEM TARGET (deve vir VAZIO) ==================='
+\echo '(regra sem target manda a entrega para a IA classificar; sem `outros` na'
+\echo ' lista, o que ela nao souber classificar cai em investimentos)'
+SELECT r.priority, r.name, r.is_active
+FROM distribution_rules r JOIN blogs b ON b.id = r.blog_id
+WHERE (b.name ILIKE '%credito%' OR b.name ILIKE '%crédito%' OR b.domain ILIKE '%credito%')
+  AND r.is_active AND r.target_category IS NULL
+ORDER BY r.priority DESC;
 
 \echo ''
 \echo '=== REGRA APONTANDO PARA CATEGORIA INEXISTENTE (deve vir VAZIO agora) ====='

@@ -72,3 +72,20 @@ WHERE category = 'investimentos'
        OR title || ' ' || coalesce(subtitle,'') ~* '(ibovespa|ifix|dividendos|balan[cç]o|lucro l[ií]quido|trimestre|day trade|bolsa de valores|mercado de a[cç][oõ]es|copom)')
 ORDER BY published_at DESC NULLS LAST
 LIMIT 12;
+
+\echo ''
+\echo '=== CATEGORIAS CADASTRADAS QUE A CENTRAL NUNCA VAI PREENCHER ============='
+\echo '(o admin do blog tem ~18 categorias; a taxonomia da central tem 7. Uma'
+\echo ' categoria que NAO esta na central so recebe artigo se uma regra apontar'
+\echo ' para ela de proposito, ou pela mao do editor. As que aparecerem aqui com'
+\echo ' 0 artigos sao secoes que vao ficar vazias para sempre: ou entram na'
+\echo ' taxonomia da central, ou saem do admin.)'
+WITH validas AS (
+  SELECT jsonb_array_elements(value::jsonb->'categories')->>'slug' AS slug
+  FROM settings WHERE key = 'site_settings'
+)
+SELECT v.slug, count(a.id) AS artigos
+FROM validas v
+LEFT JOIN articles a ON a.category = v.slug
+GROUP BY v.slug
+ORDER BY artigos, v.slug;

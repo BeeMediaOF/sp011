@@ -100,6 +100,21 @@ router.delete("/sources/:id", (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * POST /api/admin/rss/sources/bulk-delete  { ids: string[] }
+ *
+ * Exclusao em lote da selecao multipla. Cai no mesmo `requirePermissionForWrites
+ * ("rss.manage")` do router, entao nao precisa de guarda propria. Devolve os ids
+ * removidos de fato -- id ja apagado por outra aba nao e erro.
+ */
+router.post("/sources/bulk-delete", (req, res) => {
+  const brutos = (req.body as { ids?: unknown }).ids;
+  if (!Array.isArray(brutos)) { res.status(400).json({ error: "ids deve ser um array" }); return; }
+  const ids = [...new Set(brutos.map((v) => String(v ?? "")).filter(Boolean))];
+  const removidos = store.deleteRssSources(ids);
+  res.json({ deleted: removidos.length, ids: removidos });
+});
+
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 /** POST /api/admin/rss/fetch  { sourceId? } */
