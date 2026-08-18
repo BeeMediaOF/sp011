@@ -65,6 +65,23 @@ describe("resolveDeliveryCategory (precedência)", () => {
       "others",
     );
   });
+  it("balde em português ('outros') e reconhecido, mesmo fora do fim da lista", () => {
+    // Regressao do incidente de 2026-08-14: a busca do balde so conhecia o
+    // `others` ingles. Nos blogs pt-BR o fallback caia no ULTIMO slug -- que so
+    // por sorte era `outros`, ate o bug do slugify grava-lo como `otros`.
+    const ptBR = [
+      { slug: "copa-do-mundo" }, { slug: "futebol" }, { slug: "outros" }, { slug: "f1" },
+    ];
+    assert.equal(
+      resolveDeliveryCategory({ ruleCategory: null, aiCategory: null, categories: ptBR }),
+      "outros",
+      "nao pode cair em f1 so por ele ser o ultimo",
+    );
+    assert.equal(
+      resolveDeliveryCategory({ ruleCategory: null, aiCategory: "basquete", categories: ptBR }),
+      "outros",
+    );
+  });
   it("sem 'others' na lista → último slug", () => {
     assert.equal(
       resolveDeliveryCategory({

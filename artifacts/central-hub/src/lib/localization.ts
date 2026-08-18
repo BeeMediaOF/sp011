@@ -27,12 +27,28 @@ export function needsClassification(
   return (categories?.length ?? 0) > 0 && !targetCategory;
 }
 
+/** Slugs que valem como "balde" do classificador, nos dois idiomas da rede. */
+const CATCH_ALL_SLUGS = ["others", "outros"] as const;
+
 /**
  * Precedência da categoria de uma entrega:
  * 1. targetCategory da regra (intenção explícita do operador) — SEMPRE vence;
  * 2. classificação por IA (validada contra a taxonomia);
- * 3. fallback "others" (ou o último slug da lista) — classificação NUNCA bloqueia;
+ * 3. fallback: o balde da lista (`others`/`outros`) ou, na falta dele, o ÚLTIMO
+ *    slug — classificação NUNCA bloqueia entrega;
  * 4. null quando o blog não tem taxonomia (ingest usa a categoria da notícia).
+ *
+ * O item 1 devolve o target da regra SEM validar contra a taxonomia, e isso é
+ * deliberado: blog sem taxonomia nenhuma (o sp011, catch-all da rede) depende
+ * inteiramente dele — validar derrubaria as 18 regras dele de uma vez.
+ *
+ * O item 3 é o caminho que produziu o incidente de 2026-08-14: o bug do slugify
+ * (ver `lib/taxonomy.ts`) gravou `otros` no lugar de `outros`, a busca do balde
+ * só conhecia o `others` inglês, e o fallback caiu no último slug da lista —
+ * que era justamente o `otros` corrompido. 117 artigos do credito.vc foram para
+ * uma rota que não existe no blog. Daí o `CATCH_ALL_SLUGS` nos dois idiomas:
+ * blog pt-BR nunca teve balde reconhecido, só funcionava porque os kits escrevem
+ * `outros` por último.
  */
 export function resolveDeliveryCategory(opts: {
   ruleCategory?: string | null;
@@ -43,7 +59,8 @@ export function resolveDeliveryCategory(opts: {
   const cats = opts.categories ?? [];
   if (opts.aiCategory && cats.some((c) => c.slug === opts.aiCategory)) return opts.aiCategory;
   if (cats.length === 0) return null;
-  return cats.find((c) => c.slug === "others")?.slug ?? cats[cats.length - 1]!.slug;
+  const balde = cats.find((c) => (CATCH_ALL_SLUGS as readonly string[]).includes(c.slug));
+  return balde?.slug ?? cats[cats.length - 1]!.slug;
 }
 
 /** Status pós-localização: aprovação acontece DEPOIS de traduzir/classificar. */

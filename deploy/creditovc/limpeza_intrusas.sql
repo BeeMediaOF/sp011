@@ -10,13 +10,15 @@
 -- não tinha keyword nenhuma, tudo passou. Medição de 2026-08-14 (602 artigos):
 --     investimentos 37,0% | outros 32,9% | otros 16,6% | credito 3,5%
 --
--- SOBRE O "otros": não é typo do código. `resolveDeliveryCategory`
--- (central-hub/src/lib/localization.ts) valida a classificação da IA contra a
--- taxonomia e, se nada casar, cai em `others` ou no ÚLTIMO slug da lista. O
--- `targetCategory` de uma REGRA, porém, é devolvido SEM validação (linha 42) —
--- é por ali que um slug inventado entra. Seja qual for a origem, `otros` e
--- `outros` não estão cadastrados em Categorias no admin do credito.vc: são
--- páginas órfãs, e é isso que o critério abaixo usa.
+-- SOBRE O "otros" (causa confirmada em 2026-08-18): é `outros` mutilado pelo bug
+-- do slugify da central (ver deploy/central/taxonomias_reparo.sql), que apagava
+-- `u`, `f` e dígitos de todo slug salvo pelo painel. O caminho até o artigo foi
+-- o FALLBACK, não o `targetCategory` de uma regra: `resolveDeliveryCategory`
+-- procurava o balde só pelo nome inglês `others` e, não achando, usava o ÚLTIMO
+-- slug da lista — que era justamente o `otros` corrompido. (Corrigido: o balde
+-- agora é reconhecido nos dois idiomas.) Nem `otros` nem `outros` estão
+-- cadastrados em Categorias no admin do credito.vc: são páginas órfãs, e é isso
+-- que o critério abaixo usa.
 --
 -- ESTE ARQUIVO APAGA ARTIGOS. Rode a FASE 1 primeiro e leia os números.
 -- =============================================================================

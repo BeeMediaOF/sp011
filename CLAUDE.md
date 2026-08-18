@@ -352,7 +352,15 @@ blog com HMAC `${timestamp}.${rawBody}`, anti-replay 300s, idempotência por
 centralId; backoff 1m→5m→15m→1h→6h, 5 tentativas → dead).
 
 - Precedência de categoria: regra (`targetCategory`) > IA > fallback
-  `others`/último slug. Classificação nunca bloqueia entrega.
+  (balde `others`/`outros`, ou o ÚLTIMO slug se o blog não tiver balde).
+  Classificação nunca bloqueia entrega. O `targetCategory` da regra NÃO é
+  validado contra a taxonomia, e isso é deliberado: o sp011 tem taxonomia
+  VAZIA de propósito (catch-all da rede) e depende inteiramente dele —
+  validar derrubaria as 18 regras dele de uma vez. Blog SEM balde
+  (credito.vc, ocomandante) só está seguro enquanto toda regra ativa tiver
+  target; regra ativa sem target manda o que a IA não classificar para o
+  último slug da lista. Conferência pronta no fim de
+  `deploy/central/taxonomias_reparo.sql`.
 - **Portão de economia**: todos os blogs ativos saturados (entregues+em
   espera ≥ teto) → collector/rewriter pulam o ciclo. Todo blog ativo precisa
   de `max_posts_per_day`.
