@@ -166,13 +166,23 @@ export function blogCategorySurface(
 }
 
 /**
+ * Forma canônica de um slug de editoria consultado por CONTEÚDO. Estrito de
+ * propósito: o filtro `?category=` da API normaliza para minúsculas, então
+ * `/FUTEBOL` acharia os mesmos 307 artigos de `/futebol` e serviria uma segunda
+ * página, com canonical próprio — conteúdo duplicado criado pelo próprio
+ * engine. Editoria DECLARADA no painel não passa por aqui: lá vale o que o
+ * administrador cadastrou.
+ */
+const CONTENT_SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+/**
  * Apresentação de uma editoria que NÃO está na superfície mas tem conteúdo
  * publicado (arquivo histórico, taxonomia anterior). Quem decide que ela existe
  * é a contagem de artigos; esta função só resolve como ela aparece.
  */
 export function categoryRouteForSlug(slug: string): CategoryRoute | null {
   const s = (slug || "").trim().replace(/^\/+/, "").replace(/\/+$/, "");
-  if (!s || s.includes("/")) return null;
+  if (!CONTENT_SLUG_RE.test(s)) return null;
   const path = `/${s}`;
   if (RESERVED_PATHS.has(path)) return null;
   return presentation(path, s, s.replace(/-/g, " ").toUpperCase(), colorForSlug(s));

@@ -117,6 +117,19 @@ test("categoryRouteForSlug apresenta a editoria historica (Classe 3)", () => {
   assert.equal(categoryRouteForSlug(""), null);
 });
 
+test("I-29: caixa alta NAO vira editoria por conteudo (senao /FUTEBOL duplicaria /futebol)", () => {
+  /* O filtro ?category= da API normaliza para minusculas: sem esta recusa,
+     /FUTEBOL acharia os mesmos artigos e serviria uma segunda pagina com
+     canonical proprio — conteudo duplicado criado pelo proprio engine. */
+  assert.equal(categoryRouteForSlug("FUTEBOL"), null);
+  assert.equal(categoryRouteForSlug("Copa-Do-Mundo"), null);
+  assert.deepEqual(categoryRouteForSlug("futebol "), categoryRouteForSlug("futebol"));
+  // e nada de espaco, ponto, ou comeco com hifen
+  assert.equal(categoryRouteForSlug("copa do mundo"), null);
+  assert.equal(categoryRouteForSlug("-futebol"), null);
+  assert.equal(categoryRouteForSlug("robots.txt"), null);
+});
+
 test("editoria do menu: rótulo em caixa alta e cor derivada do slug", () => {
   const r = resolveCategoryRoute("/futebol", MENU);
   assert.equal(r?.slug, "futebol");
