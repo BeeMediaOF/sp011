@@ -19,7 +19,7 @@ interface Article {
 interface Props {
   title: string;
   color: string;
-  href: string;
+  href?: string;
   articles: Article[];
   /** "Modo hero": esconde o título da seção e o "Ver mais". */
   hideHeader?: boolean;
@@ -56,6 +56,7 @@ export default function SectionBlockFeatured({ title, color, href, articles, hid
                 {title}
               </h2>
             </div>
+            {href && (
             <Link
               href={href}
               className="text-[11px] font-bold hover:underline uppercase tracking-wider"
@@ -63,6 +64,7 @@ export default function SectionBlockFeatured({ title, color, href, articles, hid
             >
               {t("common.seeMoreArrow")}
             </Link>
+            )}
           </div>
         )}
 

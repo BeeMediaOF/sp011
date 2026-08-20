@@ -17,7 +17,7 @@ interface SectionArticle {
 interface SectionBlockProps {
   title: string;
   color: string;
-  href: string;
+  href?: string;
   articles: SectionArticle[];
   pageSize?: number;
   /** "Modo hero": esconde título, paginação e "Ver mais". */
@@ -61,6 +61,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
                 </button>
               </div>
             )}
+            {href && (
             <Link
               href={href}
               className="text-[11px] font-bold hover:underline uppercase tracking-wider"
@@ -68,6 +69,7 @@ export default function SectionBlock({ title, color, href, articles, pageSize = 
             >
               {t("common.seeMoreArrow")}
             </Link>
+            )}
           </div>
         </div>
         )}

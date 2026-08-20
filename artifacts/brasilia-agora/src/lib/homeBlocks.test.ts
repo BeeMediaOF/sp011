@@ -8,9 +8,10 @@ import assert from "node:assert/strict";
 import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
   isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks, sampleForPreview,
-  categoriesBlockSource, resolveCategoryBlockItems, parsePlaylistId,
+  categoriesBlockSource, resolveCategoryBlockItems, parsePlaylistId, categoryHref,
   type HomeBlock,
 } from "./homeBlocks";
+import { blogCategorySurface } from "./categoryRoutes";
 
 test("inferBlockType: campo persistido tem prioridade", () => {
   assert.equal(inferBlockType({ id: "carousel-123", blockType: "image", custom: true }), "image");
@@ -254,4 +255,48 @@ test("parsePlaylistId: recusa vazio, video solto e esquema perigoso", () => {
 test("bloco playlist: tipo inferido pelo prefixo do id e formato padrao", () => {
   assert.equal(inferBlockType({ id: "playlist-1723000000", custom: true }), "playlist");
   assert.equal(defaultFormatForType("playlist"), "playlist_player");
+});
+
+/* ── "Ver mais": o destino é validado contra a superfície do blog ──────────
+   O link do cabeçalho da seção era `/${block.category ?? "geral"}`. Num portal
+   de esporte isso publicava `/geral` — editoria que o blog não tem — tanto para
+   bloco SEM categoria quanto para bloco com `category: "geral"` explícito
+   (caso real do OleySports). A presença do campo nunca provou que a rota
+   existe. */
+const SURFACE_OLEY = blogCategorySurface(
+  [{ label: "FUTEBOL", path: "/futebol" }],
+  [{ name: "COPA DO MUNDO", slug: "copa-do-mundo", visible: false }],
+);
+const SURFACE_SP011 = blogCategorySurface(
+  [{ label: "GERAL", path: "/geral" }, { label: "POLÍTICA", path: "/politica" }],
+  undefined,
+);
+
+test("V-1/V-2: bloco sem categoria (latest/most_read) nao tem destino", () => {
+  assert.equal(categoryHref(undefined, SURFACE_OLEY), undefined);
+  assert.equal(categoryHref("", SURFACE_OLEY), undefined);
+  assert.equal(categoryHref("   ", SURFACE_OLEY), undefined);
+});
+
+test("V-3: category 'geral' EXPLICITA num blog que nao tem /geral nao vira link", () => {
+  assert.equal(categoryHref("geral", SURFACE_OLEY), undefined);
+});
+
+test("V-4: categoria que existe vira link", () => {
+  assert.equal(categoryHref("futebol", SURFACE_OLEY), "/futebol");
+  // editoria declarada e oculta no menu também é destino válido
+  assert.equal(categoryHref("copa-do-mundo", SURFACE_OLEY), "/copa-do-mundo");
+});
+
+test("V-5: no sp011, o mesmo 'geral' vira link (a editoria existe la)", () => {
+  assert.equal(categoryHref("geral", SURFACE_SP011), "/geral");
+  assert.equal(categoryHref("politica", SURFACE_SP011), "/politica");
+  // e uma editoria de esporte NAO vira link no sp011
+  assert.equal(categoryHref("futebol", SURFACE_SP011), undefined);
+});
+
+test("categoryHref nao inventa rota de dois segmentos nem aceita barra solta", () => {
+  assert.equal(categoryHref("futebol/2026", SURFACE_OLEY), undefined);
+  assert.equal(categoryHref("/futebol", SURFACE_OLEY), "/futebol");
+  assert.equal(categoryHref("/", SURFACE_OLEY), undefined);
 });

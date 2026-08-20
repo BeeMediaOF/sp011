@@ -37,6 +37,16 @@ interface CategoryPageProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
+  /** A editoria não tem artigo nenhum: o card em destaque é um placeholder de
+   *  estado vazio, e placeholder NÃO é link. Ver o comentário no destaque. */
+  isEmpty?: boolean;
+}
+
+/** Envelope do card em destaque: `<Link>` quando há destino, `<div>` quando não
+ *  há. A classe é a mesma nos dois casos — o `group` do hover está nela. */
+function CardShell({ href, children }: { href?: string; children: React.ReactNode }) {
+  if (!href) return <div className="group block">{children}</div>;
+  return <Link href={href} className="group block">{children}</Link>;
 }
 
 export default function CategoryPage({
@@ -49,6 +59,7 @@ export default function CategoryPage({
   onLoadMore,
   hasMore,
   loadingMore,
+  isEmpty,
 }: CategoryPageProps) {
   const { settings } = useSite();
   const { t } = useT();
@@ -74,7 +85,13 @@ export default function CategoryPage({
           {/* 2 Destaques grandes */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
             {[featuredArticle, second].filter(Boolean).map((art, idx) => art && (
-              <Link key={art.id} href={`/artigo/${art.slug || art.id}`} className="group block">
+              /* Estado vazio: o destaque é um placeholder, não um artigo. Ele
+                 era envolvido pelo mesmo <Link> dos artigos reais e a página
+                 publicava `<a href="/artigo/__placeholder__">` — um link interno
+                 para uma URL que não existe, oferecido ao rastreador em toda
+                 editoria sem conteúdo. Sem `href`, o card continua igual na
+                 tela e some do grafo de links. */
+              <CardShell key={art.id} href={isEmpty ? undefined : `/artigo/${art.slug || art.id}`}>
                 <div className="relative overflow-hidden bg-gray-100 h-[220px] sm:h-[300px] md:h-[380px]">
                   {/* Estes dois são o LCP da editoria e iam CRUS da origem —
                       foto de agência em tamanho original para uma caixa de no
@@ -117,7 +134,7 @@ export default function CategoryPage({
                     </div>
                   </div>
                 </div>
-              </Link>
+              </CardShell>
             ))}
           </div>
 

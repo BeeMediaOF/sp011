@@ -122,8 +122,12 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
       .finally(() => setLoadingMore(false));
   }
 
+  /* Cartão de ESTADO VAZIO — não é artigo. O id sintético `__placeholder__`
+     virava `href="/artigo/__placeholder__"` no destaque do CategoryPage, e o
+     HTML de toda editoria sem conteúdo publicava esse link. O `isEmpty` abaixo
+     é o que diz ao componente para desenhar o cartão sem destino. */
   const placeholder: CategoryArticle = {
-    id:       "__placeholder__",
+    id:       "empty-state",
     title:    t("category.empty"),
     time:     "—",
     imageUrl: `https://placehold.co/640x380/e5e7eb/9ca3af?text=${t("category.imgSoon")}`,
@@ -131,6 +135,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
     tagColor: color,
   };
 
+  const isEmpty  = articles.length === 0;
   const featured = articles[0] ?? placeholder;
   const rest     = articles.slice(1);
 
@@ -149,6 +154,7 @@ export default function CategoryArchivePage({ category, slug, color }: Props) {
             color={color}
             articles={rest}
             featuredArticle={featured}
+            isEmpty={isEmpty}
             mostRead={mostRead}
             onLoadMore={loadMore}
             hasMore={articles.length < total}

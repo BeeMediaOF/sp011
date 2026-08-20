@@ -21,7 +21,8 @@ import {
   buildSrcSet, coverSrcSet, aspectClass, CARD_WIDTHS, THUMB_WIDTHS, COVER_WIDTHS, COVER_Q,
   type CoverAspect,
 } from "@/lib/newsImage";
-import { inferBlockType, segmentBlocks, sampleForPreview, safeLinkUrl, type SegmentEntry } from "../lib/homeBlocks";
+import { inferBlockType, segmentBlocks, sampleForPreview, safeLinkUrl, categoryHref, type SegmentEntry } from "../lib/homeBlocks";
+import { blogCategorySurface } from "../lib/categoryRoutes";
 import { sanitizeArticleHtml, safeTitleHtml } from "../lib/sanitize";
 import {
   BlockPlaceholder, ImageBlock, CarouselBlock, VideoEmbedBlock, HtmlBlock,
@@ -91,7 +92,7 @@ function sortByViews(list: SectionArticle[]): SectionArticle[] {
  *  `hideHeader` é o "modo hero" do bloco: esconde título e "Ver mais" sem mexer
  *  no resto do layout (o `name` do bloco continua identificando-o no painel). */
 interface SectionLayoutProps {
-  title: string; color: string; href: string; articles: SectionArticle[];
+  title: string; color: string; href?: string; articles: SectionArticle[];
   hideHeader?: boolean;
 }
 
@@ -108,7 +109,7 @@ function SectionBlockTrio({ title, color, href, articles, hideHeader }: SectionL
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
+          {href && <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>}
         </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -139,7 +140,7 @@ function SectionBlockCompact({ title, color, href, articles, hideHeader }: Secti
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
+          {href && <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>}
         </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-3">
@@ -172,7 +173,7 @@ function SectionBlockBigStory({ title, color, href, articles, hideHeader }: Sect
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
+          {href && <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>}
         </div>
         )}
         <div className="flex flex-col lg:flex-row gap-6">
@@ -220,7 +221,7 @@ function SectionBlockTimeline({ title, color, href, articles, hideHeader }: Sect
             <div className="w-1 h-5" style={{ backgroundColor: color }} />
             <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
           </div>
-          <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
+          {href && <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>}
         </div>
         )}
         <div className="relative pl-6 border-l-2" style={{ borderColor: color + "40" }}>
@@ -241,7 +242,7 @@ function SectionBlockTimeline({ title, color, href, articles, hideHeader }: Sect
 }
 
 function SectionHeaderClassic({ title, color, href, hideHeader }: {
-  title: string; color: string; href: string; hideHeader?: boolean;
+  title: string; color: string; href?: string; hideHeader?: boolean;
 }) {
   const { t } = useT();
   if (hideHeader) return null;
@@ -251,7 +252,7 @@ function SectionHeaderClassic({ title, color, href, hideHeader }: {
         <div className="w-1 h-5" style={{ backgroundColor: color }} />
         <h2 className="text-[17px] font-bold text-[#1a1a1a] uppercase tracking-wider">{title}</h2>
       </div>
-      <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>
+      {href && <Link href={href} className="text-xs font-semibold uppercase tracking-wider hover:underline" style={{ color }}>{t("common.seeMore")}</Link>}
     </div>
   );
 }
@@ -529,10 +530,18 @@ function CustomBlock({ block, getArticles, preview }: {
   getArticles: (cat: string) => SectionArticle[];
   preview?: boolean;
 }) {
+  const { settings } = useSite();
   const type = inferBlockType(block);
   const cat = block.category ?? "geral";
   const color = block.color ?? EDITORIA_COLORS[cat] ?? "#6b7280";
-  const href = `/${cat}`;
+  /* "Ver mais" só existe se o destino existir NESTE blog: a categoria do bloco
+     é validada contra a superfície de editorias, não contra a presença do
+     campo. `undefined` faz o link sumir do cabeçalho da seção. */
+  const surface = React.useMemo(
+    () => blogCategorySurface(settings?.menuItems, settings?.categories),
+    [settings?.menuItems, settings?.categories],
+  );
+  const href = categoryHref(block.category, surface);
 
   // Fonte dos artigos (carrossel/ticker/lista/conteúdo): por categoria ou geral.
   // getArticles("") devolve todos (mais recentes primeiro); "most_read" reordena
@@ -648,12 +657,18 @@ function ConfigurableBlock({ block, getArticles, preview }: {
   getArticles: (cat: string) => SectionArticle[];
   preview?: boolean;
 }) {
+  const { settings } = useSite();
   const defaults = PREDEFINED_DEFAULTS[block.id];
 
   const cat    = block.category ?? defaults?.category ?? "geral";
   const color  = block.color    ?? defaults?.color    ?? "#6b7280";
   const layout = block.layout   ?? defaults?.layout   ?? "grid";
-  const href   = `/${cat}`;
+  /* Mesma validação do CustomBlock: destino conferido contra a superfície. */
+  const surface = React.useMemo(
+    () => blogCategorySurface(settings?.menuItems, settings?.categories),
+    [settings?.menuItems, settings?.categories],
+  );
+  const href   = categoryHref(block.category ?? defaults?.category, surface);
   const title  = block.name;
   const hd     = block.hideHeader === true;
   let articles = getArticles(cat);

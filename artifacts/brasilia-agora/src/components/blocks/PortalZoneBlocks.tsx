@@ -22,7 +22,9 @@ import {
 } from "@/lib/newsImage";
 import { safeTitleHtml } from "../../lib/sanitize";
 import { useT } from "../../lib/i18n";
-import { inferBlockType, sampleForPreview, type HomeBlock } from "../../lib/homeBlocks";
+import { inferBlockType, sampleForPreview, categoryHref, type HomeBlock } from "../../lib/homeBlocks";
+import { blogCategorySurface } from "../../lib/categoryRoutes";
+import { useSite } from "../../hooks/useSite";
 import { AD_SLOTS, BlockPlaceholder, CategoriesBlock, HtmlBlock, SearchBlock, TickerBlock } from "./HomeCustomBlocks";
 
 /** Mesmo shape do SectionArticle da Home (mapeado de useArticles). */
@@ -750,12 +752,21 @@ export function ZoneBlock({ block, zone, getArticles, preview, fallback }: {
   /** Renderização clássica do bloco — usada quando o tipo não tem renderer de zona. */
   fallback: React.ReactNode;
 }) {
+  const { settings } = useSite();
   const cat = block.category ?? "geral";
   const color = block.color ?? (block.id === "mais-lidas" ? "#c8102e" : "#6b7280");
-  // Link do cabeçalho só quando o bloco aponta para uma categoria concreta
-  // (fontes "latest"/"most_read" não têm página de arquivo própria).
-  const href = block.source !== "latest" && block.source !== "most_read" && block.category
-    ? `/${block.category}` : undefined;
+  /* Link do cabeçalho só quando o bloco aponta para uma categoria concreta
+     (fontes "latest"/"most_read" não têm página de arquivo própria) E essa
+     categoria EXISTE neste blog. Apontar para o campo bastava: um bloco com
+     `category: "geral"` num portal de esporte publicava um link para uma
+     editoria que o blog não tem. */
+  const surface = React.useMemo(
+    () => blogCategorySurface(settings?.menuItems, settings?.categories),
+    [settings?.menuItems, settings?.categories],
+  );
+  const href = block.source === "latest" || block.source === "most_read"
+    ? undefined
+    : categoryHref(block.category, surface);
 
   // Blocos pré-definidos com renderer de zona
   if (!block.custom) {

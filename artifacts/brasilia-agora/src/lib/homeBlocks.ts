@@ -410,6 +410,26 @@ export function resolveCategoryBlockItems(
   return out;
 }
 
+/**
+ * Destino do "Ver mais" de um bloco da home, VALIDADO contra a superfície de
+ * editorias do blog. `undefined` = não renderizar o link.
+ *
+ * Antes o destino era `/${block.category ?? "geral"}`: bloco sem categoria
+ * oferecia `/geral` — que existe no sp011 e NÃO existe num blog de esporte — e
+ * bloco com `category: "geral"` explícito (caso real do OleySports) fazia o
+ * mesmo. A presença do campo nunca foi prova de que a rota existe; quem prova é
+ * a mesma superfície que o servidor consulta para decidir o status HTTP.
+ */
+export function categoryHref(
+  category: string | null | undefined,
+  surface: readonly { path: string }[],
+): string | undefined {
+  const slug = (category ?? "").trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!slug || slug.includes("/")) return undefined;
+  const path = `/${slug}`;
+  return surface.some((c) => c.path === path) ? path : undefined;
+}
+
 /** Links clicáveis (imagem/banner): http(s) ou caminho relativo do site. Nunca javascript:. */
 export function safeLinkUrl(raw: string | null | undefined): string | null {
   if (!raw) return null;
