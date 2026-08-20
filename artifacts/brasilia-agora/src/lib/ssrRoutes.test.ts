@@ -22,7 +22,8 @@ test("artigo: um segmento depois de /artigo", () => {
   assert.deepEqual(classifySsrPath("/artigo/lula-anuncia-pacote"), {
     kind: "article", key: "artigo:lula-anuncia-pacote", slug: "lula-anuncia-pacote",
   });
-  assert.equal(classifySsrPath("/artigo/slug/extra"), null);
+  // dois segmentos depois de /artigo não são rota do App
+  assert.equal(classifySsrPath("/artigo/slug/extra")?.kind, "unknown");
   // /artigo sozinho não é artigo — é reservado (o resolveCategoryRoute recusa)
   assert.equal(classifySsrPath("/artigo")?.kind, "category");
 });
@@ -30,7 +31,25 @@ test("artigo: um segmento depois de /artigo", () => {
 test("editoria: candidato de um segmento só", () => {
   assert.deepEqual(classifySsrPath("/politica"), { kind: "category", key: "cat:politica", slug: "politica" });
   assert.equal(classifySsrPath("/futebol")?.slug, "futebol");
-  assert.equal(classifySsrPath("/a/b"), null);
+});
+
+test("P-4: paginas institucionais tem rota propria e nunca sao editoria", () => {
+  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo"]) {
+    assert.equal(classifySsrPath(p)?.kind, "static", p);
+  }
+});
+
+test("P-5: path de dois ou mais segmentos nao existe no App", () => {
+  /* Antes devolvia `null` e o fallback respondia 200 com o shell: era o
+     soft-404 universal medido em produção (18 de 18 paths inventados = 200). */
+  assert.equal(classifySsrPath("/a/b")?.kind, "unknown");
+  assert.equal(classifySsrPath("/a/b/c")?.kind, "unknown");
+  assert.equal(classifySsrPath("/caminho/de/dois")?.kind, "unknown");
+});
+
+test("P-6: caixa alta e candidato a editoria (quem decide a existencia e o dado)", () => {
+  assert.equal(classifySsrPath("/FUTEBOL")?.kind, "category");
+  assert.equal(classifySsrPath("/FUTEBOL")?.slug, "FUTEBOL");
 });
 
 test("o painel NUNCA é renderizado no servidor", () => {

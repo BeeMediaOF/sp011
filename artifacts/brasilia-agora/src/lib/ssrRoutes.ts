@@ -7,7 +7,9 @@
  * público ou um .jpg respondido como documento.
  */
 
-export type SsrRouteKind = "home" | "article" | "category";
+import { STATIC_PAGE_PATHS } from "./categoryRoutes";
+
+export type SsrRouteKind = "home" | "article" | "category" | "static" | "unknown";
 
 export interface SsrRoute {
   kind: SsrRouteKind;
@@ -37,6 +39,13 @@ export function classifySsrPath(pathOnly: string): SsrRoute | null {
   if (p.startsWith("/api/") || /^\/admin(\/|$)/.test(p) || /\.[a-zA-Z0-9]+$/.test(p)) return null;
   const art = ARTICLE_PATH_RE.exec(p);
   if (art?.[1]) return { kind: "article", key: `artigo:${art[1]}`, slug: art[1] };
+  /* Páginas institucionais existem sempre: não passam pela pergunta "esta
+     editoria tem conteúdo?" e portanto nunca viram 404. */
+  if (STATIC_PAGE_PATHS.has(p)) return { kind: "static", key: `static:${p}`, slug: p.slice(1) };
   if (/^\/[^/]+$/.test(p)) return { kind: "category", key: `cat:${p.slice(1)}`, slug: p.slice(1) };
-  return null;
+  /* Sobrou path de dois ou mais segmentos que não é artigo, painel, API nem
+     arquivo: no App não existe rota assim. Antes caía no `null` e o fallback
+     respondia 200 com o shell — o soft-404 universal, que fazia
+     `/rota-inventada-xyz` e `/caminho/de/dois` "existirem" em todo blog. */
+  return { kind: "unknown", key: `unknown:${p}`, slug: "" };
 }

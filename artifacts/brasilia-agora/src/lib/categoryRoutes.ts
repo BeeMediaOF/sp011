@@ -42,12 +42,20 @@ export const FIXED_CATEGORIES: readonly CategoryRoute[] = [
 ];
 
 /**
- * Paths de UM segmento que o App resolve ANTES do `/:slug` — não são editoria
- * mesmo que alguém cadastre um menuItem apontando para eles.
+ * Páginas institucionais de UM segmento, com componente próprio no App. São
+ * rotas reais e permanentes do site — o middleware precisa saber disso para não
+ * confundi-las com editoria inexistente e responder 404.
  */
-const RESERVED_PATHS: ReadonlySet<string> = new Set([
-  "/artigo", "/arquivo", "/contato", "/privacidade", "/termos",
+export const STATIC_PAGE_PATHS: ReadonlySet<string> = new Set([
+  "/arquivo", "/contato", "/privacidade", "/termos",
 ]);
+
+/**
+ * Paths de UM segmento que o App resolve ANTES do `/:slug` — não são editoria
+ * mesmo que alguém cadastre um menuItem apontando para eles. `/artigo` entra
+ * porque é o prefixo das matérias, não uma página institucional.
+ */
+const RESERVED_PATHS: ReadonlySet<string> = new Set(["/artigo", ...STATIC_PAGE_PATHS]);
 
 const COLOR_PALETTE = [
   "#0b3d91","#c8102e","#16a34a","#6b21a8","#0284c7",

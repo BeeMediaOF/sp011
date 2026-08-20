@@ -11,6 +11,8 @@ import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./s
 import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
 import { isSocialCrawler } from "./src/lib/crawlerUa";
+import { decideCategory } from "./src/lib/routeDecision";
+import { isStaticCandidate, safeRelative } from "./src/lib/staticPath";
 import { sanitizeGtmId, injectGtm } from "./src/lib/gtmSnippet";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -141,6 +143,8 @@ interface HeadFields {
   /** URL absoluta da imagem OG. */
   image: string;
   ogType?: "website" | "article";
+  /** Valor da tag `robots` — "noindex, follow" nas respostas que não indexam. */
+  robots?: string;
   /** og:title/twitter:title quando diferem do <title> (artigo: sem o sufixo). */
   socialTitle?: string;
   /** Tags extras injetadas antes de </head> (canonical, article:*). */
@@ -156,7 +160,7 @@ interface HeadFields {
  */
 function applyHead(html: string, f: HeadFields): string {
   const social = f.socialTitle ?? f.title;
-  const out = html
+  let out = html
     .replace(/<html lang="[^"]*"/, `<html lang="${f.lang}"`)
     .replace(/<title>[^<]*<\/title>/, `<title>${esc(f.title)}</title>`)
     .replace(/(<meta name="description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
@@ -170,6 +174,15 @@ function applyHead(html: string, f: HeadFields): string {
     .replace(/(<meta name="twitter:description" content=")[^"]*(")/, `$1${esc(f.description)}$2`)
     .replace(/(<meta name="twitter:image" content=")[^"]*(")/, `$1${esc(f.image)}$2`);
   const extra = [...(f.extraTags ?? [])];
+
+  /* UMA tag `robots` na resposta. O valor SUBSTITUI o do template em vez de
+     acrescentar uma segunda: duas tags robots têm resolução indefinida entre
+     buscadores, e a segunda não anula a primeira de forma previsível. */
+  if (f.robots) {
+    const robotsRe = /(<meta name="robots" content=")[^"]*(")/;
+    if (robotsRe.test(out)) out = out.replace(robotsRe, `$1${esc(f.robots)}$2`);
+    else extra.push(`<meta name="robots" content="${esc(f.robots)}">`);
+  }
 
   /* GTM no HTML SERVIDO (2026-08-14). Antes o container só era montado no
      cliente, depois do consentimento — o verificador do GTM, que faz um GET
@@ -194,9 +207,11 @@ function rewriteHeadMeta(
   origin: string,
   pathOnly: string,
   extraTags: readonly string[] = [],
+  robots?: string,
 ): string {
   return applyHead(html, {
     lang: meta.lang,
+    ...(robots ? { robots } : {}),
     title: meta.tagline ? `${meta.siteName} — ${meta.tagline}` : meta.siteName,
     description: meta.seoDescription,
     siteName: meta.siteName,
@@ -489,6 +504,8 @@ function ssrLog(
 interface ShellOptions {
   status?: number;
   cacheControl?: string;
+  /** `noindex, follow` — usado no 404. */
+  noindex?: boolean;
   /** Headers extras (o `Retry-After` do 503). */
   headers?: Readonly<Record<string, string>>;
 }
@@ -517,7 +534,13 @@ function makeShellRenderer(apiBase: string): (
       const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
       const host = req.headers.host ?? "";
       const meta = await resolveSiteMeta(host);
-      const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
+      /* Sem `extraTags`: a resposta 404 NÃO leva canonical. Canonical numa
+         página que não existe aponta o buscador para tratá-la como versão de
+         outra URL — o oposto do que o 404 comunica. */
+      const html = rewriteHeadMeta(
+        template, meta, `${proto}://${host}`, pathOnly, [],
+        opts.noindex ? "noindex, follow" : undefined,
+      );
       for (const [k, v] of Object.entries(opts.headers ?? {})) res.setHeader(k, v);
       sendHtml(res, html, opts.cacheControl ?? "no-cache, must-revalidate", opts.status ?? 200);
       return true;
@@ -558,28 +581,61 @@ function ssrPlugin(apiBase: string): Plugin {
   /* Idade a partir da qual o HTML velho deixa de ser servido: aí o visitante
      espera a renderização mesmo. Só acontece em rota que ninguém pede há 10 min. */
   const STALE_MAX_MS = 10 * 60_000;
-  const htmlCache = new Map<string, { html: string; at: number; ttl: number }>();
+  /* "Não existe" também é resposta, e cacheá-la é o que impede uma varredura de
+     URLs inventadas de virar uma consulta à `api` por requisição. Curto o
+     bastante para um artigo publicado agora aparecer rápido. */
+  const NOT_FOUND_TTL_MS = 60_000;
+  /* Teto SEPARADO para essas entradas: sem ele, a varredura despejaria do LRU as
+     páginas que o site realmente serve. */
+  const NOT_FOUND_MAX_ENTRIES = 50;
+
+  type CacheEntry =
+    | { kind: "html"; html: string; at: number; ttl: number }
+    | { kind: "notFound"; at: number; ttl: number };
+
+  const htmlCache = new Map<string, CacheEntry>();
   /** Chaves com revalidação em andamento — impede N renders simultâneos da mesma rota. */
   const revalidating = new Set<string>();
 
   /** Entrada utilizável (mesmo vencida) e se ela já passou do TTL. */
-  function cacheLookup(key: string): { html: string; stale: boolean } | null {
+  function cacheLookup(key: string): { entry: CacheEntry; stale: boolean } | null {
     const hit = htmlCache.get(key);
     if (!hit) return null;
     const age = Date.now() - hit.at;
     if (age >= STALE_MAX_MS) { htmlCache.delete(key); return null; }
+    /* Só HTML é servido vencido: um "não existe" velho tem de ser reperguntado à
+       `api`, senão um artigo republicado ficaria 10 min em 404. */
+    if (hit.kind !== "html" && age >= hit.ttl) { htmlCache.delete(key); return null; }
     htmlCache.delete(key); // reinsere no fim: Map itera por ordem de inserção
     htmlCache.set(key, hit);
-    return { html: hit.html, stale: age >= hit.ttl };
+    return { entry: hit, stale: age >= hit.ttl };
   }
 
-  function cacheSet(key: string, html: string, ttl: number): void {
+  function cacheSet(key: string, entry: CacheEntry): void {
     htmlCache.delete(key);
-    htmlCache.set(key, { html, at: Date.now(), ttl });
+    htmlCache.set(key, entry);
+    if (entry.kind === "notFound") evictExcessNotFound();
     while (htmlCache.size > CACHE_MAX_ENTRIES) {
       const oldest = htmlCache.keys().next().value;
       if (oldest === undefined) break;
       htmlCache.delete(oldest);
+    }
+  }
+
+  function cacheSetHtml(key: string, html: string, ttl: number): void {
+    cacheSet(key, { kind: "html", html, at: Date.now(), ttl });
+  }
+
+  /** Mantém no máximo NOT_FOUND_MAX_ENTRIES entradas de "não existe" (as mais novas). */
+  function evictExcessNotFound(): void {
+    let n = 0;
+    for (const e of htmlCache.values()) if (e.kind === "notFound") n += 1;
+    if (n <= NOT_FOUND_MAX_ENTRIES) return;
+    for (const [k, e] of htmlCache) {
+      if (e.kind !== "notFound") continue;
+      htmlCache.delete(k);
+      n -= 1;
+      if (n <= NOT_FOUND_MAX_ENTRIES) return;
     }
   }
 
@@ -800,8 +856,8 @@ function ssrPlugin(apiBase: string): Plugin {
 
     const meta = site ? metaFromSitePayload(site) : null;
     const url = `${origin}/artigo/${String(article["slug"] ?? article["id"] ?? slug)}`;
-    const html = compose(render(`/artigo/${slug}`, data), data, (html) => {
-      if (!meta) return langOnly(html, site);
+    const html = compose(render(`/artigo/${slug}`, data), data, (doc) => {
+      if (!meta) return langOnly(doc, site);
       const title = stripHtml(String(article["title"] ?? ""));
       // Mesmos recortes do <head> que a página aplica no cliente (Artigo.tsx):
       // servidor e cliente não podem anunciar títulos diferentes.
@@ -825,7 +881,7 @@ function ssrPlugin(apiBase: string): Plugin {
       }
       const section = String(article["category"] ?? "");
       if (section) extraTags.push(`<meta property="article:section" content="${esc(section)}">`);
-      return applyHead(html, {
+      return applyHead(doc, {
         lang: meta.lang,
         title: `${title} — ${meta.siteName}`,
         socialTitle: title,
@@ -838,6 +894,7 @@ function ssrPlugin(apiBase: string): Plugin {
         gtmId: meta.gtmId,
       });
     });
+    return { kind: "html", html };
   }
 
   async function renderCategory(pathOnly: string, origin: string): Promise<Outcome> {
@@ -870,7 +927,10 @@ function ssrPlugin(apiBase: string): Plugin {
       if (!candidate || !categoryRouteForSlug(candidate)) return { kind: "notFound" };
       const probe = await fetchList(articlesUrl({ category: candidate, limit: 1, sort: "recent" }));
       if (probe.state !== "ok") return { kind: "unavailable" };
-      if (probe.data.total === 0) return { kind: "notFound" };
+      /* Quem classifica é o `routeDecision` — aqui só se executa o veredito. */
+      if (decideCategory({ declared: false, total: probe.data.total, state: "found" }).status === 404) {
+        return { kind: "notFound" };
+      }
       route = categoryRouteForSlug(candidate);
     }
     if (!route) return { kind: "notFound" };
@@ -886,6 +946,16 @@ function ssrPlugin(apiBase: string): Plugin {
     if (list.state !== "ok" || top.state !== "ok" || recent.state !== "ok") {
       return { kind: "unavailable" };
     }
+
+    /* As quatro classes de editoria (ver `decideCategory`). O que muda aqui é
+       só a tag `robots`: editoria declarada e sem nenhum artigo continua sendo
+       página navegável do portal — ela é servida — mas não entra no índice. */
+    const decision = decideCategory({
+      declared: declared !== null,
+      total: list.data.total,
+      state: "found",
+    });
+    if (decision.status === 404) return { kind: "notFound" };
 
     const data = {
       articles: recent.data.articles,
@@ -912,6 +982,7 @@ function ssrPlugin(apiBase: string): Plugin {
             siteName: meta.siteName,
             url: `${origin}${route.path}`,
             image: `${origin}${meta.ogImagePath}`,
+            ...(decision.noindex ? { robots: "noindex, follow" } : {}),
             extraTags: [`<link rel="canonical" href="${esc(`${origin}${route.path}`)}">`],
             gtmId: meta.gtmId,
           })
@@ -945,7 +1016,7 @@ function ssrPlugin(apiBase: string): Plugin {
            - unavailable: a `api` está fora → MANTÉM o cache, que é justamente o
              stale que vai segurar o site em pé até o STALE_MAX_MS. Apagar aqui
              seria transformar uma instabilidade em página vazia. */
-        if (out.kind === "html") cacheSet(key, out.html, ttl);
+        if (out.kind === "html") cacheSetHtml(key, out.html, ttl);
         else if (out.kind === "notFound") htmlCache.delete(key);
       })
       .catch(() => { /* mantém o que está em cache até o STALE_MAX_MS */ })
@@ -963,6 +1034,18 @@ function ssrPlugin(apiBase: string): Plugin {
       next();
       return;
     }
+    /* Página institucional: existe sempre, segue para o shell (o SSR dela é
+       outro assunto). Nunca passa pela pergunta "tem conteúdo?". */
+    if (route.kind === "static") {
+      next();
+      return;
+    }
+    /* Path que não corresponde a rota nenhuma do App. Não consulta a `api` — não
+       há o que consultar — e por isso também não ocupa entrada de cache. */
+    if (route.kind === "unknown") {
+      await serveNotFound(req, res, pathOnly);
+      return;
+    }
     const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
     const host = req.headers.host ?? "";
     // O host entra na chave: og:url e canonical são absolutos, e um blog
@@ -974,14 +1057,18 @@ function ssrPlugin(apiBase: string): Plugin {
 
     const cached = cacheLookup(cacheKey);
     if (cached) {
-      sendHtml(res, cached.html, cacheControl);
+      if (cached.entry.kind === "notFound") {
+        await serveNotFound(req, res, pathOnly);
+        return;
+      }
+      sendHtml(res, cached.entry.html, cacheControl);
       if (cached.stale) revalidate(cacheKey, ttl, route, pathOnly, origin);
       return;
     }
     try {
       const out = await renderRoute(route, pathOnly, origin);
       if (out.kind === "html") {
-        cacheSet(cacheKey, out.html, ttl);
+        cacheSetHtml(cacheKey, out.html, ttl);
         ssrStats.ok += 1;
         sendHtml(res, out.html, cacheControl);
         return;
@@ -990,7 +1077,10 @@ function ssrPlugin(apiBase: string): Plugin {
         await serveUnavailable(req, res, pathOnly);
         return;
       }
-      next(); // notFound: por enquanto continua caindo no shell da SPA
+      /* A `api` afirmou que não existe. É o ÚNICO caminho que autoriza um 404
+         aqui — e o único que grava "não existe" no cache. */
+      cacheSet(cacheKey, { kind: "notFound", at: Date.now(), ttl: NOT_FOUND_TTL_MS });
+      await serveNotFound(req, res, pathOnly);
     } catch (err) {
       ssrLog("renderError", 1, 1, {
         path: pathOnly,
@@ -998,6 +1088,34 @@ function ssrPlugin(apiBase: string): Plugin {
       });
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
     }
+  }
+
+  /**
+   * Rota que não existe: 404 com o shell do blog e `noindex`.
+   *
+   * O `noindex` num 404 é redundante — o status já basta — e é mantido de
+   * propósito: se algum dia um middleware novo vazar essa resposta como 200, a
+   * tag segura a página fora do índice. O que NÃO vai junto é o canonical:
+   * canonical numa página inexistente manda o buscador tratá-la como versão de
+   * outra URL, o oposto do que o 404 comunica.
+   */
+  async function serveNotFound(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathOnly: string,
+  ): Promise<void> {
+    ssrStats.notFound += 1;
+    ssrLog("notFound", 50, ssrStats.notFound, { path: pathOnly });
+    const served = await serveShell(req, res, {
+      status: 404,
+      noindex: true,
+      cacheControl: "public, max-age=60",
+    });
+    if (served) return;
+    res.statusCode = 404;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.end("404 Not Found");
   }
 
   /**
@@ -1236,7 +1354,35 @@ function seoTextPlugin(apiBase: string): Plugin {
     next: () => void,
   ): Promise<void> {
     const pathOnly = (req.url ?? "").split("?")[0] ?? "";
-    if (!isReadRequest(req) || (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt")) {
+    if (!isReadRequest(req)) {
+      next();
+      return;
+    }
+    /* `/sitemap.xml` na raiz é URL de convenção, e antes respondia 200 com o
+       HTML da SPA — para um buscador, um sitemap ilegível. O documento real é
+       servido pela `api`, que é quem tem o banco; um 301 permanente mantém UMA
+       fonte da verdade em vez de publicar o mesmo XML em dois endereços. É
+       também para onde o robots.txt já aponta. */
+    if (pathOnly === "/sitemap.xml") {
+      const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+      const host = req.headers.host ?? "";
+      res.statusCode = 301;
+      res.setHeader("Location", `${proto}://${host}/api/sitemap.xml`);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.setHeader("Content-Length", "0");
+      res.end();
+      return;
+    }
+    /* Não existe sitemap index nesta arquitetura, e inventar um seria anunciar
+       um documento que ninguém gera. */
+    if (pathOnly === "/sitemap_index.xml") {
+      res.statusCode = 404;
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Cache-Control", "public, max-age=60");
+      res.end("404 Not Found");
+      return;
+    }
+    if (pathOnly !== "/llms.txt" && pathOnly !== "/robots.txt") {
       next();
       return;
     }
@@ -1284,6 +1430,65 @@ function seoTextPlugin(apiBase: string): Plugin {
   };
 }
 
+/**
+ * staticExistsPlugin — arquivo que não existe responde 404, e não o `index.html`.
+ *
+ * O `vite preview` roda com `appType` no default `spa`: o servidor estático tem
+ * fallback single-page e devolvia o documento da SPA, com 200 `text/html`, para
+ * QUALQUER path com extensão que não existisse. Medido em produção
+ * (20/08/2026): `/sitemap.xml`, `/sitemap_index.xml`, `/manifest.json`,
+ * `/wp-login.php`, `/nada.xml` e `/assets/inexistente.js` respondiam 200 com o
+ * mesmo shell de 6.588 B. Para um rastreador é um site de páginas infinitas;
+ * para uma aba antiga pedindo um chunk que o deploy substituiu, é um erro de
+ * MIME em vez de um 404 que manda recarregar.
+ *
+ * Registrado como o ÚLTIMO dos plugins próprios: `/robots.txt`, `/llms.txt` e
+ * `/sitemap.xml` já foram respondidos antes de chegar aqui.
+ *
+ * A alternativa de uma linha (`appType: "mpa"`) mudaria também o servidor de
+ * desenvolvimento; este plugin é cirúrgico, testável e não toca o dev.
+ */
+function staticExistsPlugin(): Plugin {
+  const distPublic = path.resolve(import.meta.dirname, "dist/public");
+  /* Só o resultado POSITIVO é memorizado: o conteúdo de dist/public é imutável
+     dentro do container, e cachear ausência daria a um scanner uma forma barata
+     de crescer memória. */
+  const known = new Set<string>();
+
+  function handleStatic(req: IncomingMessage, res: ServerResponse, next: () => void): void {
+    const pathOnly = (req.url ?? "").split("?")[0] ?? "";
+    if (!isReadRequest(req) || !isStaticCandidate(pathOnly)) {
+      next();
+      return;
+    }
+    if (known.has(pathOnly)) {
+      next();
+      return;
+    }
+    const rel = safeRelative(pathOnly);
+    if (rel !== null && fs.existsSync(path.join(distPublic, rel))) {
+      if (known.size < 1000) known.add(pathOnly);
+      next();
+      return;
+    }
+    ssrStats.staticNotFound += 1;
+    ssrLog("staticNotFound", 50, ssrStats.staticNotFound, { path: pathOnly });
+    res.statusCode = 404;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=60");
+    res.end("404 Not Found");
+  }
+
+  return {
+    name: "static-exists",
+    // Só no preview (produção): no dev os módulos são servidos da árvore de
+    // fontes e `dist/public` pode nem existir.
+    configurePreviewServer(server) {
+      server.middlewares.use(handleStatic);
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
@@ -1292,6 +1497,8 @@ export default defineConfig({
     seoTextPlugin(process.env.API_URL ?? "http://localhost:8080"),
     ssrPlugin(process.env.API_URL ?? "http://localhost:8080"),
     spaHeadPlugin(process.env.API_URL ?? "http://localhost:8080"),
+    // Último dos plugins próprios: só chega aqui o que ninguém respondeu.
+    staticExistsPlugin(),
     react(),
     tailwindcss(),
     runtimeErrorOverlay(),
