@@ -1,64 +1,75 @@
 import { Router } from "express";
-import { store } from "../lib/store.js";
+import { db, articlesTable } from "@workspace/db";
+import { eq, and, ne, desc } from "drizzle-orm";
+import { buildSitemapXml, SITEMAP_MAX_URLS } from "../lib/sitemapXml.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
-const STATIC_PAGES: { path: string; changefreq: string; priority: string }[] = [
-  { path: "/",           changefreq: "hourly",  priority: "1.0" },
-  { path: "/politica",   changefreq: "daily",   priority: "0.9" },
-  { path: "/cidade",     changefreq: "daily",   priority: "0.9" },
-  { path: "/seguranca",  changefreq: "daily",   priority: "0.9" },
-  { path: "/transporte", changefreq: "daily",   priority: "0.9" },
-  { path: "/saude",      changefreq: "daily",   priority: "0.9" },
-  { path: "/educacao",   changefreq: "daily",   priority: "0.9" },
-  { path: "/cultura",    changefreq: "daily",   priority: "0.9" },
-  { path: "/esportes",   changefreq: "daily",   priority: "0.9" },
-  { path: "/brasil",     changefreq: "daily",   priority: "0.9" },
-  { path: "/mundo",      changefreq: "daily",   priority: "0.9" },
-  { path: "/colunas",    changefreq: "daily",   priority: "0.8" },
-  { path: "/arquivo",    changefreq: "weekly",  priority: "0.6" },
-  { path: "/contato",    changefreq: "monthly", priority: "0.5" },
-];
-
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&apos;");
-}
-
-/** GET /api/sitemap.xml — full site sitemap including all published articles */
-router.get("/sitemap.xml", (req, res) => {
+/**
+ * GET /api/sitemap.xml — mapa do site com o acervo REAL deste blog.
+ *
+ * A lista de artigos vinha de `store.getArticles()`, um stub que devolve `[]`
+ * desde junho de 2026: o endpoint respondia 200 com XML válido anunciando 14
+ * URLs fixas — 12 delas editorias de outro portal — e ZERO artigos, num blog
+ * com centenas de matérias publicadas.
+ *
+ * As editorias saem do PRÓPRIO acervo: uma editoria com artigo publicado é
+ * página 200 indexável, e uma sem artigo nenhum responde `noindex` (declarada)
+ * ou 404 (não declarada) — nos dois casos ela não pode ser anunciada aqui.
+ * Assim o sitemap acompanha a taxonomia de cada blog sem uma linha de slug
+ * embutida na imagem compartilhada.
+ *
+ * O molde da consulta é o do `sitemap-news.ts`, que já lia o banco.
+ */
+router.get("/sitemap.xml", async (req, res) => {
   const base = `${req.protocol}://${req.get("host")}`;
 
-  const articles = store
-    .getArticles()
-    .filter((a) => a.status === "published");
+  const [articles, cats, legacyTags] = await Promise.all([
+    db
+      .select({
+        id:           articlesTable.id,
+        slug:         articlesTable.slug,
+        publishedAt:  articlesTable.publishedAt,
+        canonicalUrl: articlesTable.canonicalUrl,
+      })
+      .from(articlesTable)
+      .where(eq(articlesTable.status, "published"))
+      .orderBy(desc(articlesTable.publishedAt))
+      // Teto do protocolo (50.000 URLs por arquivo). Corta pelas mais recentes.
+      .limit(SITEMAP_MAX_URLS),
+    db
+      .select({ category: articlesTable.category })
+      .from(articlesTable)
+      .where(and(eq(articlesTable.status, "published"), ne(articlesTable.category, "")))
+      .groupBy(articlesTable.category),
+    /* Artigo legado sem `category` é listado pela editoria da TAG slugificada —
+       mesma regra do filtro de /api/articles. Sem isto, uma editoria que só tem
+       artigo antigo responderia 200 e ficaria fora do sitemap. */
+    db
+      .select({ tag: articlesTable.tag })
+      .from(articlesTable)
+      .where(and(eq(articlesTable.status, "published"), eq(articlesTable.category, "")))
+      .groupBy(articlesTable.tag),
+  ]);
 
-  const staticUrls = STATIC_PAGES.map(
-    (p) =>
-      `  <url>\n    <loc>${escapeXml(base + p.path)}</loc>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`,
-  ).join("\n");
+  const categorySlugs = [
+    ...cats.map((c) => (c.category ?? "").trim().toLowerCase()),
+    ...legacyTags.map((t) => (t.tag ?? "").trim().toLowerCase().replace(/\s+/g, "-")),
+  ];
 
-  const articleUrls = articles
-    .map((a) => {
-      const lastmod = a.updatedAt
-        ? new Date(a.updatedAt).toISOString().split("T")[0]
-        : "";
-      const lastmodTag = lastmod ? `\n    <lastmod>${lastmod}</lastmod>` : "";
-      return `  <url>\n    <loc>${escapeXml(base + "/artigo/" + (a.slug || a.id))}</loc>${lastmodTag}\n    <changefreq>monthly</changefreq>\n    <priority>0.7</priority>\n  </url>`;
-    })
-    .join("\n");
+  const { xml, articleCount, truncated } = buildSitemapXml({ base, articles, categorySlugs });
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${staticUrls}
-${articleUrls}
-</urlset>`;
+  if (truncated > 0) {
+    logger.warn(
+      { truncated, published: articleCount + truncated },
+      "sitemap: acervo acima do limite de 50.000 URLs do protocolo — considerar sitemap index",
+    );
+  }
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  // Mesma janela do sitemap de notícias: o rastreador não paga a consulta a cada visita.
+  res.setHeader("Cache-Control", "public, max-age=900");
   res.send(xml);
 });
 

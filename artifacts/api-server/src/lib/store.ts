@@ -1327,9 +1327,12 @@ export const store = {
       .catch((err: unknown) => logger.error({ err }, "store: failed to track article view"));
   },
 
-  // ── Legacy stubs (kept for backward compatibility) ────────────────────────
-  // Articles are now managed exclusively by articleService + DB.
-  getArticles: (): Article[] => [],
+  /* `getArticles` e `isDuplicateArticle` viviam aqui como stubs que devolviam
+     `[]` e `false` desde junho de 2026, quando os artigos passaram a ser
+     exclusividade do articleService + banco. O sitemap geral continuou chamando
+     o primeiro e por isso publicou ZERO artigos por dois meses, sem erro nenhum.
+     Foram removidos de propósito: um consumidor novo agora quebra no typecheck
+     em vez de receber uma lista vazia em silêncio. */
   isDuplicateArticle: (_title: string, _link?: string, _imageUrl?: string): boolean => false,
 
   // ── Slug utility ──────────────────────────────────────────────────────────
