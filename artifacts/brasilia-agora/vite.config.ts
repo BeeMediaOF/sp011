@@ -11,7 +11,7 @@ import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./s
 import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
 import { isSocialCrawler } from "./src/lib/crawlerUa";
-import { decideCategory } from "./src/lib/routeDecision";
+import { decideArticle, decideCategory } from "./src/lib/routeDecision";
 import { isStaticCandidate, safeRelative } from "./src/lib/staticPath";
 import { sanitizeGtmId, injectGtm } from "./src/lib/gtmSnippet";
 import react from "@vitejs/plugin-react";
@@ -591,6 +591,7 @@ function ssrPlugin(apiBase: string): Plugin {
 
   type CacheEntry =
     | { kind: "html"; html: string; at: number; ttl: number }
+    | { kind: "redirect"; location: string; at: number; ttl: number }
     | { kind: "notFound"; at: number; ttl: number };
 
   const htmlCache = new Map<string, CacheEntry>();
@@ -696,6 +697,8 @@ function ssrPlugin(apiBase: string): Plugin {
    */
   type Outcome =
     | { kind: "html"; html: string }
+    /** Path canônico SEM query: quem responde acrescenta a query da requisição. */
+    | { kind: "redirect"; location: string }
     | { kind: "notFound" }
     | { kind: "unavailable" };
 
@@ -844,6 +847,23 @@ function ssrPlugin(apiBase: string): Plugin {
     const article = (detail.data as { article?: Row } | null)?.article;
     // Payload sem título: a `api` respondeu 200 sem artigo utilizável.
     if (!article || typeof article["title"] !== "string") return { kind: "notFound" };
+
+    /* Canonicalização ANTES de renderizar: `/artigo/<uuid>` e `/artigo/<slug>`
+       serviam a mesma matéria com 200 nos dois, porque o backend resolve por id
+       OU slug. A resolução continua igual — link histórico não pode quebrar —,
+       muda o status. O `Location` sai sem query; quem responde recoloca a da
+       requisição. */
+    const decision = decideArticle({
+      requested: slug,
+      state: "found",
+      article: {
+        slug: typeof article["slug"] === "string" ? article["slug"] : null,
+        id: typeof article["id"] === "string" ? article["id"] : null,
+      },
+    });
+    if (decision.action === "redirect" && decision.location) {
+      return { kind: "redirect", location: decision.location };
+    }
 
     const site: Row | null = s.data && typeof s.data === "object" ? { ...(s.data as Row) } : null;
     const data = {
@@ -1017,7 +1037,7 @@ function ssrPlugin(apiBase: string): Plugin {
              stale que vai segurar o site em pé até o STALE_MAX_MS. Apagar aqui
              seria transformar uma instabilidade em página vazia. */
         if (out.kind === "html") cacheSetHtml(key, out.html, ttl);
-        else if (out.kind === "notFound") htmlCache.delete(key);
+        else if (out.kind === "notFound" || out.kind === "redirect") htmlCache.delete(key);
       })
       .catch(() => { /* mantém o que está em cache até o STALE_MAX_MS */ })
       .finally(() => { revalidating.delete(key); });
@@ -1055,10 +1075,20 @@ function ssrPlugin(apiBase: string): Plugin {
     const cacheControl = route.kind === "home" ? HOME_CACHE_CONTROL : PAGE_CACHE_CONTROL;
     const origin = `${proto}://${host}`;
 
+    /* Query da requisição: não entra na chave do cache (a mesma editoria com
+       ?page=2 devolve o mesmo HTML e o mesmo canonical), mas é recolocada no
+       `Location` do 301 — perder o utm_source de um link compartilhado seria
+       apagar a origem da visita. */
+    const search = (req.url ?? "").slice(pathOnly.length);
+
     const cached = cacheLookup(cacheKey);
     if (cached) {
       if (cached.entry.kind === "notFound") {
         await serveNotFound(req, res, pathOnly);
+        return;
+      }
+      if (cached.entry.kind === "redirect") {
+        sendRedirect(res, `${cached.entry.location}${search}`, pathOnly);
         return;
       }
       sendHtml(res, cached.entry.html, cacheControl);
@@ -1071,6 +1101,13 @@ function ssrPlugin(apiBase: string): Plugin {
         cacheSetHtml(cacheKey, out.html, ttl);
         ssrStats.ok += 1;
         sendHtml(res, out.html, cacheControl);
+        return;
+      }
+      if (out.kind === "redirect") {
+        cacheSet(cacheKey, {
+          kind: "redirect", location: out.location, at: Date.now(), ttl: NOT_FOUND_TTL_MS,
+        });
+        sendRedirect(res, `${out.location}${search}`, pathOnly);
         return;
       }
       if (out.kind === "unavailable") {
@@ -1088,6 +1125,17 @@ function ssrPlugin(apiBase: string): Plugin {
       });
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
     }
+  }
+
+  /** 301 permanente para a URL canônica. Sem corpo — o HEAD recebe o mesmo. */
+  function sendRedirect(res: ServerResponse, location: string, from: string): void {
+    ssrStats.redirect += 1;
+    ssrLog("redirect", 50, ssrStats.redirect, { from, to: location });
+    res.statusCode = 301;
+    res.setHeader("Location", location);
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Content-Length", "0");
+    res.end();
   }
 
   /**
