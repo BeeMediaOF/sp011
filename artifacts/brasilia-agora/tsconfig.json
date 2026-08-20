@@ -1,6 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*"],
+  /* `vite.config.ts` entra no typecheck: ele deixou de ser configuração e passou
+     a carregar a cadeia de middlewares que decide status HTTP, redirect e
+     indexabilidade. Fora daqui, um `Promise<Outcome>` sem `return` no fim
+     compilava e ia para produção — foi o que aconteceu ao escrever o P0 de
+     indexação. Os `*.test.ts` seguem excluídos (rodam por `tsx --test`). */
+  "include": ["src/**/*", "vite.config.ts"],
   "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
   "compilerOptions": {
     "noEmit": true,

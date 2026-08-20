@@ -1498,6 +1498,7 @@ function seoTextPlugin(apiBase: string): Plugin {
  */
 function staticExistsPlugin(): Plugin {
   const distPublic = path.resolve(import.meta.dirname, "dist/public");
+  const base = basePath ?? "/";
   /* Só o resultado POSITIVO é memorizado: o conteúdo de dist/public é imutável
      dentro do container, e cachear ausência daria a um scanner uma forma barata
      de crescer memória. */
@@ -1513,7 +1514,13 @@ function staticExistsPlugin(): Plugin {
       next();
       return;
     }
-    const rel = safeRelative(pathOnly);
+    /* `basePath` é "/" nos 11 blogs, mas se algum dia não for, os assets vivem
+       em `${base}/assets/...` e procurá-los sem tirar o prefixo devolveria 404
+       em arquivo que existe — o pior erro possível neste plugin. */
+    const relPath = base !== "/" && pathOnly.startsWith(base)
+      ? pathOnly.slice(base.length - 1)
+      : pathOnly;
+    const rel = safeRelative(relPath);
     if (rel !== null && fs.existsSync(path.join(distPublic, rel))) {
       if (known.size < 1000) known.add(pathOnly);
       next();
@@ -1626,6 +1633,9 @@ export default defineConfig({
           if (id.includes("node_modules/@radix-ui")) {
             return "vendor-radix";
           }
+          // Explícito: o Rollup trata `undefined` como "sem chunk manual", que
+          // já era o comportamento ao cair fora de todos os `if` acima.
+          return undefined;
         },
       },
     },
