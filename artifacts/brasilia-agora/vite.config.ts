@@ -7,6 +7,7 @@ import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } fro
 import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
 import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
+import { isSocialCrawler } from "./src/lib/crawlerUa";
 import { sanitizeGtmId, injectGtm } from "./src/lib/gtmSnippet";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -37,9 +38,6 @@ if (!basePath) {
     "BASE_PATH environment variable is required but was not provided.",
   );
 }
-
-const CRAWLER_RE =
-  /facebookexternalhit|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|instagram|Googlebot|bingbot|Applebot|vkShare|W3C_Validator/i;
 
 function esc(s: string): string {
   return s
@@ -339,7 +337,13 @@ function socialOgPlugin(apiBase: string): Plugin {
     const url = req.url ?? "";
 
     const match = url.match(/^\/artigo\/([^/?#]+)/);
-    if (!match || !CRAWLER_RE.test(ua)) {
+    /* Duas condições novas (P0 de indexação, 20/08/2026):
+       - `isReadRequest`: um POST em /artigo/* com UA de crawler não pode ser
+         respondido com o card de compartilhamento;
+       - `isSocialCrawler`: BUSCADOR NÃO PASSA POR AQUI. Googlebot e bingbot
+         seguem para o `ssrPlugin` e recebem o mesmo HTML editorial que o
+         navegador recebe. Ver `src/lib/crawlerUa.ts`. */
+    if (!isReadRequest(req) || !match || !isSocialCrawler(ua)) {
       next();
       return;
     }
