@@ -3,7 +3,10 @@ import { defineConfig, type Plugin } from "vite";
    SSR precisa concordar com o App sobre o que é página de editoria e sobre a URL
    exata de cada lista — divergir aqui é renderizar no servidor uma página que o
    cliente hidrata diferente. São TS puro, sem React nem browser. */
-import { resolveCategoryRoute, categoryTitle, smartCase, type MenuItemLike } from "./src/lib/categoryRoutes";
+import {
+  resolveCategoryRoute, categoryRouteForSlug, categoryTitle, smartCase,
+  type MenuItemLike, type CategoryLike,
+} from "./src/lib/categoryRoutes";
 import { articlesUrl, ARTICLES_CATEGORY_LIMIT, ARTICLES_TICKER_LIMIT } from "./src/lib/articlesQuery";
 import { brandNameFromHost } from "./src/lib/blogIdentity";
 import { classifySsrPath, type SsrRoute } from "./src/lib/ssrRoutes";
@@ -718,7 +721,28 @@ function ssrPlugin(apiBase: string): Plugin {
     // barato de multiplicar consultas.
     const s = await fetchJson(`${apiBase}/api/site`);
     const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
-    const route = resolveCategoryRoute(pathOnly, site?.["menuItems"] as MenuItemLike[] | undefined);
+    /* Superfície do PRÓPRIO blog: menu + editorias declaradas no painel
+       (inclusive as ocultas). A tabela fixa das 13 editorias do sp011 só entra
+       quando o blog não declarou nada. */
+    const declared = resolveCategoryRoute(
+      pathOnly,
+      site?.["menuItems"] as MenuItemLike[] | undefined,
+      site?.["categories"] as CategoryLike[] | undefined,
+    );
+    /* Fora da superfície, a segunda pergunta: a editoria TEM CONTEÚDO? Arquivo
+       histórico de blog que mudou de taxonomia continua sendo página real — é o
+       /seguranca do sp011 (163 artigos) e o /copa-do-mundo do Oley (86). A sonda
+       é de 1 item só, e existe para não pagar quatro buscas por path inventado. */
+    const candidate = /^\/[^/]+$/.test(pathOnly.replace(/\/+$/, ""))
+      ? pathOnly.replace(/\/+$/, "").slice(1)
+      : "";
+    let route = declared;
+    if (!route) {
+      if (!candidate || !categoryRouteForSlug(candidate)) return null;
+      const probe = await fetchList(articlesUrl({ category: candidate, limit: 1, sort: "recent" }));
+      if (probe.total === 0) return null;
+      route = categoryRouteForSlug(candidate);
+    }
     if (!route) return null;
 
     const [list, top, recent, d] = (await Promise.all([

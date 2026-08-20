@@ -83,30 +83,107 @@ function flatMenu(items: readonly MenuItemLike[] | undefined): MenuItemLike[] {
   return out;
 }
 
+/** Formato mínimo de uma editoria declarada em `settings.categories`. */
+export interface CategoryLike {
+  name?: string;
+  slug?: string;
+  color?: string;
+  visible?: boolean;
+}
+
 /**
- * Resolve o path de uma página de editoria: editoria fixa primeiro, senão um
- * item do menu apontando para ele. `null` = o path não é página de editoria
- * (no App vira NotFound; no SSR vira `next()` e cai na SPA).
+ * Rótulo e cor de uma editoria. A tabela fixa continua valendo AQUI, e só aqui:
+ * ela descreve como as editorias clássicas do engine se APRESENTAM (o acento de
+ * "SEGURANÇA", a cor do chapéu), o que é independente de a editoria existir ou
+ * não neste blog. Sem este passo, tirar a tabela da resolução de existência
+ * trocaria "SEGURANÇA" por "SEGURANCA" no H1 do sp011.
+ */
+function presentation(path: string, slug: string, label: string, color: string): CategoryRoute {
+  const fixed = FIXED_CATEGORIES.find((c) => c.path === path);
+  return fixed ? { ...fixed } : { path, slug, label, color };
+}
+
+/**
+ * SUPERFÍCIE DE EDITORIAS DO BLOG: os paths de um segmento que existem neste
+ * portal. Responde a UMA pergunta — "esta rota existe?" — e só a ela.
+ *
+ * Três conceitos que não se confundem:
+ *   existir na taxonomia  !=  aparecer na navegação  !=  ser indexável.
+ *
+ * Por isso as editorias com `visible: false` ENTRAM: `visible` é visibilidade
+ * de MENU. É o caso de `copa-do-mundo` no OleySports — 86 artigos publicados
+ * numa editoria que o menu não mostra. Copiar para cá o filtro
+ * `visible !== false` da rota `/api/articles/categories` (aquele é de UI)
+ * apagaria a segunda maior editoria do portal.
+ *
+ * A tabela fixa é REDE DE SEGURANÇA, não regra: entra somente quando o blog não
+ * declarou nada (instalação nova, wizard incompleto). Blog com menu próprio não
+ * herda as 13 editorias do portal que gerou a imagem Docker compartilhada.
+ *
+ * O que esta função NÃO decide: editoria histórica, fora da superfície, mas com
+ * artigos publicados continua existindo. Isso se responde pela CONTAGEM de
+ * artigos — que é dado, não configuração — no middleware de SSR.
+ */
+export function blogCategorySurface(
+  menuItems: readonly MenuItemLike[] | undefined,
+  categories: readonly CategoryLike[] | undefined,
+): CategoryRoute[] {
+  const out: CategoryRoute[] = [];
+  const seen = new Set<string>();
+  const add = (rawSlug: string, label: string, color: string): void => {
+    const slug = rawSlug.trim().replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!slug || slug.includes("/")) return;
+    const path = `/${slug}`;
+    if (RESERVED_PATHS.has(path) || seen.has(path)) return;
+    seen.add(path);
+    out.push(presentation(path, slug, label || slug.toUpperCase(), color));
+  };
+
+  /* 1. Menu do portal primeiro: assim rótulo e cor saem exatamente como a
+        página de editoria já os exibe hoje. */
+  for (const m of flatMenu(menuItems)) {
+    const mp = (m.path ?? "").trim();
+    if (!mp.startsWith("/") || mp === "/") continue; // link externo não é seção
+    add(mp.slice(1), (m.label ?? "").toUpperCase(), colorForSlug(mp.slice(1).replace(/\/+$/, "")));
+  }
+  /* 2. Editorias declaradas no painel, INCLUSIVE as ocultas no menu. */
+  for (const c of categories ?? []) {
+    const slug = (c?.slug ?? "").trim();
+    if (!slug) continue;
+    add(slug, ((c.name ?? "").trim() || slug).toUpperCase(), (c.color ?? "").trim() || colorForSlug(slug));
+  }
+  /* 3. Rede de segurança: blog sem menu E sem categorias declaradas. */
+  if (out.length === 0) return FIXED_CATEGORIES.map((c) => ({ ...c }));
+  return out;
+}
+
+/**
+ * Apresentação de uma editoria que NÃO está na superfície mas tem conteúdo
+ * publicado (arquivo histórico, taxonomia anterior). Quem decide que ela existe
+ * é a contagem de artigos; esta função só resolve como ela aparece.
+ */
+export function categoryRouteForSlug(slug: string): CategoryRoute | null {
+  const s = (slug || "").trim().replace(/^\/+/, "").replace(/\/+$/, "");
+  if (!s || s.includes("/")) return null;
+  const path = `/${s}`;
+  if (RESERVED_PATHS.has(path)) return null;
+  return presentation(path, s, s.replace(/-/g, " ").toUpperCase(), colorForSlug(s));
+}
+
+/**
+ * Resolve o path de uma página de editoria contra a superfície do blog.
+ * `null` = o path não está na superfície — o que NÃO significa "não existe":
+ * falta consultar o conteúdo. Quem faz essa segunda pergunta é o middleware de
+ * SSR (e, no cliente, a semente que ele deixa).
  */
 export function resolveCategoryRoute(
   pathOnly: string,
   menuItems: readonly MenuItemLike[] | undefined,
+  categories?: readonly CategoryLike[] | undefined,
 ): CategoryRoute | null {
   const p = (pathOnly || "").replace(/\/+$/, "");
   if (!/^\/[^/]+$/.test(p) || RESERVED_PATHS.has(p)) return null;
-  const fixed = FIXED_CATEGORIES.find((c) => c.path === p);
-  if (fixed) return fixed;
-  const slug = p.slice(1);
-  for (const m of flatMenu(menuItems)) {
-    const mp = (m.path ?? "").trim();
-    if (!mp.startsWith("/")) continue; // link externo do menu não é seção
-    if (mp === p || mp.replace(/^\//, "").replace(/\/+$/, "") === slug) {
-      // .toUpperCase() e nada de limpeza no rótulo: é o que o DynamicCategory
-      // sempre fez, e o H1 da página precisa sair igual no servidor e no cliente.
-      return { path: p, slug, label: (m.label ?? slug).toUpperCase(), color: colorForSlug(slug) };
-    }
-  }
-  return null;
+  return blogCategorySurface(menuItems, categories).find((c) => c.path === p) ?? null;
 }
 
 /**

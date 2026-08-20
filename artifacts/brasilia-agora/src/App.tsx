@@ -5,7 +5,8 @@ import SEOHead from "@/components/SEOHead";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { useSite } from "@/hooks/useSite";
 import { useT } from "@/lib/i18n";
-import { FIXED_CATEGORIES, resolveCategoryRoute } from "@/lib/categoryRoutes";
+import { resolveCategoryRoute, categoryRouteForSlug } from "@/lib/categoryRoutes";
+import { readCategorySeed } from "@/lib/categorySeed";
 import { lazy, Suspense, useEffect } from "react";
 
 /* ─── Eager — crítico para o carregamento inicial ─── */
@@ -128,8 +129,19 @@ function DynamicCategory({ Page }: { Page: SsrPages["CategoryArchivePage"] }) {
   const { slug } = useParams<{ slug: string }>();
   const { settings, validated } = useSite();
 
-  const route = resolveCategoryRoute(`/${slug ?? ""}`, settings?.menuItems);
+  /* A superfície de editorias inclui as declaradas no painel — inclusive as
+     ocultas no menu — e é a MESMA função que o middleware de SSR consulta. */
+  const route = resolveCategoryRoute(`/${slug ?? ""}`, settings?.menuItems, settings?.categories);
   if (route) return <Page category={route.label} slug={route.slug} color={route.color} />;
+  /* Fora da superfície, mas o SERVIDOR decidiu que a editoria existe por ter
+     conteúdo publicado (arquivo histórico) e deixou a semente. Sem este ramo, a
+     hidratação apagaria a página que o SSR acabou de pintar — é o caso do
+     /seguranca no sp011, 163 artigos fora do menu. */
+  const historic = slug ? readCategorySeed(slug) : null;
+  const historicRoute = historic ? categoryRouteForSlug(slug!) : null;
+  if (historicRoute) {
+    return <Page category={historicRoute.label} slug={historicRoute.slug} color={historicRoute.color} />;
+  }
   /* Menu ainda não confirmado (só o cache do localStorage, que pode ser anterior
      à criação desta editoria) → nada na tela, nunca um "não encontrado" que
      pisca e some. */
@@ -301,13 +313,11 @@ function Router({ pages }: { pages?: SsrPages }) {
 
         {/* ── Public routes ── */}
         <Route path="/" component={Home} />
-        {/* Editorias de rota fixa: eram 13 arquivos de página de 3 linhas, hoje
-            saem da tabela que o middleware de SSR também lê (categoryRoutes). */}
-        {FIXED_CATEGORIES.map((c) => (
-          <Route key={c.path} path={c.path}>
-            <CategoryPage category={c.label} slug={c.slug} color={c.color} />
-          </Route>
-        ))}
+        {/* As 13 rotas fixas saíram daqui: elas faziam TODO blog da rede
+            responder /politica, /cidade, /transporte… mesmo sendo um portal de
+            esporte sem um único artigo nessas editorias. Quem existe agora sai
+            da superfície do próprio blog, resolvida no `/:slug` abaixo pela
+            mesma função que o middleware de SSR usa. */}
         <Route path="/artigo/:slug" component={ArtigoPage} />
         <Route path="/arquivo" component={Archive} />
         <Route path="/contato" component={Contato} />
