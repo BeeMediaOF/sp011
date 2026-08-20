@@ -450,11 +450,81 @@ const HOME_CACHE_CONTROL = "public, max-age=30, stale-while-revalidate=60";
 /* Artigo e editoria mudam menos que a home (a home reordena a cada publicação). */
 const PAGE_CACHE_CONTROL = "public, max-age=60, stale-while-revalidate=120";
 
-function sendHtml(res: ServerResponse, html: string, cacheControl: string): void {
+function sendHtml(res: ServerResponse, html: string, cacheControl: string, status = 200): void {
+  res.statusCode = status;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", cacheControl);
   res.setHeader("Content-Length", String(Buffer.byteLength(html)));
   res.end(html);
+}
+
+/**
+ * Contadores em memória do middleware. Não existe logger estruturado no
+ * container `web` (ele é um `vite preview`), e sem NENHUM sinal uma `api`
+ * instável degrada em silêncio: o visitante vê página vazia e nada acende.
+ */
+const ssrStats = {
+  ok: 0, notFound: 0, redirect: 0, staleServed: 0, unavailable503: 0, staticNotFound: 0,
+};
+
+/**
+ * Log amostrado (1 a cada `every` ocorrências do mesmo evento).
+ * NUNCA registra query string, cookie, header de autenticação ou IP — mesma
+ * disciplina do `pino` do api-server, que serializa `req.url.split("?")[0]`.
+ */
+function ssrLog(
+  event: string,
+  every: number,
+  count: number,
+  fields: Record<string, string | number>,
+): void {
+  if ((count - 1) % every !== 0) return;
+  const parts = Object.entries(fields).map(([k, v]) => `${k}=${v}`).join(" ");
+  const line = `[ssr] ${event} ${parts} n=${count}`;
+  if (event === "apiUnavailable" || event === "staleServed") console.warn(line);
+  else console.log(line);
+}
+
+/** Como servir o shell da SPA numa resposta que não é o 200 de sempre. */
+interface ShellOptions {
+  status?: number;
+  cacheControl?: string;
+  /** Headers extras (o `Retry-After` do 503). */
+  headers?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Serve o `index.html` buildado com o `<head>` do blog da requisição.
+ *
+ * Era código exclusivo do `spaHeadPlugin`; virou fábrica compartilhada porque o
+ * `ssrPlugin` também precisa devolver o shell — com outro status — quando a
+ * `api` está indisponível. Uma implementação só evita que as duas respostas
+ * divirjam na identidade do portal.
+ */
+function makeShellRenderer(apiBase: string): (
+  req: IncomingMessage,
+  res: ServerResponse,
+  opts?: ShellOptions,
+) => Promise<boolean> {
+  const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
+  const resolveSiteMeta = makeSiteMetaResolver(apiBase);
+  let template: string | null = null;
+
+  return async (req, res, opts = {}) => {
+    try {
+      if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
+      const pathOnly = (req.url ?? "").split("?")[0] ?? "";
+      const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
+      const host = req.headers.host ?? "";
+      const meta = await resolveSiteMeta(host);
+      const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
+      for (const [k, v] of Object.entries(opts.headers ?? {})) res.setHeader(k, v);
+      sendHtml(res, html, opts.cacheControl ?? "no-cache, must-revalidate", opts.status ?? 200);
+      return true;
+    } catch {
+      return false;
+    }
+  };
 }
 
 /**
@@ -470,6 +540,7 @@ function sendHtml(res: ServerResponse, html: string, cacheControl: string): void
 function ssrPlugin(apiBase: string): Plugin {
   const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
   const ssrEntry = path.resolve(import.meta.dirname, "dist/server/entry-server.js");
+  const serveShell = makeShellRenderer(apiBase);
   let template: string | null = null;
   let renderFn: ((url: string, data: unknown) => string) | null = null;
 
@@ -512,24 +583,65 @@ function ssrPlugin(apiBase: string): Plugin {
     }
   }
 
-  async function fetchJson(u: string): Promise<unknown> {
+  /**
+   * Resposta da `api` com TRÊS estados, e não dois.
+   *
+   * "Não existe" e "não deu para saber" são coisas diferentes, e confundi-las é
+   * o defeito mais caro que este middleware pode ter: um timeout ou um 5xx
+   * respondido como 404 tira do índice conteúdo que está publicado. Só o 404
+   * EXPLÍCITO da `api` é autoritativo — ela sabe distinguir (o app responde 503
+   * `db_unavailable`/`setup_required` antes do router e 404 no artigo que não
+   * existe).
+   */
+  type Fetched<T> =
+    | { state: "ok"; data: T }
+    | { state: "notFound" }
+    | { state: "unavailable" };
+
+  async function fetchJson(u: string): Promise<Fetched<unknown>> {
     try {
       const r = await fetch(u);
-      return r.ok ? await r.json() : null;
+      if (r.ok) return { state: "ok", data: await r.json() };
+      if (r.status === 404) return { state: "notFound" };
+      // 5xx, 503 de banco não hidratado, 429: indisponibilidade, não ausência.
+      return { state: "unavailable" };
     } catch {
-      return null;
+      return { state: "unavailable" };
     }
   }
 
+  /** Payload quando existe; `null` para ausência E para falha. Só onde a
+   *  ausência é aceitável e não muda o status da página (anúncios). */
+  function dataOrNull(f: Fetched<unknown>): unknown {
+    return f.state === "ok" ? f.data : null;
+  }
+
   type Row = Record<string, unknown>;
+  interface ListPage { articles: Row[]; total: number }
 
   /** Uma página de /api/articles, já sem os campos que o site não usa. */
-  async function fetchList(query: string): Promise<{ articles: Row[]; total: number }> {
-    const raw = (await fetchJson(`${apiBase}${query}`)) as { articles?: unknown[]; total?: number } | null;
+  async function fetchList(query: string): Promise<Fetched<ListPage>> {
+    const res = await fetchJson(`${apiBase}${query}`);
+    if (res.state !== "ok") return res;
+    const raw = res.data as { articles?: unknown[]; total?: number } | null;
     const rows = Array.isArray(raw?.articles) ? (raw.articles as Row[]) : [];
     const articles = rows.map((a) => { const copy = { ...a }; delete copy["keywords"]; return copy; });
-    return { articles, total: typeof raw?.total === "number" ? raw.total : articles.length };
+    return {
+      state: "ok",
+      data: { articles, total: typeof raw?.total === "number" ? raw.total : articles.length },
+    };
   }
+
+  /**
+   * O que o middleware deve responder para uma rota. Substitui o `string | null`
+   * de antes, em que "não existe", "está fora do ar" e "não é rota de SSR"
+   * chegavam ao handler como o MESMO valor — e por isso viravam a mesma
+   * resposta 200.
+   */
+  type Outcome =
+    | { kind: "html"; html: string }
+    | { kind: "notFound" }
+    | { kind: "unavailable" };
 
   /** Carrega o bundle de SSR e o template uma única vez por processo. */
   async function ensureRuntime(): Promise<(url: string, data: unknown) => string> {
@@ -580,21 +692,25 @@ function ssrPlugin(apiBase: string): Plugin {
     return html.replace(/<html lang="[^"]*"/, `<html lang="${lang}"`);
   }
 
-  async function renderHome(origin: string): Promise<string | null> {
+  async function renderHome(origin: string): Promise<Outcome> {
     const render = await ensureRuntime();
-    const [a, s, d] = (await Promise.all([
+    const [a, s, d] = await Promise.all([
       // Pool de origem do SSR: 300 recentes bastam para os 22 blocos + o
       // complemento por categoria abaixo (a rota é paginada — PRD-PERF-01).
       fetchList("/api/articles?limit=300&offset=0&sort=recent"),
       fetchJson(`${apiBase}/api/site`),
       fetchJson(`${apiBase}/api/ads`),
-    ])) as [{ articles: Row[] }, unknown, { ads?: unknown[] } | null];
+    ]);
+    /* A home nunca "não existe": ou ela tem o conteúdo do portal, ou a `api`
+       está fora — e aí a resposta é 503, nunca uma página vazia com 200.
+       Anúncio de fora não derruba a página. */
+    if (a.state !== "ok" || s.state !== "ok") return { kind: "unavailable" };
 
     /* O /api/site publica os campos de imagem como URLs pequenas
        (/api/site-asset/…) em vez de data URI — o __SSR_DATA__ pode levar as
        settings inteiras sem inchar o HTML, e o header/rodapé do SSR já saem
        com a logo certa (sem flash da marca default na hidratação). */
-    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    const site: Row | null = s.data && typeof s.data === "object" ? { ...(s.data as Row) } : null;
     /* O __SSR_DATA__ duplica os artigos (já renderizados no appHtml) como JSON
        para a hidratação. A home exibe ~60 itens (mais recentes por seção), então
        inlinear a lista INTEIRA incha o documento à toa. Limitamos aos 100 mais
@@ -604,7 +720,7 @@ function ssrPlugin(apiBase: string): Plugin {
        16,5 KB e o __SSR_DATA__ foi de 70.923 B para 86.921 B — o oposto do
        objetivo. As editorias de baixo volume são cobertas pelo pool por
        categoria abaixo, não pelo tamanho deste corte. */
-    const articles = a.articles
+    const articles = a.data.articles
       .slice()
       .sort((x, y) => new Date(String(y["publishedAt"] ?? 0)).getTime() - new Date(String(x["publishedAt"] ?? 0)).getTime())
       .slice(0, 100);
@@ -632,7 +748,9 @@ function ssrPlugin(apiBase: string): Plugin {
       )));
       const have = new Set(articles.map((art) => String(art["id"])));
       for (const pool of pools) {
-        for (const raw of pool.articles) {
+        // Complemento por editoria: falha aqui não invalida a home.
+        if (pool.state !== "ok") continue;
+        for (const raw of pool.data.articles) {
           const id = String(raw["id"]);
           if (have.has(id)) continue;
           have.add(id);
@@ -641,40 +759,48 @@ function ssrPlugin(apiBase: string): Plugin {
       }
     }
 
-    const data = { articles, site, ads: d?.ads ?? [], origin };
+    const data = { articles, site, ads: (dataOrNull(d) as { ads?: unknown[] } | null)?.ads ?? [], origin };
     const meta = site ? metaFromSitePayload(site) : null;
-    return compose(render("/", data), data, (html) =>
+    const html = compose(render("/", data), data, (h) =>
       meta
-        ? rewriteHeadMeta(html, meta, origin, "/", [`<link rel="canonical" href="${esc(`${origin}/`)}">`])
-        : langOnly(html, site));
+        ? rewriteHeadMeta(h, meta, origin, "/", [`<link rel="canonical" href="${esc(`${origin}/`)}">`])
+        : langOnly(h, site));
+    return { kind: "html", html };
   }
 
-  async function renderArticle(slug: string, origin: string): Promise<string | null> {
+  async function renderArticle(slug: string, origin: string): Promise<Outcome> {
     const render = await ensureRuntime();
-    const [detail, list, s, d] = (await Promise.all([
+    const [detail, list, s, d] = await Promise.all([
       // Slug CRU, exatamente como o useArticle do cliente pede.
       fetchJson(`${apiBase}/api/articles/${slug}`),
       fetchList(articlesUrl({ limit: ARTICLES_TICKER_LIMIT, offset: 0, sort: "recent" })),
       fetchJson(`${apiBase}/api/site`),
       fetchJson(`${apiBase}/api/ads`),
-    ])) as [{ article?: Row } | null, { articles: Row[] }, unknown, { ads?: unknown[] } | null];
+    ]);
 
-    const article = detail?.article;
-    // Artigo inexistente/despublicado → SPA (que mostra "notícia não encontrada").
-    if (!article || typeof article["title"] !== "string") return null;
+    /* 404 da `api` é AUTORITATIVO: o artigo foi despublicado ou apagado. É o
+       único caminho que autoriza um 404 na borda. */
+    if (detail.state === "notFound") return { kind: "notFound" };
+    if (detail.state !== "ok" || s.state !== "ok" || list.state !== "ok") {
+      return { kind: "unavailable" };
+    }
 
-    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    const article = (detail.data as { article?: Row } | null)?.article;
+    // Payload sem título: a `api` respondeu 200 sem artigo utilizável.
+    if (!article || typeof article["title"] !== "string") return { kind: "notFound" };
+
+    const site: Row | null = s.data && typeof s.data === "object" ? { ...(s.data as Row) } : null;
     const data = {
-      articles: list.articles,
+      articles: list.data.articles,
       site,
-      ads: d?.ads ?? [],
+      ads: (dataOrNull(d) as { ads?: unknown[] } | null)?.ads ?? [],
       origin,
       article: { key: slug, article },
     };
 
     const meta = site ? metaFromSitePayload(site) : null;
     const url = `${origin}/artigo/${String(article["slug"] ?? article["id"] ?? slug)}`;
-    return compose(render(`/artigo/${slug}`, data), data, (html) => {
+    const html = compose(render(`/artigo/${slug}`, data), data, (html) => {
       if (!meta) return langOnly(html, site);
       const title = stripHtml(String(article["title"] ?? ""));
       // Mesmos recortes do <head> que a página aplica no cliente (Artigo.tsx):
@@ -714,13 +840,16 @@ function ssrPlugin(apiBase: string): Plugin {
     });
   }
 
-  async function renderCategory(pathOnly: string, origin: string): Promise<string | null> {
+  async function renderCategory(pathOnly: string, origin: string): Promise<Outcome> {
     const render = await ensureRuntime();
     // O /api/site vem ANTES do resto: sem ele não dá para saber se este slug é
     // editoria, e buscar as listas de um path qualquer daria a bots um jeito
     // barato de multiplicar consultas.
     const s = await fetchJson(`${apiBase}/api/site`);
-    const site: Row | null = s && typeof s === "object" ? { ...(s as Row) } : null;
+    // Sem as settings não se sabe QUAIS editorias existem — e chutar aqui é
+    // exatamente o erro que este PRD corrige. Indisponível, nunca inexistente.
+    if (s.state !== "ok") return { kind: "unavailable" };
+    const site: Row | null = s.data && typeof s.data === "object" ? { ...(s.data as Row) } : null;
     /* Superfície do PRÓPRIO blog: menu + editorias declaradas no painel
        (inclusive as ocultas). A tabela fixa das 13 editorias do sp011 só entra
        quando o blog não declarou nada. */
@@ -738,41 +867,45 @@ function ssrPlugin(apiBase: string): Plugin {
       : "";
     let route = declared;
     if (!route) {
-      if (!candidate || !categoryRouteForSlug(candidate)) return null;
+      if (!candidate || !categoryRouteForSlug(candidate)) return { kind: "notFound" };
       const probe = await fetchList(articlesUrl({ category: candidate, limit: 1, sort: "recent" }));
-      if (probe.total === 0) return null;
+      if (probe.state !== "ok") return { kind: "unavailable" };
+      if (probe.data.total === 0) return { kind: "notFound" };
       route = categoryRouteForSlug(candidate);
     }
-    if (!route) return null;
+    if (!route) return { kind: "notFound" };
 
-    const [list, top, recent, d] = (await Promise.all([
+    const [list, top, recent, d] = await Promise.all([
       fetchList(articlesUrl({ category: route.slug, limit: ARTICLES_CATEGORY_LIMIT, sort: "recent" })),
       // "Mais lidas" da sidebar é do SITE INTEIRO, não da editoria.
       fetchList(articlesUrl({ limit: 5, sort: "views" })),
       // Lista curta que o chrome (TopBar) lê via useArticles em rota não-home.
       fetchList(articlesUrl({ limit: ARTICLES_TICKER_LIMIT, offset: 0, sort: "recent" })),
       fetchJson(`${apiBase}/api/ads`),
-    ])) as [{ articles: Row[]; total: number }, { articles: Row[] }, { articles: Row[] }, { ads?: unknown[] } | null];
+    ]);
+    if (list.state !== "ok" || top.state !== "ok" || recent.state !== "ok") {
+      return { kind: "unavailable" };
+    }
 
     const data = {
-      articles: recent.articles,
+      articles: recent.data.articles,
       site,
-      ads: d?.ads ?? [],
+      ads: (dataOrNull(d) as { ads?: unknown[] } | null)?.ads ?? [],
       origin,
       category: {
         slug: route.slug,
-        articles: list.articles,
-        total: list.total,
-        mostRead: top.articles.map((a) => ({
+        articles: list.data.articles,
+        total: list.data.total,
+        mostRead: top.data.articles.map((a) => ({
           id: String(a["id"]), slug: String(a["slug"] ?? a["id"]), title: String(a["title"] ?? ""),
         })),
       },
     };
 
     const meta = site ? metaFromSitePayload(site) : null;
-    return compose(render(route.path, data), data, (html) =>
+    const html = compose(render(route.path, data), data, (h) =>
       meta
-        ? applyHead(html, {
+        ? applyHead(h, {
             lang: meta.lang,
             title: categoryTitle(route.label, meta.siteName),
             description: meta.seoDescription,
@@ -782,10 +915,11 @@ function ssrPlugin(apiBase: string): Plugin {
             extraTags: [`<link rel="canonical" href="${esc(`${origin}${route.path}`)}">`],
             gtmId: meta.gtmId,
           })
-        : langOnly(html, site));
+        : langOnly(h, site));
+    return { kind: "html", html };
   }
 
-  function renderRoute(route: SsrRoute, pathOnly: string, origin: string): Promise<string | null> {
+  function renderRoute(route: SsrRoute, pathOnly: string, origin: string): Promise<Outcome> {
     return route.kind === "home" ? renderHome(origin)
       : route.kind === "article" ? renderArticle(route.slug, origin)
       : renderCategory(pathOnly, origin);
@@ -804,11 +938,15 @@ function ssrPlugin(apiBase: string): Plugin {
     if (revalidating.has(key)) return;
     revalidating.add(key);
     renderRoute(route, pathOnly, origin)
-      .then((html) => {
-        // null = a rota deixou de existir (artigo despublicado): tira do cache
-        // para a próxima requisição cair na SPA em vez de servir o velho.
-        if (html === null) htmlCache.delete(key);
-        else cacheSet(key, html, ttl);
+      .then((out) => {
+        /* A distinção decide se o visitante seguinte vê a página velha ou não:
+           - notFound: a rota deixou de existir (artigo despublicado) e o 404 da
+             `api` é autoritativo → invalida, para não servir conteúdo morto;
+           - unavailable: a `api` está fora → MANTÉM o cache, que é justamente o
+             stale que vai segurar o site em pé até o STALE_MAX_MS. Apagar aqui
+             seria transformar uma instabilidade em página vazia. */
+        if (out.kind === "html") cacheSet(key, out.html, ttl);
+        else if (out.kind === "notFound") htmlCache.delete(key);
       })
       .catch(() => { /* mantém o que está em cache até o STALE_MAX_MS */ })
       .finally(() => { revalidating.delete(key); });
@@ -841,16 +979,59 @@ function ssrPlugin(apiBase: string): Plugin {
       return;
     }
     try {
-      const html = await renderRoute(route, pathOnly, origin);
-      if (html === null) {
-        next();
+      const out = await renderRoute(route, pathOnly, origin);
+      if (out.kind === "html") {
+        cacheSet(cacheKey, out.html, ttl);
+        ssrStats.ok += 1;
+        sendHtml(res, out.html, cacheControl);
         return;
       }
-      cacheSet(cacheKey, html, ttl);
-      sendHtml(res, html, cacheControl);
-    } catch {
+      if (out.kind === "unavailable") {
+        await serveUnavailable(req, res, pathOnly);
+        return;
+      }
+      next(); // notFound: por enquanto continua caindo no shell da SPA
+    } catch (err) {
+      ssrLog("renderError", 1, 1, {
+        path: pathOnly,
+        msg: err instanceof Error ? err.message : "erro desconhecido",
+      });
       next(); // qualquer falha → cai para o index.html cru (SPA client-only)
     }
+  }
+
+  /**
+   * `api` indisponível e SEM HTML em cache para servir: 503 com `Retry-After`.
+   *
+   * NUNCA 404 (indisponibilidade não é ausência) e nunca 200 com página vazia —
+   * um 200 sem conteúdo é o próprio defeito que este middleware existe para
+   * corrigir, e ainda esconde o incidente de qualquer monitoramento. O 503 é
+   * curto, tratado como transitório pelos buscadores e visível em qualquer
+   * métrica de status.
+   *
+   * O caminho do stale é o do cache acima: uma entrada dentro da janela de 10
+   * min é servida ANTES de qualquer nova busca à `api`, e o `revalidate` a
+   * preserva enquanto a `api` não voltar.
+   */
+  async function serveUnavailable(
+    req: IncomingMessage,
+    res: ServerResponse,
+    pathOnly: string,
+  ): Promise<void> {
+    ssrStats.unavailable503 += 1;
+    ssrLog("apiUnavailable", 10, ssrStats.unavailable503, { path: pathOnly, upstream: "api" });
+    const served = await serveShell(req, res, {
+      status: 503,
+      cacheControl: "no-store",
+      headers: { "Retry-After": "60" },
+    });
+    if (served) return;
+    // Sem nem o shell (build incompleto): texto puro, mas com o status certo.
+    res.statusCode = 503;
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Retry-After", "60");
+    res.setHeader("Cache-Control", "no-store");
+    res.end("503 Service Unavailable");
   }
 
   return {
@@ -875,9 +1056,9 @@ function ssrPlugin(apiBase: string): Plugin {
  * Falha → index.html cru.
  */
 function spaHeadPlugin(apiBase: string): Plugin {
-  const clientIndex = path.resolve(import.meta.dirname, "dist/public/index.html");
-  const resolveSiteMeta = makeSiteMetaResolver(apiBase);
-  let template: string | null = null;
+  /* Mesma fábrica que o ssrPlugin usa para o 503: um só lugar monta o shell com
+     a identidade do blog. */
+  const serveShell = makeShellRenderer(apiBase);
 
   async function handleSpaRoute(
     req: IncomingMessage,
@@ -891,16 +1072,7 @@ function spaHeadPlugin(apiBase: string): Plugin {
       next();
       return;
     }
-    try {
-      if (template === null) template = fs.readFileSync(clientIndex, "utf-8");
-      const proto = (req.headers["x-forwarded-proto"] as string) ?? "https";
-      const host = req.headers.host ?? "";
-      const meta = await resolveSiteMeta(host);
-      const html = rewriteHeadMeta(template, meta, `${proto}://${host}`, pathOnly);
-      sendHtml(res, html, "no-cache, must-revalidate");
-    } catch {
-      next();
-    }
+    if (!(await serveShell(req, res))) next();
   }
 
   return {
