@@ -653,6 +653,43 @@ montada no servidor.
   SERVIDOR relendo o dono de cada artigo — nunca confiar no payload. Na tela de
   Artigos a caixinha do cabeçalho marca só A PÁGINA; "selecionar os N do filtro"
   é um segundo clique (padrão do Gmail), senão um clique apagaria 600 artigos.
+- **URL, indexação e sitemap** (2026-08-21, P0 do OleySports, imagem v98):
+  cinco invariantes que valem para a rede inteira, porque a imagem é uma só.
+  - **Buscador e navegador recebem o MESMO HTML.** O pré-render social
+    (`socialOgPlugin`, `vite.config.ts`) só atende crawler SOCIAL —
+    `SOCIAL_CRAWLER_RE` em `brasilia-agora/src/lib/crawlerUa.ts`. Googlebot,
+    bingbot e Applebot saíram de lá e caem no SSR normal; antes recebiam um
+    stub de 3 KB com `window.location.replace` (divergência por User-Agent, o
+    achado F-26). A verificação válida é `curl -A 'Googlebot/2.1 ...'` — o
+    "Testar URL ativa" do Search Console usa `Google-InspectionTool`, que
+    **não** casa o regex e mascara o defeito.
+  - **Existir, aparecer no menu e ser indexável são coisas diferentes.**
+    `blogCategorySurface`/`resolveCategoryRoute` (`lib/categoryRoutes.ts`)
+    montam a superfície por blog a partir de `settings.categories` ∪ menu —
+    `visible:false` é navegação, NÃO existência, e por isso a superfície
+    **não copia** o filtro `visible !== false` de `routes/articles.ts`.
+    Quatro classes: declarada com conteúdo → 200; declarada e vazia → 200 +
+    `noindex`; fora do menu mas com artigos → **200 indexável** (é o
+    `/seguranca` do sp011, 163 artigos); nem declarada nem com conteúdo →
+    404. A resolução por conteúdo só vale em slug canônico
+    (`CONTENT_SLUG_RE`), senão `/FUTEBOL` duplicaria `/futebol`.
+    `FIXED_CATEGORIES` só entra quando o blog não declara NADA.
+  - **Falha de infraestrutura nunca vira ausência.** O `fetch` do SSR é
+    tri-estado (achou / não achou / indisponível): timeout, 5xx e
+    ECONNREFUSED servem HTML stale (janela de 10 min) ou **503 +
+    `Retry-After: 60` + `no-store`** — nunca 404, nunca 200 vazio. Só um 404
+    explícito da api vira 404 público, e ele invalida a entrada do cache.
+  - **Path com extensão que não existe em `dist/public` responde 404**
+    (`staticExistsPlugin`, registrado por ÚLTIMO para `/robots.txt`,
+    `/llms.txt` e `/sitemap.xml` já terem sido respondidos). O `appType`
+    padrão do Vite é `spa`: antes disso `/wp-login.php` e
+    `/assets/inexistente.js` devolviam o `index.html` com 200.
+  - **Sitemap** `/api/sitemap.xml` sai do banco (artigos publicados +
+    editorias indexáveis), `lastmod` = `publishedAt` (`updatedAt` é alterado
+    em massa por rotinas de manutenção — `articleService.ts`), `max-age=900`,
+    teto de 50.000 URLs com log. `/sitemap.xml` → 301 para ele;
+    `/sitemap_index.xml` → 404. Nenhuma URL publicada no sitemap pode
+    responder 301, 404 ou `noindex`.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 
