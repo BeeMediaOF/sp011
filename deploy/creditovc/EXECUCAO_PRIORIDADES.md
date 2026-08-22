@@ -212,6 +212,17 @@ parsers que só honram o primeiro ignorarem o `Disallow: /admin`); as duas linha
 do `<title>` novos, e as regras da central já classificam para ela
 (`rules_keywords.sql`, prioridade 28).
 
+Enquanto não há conteúdo, o link dela no **rodapé** é um `noindex` publicado na
+home. O script tira o link (e **recusa rodar** se `/score` já tiver artigo):
+
+```bash
+cd /opt/sp011
+docker compose exec -T -e PGCLIENTENCODING=UTF8 pg-blogs psql -U postgres -d creditovc -v ON_ERROR_STOP=1 < deploy/creditovc/score_rodape.sql
+```
+
+O SQL de restauração está comentado no fim do próprio arquivo — **nada devolve
+o link sozinho** quando a editoria receber a primeira pauta.
+
 ### 9.4 Etapa 7 — o segundo `<h1>` da home
 
 Painel → **Home + menu** → bloco **"HTML Personalizado"** (o ticker de
@@ -219,8 +230,14 @@ indicadores, ~15 KB) → trocar `<h1 class="ticker-heading-title">` por
 `<h2 class="ticker-heading-title">` e o `</h1>` correspondente por `</h2>`.
 O CSS casa por classe: o visual não muda.
 
-**Não fazer por SQL** — 15 KB de HTML com aspas, `<style>` e escapes; um
-`jsonb_set` mal formado corrompe o bloco inteiro.
+**Ou por SQL**, que é o caminho mais seguro dos dois — o script não digita HTML
+nenhum: o valor novo sai de `replace()` sobre o próprio campo e volta por
+`to_jsonb()`, que escapa sozinho.
+
+```bash
+cd /opt/sp011
+docker compose exec -T -e PGCLIENTENCODING=UTF8 pg-blogs psql -U postgres -d creditovc -v ON_ERROR_STOP=1 < deploy/creditovc/ticker_h1_h2.sql
+```
 
 ```bash
 curl -s https://credito.vc/ | grep -o '<h1' | wc -l
@@ -234,6 +251,15 @@ O JSON-LD declara `"author":{"@type":"Person","name":"Crédito.vc"}` — uma
 organização declarada como pessoa. Dois caminhos legítimos, ambos no painel:
 cadastrar **pessoa real** (`settings.columnists` + `articles.columnist_id`,
 perfil `columnist`) ou assinar **"Redação Crédito.vc"**.
+
+A segunda é SQL — grava `settings.bylineName`, que é o terceiro elo da cadeia
+`columnist → autor explícito → bylineName → siteName` usada **tanto** pelo
+JSON-LD **quanto** pela assinatura visível (`Artigo.tsx:540` e `:700`):
+
+```bash
+cd /opt/sp011
+docker compose exec -T -e PGCLIENTENCODING=UTF8 pg-blogs psql -U postgres -d creditovc -v ON_ERROR_STOP=1 < deploy/creditovc/autoria_redacao.sql
+```
 
 > **Limite:** não inventar jornalistas. Nome fictício com página de perfil é
 > fabricação de sinal de E-E-A-T, e é o padrão que alimenta classificação de

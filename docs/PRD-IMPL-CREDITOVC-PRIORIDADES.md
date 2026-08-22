@@ -30,9 +30,9 @@ alteração no repositório de código.
 | 3 | Rodapé com link 404 e três rótulos para a mesma URL | SQL · `site_settings.footerConfig` | `CVC-06`, `CVC-14` | ✔ 22/08 |
 | 4 | Capas hotlinkadas de terceiros | Painel, artigo a artigo | `CVC-02` | pendente |
 | 5 | `robots.txt` bloqueando IA | Painel do Cloudflare | `CVC-05` | pendente |
-| 6 | Três editorias vazias na navegação | Decisão editorial + SQL | `CVC-07` | pendente |
-| 7 | Segundo `<h1>` na home | Painel · bloco HTML | `CVC-12` | pendente |
-| 8 | Autoria genérica | Painel · colunistas | `CVC-11` | pendente |
+| 6 | Três editorias vazias na navegação | SQL · `score_rodape.sql` + conteúdo | `CVC-07` | parcial |
+| 7 | Segundo `<h1>` na home | SQL · `ticker_h1_h2.sql` | `CVC-12` | pendente |
+| 8 | Autoria genérica | SQL · `autoria_redacao.sql` (+ painel) | `CVC-11` | parcial |
 
 ### 0.2 O que ficou de fora, e por quê
 
@@ -529,6 +529,13 @@ um dos três termos da nova identidade do portal
 **Depois da Etapa 2 (Variante A), as duas últimas já saem do menu e viram 404
 automaticamente.** Nada a fazer, a menos que se decida dar conteúdo a elas.
 
+Sobra `/score`, que continua **linkada no rodapé** — e o rodapé é renderizado na
+home, então isso viola o critério 6 ("zero `noindex` entre as rotas linkadas").
+`deploy/creditovc/score_rodape.sql` remove o link enquanto a editoria estiver
+vazia, com guarda que **recusa rodar** se `/score` já tiver artigo, e traz o SQL
+de restauração comentado no fim. É a metade barata: a correção de verdade é
+conteúdo.
+
 Para `/score`, o caminho recomendado é conteúdo, não remoção — inclusive porque
 a central já classifica para essa editoria e as regras de `rules_keywords.sql`
 têm `score` com prioridade 28.
@@ -562,9 +569,18 @@ Painel → *Home + menu* → bloco "HTML Personalizado" → trocar
 (e o `</h1>` correspondente por `</h2>`). O CSS casa por classe, então o visual
 não muda.
 
-**Não fazer por SQL.** O HTML tem 15 KB com aspas, `<style>` e escapes — um
-`jsonb_set` mal formado corrompe o bloco inteiro. A edição no painel é mais
-segura e leva menos tempo.
+**Revisão de 22/08 — isto virou SQL:** `deploy/creditovc/ticker_h1_h2.sql`.
+
+A objeção original era "15 KB de HTML com aspas, `<style>` e escapes; um
+`jsonb_set` mal formado corrompe o bloco". Ela vale para `jsonb_set` com um
+**literal escrito à mão** — e é aí que ela para de valer. O script não digita
+HTML nenhum: o valor novo sai de `replace()` sobre o próprio campo e volta por
+`to_jsonb()`, que escapa sozinho. Sem literal, sem escape manual, sem risco de
+aspa. Editar 15 KB numa textarea é que é o caminho arriscado.
+
+A guarda prévia exige **um** bloco com `ticker-heading-title` contendo
+exatamente **um** `<h1` e **um** `</h1>` — com 1 e 1 não há ambiguidade sobre
+qual fechamento pertence a qual abertura. A posterior aborta se sobrar `<h1`.
 
 ### 8.3 Critério de aceite
 
@@ -609,6 +625,7 @@ Dois caminhos legítimos:
 
 | Parte | Onde |
 |---|---|
+| Assinar "Redação Crédito.vc" (`settings.bylineName`) | **SQL** — `deploy/creditovc/autoria_redacao.sql` |
 | Cadastrar autor real e vincular aos artigos | **Painel** — esta etapa |
 | `@type` correto, `author.url`, `publisher.url`, `publisher.logo` real | **Código** — P1 do OleySports (`P1-4`) |
 
