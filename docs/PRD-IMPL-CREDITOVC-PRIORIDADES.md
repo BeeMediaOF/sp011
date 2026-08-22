@@ -76,7 +76,7 @@ echo "== h1 na home ==" && grep -o '<h1' cvc0.html | wc -l
 ```bash
 cd /opt/sp011
 docker compose exec -T pg-blogs psql -U postgres -d creditovc -At -c \
-"SELECT category, count(*) FILTER (WHERE published) FROM articles GROUP BY category ORDER BY 2 DESC;"
+"SELECT category, count(*) FILTER (WHERE status = 'published') FROM articles GROUP BY category ORDER BY 2 DESC;"
 ```
 
 Essa contagem é **pré-requisito das Etapas 1, 2 e 6** — sem ela não dá para
@@ -373,7 +373,7 @@ Levantamento de 22/08, 209 dos 223 artigos publicados:
 ```bash
 cd /opt/sp011
 docker compose exec -T pg-blogs psql -U postgres -d creditovc -c \
-"SELECT slug, image_url FROM articles WHERE published AND image_url !~ '^https?://(credito\.vc|central\.midia\.run)/' ORDER BY slug;"
+"SELECT slug, image_url FROM articles WHERE status = 'published' AND image_url !~ '^https?://(credito\.vc|central\.midia\.run)/' ORDER BY slug;"
 ```
 
 ### 5.2 Ordem de execução
@@ -395,7 +395,7 @@ Painel → Artigos → editar capa. Nesta ordem, que é a de risco decrescente:
 ```bash
 cd /opt/sp011
 docker compose exec -T pg-blogs psql -U postgres -d creditovc -At -c \
-"SELECT image_url, count(*) FROM articles WHERE published GROUP BY image_url HAVING count(*) > 1 ORDER BY 2 DESC;"
+"SELECT image_url, count(*) FROM articles WHERE status = 'published' GROUP BY image_url HAVING count(*) > 1 ORDER BY 2 DESC;"
 ```
 
 Capa repetida em vários artigos é a assinatura de um card institucional de

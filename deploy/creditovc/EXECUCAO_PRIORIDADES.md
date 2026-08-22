@@ -54,7 +54,7 @@ Os três arquivos são JSON puro, sem segredo — `homeBlocks`, `menu_items` e
 
 ```bash
 cd /opt/sp011
-docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT category, count(*) FILTER (WHERE published) AS publicados FROM articles GROUP BY category ORDER BY 2 DESC;"
+docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT category, count(*) FILTER (WHERE status = 'published') AS publicados FROM articles GROUP BY category ORDER BY 2 DESC;"
 ```
 
 **Regra de decisão:** se `credito`, `organizar-financas` ou `investimentos`
@@ -169,8 +169,8 @@ Lista autoritativa do que trocar, em ordem de risco decrescente:
 
 ```bash
 cd /opt/sp011
-docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT slug, image_url FROM articles WHERE published AND image_url !~ '^https?://(credito\.vc|central\.midia\.run)/' ORDER BY (image_url LIKE 'http://%') DESC, slug;"
-docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT image_url, count(*) FROM articles WHERE published GROUP BY image_url HAVING count(*) > 1 ORDER BY 2 DESC;"
+docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT slug, image_url FROM articles WHERE status = 'published' AND image_url !~ '^https?://(credito\.vc|central\.midia\.run)/' ORDER BY (image_url LIKE 'http://%') DESC, slug;"
+docker compose exec -T pg-blogs psql -U postgres -d creditovc -c "SELECT image_url, count(*) FROM articles WHERE status = 'published' GROUP BY image_url HAVING count(*) > 1 ORDER BY 2 DESC;"
 ```
 
 A primeira consulta traz os **9 hotlinks diretos**, com o de `http://` (mixed
