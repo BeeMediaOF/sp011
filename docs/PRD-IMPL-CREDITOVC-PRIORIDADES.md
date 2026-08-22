@@ -1,6 +1,8 @@
 # PRD de Implementação — Crédito.vc: prioridades restantes
 
-> **Status:** Proposto · **Data:** 2026-08-22 · **Versão:** 1
+> **Status:** Etapas 1, 2 e 3 **executadas em 22/08** e validadas em produção
+> (§1, "Depois"). Etapas 4 a 8 pendentes — são de painel/Cloudflare.
+> **Data:** 2026-08-22 · **Versão:** 1
 >
 > **Referência de análise:** `docs/PRD-SEO-CREDITOVC-CRUZAMENTO-OLEYSPORTS.md`
 > (auditoria e matriz de findings). Este documento **não reabre a análise** —
@@ -21,16 +23,16 @@
 Oito etapas, **todas de dados ou configuração**. Nenhuma exige build, deploy ou
 alteração no repositório de código.
 
-| Etapa | O que | Onde | Finding |
-|---|---|---|---|
-| 1 | Blocos da home apontando para categoria inexistente e para categoria repetida | SQL · `site_settings.homeBlocks` | `CVC-04` |
-| 2 | Menu que não alcança o acervo | SQL · `menu_items` | `CVC-01` |
-| 3 | Rodapé com link 404 e três rótulos para a mesma URL | SQL · `site_settings.footerConfig` | `CVC-06`, `CVC-14` |
-| 4 | Capas hotlinkadas de terceiros | Painel, artigo a artigo | `CVC-02` |
-| 5 | `robots.txt` bloqueando IA | Painel do Cloudflare | `CVC-05` |
-| 6 | Três editorias vazias na navegação | Decisão editorial + SQL | `CVC-07` |
-| 7 | Segundo `<h1>` na home | Painel · bloco HTML | `CVC-12` |
-| 8 | Autoria genérica | Painel · colunistas | `CVC-11` |
+| Etapa | O que | Onde | Finding | Estado |
+|---|---|---|---|---|
+| 1 | Blocos da home apontando para categoria inexistente e para categoria repetida | SQL · `site_settings.homeBlocks` | `CVC-04` | ✔ 22/08 |
+| 2 | Menu que não alcança o acervo | SQL · `menu_items` | `CVC-01` | ✔ 22/08 |
+| 3 | Rodapé com link 404 e três rótulos para a mesma URL | SQL · `site_settings.footerConfig` | `CVC-06`, `CVC-14` | ✔ 22/08 |
+| 4 | Capas hotlinkadas de terceiros | Painel, artigo a artigo | `CVC-02` | pendente |
+| 5 | `robots.txt` bloqueando IA | Painel do Cloudflare | `CVC-05` | pendente |
+| 6 | Três editorias vazias na navegação | Decisão editorial + SQL | `CVC-07` | pendente |
+| 7 | Segundo `<h1>` na home | Painel · bloco HTML | `CVC-12` | pendente |
+| 8 | Autoria genérica | Painel · colunistas | `CVC-11` | pendente |
 
 ### 0.2 O que ficou de fora, e por quê
 
@@ -73,6 +75,16 @@ echo "== h1 na home ==" && grep -o '<h1' cvc0.html | wc -l
 **Baseline registrado em 22/08:** `links=22 unicos=11`, `locs=234 artigos=223`,
 `"total":223`, `h1=2`.
 
+**Depois das Etapas 1, 2 e 3 (22/08, medido 6 min após aplicar):**
+`links=30 unicos=21`, `blocos_mortos=0`, `outros=0`, `sitemap=223`, `h1=2`
+(a Etapa 7 é de painel e não foi feita). As 6 editorias do menu em `200` com
+`noindex=0`. Não-regressão: `googlebot=166632` e `navegador=166632` bytes —
+idênticos; `/rota-inventada-xyz` em `404`.
+
+Os 21 únicos superaram a projeção de ~19 do §2.4: os blocos reapontados caíram
+em editorias grandes o bastante para encher a cota sem reaproveitar artigo já
+exibido.
+
 ```bash
 cd /opt/sp011
 docker compose exec -T pg-blogs psql -U postgres -d creditovc -At -c \
@@ -81,6 +93,16 @@ docker compose exec -T pg-blogs psql -U postgres -d creditovc -At -c \
 
 Essa contagem é **pré-requisito das Etapas 1, 2 e 6** — sem ela não dá para
 saber quais editorias sustentam um bloco.
+
+**Medido em 22/08:** `investimentos` 140, `credito` 39, `sair-das-dividas` 17,
+`organizar-financas` 13, `renda-extra` 7, `planejar-o-futuro` 7 — soma 223,
+igual ao sitemap. `score` **não aparece: zero artigos**. Os três destinos da
+Etapa 1 ficaram muito acima do piso de 4.
+
+Fora do escopo desta rodada, mas escancarado pela contagem: `investimentos` é
+**63% do portal** num blog cuja proposta é crédito e finanças pessoais. O
+`deploy/creditovc/reclassifica_investimentos.sql` existe para isso e ainda não
+foi rodado.
 
 ### 1.1 Backup
 

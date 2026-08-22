@@ -777,6 +777,20 @@ montada no servidor.
     marcar `en` gastaria tradução à toa E faria `deploy/ksports/sources_en.sql`
     carimbar prompt inglês nelas. Sem backfill (histórico da central é de
     esporte/finanças) e sem artes sociais.
+11. **Crédito.vc — SEO/descoberta** (2026-08-22): auditoria cruzada com os PRDs
+    do OleySports em `docs/PRD-SEO-CREDITOVC-CRUZAMENTO-OLEYSPORTS.md`; execução
+    em `docs/PRD-IMPL-CREDITOVC-PRIORIDADES.md` + runbook
+    `deploy/creditovc/EXECUCAO_PRIORIDADES.md`. **Etapas 1–3 entregues**
+    (`home_blocos.sql`, `menu_final.sql`, `rodape_limpeza.sql`): a home saiu de
+    11 para 21 artigos únicos, zero seção vazia, zero URL 404 publicada, as 6
+    editorias alcançáveis pelo menu. Falta (tudo painel/Cloudflare): capas
+    hotlinkadas de terceiros (9 diretas + os cards de marca "SUNO NOTÍCIAS"),
+    o `robots.txt` gerenciado do Cloudflare que bloqueia GPTBot/ClaudeBot,
+    `/score` declarada e vazia, o `<h1>` do bloco HTML do ticker e a autoria
+    (`@type: Person` para uma organização). ⚠️ `investimentos` concentra 63% do
+    acervo (140 de 223) — `reclassifica_investimentos.sql` existe e não foi
+    rodado. Os defeitos de CÓDIGO que o Crédito.vc revelou não abrem release
+    própria: entram pelo P1 do OleySports, para os 11 blogs de uma vez.
 
 ## 20. Onde procurar mais (no repo)
 
