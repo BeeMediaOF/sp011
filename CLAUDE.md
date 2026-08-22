@@ -380,7 +380,8 @@ centralId; backoff 1m→5m→15m→1h→6h, 5 tentativas → dead).
 - IA da central: provider primário configurável (`aiProvider` nas
   Configurações) — em produção é o **Ollama** self-hosted
   (`qwen2.5:7b-instruct`, serviço `ollama` do compose raiz,
-  `http://ollama:11434`; ~13 GB de RAM residentes, maior consumidor da VPS),
+  `http://ollama:11434`; ~13 GB de RAM residentes, maior consumidor da VPS;
+  teto de 4 dos 8 vCPU via `cpus`+`cpuset` desde 2026-08-21 — ver §17),
   com fallback e lane de reforço nos pools de chaves Gemini/OpenAI/Perplexity
   (criptografadas, rodízio). Prompt padrão de reescrita PT em
   `lib/news-engine/src/prompts.ts` — **espelhar sempre** com
@@ -560,6 +561,19 @@ montada no servidor.
   (`lib/originFailures.ts`) — sem isso a mesma foto reprovada era rebaixada a
   cada visita. Transitória (5xx/timeout) continua com retry: a capa da central
   engasga sob carga e precisa da segunda chance.
+- **Container que roda Chromium precisa de `init: true`** (2026-08-21): o Node
+  como PID 1 não adota nem enterra processo órfão, e cada arte social
+  renderizada pelo Playwright deixa filho para trás — em 2026-08-20 eram
+  **2.610 zumbis** na VPS, a ponto de o `docker compose stop` falhar ("PID ...
+  is zombie and can not be killed. Use the --init option"). O campo está no
+  `api` do `docker-compose.yml` **E** no `deploy/blog-template/compose.yml`; e
+  como o template é CÓPIA (§6), mudar lá não muda blog nenhum sem o `cp` +
+  `up -d`. O `ollama` ganhou teto de CPU no mesmo dia (`cpus: 4.0` +
+  `cpuset: "0-3"`): sem ele chegou a **4092% de CPU** nos 8 vCPU e estrangulou
+  os 11 blogs de uma vez (resposta em 8 s, steal de 34–83% no host). O `cpuset`
+  não é redundante com o `cpus` — o runtime Go lê `sched_getaffinity`, NÃO a
+  cota do cgroup: sem pin ele abriria 8 threads para caber em 4 CPUs de cota e
+  a geração ficaria mais LENTA de tanto throttling.
 - **Analytics**: heartbeat cumulativo agregado por MAX; tráfego interno
   marcado `is_internal`, nunca dropado; `totals.*` do /stats fixos ao agora;
   canal classificado no servidor; migrações de coluna via Drizzle schema E

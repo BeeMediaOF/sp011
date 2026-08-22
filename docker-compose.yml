@@ -38,6 +38,12 @@ services:
         aliases: ["sp011-api"]
     depends_on:
       - ollama
+    # Node como PID 1 não adota nem enterra processo órfão, e o Chromium do
+    # render social (Playwright) deixa filho para trás a cada arte gerada: em
+    # 2026-08-20 eram 2.610 zumbis na VPS, a ponto de o `docker compose stop`
+    # falhar ("PID ... is zombie and can not be killed. Use the --init option").
+    # Com o init o PID 1 vira o tini, que faz o reaping que o kernel espera.
+    init: true
     # PRD-07: least-privilege de kernel. read_only fica de fora (Chromium/tmp
     # gravam) — validar no canário. --no-sandbox segue no código (decisão de
     # canário/operador, ver STATUS).
@@ -195,6 +201,16 @@ services:
     # folga ao KV cache de OLLAMA_CONTEXT_LENGTH=16384. Imagem de terceiros que
     # grava modelos em /root/.ollama → sem cap_drop/read_only (validar antes).
     mem_limit: 16g
+    # Teto de CPU (2026-08-21): sem ele o Ollama chegou a 4092% de CPU em 8
+    # vCPU e estrangulou a VPS inteira — os 11 blogs foram a 8 s de resposta e
+    # o host acusou steal de 34-83%. `cpus` é a cota (nunca passa de 4 dos 8
+    # vCPU). `cpuset` existe porque o runtime Go lê sched_getaffinity, NÃO a
+    # cota do cgroup: sem pinar, ele abriria 8 threads para caber em 4 CPUs de
+    # cota e a geração ficaria mais LENTA de tanto throttling. Pinado, enxerga
+    # 4 CPUs, abre 4 threads, e sobram 4 vCPU sempre livres para
+    # caddy/api/web/postgres.
+    cpus: 4.0
+    cpuset: "0-3"
     security_opt: ["no-new-privileges:true"]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]

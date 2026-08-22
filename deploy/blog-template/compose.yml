@@ -21,6 +21,11 @@ services:
       blogs:
         # Alias ÚNICO na rede compartilhada — é o nome que o Caddy usa.
         aliases: ["${BLOG_ID}-api"]
+    # Mesmo motivo do api da raiz: o Chromium do render social (Playwright)
+    # deixa órfão a cada arte gerada e o Node como PID 1 não enterra zumbi —
+    # eram 2.610 na VPS em 2026-08-20, e o `docker compose stop` chegou a
+    # falhar por causa deles. Com o init o PID 1 vira o tini, que faz o reaping.
+    init: true
     # PRD-07: espelha o hardening do api da raiz. Volume api_data:/data
     # preexistente exige `chown -R node:node /data` único na VPS antes do 1o up.
     security_opt: ["no-new-privileges:true"]
