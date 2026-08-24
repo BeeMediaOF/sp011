@@ -507,8 +507,29 @@ Painel do Cloudflare → zona `credito.vc` → a feature que gerencia `robots.tx
 registrada: liberar `GPTBot` e `ClaudeBot` (descoberta e citação) e manter, se
 desejado, a restrição de treino via `Content-Signal: ai-train=no`.
 
-**Este PRD não decide por você.** Ele registra que o bloqueio atual veio de um
-default do Cloudflare, não de uma escolha deliberada.
+### 6.3.1 Decisão registrada — 2026-08-22
+
+O dono do conteúdo delegou a decisão. Fica assim:
+
+| Agente | Decisão | Por quê |
+|---|---|---|
+| `GPTBot` | **liberar** | descoberta e citação em assistente; o portal é novo e não pode recusar canal |
+| `ClaudeBot` | **liberar** | idem |
+| `Google-Extended` | **manter bloqueado** | governa treino/grounding do Gemini, **não** ranqueamento no Google Search — bloquear não custa tráfego |
+| `Content-Signal: ai-train=no` | **manter** | separa "pode me citar" de "pode me absorver" |
+| `OAI-SearchBot` | nada a fazer | **já está liberado** hoje |
+| Demais (`Amazonbot`, `Bytespider`, `CCBot`, `meta-externalagent`, …) | manter bloqueados | são coletores de treino sem canal de citação de volta |
+
+Racional: o Crédito.vc é conteúdo explicativo de crédito e finanças pessoais —
+o formato que assistente cita com atribuição. A troca é alcance por controle, e
+num portal em fase de descoberta o alcance vale mais. Reversível com um toggle.
+
+**Não é decisão, é defeito:** os dois grupos `User-agent: *` (§6.2) precisam
+virar um só de qualquer forma. Parser que honra apenas o primeiro grupo ignora
+o `Disallow: /admin`.
+
+Este PRD registra que o bloqueio atual veio de um **default do Cloudflare**, não
+de uma escolha deliberada — e que a escolha deliberada, agora, é a de cima.
 
 ### 6.4 Critério de aceite
 

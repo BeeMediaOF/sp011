@@ -191,9 +191,19 @@ que o público recebe vêm do bloco **gerenciado pelo Cloudflare**, prependido
 entre `# BEGIN Cloudflare Managed content` e `# END Cloudflare Managed Content`.
 `credito.vc` é o único blog da rede atrás do Cloudflare.
 
-Painel do Cloudflare → zona `credito.vc` → a feature que gerencia `robots.txt` /
-bloqueio de bots de IA. **A decisão é do dono do conteúdo** — registrar por
-escrito, inclusive se for "manter como está".
+**Decisão registrada em 22/08** (PRD §6.3.1): liberar `GPTBot` e `ClaudeBot`,
+manter `Google-Extended` bloqueado (ele governa treino/grounding do Gemini, não
+ranqueamento no Google Search) e manter `Content-Signal: ai-train=no`.
+`OAI-SearchBot` já estava liberado.
+
+Painel do Cloudflare → zona `credito.vc` → **Security**, e ali a feature de
+controle de rastreadores de IA. **O nome do painel muda com frequência**
+(já se chamou "AI Audit", depois "AI Crawl Control"; o bloco em si aparece como
+"Managed robots.txt" / "Content Signals Policy") — procurar pela função, não
+pelo rótulo. Ou desligar o bloco gerenciado por inteiro, ou retirar `GPTBot` e
+`ClaudeBot` da lista de bloqueados.
+
+A prova não é o nome do menu, é o `curl` abaixo.
 
 ```bash
 curl -s https://credito.vc/robots.txt
