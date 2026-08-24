@@ -95,6 +95,10 @@ então a igualdade prova que nenhum escape dos 15 KB se perdeu no `replace()`.
 9 links, sem `/score`. `/cartoes-de-credito` e `/consignado-publico` em `404`,
 `/score` em `200` (declarada, `noindex`, agora sem link publicado).
 
+Confirmado no HTML **servido**, não só no banco: `h1=1` e
+`score_no_rodape=0`. Com isso os **11 critérios da §12 passam** — os 10
+mensuráveis nesta rodada mais a não-regressão, que rodou em cada leva.
+
 **Loose end fechado:** os 7 blocos herdados do template do sp011 (`brasil`,
 `mundo`, `esportes`, `cultura`, `cidade`, `saude`, `tecnologia`, todos
 apontando para categorias que não existem no Crédito.vc) estão **todos
