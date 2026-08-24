@@ -798,6 +798,32 @@ montada no servidor.
     acervo (140 de 223) — `reclassifica_investimentos.sql` existe e não foi
     rodado. Os defeitos de CÓDIGO que o Crédito.vc revelou não abrem release
     própria: entram pelo P1 do OleySports, para os 11 blogs de uma vez.
+12. **Higiene de categoria da rede** (2026-08-24): o bug do slugify (barra dupla
+    apagando `u`, `f` e dígitos, corrigido em `90a0d47`) tinha reparo só na
+    CENTRAL — o `articles.category` já gravado no banco de cada blog ficou como
+    estava. Até a v98 essas rotas eram shell; depois dela viraram **Classe 3**
+    (não declarada mas com conteúdo → 200 indexável) e entraram no sitemap.
+    Eram **357 artigos em 20 editorias fantasma**: ksports 151 (`ootball` 119,
+    `world-cp` 14, `nl` 14, `ormla` 4), recebabet 40, apostaganha 40,
+    beeesportes 33, esporteagora 32, resenhavip 32, pontofarma 29 — todos
+    duplicando a editoria real ao lado. **Corrigido** por
+    `deploy/higiene/categorias_slugify.sql` (mapa único, idempotente, roda em
+    qualquer banco: nenhuma origem colide com slug canônico, e a guarda prévia
+    só exige o destino quando a origem tem linha). O 1 artigo do ksports em
+    `copa-do-mundo` (slug PT em blog EN) tem arquivo próprio com trava
+    `current_database()` — em blog pt-BR `copa-do-mundo` é a editoria canônica e
+    um mapa global esvaziaria 92 artigos só no Oley. Os 21 do ocomandante fora
+    da taxonomia não eram corrupção: `deploy/ocomandante/editorias_higiene.sql`
+    declara `o-comandante` como **5ª editoria** (9 relatos de aviação em 1ª
+    pessoa — coluna, não erro), manda `tecnologia` (6) para `negocios` e
+    despublica `esportes` (6), já que o blog não tem balde. ⚠️ **O sp011 não foi
+    medido** — banco no Supabase, fora da varredura; o mapa só cobre o que foi
+    MEDIDO, e as editorias dele corrompem em formas ainda não vistas (`mundo` →
+    `mndo`, `cultura` → `cltra`, `saude` → `sade`, `seguranca` → `segranca`).
+    Achado lateral: `menu_items` não carrega `order` e `getMenuItems`
+    (`store.ts:1129`) ordena por ele sobre um cast sem normalização — o
+    comparador devolve `NaN` e só não quebrou porque o V8 mantém a ordem de
+    inserção.
 
 ## 20. Onde procurar mais (no repo)
 
