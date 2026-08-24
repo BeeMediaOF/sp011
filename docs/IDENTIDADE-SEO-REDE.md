@@ -153,11 +153,17 @@ Critério: **11 títulos distintos e 11 descrições distintas**, nenhuma conten
 são distintos e idênticos aos propostos acima; nenhum traço da frase antiga; o
 espaço sobrando no início da tagline do KSports saiu junto.
 
-**Descrições — ainda não conferidas.** É a metade que mais pesa: pela
-precedência `seoDescription || tagline || siteName` (`vite.config.ts:119`), um
-blog com `seoDescription` vazio continua servindo a tagline como
-`<meta description>` da home **e de todas as editorias**. Título distinto não
-prova descrição distinta. Rodar:
+**Descrições — conferidas em produção nos 11 domínios (2026-08-22): PASSA.** As
+11 são distintas e idênticas às propostas. Isso importava mais que os títulos:
+pela precedência `seoDescription || tagline || siteName`
+(`vite.config.ts:119`), um blog com `seoDescription` vazio serviria a tagline
+como `<meta description>` da home **e de todas as editorias**, e ainda assim
+teria `<title>` distinto — título distinto não provava descrição distinta.
+
+Com as duas medições, `CVC-03` está fechado: **a duplicação de identidade entre
+os 11 domínios acabou.**
+
+Comando de reconferência:
 
 ```bash
 for d in sp011.com.br ksports.midia.run esporteagora.midia.run          resenhavip.midia.run oleysports.com.br beeesportes.midia.run          pontofarma.com credito.vc apostaganha.midia.run          recebabet.midia.run ocomandantenews.com.br; do
