@@ -147,6 +147,25 @@ done
 Critério: **11 títulos distintos e 11 descrições distintas**, nenhuma contendo
 `Notícia. Agora. Sempre.` nem `News. Now. Always.`
 
+### Estado verificado
+
+**Títulos — conferidos em produção nos 11 domínios (2026-08-22): PASSA.** Os 11
+são distintos e idênticos aos propostos acima; nenhum traço da frase antiga; o
+espaço sobrando no início da tagline do KSports saiu junto.
+
+**Descrições — ainda não conferidas.** É a metade que mais pesa: pela
+precedência `seoDescription || tagline || siteName` (`vite.config.ts:119`), um
+blog com `seoDescription` vazio continua servindo a tagline como
+`<meta description>` da home **e de todas as editorias**. Título distinto não
+prova descrição distinta. Rodar:
+
+```bash
+for d in sp011.com.br ksports.midia.run esporteagora.midia.run          resenhavip.midia.run oleysports.com.br beeesportes.midia.run          pontofarma.com credito.vc apostaganha.midia.run          recebabet.midia.run ocomandantenews.com.br; do
+  printf '%-24s %s
+' "$d" "$(curl -s --max-time 20 "https://$d/" | grep -o 'name="description" content="[^"]*"' | head -1)"
+done
+```
+
 ## Documentos relacionados
 
 - `docs/PRD-SEO-CREDITOVC-CRUZAMENTO-OLEYSPORTS.md` — `CVC-03` (identidade) e o
