@@ -783,11 +783,18 @@ montada no servidor.
     `deploy/creditovc/EXECUCAO_PRIORIDADES.md`. **Etapas 1–3 entregues**
     (`home_blocos.sql`, `menu_final.sql`, `rodape_limpeza.sql`): a home saiu de
     11 para 21 artigos únicos, zero seção vazia, zero URL 404 publicada, as 6
-    editorias alcançáveis pelo menu. Falta (tudo painel/Cloudflare): capas
-    hotlinkadas de terceiros (9 diretas + os cards de marca "SUNO NOTÍCIAS"),
-    o `robots.txt` gerenciado do Cloudflare que bloqueia GPTBot/ClaudeBot,
-    `/score` declarada e vazia, o `<h1>` do bloco HTML do ticker e a autoria
-    (`@type: Person` para uma organização). ⚠️ `investimentos` concentra 63% do
+    editorias alcançáveis pelo menu. **Etapas 6, 7 e 8 também entregues**
+    (`ticker_h1_h2.sql` tirou o 2º `<h1>` da home trocando o do ticker por `h2`
+    — `to_jsonb(replace(...))` não digita HTML, por isso é mais seguro que
+    editar 15 KB na textarea; `autoria_redacao.sql` gravou
+    `settings.bylineName`; `score_rodape.sql` tirou do rodapé o link para
+    `/score`, que é editoria vazia = `noindex` publicado na home, e traz o SQL
+    de restauração comentado — nada devolve o link sozinho). Falta: capas
+    hotlinkadas de terceiros (9 diretas + os cards de marca "SUNO NOTÍCIAS") —
+    exige imagem própria ou licenciada, re-hospedar foto alheia só move o
+    problema — e o `robots.txt` gerenciado do Cloudflare que bloqueia
+    GPTBot/ClaudeBot (toggle no painel da zona, fora da VPS). O `@type: Person`
+    para uma organização é código: P1 do OleySports. ⚠️ `investimentos` concentra 63% do
     acervo (140 de 223) — `reclassifica_investimentos.sql` existe e não foi
     rodado. Os defeitos de CÓDIGO que o Crédito.vc revelou não abrem release
     própria: entram pelo P1 do OleySports, para os 11 blogs de uma vez.

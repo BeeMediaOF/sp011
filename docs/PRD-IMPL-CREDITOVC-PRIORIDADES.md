@@ -1,7 +1,10 @@
 # PRD de Implementação — Crédito.vc: prioridades restantes
 
-> **Status:** Etapas 1, 2 e 3 **executadas em 22/08** e validadas em produção
-> (§1, "Depois"). Etapas 4 a 8 pendentes — são de painel/Cloudflare.
+> **Status:** Etapas 1, 2, 3, 6, 7 e 8 **executadas em 22/08** e validadas
+> (§1, "Depois"). Sobram a **4** (capas — exige imagem própria ou licenciada) e
+> a **5** (Cloudflare — toggle no painel da zona, fora da VPS). As 6 e 8 são
+> parciais **por natureza**: a metade que falta em cada uma é conteúdo
+> editorial e código do P1, não configuração.
 > **Data:** 2026-08-22 · **Versão:** 1
 >
 > **Referência de análise:** `docs/PRD-SEO-CREDITOVC-CRUZAMENTO-OLEYSPORTS.md`
@@ -30,9 +33,9 @@ alteração no repositório de código.
 | 3 | Rodapé com link 404 e três rótulos para a mesma URL | SQL · `site_settings.footerConfig` | `CVC-06`, `CVC-14` | ✔ 22/08 |
 | 4 | Capas hotlinkadas de terceiros | Painel, artigo a artigo | `CVC-02` | pendente |
 | 5 | `robots.txt` bloqueando IA | Painel do Cloudflare | `CVC-05` | pendente |
-| 6 | Três editorias vazias na navegação | SQL · `score_rodape.sql` + conteúdo | `CVC-07` | parcial |
-| 7 | Segundo `<h1>` na home | SQL · `ticker_h1_h2.sql` | `CVC-12` | pendente |
-| 8 | Autoria genérica | SQL · `autoria_redacao.sql` (+ painel) | `CVC-11` | parcial |
+| 6 | Três editorias vazias na navegação | SQL · `score_rodape.sql` + conteúdo | `CVC-07` | ✔ link · conteúdo pendente |
+| 7 | Segundo `<h1>` na home | SQL · `ticker_h1_h2.sql` | `CVC-12` | ✔ 22/08 |
+| 8 | Autoria genérica | SQL · `autoria_redacao.sql` (+ painel) | `CVC-11` | ✔ assinatura · `@type` no P1 |
 
 ### 0.2 O que ficou de fora, e por quê
 
@@ -84,6 +87,19 @@ idênticos; `/rota-inventada-xyz` em `404`.
 Os 21 únicos superaram a projeção de ~19 do §2.4: os blocos reapontados caíram
 em editorias grandes o bastante para encher a cota sem reaproveitar artigo já
 exibido.
+
+**Depois das Etapas 6, 7 e 8 (22/08):** o bloco do ticker manteve **15.012
+bytes** antes e depois — `<h1`→`<h2` e `</h1>`→`</h2>` têm o mesmo comprimento,
+então a igualdade prova que nenhum escape dos 15 KB se perdeu no `replace()`.
+`bylineName` passou de vazio para `Redação Crédito.vc`. O rodapé foi de 10 para
+9 links, sem `/score`. `/cartoes-de-credito` e `/consignado-publico` em `404`,
+`/score` em `200` (declarada, `noindex`, agora sem link publicado).
+
+**Loose end fechado:** os 7 blocos herdados do template do sp011 (`brasil`,
+`mundo`, `esportes`, `cultura`, `cidade`, `saude`, `tecnologia`, todos
+apontando para categorias que não existem no Crédito.vc) estão **todos
+`visible: false`** — resíduo inerte, não renderizam. A Etapa 1 fecha sem
+pendência.
 
 ```bash
 cd /opt/sp011
