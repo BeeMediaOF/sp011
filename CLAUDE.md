@@ -77,7 +77,12 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   (§17) devolver 404 para extensão que não existe em `dist/public`. O matcher
   só casa se o arquivo EXISTIR, e só para `.html/.txt/.xml/.json`; o
   `file_server` lê do disco a cada request, então arquivo novo vale NA HORA,
-  sem reload, sem rebuild. Runbook: `caddy/verify/README.md`.
+  sem reload, sem rebuild. Publicar é UM comando: `verify-add <domínio-ou-id>
+  <arquivo>` (`deploy/verify-add.sh`, symlinkado em `/usr/local/bin` na VPS) —
+  ele resolve blog↔domínio pelo `caddy/sites/`, deriva o conteúdo dos arquivos
+  `google*.html` do próprio nome e confere origem + domínio público com curl.
+  Arquivo criado por ele fica não rastreado: commitar depois é o que o faz
+  sobreviver a um reprovisionamento. Runbook: `caddy/verify/README.md`.
 - **Bancos**:
   - Blog sp011 (mãe): **Supabase** (projeto "SP011", ref
     `yfmyufqfepzwjtzblths`, sa-east-1) via `SUPABASE_DATABASE_URL` no `.env`
