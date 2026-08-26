@@ -6,6 +6,7 @@ import { articleService } from "./lib/articleService.js";
 import { startSocialCron } from "./lib/social/queueProcessor.js";
 import { startSocialAutomation } from "./lib/social/autoScheduler.js";
 import { startScheduler } from "./lib/scheduler.js";
+import { pruneImageCache, CACHE_DIR as IMG_CACHE_DIR } from "./lib/imageTransform.js";
 import { startSanityMonitor } from "./lib/sanityMonitor.js";
 import { startNewsletterWorker } from "./lib/newsletter/dispatch.js";
 import { seedNewsletterTemplates } from "./lib/newsletter/seedTemplates.js";
@@ -196,6 +197,22 @@ async function bootWithDb(): Promise<void> {
   } catch (jsonMigrateErr) {
     logger.warn({ err: jsonMigrateErr }, "JSON-content migration failed (non-fatal)");
   }
+
+  // Poda do cache de imagens em disco. Ele passou a viver no volume persistente
+  // (/data/img-cache) para sobreviver aos rollouts — o que também o fez crescer
+  // para sempre. Boot + a cada 6 h, apagando os menos recentes acima do teto.
+  const podarCache = () => {
+    void pruneImageCache()
+      .then(({ apagados, bytes }) => {
+        if (apagados > 0) {
+          logger.info({ apagados, mb: Math.round(bytes / 1048576) }, "cache de imagens podado");
+        }
+      })
+      .catch((err: unknown) => logger.warn({ err }, "poda do cache de imagens falhou"));
+  };
+  logger.info({ dir: IMG_CACHE_DIR }, "cache de imagens em disco");
+  podarCache();
+  setInterval(podarCache, 6 * 60 * 60 * 1000).unref();
 
   // Coleta RSS + fila de reescrita — antes rodava no import de app.ts; agora
   // só inicia com o banco inicializado (e nunca em modo instalação).

@@ -15,7 +15,7 @@ import { join } from "node:path";
 // Antes de carregar o módulo: sem isto o import cria data/uploads no pacote.
 process.env["UPLOADS_DIR"] = join(tmpdir(), "sp011-test-uploads");
 
-const { withBlockImageDimensions } = await import("../src/lib/blockImageMeta.ts");
+const { withBlockImageDimensions, withHtmlImageDimensions } = await import("../src/lib/blockImageMeta.ts");
 
 type Block = Parameters<typeof withBlockImageDimensions>[0] extends readonly (infer T)[] | undefined
   ? T : never;
@@ -67,4 +67,32 @@ test("query e âncora não entram no nome do arquivo", async () => {
   const blocos = [bloco({ imageUrl: "/api/uploads/banner-abc123.png?v=2" })];
   const out = await withBlockImageDimensions(blocos);
   assert.equal(out?.[0]?.imageUrl, "/api/uploads/banner-abc123.png?v=2");
+});
+
+// ── HTML do bloco (banners de anuncio) — 2026-08-26 ──────────────────────────
+
+test("bloco html sem <img> de upload continua saindo por referencia", async () => {
+  const blocos = [bloco({ blockType: "html", html: '<img src="https://x.com/a.png">' })];
+  assert.equal(await withBlockImageDimensions(blocos), blocos);
+});
+
+test("banner de upload no html do bloco vira WebP dimensionado", async () => {
+  const html = '<img src="/api/uploads/nao-existe-9999.png" alt="banner" style="width:100%;height:auto;">';
+  const blocos = [bloco({ blockType: "html", html })];
+  const out = await withBlockImageDimensions(blocos);
+  // arquivo inexistente: sem width/height (nao se inventa), mas o src pede WebP
+  assert.notEqual(out, blocos);
+  assert.ok(out?.[0]?.html?.includes("?w="), out?.[0]?.html);
+  assert.ok(out?.[0]?.html?.includes("q=82"), out?.[0]?.html);
+  assert.ok(!out?.[0]?.html?.includes('width="'), out?.[0]?.html);
+  // o resto do bloco nao muda
+  assert.equal(out?.[0]?.id, "b1");
+  assert.ok(out?.[0]?.html?.includes('alt="banner"'));
+});
+
+test("banner do cabecalho passa pela mesma reescrita", async () => {
+  assert.equal(await withHtmlImageDimensions(undefined), undefined);
+  assert.equal(await withHtmlImageDimensions("<p>oi</p>"), "<p>oi</p>");
+  const out = await withHtmlImageDimensions('<img src="/api/uploads/nao-existe-9999.png">');
+  assert.ok(out?.includes("?w="), out);
 });

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { SITE_ASSET_FIELDS, store } from "../lib/store.js";
-import { withBlockImageDimensions } from "../lib/blockImageMeta.js";
+import { withBlockImageDimensions, withHtmlImageDimensions } from "../lib/blockImageMeta.js";
 import {
   cacheKey, memGet, resolveImage, MAX_WIDTH,
   type ImageFormat,
@@ -101,6 +101,9 @@ router.get("/site", async (_req, res) => {
      leitura é cacheada por nome de arquivo; falha devolve o bloco intacto. */
   settings.homeBlocks = await withBlockImageDimensions(settings.homeBlocks);
   settings.articleSidebarBlocks = await withBlockImageDimensions(settings.articleSidebarBlocks);
+  /* O banner do cabeçalho é HTML solto (não é bloco), e sofria do mesmo defeito:
+     PNG cru sem width/height acima da dobra. Mesma reescrita. */
+  settings.headerBannerHtml = await withHtmlImageDimensions(settings.headerBannerHtml);
   const menuItems = store.getMenuItems()
     .filter((m) => m.visible)
     .map((m) => ({ ...m, children: m.children?.filter((c) => c.visible) }));

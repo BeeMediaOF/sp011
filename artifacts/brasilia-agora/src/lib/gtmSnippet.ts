@@ -47,6 +47,22 @@ const CONSENT_KEY = "bee_analytics_consent";
  *
  * O `j.async=true` do snippet oficial é mantido: o container não bloqueia o
  * parser, então não entra no caminho de renderização nem mexe em CLS.
+ *
+ * QUANDO o container baixa (2026-08-26): async não é o mesmo que gratuito. No
+ * PageSpeed do oleysports o GTM apareceu como **279,8 KiB, 129,3 KiB deles sem
+ * uso**, e como 236 ms dos 260 ms de bloqueio da thread principal — disputando
+ * banda com a imagem do LCP num link 4G. O `j.src` passou a ser atribuído no
+ * `load` da página (ou no primeiro toque, ou num teto de 3 s — o que vier
+ * primeiro), então o container sai INTEIRAMENTE de fora do caminho crítico.
+ *
+ * Isto NÃO desfaz a correção de 2026-08-14: o que o verificador do GTM lê é o
+ * HTML de um GET simples, e a tag `<script>` — com a URL literal do gtm.js
+ * dentro — continua exatamente onde estava. O que mudou é só o instante em que
+ * o navegador busca o arquivo.
+ *
+ * O teto de 3 s existe para o visitante que sai antes do `load`: sem ele, uma
+ * página com um recurso lento nunca carregaria o container. O `pointerdown`
+ * antecipa para quem interage, e o `visibilitychange` cobre quem abandona a aba.
  */
 export function gtmHeadTag(id: string): string {
   const gid = sanitizeGtmId(id);
@@ -56,9 +72,13 @@ gtag('consent','default',{'ad_storage':'denied','ad_user_data':'denied','ad_pers
 try{if(localStorage.getItem('${CONSENT_KEY}')==='accepted'){gtag('consent','update',{'ad_storage':'granted','ad_user_data':'granted','ad_personalization':'granted','analytics_storage':'granted'});}}catch(e){}</script>
 <!-- Google Tag Manager -->
 <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+new Date().getTime(),event:'gtm.js'});var feito=false;function go(){if(feito)return;feito=true;
+var f=d.getElementsByTagName(s)[0],
 j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);}
+if(d.readyState==='complete'){go();}else{w.addEventListener('load',go,{once:true});}
+w.setTimeout(go,3000);w.addEventListener('pointerdown',go,{once:true});
+d.addEventListener('visibilitychange',function(){if(d.visibilityState==='hidden'){go();}});
 })(window,document,'script','dataLayer','${gid}');</script>
 <!-- End Google Tag Manager -->`;
 }

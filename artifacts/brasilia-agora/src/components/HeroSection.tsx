@@ -174,7 +174,13 @@ function MobileCarousel({ items }: { items: FeaturedItem[] }) {
           <button
             key={i}
             onClick={() => { setActive(i); setPaused(true); setTimeout(() => setPaused(false), 5000); }}
-            className={`rounded-full transition-all duration-300 ${i === active ? "bg-white w-5 h-1.5" : "bg-white/40 w-1.5 h-1.5"}`}
+            /* transition-OPACITY, nao transition-all: `width` e
+               `background-color` nao sao compostas — o navegador refaz layout e
+               pintura a cada quadro dos 300 ms ("Evitar animacoes nao
+               compostas", PageSpeed do oleysports 2026-08-26). A opacidade roda
+               na GPU; a largura passa a trocar de uma vez, o que mantem a
+               geometria de hoje intacta. */
+            className={`rounded-full bg-white transition-opacity duration-300 ${i === active ? "w-5 h-1.5 opacity-100" : "w-1.5 h-1.5 opacity-40"}`}
             aria-label={`Slide ${i + 1}`}
           />
         ))}

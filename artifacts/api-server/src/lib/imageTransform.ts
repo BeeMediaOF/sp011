@@ -36,7 +36,34 @@ export const DEFAULT_W = 800;
 export const DEFAULT_Q = 82;
 export const MAX_Q = 100;
 
-const CACHE_DIR = path.join(os.tmpdir(), "img-proxy-cache");
+/**
+ * Cache em disco no VOLUME PERSISTENTE (2026-08-26).
+ *
+ * Estava em `os.tmpdir()`, que dentro do container é a camada gravável da
+ * IMAGEM: todo rollout (§6 do CLAUDE.md recria os 11 containers) jogava fora o
+ * cache inteiro da rede. O primeiro visitante depois de um deploy pagava a
+ * reconstrução de TODAS as imagens da home de uma vez — com a fila de 2 vagas
+ * abaixo, a décima transformação esperava dezenas de segundos e o navegador
+ * desistia. É a explicação dos `net::ERR_TIMED_OUT` em `/api/image` e
+ * `/api/site-asset/logo` no PageSpeed do oleysports (2026-08-26).
+ *
+ * `/data` é o volume `api_data`, montado tanto no compose raiz quanto no
+ * `deploy/blog-template/compose.yml` — nenhum blog precisa de mudança de
+ * compose. Fora de produção continua no tmp.
+ */
+const isProd = process.env["NODE_ENV"] === "production";
+export const CACHE_DIR = process.env["IMG_CACHE_DIR"]
+  ?? (isProd ? "/data/img-cache" : path.join(os.tmpdir(), "img-proxy-cache"));
+
+/**
+ * Teto do cache em disco. Cache que sobrevive a deploy é cache que cresce para
+ * sempre — e são 11 blogs no mesmo disco. `pruneImageCache()` apara os mais
+ * antigos quando passa daqui.
+ */
+const CACHE_MAX_BYTES = Math.max(
+  32, parseInt(process.env["IMG_CACHE_MAX_MB"] ?? "512", 10) || 512,
+) * 1024 * 1024;
+
 const MEM_MAX = 500; // entradas no LRU em memória
 
 /**
@@ -61,22 +88,41 @@ sharp.cache({ memory: 32 });
  * vaga (o coalescing por chave já colapsa as repetidas).
  */
 const MAX_CONCURRENT_TRANSFORMS = 2;
-let emAndamento = 0;
-const esperando: Array<() => void> = [];
 
-/** Executa `fn` ocupando uma das vagas de transformação. */
-export async function withTransformSlot<T>(fn: () => Promise<T>): Promise<T> {
-  if (emAndamento < MAX_CONCURRENT_TRANSFORMS) emAndamento++;
-  else await new Promise<void>((resolve) => esperando.push(resolve));
-  try {
-    return await fn();
-  } finally {
-    const proximo = esperando.shift();
-    // A vaga passa direto para quem esperava: `emAndamento` não muda.
-    if (proximo) proximo();
-    else emAndamento--;
-  }
+/** Uma fila de N vagas. O `finally` passa a vaga direto a quem esperava. */
+function filaDeVagas(max: number) {
+  let emAndamento = 0;
+  const esperando: Array<() => void> = [];
+  return async function comVaga<T>(fn: () => Promise<T>): Promise<T> {
+    if (emAndamento < max) emAndamento++;
+    else await new Promise<void>((resolve) => esperando.push(resolve));
+    try {
+      return await fn();
+    } finally {
+      const proximo = esperando.shift();
+      // A vaga passa direto para quem esperava: `emAndamento` não muda.
+      if (proximo) proximo();
+      else emAndamento--;
+    }
+  };
 }
+
+/** Executa `fn` ocupando uma das vagas de FOTO (capas de artigo, uploads). */
+export const withTransformSlot = filaDeVagas(MAX_CONCURRENT_TRANSFORMS);
+
+/**
+ * Vaga PRÓPRIA para arte de identidade (2026-08-26).
+ *
+ * Logo, logo-mobile, byline e favicon são meia dúzia de chaves distintas por
+ * blog, minúsculas, cacheadas como `immutable` — e ficam no CABEÇALHO, acima da
+ * dobra. Na fila única elas entravam atrás de uma dezena de capas de artigo e
+ * eram as ÚLTIMAS a sair: no PageSpeed do oleysports as três deram
+ * `net::ERR_TIMED_OUT` e o site apareceu sem marca. O teto de memória continua
+ * valendo (são no máximo 3 transformações simultâneas no processo, e a terceira
+ * é sempre uma logo), então o motivo do semáforo — o OOM de agosto — segue
+ * respeitado.
+ */
+export const withArtworkSlot = filaDeVagas(1);
 
 // ── LRU em memória simples ────────────────────────────────────────────────────
 const memCache = new Map<string, Buffer>();
@@ -213,7 +259,9 @@ export async function transformImage(
   // exige saber a proporção, que só o servidor conhece: a do KSports é 1080x300
   // (3,6:1) e, exibida a 120 px de altura, ocupa 432 px — pedir w=320 fazia o
   // navegador dar UPSCALE e borrava a marca (observado em 2026-07-28).
-  return withTransformSlot(async () => {
+  // Arte de identidade tem fila própria: ver withArtworkSlot.
+  const comVaga = profile === "artwork" ? withArtworkSlot : withTransformSlot;
+  return comVaga(async () => {
     const entrada = () => sharp(raw, { limitInputPixels: MAX_INPUT_PIXELS, failOn: "error" });
 
     // Recorte na proporção da caixa: o alvo é reduzido ao que a origem cobre
@@ -302,4 +350,55 @@ export async function resolveImage(
   }
 
   return pending;
+}
+
+// ── Poda do cache em disco ────────────────────────────────────────────────────
+/**
+ * Mantém o cache em disco abaixo de `CACHE_MAX_BYTES`, apagando os arquivos
+ * menos recentes primeiro (mtime). Roda no boot e a cada 6 h (ver index.ts).
+ *
+ * Existe porque o cache passou a viver no volume persistente: antes ele sumia a
+ * cada recriação de container e nunca precisou de teto. Apagar é sempre seguro —
+ * o cache é derivado, e um miss só custa uma transformação.
+ *
+ * Nunca lança: diretório ausente (blog que nunca serviu imagem) devolve zeros.
+ */
+export async function pruneImageCache(): Promise<{ apagados: number; bytes: number }> {
+  const arquivos: Array<{ caminho: string; bytes: number; mtime: number }> = [];
+  try {
+    // Cria na primeira passada: assim um diretório sem permissão de escrita
+    // aparece no log do boot, em vez de virar um cache que nunca grava.
+    await fs.mkdir(CACHE_DIR, { recursive: true });
+    const prefixos = await fs.readdir(CACHE_DIR, { withFileTypes: true });
+    for (const p of prefixos) {
+      if (!p.isDirectory()) continue;
+      const dir = path.join(CACHE_DIR, p.name);
+      for (const nome of await fs.readdir(dir).catch(() => [] as string[])) {
+        const caminho = path.join(dir, nome);
+        const st = await fs.stat(caminho).catch(() => null);
+        if (st?.isFile()) arquivos.push({ caminho, bytes: st.size, mtime: st.mtimeMs });
+      }
+    }
+  } catch {
+    return { apagados: 0, bytes: 0 };
+  }
+
+  const total = arquivos.reduce((s, a) => s + a.bytes, 0);
+  if (total <= CACHE_MAX_BYTES) return { apagados: 0, bytes: 0 };
+
+  // Alvo 80% do teto: podar até a borda exata faria a próxima request podar de novo.
+  const alvo = Math.floor(CACHE_MAX_BYTES * 0.8);
+  arquivos.sort((a, b) => a.mtime - b.mtime);
+  let restante = total;
+  let apagados = 0;
+  let bytes = 0;
+  for (const a of arquivos) {
+    if (restante <= alvo) break;
+    if (await fs.unlink(a.caminho).then(() => true, () => false)) {
+      restante -= a.bytes;
+      bytes += a.bytes;
+      apagados++;
+    }
+  }
+  return { apagados, bytes };
 }

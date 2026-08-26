@@ -128,3 +128,20 @@ test("injectGtm: dois blogs, dois containers, sem cruzar", () => {
   assert.ok(a.includes("GTM-AAAA111") && !a.includes("GTM-BBBB222"));
   assert.ok(b.includes("GTM-BBBB222") && !b.includes("GTM-AAAA111"));
 });
+
+test("gtmHeadTag: o container sai do caminho critico sem sair do HTML", () => {
+  const tag = gtmHeadTag(ID);
+  // O que o verificador do GTM le num GET simples continua exatamente ali —
+  // esta e a correcao de 2026-08-14, que NAO pode ser desfeita.
+  assert.ok(tag.includes("https://www.googletagmanager.com/gtm.js?id='+i+dl"));
+  assert.ok(tag.includes("<!-- Google Tag Manager -->"));
+  // ...mas a BUSCA do arquivo espera a pagina terminar de carregar.
+  assert.ok(tag.includes("function go()"));
+  assert.ok(tag.includes("addEventListener('load',go"));
+  // Teto: visitante que sai antes do load ainda carrega o container.
+  assert.ok(tag.includes("setTimeout(go,3000)"));
+  assert.ok(tag.includes("pointerdown"));
+  assert.ok(tag.includes("visibilitychange"));
+  // Uma vez so, venha o gatilho que vier.
+  assert.ok(tag.includes("if(feito)return;feito=true;"));
+});

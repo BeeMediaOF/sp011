@@ -576,6 +576,52 @@ montada no servidor.
   (`lib/originFailures.ts`) — sem isso a mesma foto reprovada era rebaixada a
   cada visita. Transitória (5xx/timeout) continua com retry: a capa da central
   engasga sob carga e precisa da segunda chance.
+- **Cache de imagem sobrevive ao deploy** (2026-08-26): o cache em disco do
+  proxy mora em `/data/img-cache` (volume `api_data`, já montado no compose raiz
+  E no `blog-template` — nenhum blog precisa de mudança de compose), não mais em
+  `os.tmpdir()`. No tmp ele era a camada gravável da IMAGEM: todo rollout (§6
+  recria os 11 containers) descartava o cache da rede inteira, e o primeiro
+  visitante depois do deploy pagava a reconstrução de TODAS as imagens da home de
+  uma vez — com a fila de 2 vagas, a décima transformação esperava dezenas de
+  segundos e o navegador desistia (`net::ERR_TIMED_OUT` em `/api/image` e
+  `/api/site-asset/logo`, PageSpeed do oleysports). Cache que sobrevive é cache
+  que cresce: `pruneImageCache()` roda no boot e a cada 6 h, apagando os menos
+  recentes acima de `IMG_CACHE_MAX_MB` (512 por padrão, × 11 blogs).
+  `IMG_CACHE_DIR` sobrepõe o caminho.
+- **Arte de identidade tem fila própria** (2026-08-26): `withArtworkSlot` (1
+  vaga) ao lado de `withTransformSlot` (2, fotos). Logo, logo-mobile, byline e
+  favicon são meia dúzia de chaves por blog, minúsculas e `immutable`, mas moram
+  no CABEÇALHO — na fila única entravam atrás de uma dezena de capas de artigo e
+  eram as últimas a sair; as três deram timeout e o site apareceu sem marca. O
+  teto de memória do bullet acima continua valendo: no máximo 3 transformações
+  simultâneas por processo, e a terceira é sempre uma logo.
+- **`<img>` de upload no HTML do operador é reescrito no `/api/site`**
+  (2026-08-26): o painel grava o banner como `<img src="/api/uploads/x.png"
+  style="width:100%;height:auto">` — PNG cru, sem `width`/`height` (252,7 KiB em
+  duas artes na home do oleysports; 229,5 KiB de desperdício + CLS).
+  `lib/htmlUploadImages.ts` (puro, testado) troca o `src` por `?w=<nativa>&q=82`
+  — a rota `/api/uploads/:filename` já sabia redimensionar e converter para
+  WebP, o HTML é que nunca pedia — e carimba as dimensões nativas lidas com
+  sharp (`blockImageMeta.ts`, mesmo cache por nome de arquivo). Alcança
+  `homeBlocks[].html`, `articleSidebarBlocks[].html` e `headerBannerHtml`. É no
+  SERVIDOR e não no `sanitizeArticleHtml` do front por dois motivos: só ele tem
+  o arquivo para medir, e reescrever no payload faz SSR e hidratação receberem a
+  MESMA string por construção (o mismatch #418 já custou o LCP da home uma vez).
+  NÃO se toca em `src` que já tem query (é ajuste manual de quem escreveu), e
+  NÃO se acrescenta `loading="lazy"`: trocar a semântica de carregamento de um
+  slot PAGO, em 11 blogs de layout desconhecido, não é assunto de uma correção
+  de bytes. O `/api/admin/settings` é outra rota — o editor continua mostrando o
+  HTML original do operador.
+- **GTM carrega no `load`, não no parse** (2026-08-26): a tag `<script>` do
+  container continua no `<head>` servido, com a URL literal do `gtm.js` dentro —
+  é isso que o verificador do GTM lê num GET simples, e desfazer isso reabre o
+  "container não encontrado" de 2026-08-14. O que mudou é só o `j.src`,
+  atribuído dentro de `go()` e disparado por `load` / `pointerdown` /
+  `visibilitychange:hidden` / teto de 3 s. Motivo: 279,8 KiB (129,3 sem uso) e
+  236 ms dos 260 ms de bloqueio da thread principal, disputando banda com a
+  imagem do LCP num link 4G. O teto de 3 s é o que garante o container para quem
+  sai antes do `load` — sem ele, uma página com um recurso lento nunca
+  registraria a visita.
 - **Container que roda Chromium precisa de `init: true`** (2026-08-21): o Node
   como PID 1 não adota nem enterra processo órfão, e cada arte social
   renderizada pelo Playwright deixa filho para trás — em 2026-08-20 eram
