@@ -68,6 +68,16 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
   `caddy reload` relê o arquivo VELHO → pull que muda o Caddyfile exige
   `docker compose up -d --force-recreate caddy`. O diretório `caddy/sites/`
   não sofre disso (reload normal funciona).
+  **Arquivos na raiz do domínio** (verificação do Search Console/Bing/Meta,
+  `ads.txt`): `caddy/verify/<BLOG_ID>/<arquivo>` — servido só no domínio
+  daquele blog pelo matcher `@verify` dos snippets `(blog)`/`(blog-cf)` e do
+  bloco do sp011. Não pode ir em `artifacts/brasilia-agora/public/`: a imagem
+  `web` é UMA para os 11 blogs, e o token do Search Console de um domínio
+  responderia na raiz de todos os outros — além de o `staticExistsPlugin`
+  (§17) devolver 404 para extensão que não existe em `dist/public`. O matcher
+  só casa se o arquivo EXISTIR, e só para `.html/.txt/.xml/.json`; o
+  `file_server` lê do disco a cada request, então arquivo novo vale NA HORA,
+  sem reload, sem rebuild. Runbook: `caddy/verify/README.md`.
 - **Bancos**:
   - Blog sp011 (mãe): **Supabase** (projeto "SP011", ref
     `yfmyufqfepzwjtzblths`, sa-east-1) via `SUPABASE_DATABASE_URL` no `.env`

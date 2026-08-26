@@ -232,6 +232,11 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./caddy/sites:/etc/caddy/sites:ro   # 1 arquivo .caddy por blog replicado
+      # Arquivos estaticos de RAIZ por blog (verificacao do Search Console,
+      # Bing, Meta, ads.txt...). Diretorio -- nao sofre a troca de inode do
+      # bind de arquivo unico do Caddyfile, e o file_server le do disco a
+      # cada request: arquivo novo vale na hora, sem reload. Ver Caddyfile.
+      - ./caddy/verify:/etc/caddy/verify:ro
       # Certificados de ORIGEM de blogs atrás do Cloudflare (snippet blog-cf).
       # FORA do repositório de propósito: a chave privada nunca pode ser
       # commitada. Só é lido; quem não usa Cloudflare não tem arquivo aqui.
