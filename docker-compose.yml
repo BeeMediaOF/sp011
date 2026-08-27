@@ -209,8 +209,17 @@ services:
     # cota e a geração ficaria mais LENTA de tanto throttling. Pinado, enxerga
     # 4 CPUs, abre 4 threads, e sobram 4 vCPU sempre livres para
     # caddy/api/web/postgres.
-    cpus: 4.0
-    cpuset: "0-3"
+    #
+    # 2026-08-27: de 4 para 3 nucleos, junto com a troca do modelo 7B pelo 3B.
+    # Motivo: a Hostinger aplicou limitacao automatica de CPU (VPS travada em
+    # 40%) apos consumo sustentado perto de 100%, e o reset manual semanal ja
+    # tinha sido gasto -- ou seja, 7 dias sem rede de seguranca. Com 4 nucleos a
+    # inferencia sozinha reserva 50% da maquina sempre que ha fila; com 3, 37,5%.
+    # Nao custa vazao: o 3B e ~2,5x mais rapido, entao 3 nucleos rendem ~1,9x o
+    # que 4 nucleos rendiam com o 7B. Medido antes da troca: ~100 reescritas/dia
+    # (pico 135), cobertura media 77%, score medio 54.
+    cpus: 3.0
+    cpuset: "0-2"
     security_opt: ["no-new-privileges:true"]
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
