@@ -20,6 +20,7 @@ const Contato          = lazy(() => import("@/pages/Contato"));
 const Privacidade      = lazy(() => import("@/pages/Privacidade"));
 const Termos           = lazy(() => import("@/pages/Termos"));
 const CategoryArchivePage = lazy(() => import("@/pages/CategoryArchivePage"));
+const TopNews          = lazy(() => import("@/pages/TopNews"));
 
 /**
  * Componentes que o SSR precisa ter RESOLVIDOS antes de renderizar
@@ -320,6 +321,10 @@ function Router({ pages }: { pages?: SsrPages }) {
             mesma função que o middleware de SSR usa. */}
         <Route path="/artigo/:slug" component={ArtigoPage} />
         <Route path="/arquivo" component={Archive} />
+        {/* Aba das mais lidas. Precisa vir ANTES do /:slug e estar em
+            STATIC_PAGE_PATHS: sem isso o menu /top-news seria resolvido como
+            editoria e abriria uma página de categoria vazia. */}
+        <Route path="/top-news" component={TopNews} />
         <Route path="/contato" component={Contato} />
         <Route path="/privacidade" component={Privacidade} />
         <Route path="/termos" component={Termos} />

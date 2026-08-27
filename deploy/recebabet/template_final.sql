@@ -137,6 +137,13 @@ SET value = jsonb_set(
       "path": "/outros",
       "order": 8,
       "visible": true
+    },
+    {
+      "id": "rb-menu-topnews",
+      "label": "TOP NEWS",
+      "path": "/top-news",
+      "order": 9,
+      "visible": true
     }
   ],
   "footerConfig": {

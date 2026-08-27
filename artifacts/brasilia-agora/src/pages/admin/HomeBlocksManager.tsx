@@ -297,6 +297,7 @@ const KSPORTS_MENU: TemplateMenuItem[] = [
   { id: "ks-menu-nfl",        label: "NFL",        path: "/nfl",        order: 6, visible: true },
   { id: "ks-menu-esports",    label: "E-SPORTS",   path: "/esports",    order: 7, visible: true },
   { id: "ks-menu-others",     label: "OTHERS",     path: "/others",     order: 8, visible: true },
+  { id: "ks-menu-topnews",   label: "TOP NEWS",   path: "/top-news",   order: 9, visible: true },
 ];
 
 // Rodapé dark blue do mockup: tagline + Navigation/Institutional + newsletter.
@@ -384,6 +385,7 @@ const EA_MENU: TemplateMenuItem[] = [
   { id: "ea-menu-futam",    label: "FUT. AMERICANO", path: "/futebol-americano", order: 6, visible: true },
   { id: "ea-menu-esports",  label: "E-SPORTS",       path: "/e-sports",          order: 7, visible: true },
   { id: "ea-menu-outros",   label: "OUTROS",         path: "/outros",            order: 8, visible: true },
+  { id: "ea-menu-topnews",  label: "TOP NEWS",       path: "/top-news",          order: 9, visible: true },
 ];
 
 const EA_FOOTER: FooterConfig = {

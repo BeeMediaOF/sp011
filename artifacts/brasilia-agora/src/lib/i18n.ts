@@ -91,6 +91,19 @@ const PT = {
   "archive.byDate": "Busca por data",
   "archive.clearDate": "Limpar data",
 
+  // ── Top News (aba das mais lidas) ──────────────────────────────────────
+  // O nome da aba NÃO é traduzido: "Top News" é como ela foi batizada, e é o
+  // mesmo rótulo no menu dos blogs pt-BR e do ksports (EN).
+  "topNews.title": "Top News",
+  "topNews.subtitle": "As notícias mais lidas do portal",
+  "topNews.week": "7 dias",
+  "topNews.month": "30 dias",
+  "topNews.always": "Sempre",
+  "topNews.leader": "Mais lida",
+  "topNews.ranking": "Ranking",
+  "topNews.reads": "leituras",
+  "topNews.empty": "Ainda não há notícias publicadas para ranquear.",
+
   // ── Consentimento de cookies (pt = LGPD; en = aviso genérico) ─────────
   "consent.aria": "Controle de privacidade",
   "consent.title": "Controle sua privacidade",
@@ -180,6 +193,16 @@ const EN: Record<TKey, string> = {
   "archive.categories": "Categories",
   "archive.byDate": "Search by date",
   "archive.clearDate": "Clear date",
+
+  "topNews.title": "Top News",
+  "topNews.subtitle": "The most read stories on this site",
+  "topNews.week": "7 days",
+  "topNews.month": "30 days",
+  "topNews.always": "All time",
+  "topNews.leader": "Most read",
+  "topNews.ranking": "Ranking",
+  "topNews.reads": "reads",
+  "topNews.empty": "No published stories to rank yet.",
 
   "consent.aria": "Privacy controls",
   "consent.title": "Your privacy choices",

@@ -765,6 +765,31 @@ montada no servidor.
     teto de 50.000 URLs com log. `/sitemap.xml` → 301 para ele;
     `/sitemap_index.xml` → 404. Nenhuma URL publicada no sitemap pode
     responder 301, 404 ou `noindex`.
+- **Aba "Top News"** (`/top-news`, 2026-08-27): página das mais lidas do blog.
+  Está na imagem, então EXISTE nos 11 blogs; quem decide se ela aparece é o
+  menu — `deploy/top-news/menu_top_news.sql` roda só nos sete de esporte.
+  Path único e em inglês para pt-BR e EN de propósito: um path por idioma teria
+  que ser resolvido em tempo de execução no App, no `ssrRoutes` e no
+  `categoryRoutes` — o rótulo é dado do blog, o path é código. Três amarras:
+  - `/top-news` mora em `STATIC_PAGE_PATHS` (`lib/categoryRoutes.ts`), e isso
+    faz DUAS coisas — o middleware de SSR o classifica como `static` (nunca
+    404 de "editoria sem conteúdo") e o `RESERVED_PATHS` impede que o item de
+    menu vire uma EDITORIA chamada "top-news", que abriria categoria vazia com
+    `noindex` no lugar da página. Espelhado em `RESERVED_SLUGS` do
+    `api-server/src/lib/sitemapXml.ts`.
+  - O ranking é uma CASCATA (`api-server/src/lib/topArticles.ts`, puro e
+    testado): leituras da janela (`analytics_events`, pageviews não-internos)
+    → acumulado (`article_views`) → data. A janela existe para a aba não
+    congelar no campeão histórico; os outros dois degraus são o que segura a
+    página cheia em blog de tráfego ralo e em blog recém-publicado. `GET
+    /api/articles/top?limit=&days=` (`days=0` = sempre) fica ANTES de `/:id` na
+    rota, senão o Express entrega "top" como slug de artigo; a agregação tem
+    cache de 5 min e single-flight — é varredura de tabela numa rota pública,
+    em VPS compartilhada por 11 blogs.
+  - **Aplicar template apaga o menu** (§8). Por isso a aba também está nos seis
+    `deploy/<blog>/template_final.sql` de esporte e nos dois starters do
+    código (`KSPORTS_MENU`/`EA_MENU` em `HomeBlocksManager.tsx`) — template
+    novo já nasce com ela; snapshot salvo no banco antes desta data, não.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 

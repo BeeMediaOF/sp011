@@ -80,7 +80,8 @@ SET value = jsonb_set(
     { "id": "bee-menu-f1",      "label": "FÓRMULA 1",      "path": "/f1",                "order": 5, "visible": true },
     { "id": "bee-menu-futam",   "label": "FUT. AMERICANO", "path": "/futebol-americano", "order": 6, "visible": true },
     { "id": "bee-menu-esports", "label": "E-SPORTS",       "path": "/e-sports",          "order": 7, "visible": true },
-    { "id": "bee-menu-outros",  "label": "OUTROS",         "path": "/outros",            "order": 8, "visible": true }
+    { "id": "bee-menu-outros",  "label": "OUTROS",         "path": "/outros",            "order": 8, "visible": true },
+    { "id": "bee-menu-topnews", "label": "TOP NEWS",       "path": "/top-news",          "order": 9, "visible": true }
   ],
   "footerConfig": {
     "description": "Notícias. Análises. Paixão pelo esporte.",

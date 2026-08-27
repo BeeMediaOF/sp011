@@ -1,7 +1,11 @@
 import { Router } from "express";
+import { sql } from "drizzle-orm";
+import { db } from "@workspace/db";
 import { articleService } from "../lib/articleService.js";
 import { parseArticleListParams, selectArticles } from "../lib/articlesList.js";
+import { parseTopNewsParams, rankTopArticles } from "../lib/topArticles.js";
 import { store } from "../lib/store.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
@@ -95,6 +99,104 @@ router.get("/", async (req, res) => {
     total,
     limit: Number.isFinite(params.limit) ? params.limit : total,
     offset: params.offset,
+  });
+});
+
+/* ── Top News: leituras da janela ──────────────────────────────────────────
+ *
+ * A agregação varre `analytics_events` e a aba é PÚBLICA — sem cache, um pico
+ * de tráfego viraria N varreduras simultâneas da mesma tabela, e a VPS é
+ * compartilhada pelos 11 blogs (a Hostinger já estrangulou a CPU uma vez).
+ * Daí o TTL de 5 min E o single-flight: enquanto uma consulta está no ar, quem
+ * chegar espera nela em vez de abrir a segunda.
+ *
+ * `is_internal = false` exclui a navegação da redação — o mesmo filtro de todas
+ * as agregações do painel. (O acumulado de `article_views` não tem esse filtro;
+ * é o desempate, não o critério.)
+ */
+const TOP_WINDOW_TTL_MS = 5 * 60_000;
+const topWindowCache = new Map<number, { at: number; views: Map<string, number> }>();
+const topWindowInflight = new Map<number, Promise<Map<string, number>>>();
+
+function topWindowViews(days: number): Promise<Map<string, number>> {
+  const hit = topWindowCache.get(days);
+  if (hit && Date.now() - hit.at < TOP_WINDOW_TTL_MS) return Promise.resolve(hit.views);
+  const flying = topWindowInflight.get(days);
+  if (flying) return flying;
+
+  const run = db
+    .execute(sql`
+      SELECT article_id, count(*)::int AS views
+      FROM analytics_events
+      WHERE type = 'pageview' AND is_internal = false
+        AND article_id IS NOT NULL AND article_id <> ''
+        AND ts >= ${new Date(Date.now() - days * 86_400_000)}
+      GROUP BY article_id
+    `)
+    .then((r) => {
+      const views = new Map<string, number>();
+      for (const row of (r.rows ?? []) as { article_id?: string; views?: number }[]) {
+        if (row.article_id) views.set(row.article_id, row.views ?? 0);
+      }
+      topWindowCache.set(days, { at: Date.now(), views });
+      return views;
+    })
+    .catch((err: unknown) => {
+      /* Falha de consulta não pode esvaziar a aba: sem a janela o ranking cai
+         no acumulado, que vive em memória e não depende deste SELECT. E o
+         resultado NÃO entra no cache — a próxima visita tenta de novo. */
+      logger.error({ err }, "top news: agregacao da janela falhou");
+      return new Map<string, number>();
+    })
+    .finally(() => { topWindowInflight.delete(days); });
+
+  topWindowInflight.set(days, run);
+  return run;
+}
+
+/** GET /api/articles/top — as mais lidas do blog (público).
+ *
+ *  Params ADITIVOS: `limit` (1–60, padrão 24) e `days` (janela em dias, padrão
+ *  7; `0` = todos os tempos). Devolve `{ articles, days, total }`, onde cada
+ *  artigo traz `rank` (1..N), `views` (acumulado) e `windowViews`.
+ *
+ *  Rota própria, e não um `sort=` do /api/articles, porque a ordem depende de
+ *  uma consulta ao analytics que a lista comum não faz — e porque `windowViews`
+ *  e `rank` não existem lá. Precisa ficar ANTES de `/:id`, senão o Express
+ *  entrega "top" como se fosse slug de artigo. */
+router.get("/top", async (req, res) => {
+  const p = parseTopNewsParams(req.query as Record<string, unknown>);
+
+  const allTime = store.getArticleViews();
+  const allTimeOf = (id: string) => allTime[id]?.views ?? 0;
+
+  const [published, winViews] = await Promise.all([
+    articleService.getArticles().then((all) => all.filter((a) => a.status === "published")),
+    p.days > 0 ? topWindowViews(p.days) : Promise.resolve(new Map<string, number>()),
+  ]);
+  const windowOf = (id: string) => winViews.get(id) ?? 0;
+
+  const ranked = rankTopArticles(published, windowOf, allTimeOf, p.limit);
+
+  res.setHeader("Cache-Control", "public, max-age=300, s-maxage=300, stale-while-revalidate=600");
+  res.json({
+    days: p.days,
+    total: published.length,
+    articles: ranked.map((a, i) => ({
+      id: a.id,
+      slug: a.slug || a.id,
+      title: a.title,
+      subtitle: a.subtitle,
+      category: a.category,
+      tag: a.tag,
+      imageUrl: a.imageUrl,
+      author: a.author,
+      publishedAt: a.publishedAt,
+      readingMinutes: a.readingMinutes,
+      rank: i + 1,
+      views: allTimeOf(a.id),
+      windowViews: windowOf(a.id),
+    })),
   });
 });
 

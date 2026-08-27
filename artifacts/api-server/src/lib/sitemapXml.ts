@@ -21,7 +21,7 @@ export const SITEMAP_MAX_URLS = 50_000;
  * Espelha `RESERVED_PATHS` do frontend (`src/lib/categoryRoutes.ts`).
  */
 const RESERVED_SLUGS: ReadonlySet<string> = new Set([
-  "artigo", "arquivo", "contato", "privacidade", "termos",
+  "artigo", "arquivo", "contato", "privacidade", "termos", "top-news",
 ]);
 
 /** Slug de editoria aceitável numa URL: um segmento, minúsculo, sem espaço. */

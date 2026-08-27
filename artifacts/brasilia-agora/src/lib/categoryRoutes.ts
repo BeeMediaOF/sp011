@@ -42,12 +42,18 @@ export const FIXED_CATEGORIES: readonly CategoryRoute[] = [
 ];
 
 /**
- * Páginas institucionais de UM segmento, com componente próprio no App. São
- * rotas reais e permanentes do site — o middleware precisa saber disso para não
- * confundi-las com editoria inexistente e responder 404.
+ * Páginas de UM segmento com componente próprio no App. São rotas reais e
+ * permanentes do site — o middleware precisa saber disso para não confundi-las
+ * com editoria inexistente e responder 404.
+ *
+ * `/top-news` (aba das mais lidas) entra aqui por DOIS motivos, e o segundo é o
+ * que não é óbvio: além do 404 do middleware, esta lista alimenta o
+ * `RESERVED_PATHS` abaixo — sem ela, o item de menu `/top-news` seria lido pelo
+ * `blogCategorySurface` como se fosse uma EDITORIA chamada "top-news", e a aba
+ * abriria uma página de categoria vazia em vez da página real.
  */
 export const STATIC_PAGE_PATHS: ReadonlySet<string> = new Set([
-  "/arquivo", "/contato", "/privacidade", "/termos",
+  "/arquivo", "/contato", "/privacidade", "/termos", "/top-news",
 ]);
 
 /**

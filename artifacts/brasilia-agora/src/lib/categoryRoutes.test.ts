@@ -153,9 +153,25 @@ test("link externo do menu não é seção deste portal", () => {
 test("rotas que o App resolve ANTES do /:slug nunca são editoria", () => {
   // mesmo que alguém cadastre um menuItem apontando para elas
   const menu: MenuItemLike[] = [{ label: "Contato", path: "/contato" }, { label: "Termos", path: "/termos" }];
-  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/artigo"]) {
+  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/artigo", "/top-news"]) {
     assert.equal(resolveCategoryRoute(p, menu), null, p);
   }
+});
+
+test("a aba Top News é página, não editoria — mesmo estando no menu", () => {
+  /* Este é o caso REAL: o item `/top-news` é gravado no `menu_items` dos blogs
+     de esporte. Se ele entrasse na superfície de editorias, o clique abriria
+     uma página de categoria vazia (`noindex`) em vez da página das mais lidas
+     — e o defeito só apareceria depois do SQL rodar em produção. */
+  const menu: MenuItemLike[] = [
+    { label: "HOME", path: "/" },
+    { label: "FUTEBOL", path: "/futebol" },
+    { label: "TOP NEWS", path: "/top-news" },
+  ];
+  assert.equal(resolveCategoryRoute("/top-news", menu), null);
+  assert.ok(!blogCategorySurface(menu, []).some((c) => c.path === "/top-news"));
+  // E continua sendo o único reservado a sair: as editorias reais ficam.
+  assert.ok(blogCategorySurface(menu, []).some((c) => c.path === "/futebol"));
 });
 
 test("só um segmento, com ou sem barra final", () => {
