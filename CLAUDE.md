@@ -911,6 +911,40 @@ montada no servidor.
     comparador devolve `NaN` e só não quebrou porque o V8 mantém a ordem de
     inserção.
 
+13. **Crise de CPU da VPS** (2026-08-27 a 08-31): a Hostinger aplicou
+    limitação automática (teto de 40%) e ela **não caiu sozinha em três dias**,
+    mesmo com `ollama` e `central-api` parados o tempo todo. O Ollama era o
+    maior consumidor, não a causa do estrangulamento permanente. A causa era o
+    `getArticles()`: TTL sem proteção contra concorrência, e o `renderHome`
+    dispara `/api/articles?limit=300` mais um `?category=` por bloco visível
+    (8 pedidos em milissegundos) — os oito viam o cache vencido juntos e cada
+    um abria o SEU `SELECT *` com a coluna `content`. No ksports (3.095
+    publicados / 7,9 MB de HTML) davam ~1,9 milhão de conversões de linha por
+    hora. Corrigido em `58fcae6` (single-flight + contador de geração para a
+    corrida com a escrita) e o `CACHE_TTL` foi de 30 s para 60 s: 30 s era
+    igual ao `HOME_TTL_MS` do SSR, então os relógios ressoavam e quase todo
+    render caía em cache frio. **Nunca deixe os dois TTL iguais.** A prova no
+    log é N requisições a `/api/articles` terminando no MESMO milissegundo.
+14. **`pg-blogs` cai sozinho sob CPU faminta** (a investigar): `server process
+    exited with exit code 2` + `terminating any other active server processes`
+    em 20/08, 22/08, 28/08 e 31/08 — quatro vezes em onze dias, todas em
+    período de crise de CPU (Ollama disparado nas duas primeiras, limitação da
+    Hostinger nas duas últimas). O CONTAINER não cai (`restarts=0`, `oom=false`):
+    é crash-recovery INTERNO do Postgres, ~1 min de todos os 10 blogs sem banco.
+    Não há erro registrado antes; a única anomalia na hora anterior foi
+    `canceling authentication due to timeout` (handshake estourando 60 s).
+    Teste: se a CPU normalizar e parar, está confirmado que é sintoma.
+15. **Build da imagem custa 65 min** (2026-08-31, sob throttle; ~32 min normal).
+    Metade é evitável: `pnpm install` (790 s × 2) e `playwright install
+    chromium` (985 s) rodaram SEM cache mesmo sem mudança no lockfile —
+    invalidou no `COPY package.json pnpm-lock.yaml …`, conferir `docker buildx
+    du`. Os dois defeitos estruturais: `COPY --from=build --chown=node:node
+    /app /app` copia o workspace inteiro com `node_modules` numa camada só e o
+    `--chown` reescreve metadado de cada arquivo (523+432 s copiando, 786 s
+    exportando, 453 s desempacotando); e o Chromium do Playwright mora na
+    imagem de TODO blog (`apt-get install-deps` de 846 s por build) para um
+    recurso que a maioria nunca usa.
+
 ## 20. Onde procurar mais (no repo)
 
 - `deploy/README.md` — runbook vivo da replicação (arquitetura, preparação,
