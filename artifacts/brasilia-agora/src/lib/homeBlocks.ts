@@ -17,7 +17,7 @@ export type HomeBlockType =
   | "content" | "image" | "carousel" | "video" | "advertising" | "list"
   | "ticker" | "newsletter" | "categories" | "quotes" | "social"
   | "html" | "embed" | "map" | "sep" | "weather" | "table" | "counter"
-  | "search" | "playlist";
+  | "search" | "playlist" | "transfers";
 
 /** Ajuste de UMA editoria dentro do bloco "Categorias". */
 export interface CategoryBlockItem {
@@ -170,7 +170,7 @@ export interface HomeTemplate {
 const TYPE_PREFIXES: readonly string[] = [
   "content", "image", "carousel", "video", "advertising", "list", "ticker",
   "newsletter", "categories", "weather", "quotes", "social", "html", "table",
-  "counter", "sep", "map", "embed", "search", "playlist",
+  "counter", "sep", "map", "embed", "search", "playlist", "transfers",
 ];
 
 /**
@@ -191,6 +191,7 @@ export function defaultFormatForType(type: string): string {
     case "carousel":    return "carousel_news";
     case "video":       return "video_featured";
     case "playlist":    return "playlist_player";
+    case "transfers":   return "transfers_list";
     case "advertising": return "banner_970x90";
     case "list":        return "list_compact";
     case "search":      return "search_bar";

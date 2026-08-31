@@ -31,6 +31,7 @@ import imageRouter from "./image";
 import newsletterRouter from "./newsletter";
 import newsletterAdminRouter from "./newsletterAdmin";
 import youtubeRouter from "./youtube";
+import transfersRouter from "./transfers";
 
 const router: IRouter = Router();
 
@@ -55,6 +56,7 @@ router.use(ampRouter);
 router.use("/analytics", analyticsRouter);
 router.use("/newsletter", newsletterRouter);
 router.use("/admin/newsletter", newsletterAdminRouter);
+router.use("/admin/transfers", transfersRouter);
 router.use("/admin/rss", rssRouter);
 router.use("/admin/perplexity", perplexityRouter);
 router.use("/admin/users", usersRouter);

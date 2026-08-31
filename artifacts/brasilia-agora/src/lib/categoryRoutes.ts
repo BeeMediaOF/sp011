@@ -54,6 +54,7 @@ export const FIXED_CATEGORIES: readonly CategoryRoute[] = [
  */
 export const STATIC_PAGE_PATHS: ReadonlySet<string> = new Set([
   "/arquivo", "/contato", "/privacidade", "/termos", "/top-news",
+  "/transferencias",
 ]);
 
 /**

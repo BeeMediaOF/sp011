@@ -22,6 +22,7 @@ export const SITEMAP_MAX_URLS = 50_000;
  */
 const RESERVED_SLUGS: ReadonlySet<string> = new Set([
   "artigo", "arquivo", "contato", "privacidade", "termos", "top-news",
+  "transferencias",
 ]);
 
 /** Slug de editoria aceitável numa URL: um segmento, minúsculo, sem espaço. */

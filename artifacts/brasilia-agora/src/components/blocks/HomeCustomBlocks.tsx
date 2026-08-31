@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { FaFacebook, FaInstagram, FaYoutube, FaTiktok, FaWhatsapp, FaLinkedin } from "react-icons/fa";
 import { FaXTwitter } from "react-icons/fa6";
-import { ChevronLeft, ChevronRight, Mail } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mail, ArrowRight } from "lucide-react";
 import AdBanner from "../ads/AdBanner";
 import CotacaoWidget from "../CotacaoWidget";
 import { useSite } from "../../hooks/useSite";
@@ -25,6 +25,9 @@ import {
   parsePlaylistId, categoriesBlockSource, resolveCategoryBlockItems,
 } from "../../lib/homeBlocks";
 import { categoryIcon } from "../../lib/categoryIcons";
+import {
+  clubMonogram, positionKey, transferCrestUrl, transferPhotoUrl,
+} from "../../lib/transfers";
 import { useAdImpression, trackClick, type AdSlotKey } from "../ads/useAds";
 import { proxyUrl, buildSrcSet } from "../../lib/newsImage";
 import { trackSearch, trackNewsletter } from "../../hooks/useAnalytics";
@@ -885,5 +888,153 @@ export function AdSlotBlock({ block, preview }: { block: HomeBlock; preview?: bo
         </p>
       )}
     </div>
+  );
+}
+
+// ─── Transferências (rumores de mercado) ─────────────────────────────────────
+/**
+ * Painel de possíveis transferências: foto do jogador, clube de origem → clube
+ * de destino e o selo de probabilidade à direita.
+ *
+ * Os dados vêm prontos do `/api/site` (`lib/transfers.ts` do api-server já
+ * filtrou os ativos, resolveu os clubes e ordenou por data da informação), e é
+ * isso que faz o bloco nascer no HTML do SERVIDOR: sem fetch no cliente, sem
+ * CLS e sem o "pisca" do bloco de playlist.
+ *
+ * Ordem: data da informação, mais recente primeiro — decisão do usuário. A
+ * probabilidade continua no selo, com o mesmo peso visual; ela só não ordena.
+ *
+ * Cor: a do bloco, e como reserva as das settings do PRÓPRIO blog. A imagem é a
+ * mesma para os 11 — nada de tinta de marca escrita aqui.
+ */
+function alphaOn(color: string, alpha: string): string | undefined {
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? `${color}${alpha}` : undefined;
+}
+
+/** Escudo do clube; sem arquivo, o monograma com as iniciais. Escudo é marca de
+ *  terceiro — o seed não traz nenhum, e o bloco nunca pode ficar com buraco. */
+function ClubCrest({ name, crestUrl, accent, size = 20 }: {
+  name: string; crestUrl?: string; accent: string; size?: number;
+}) {
+  if (crestUrl) {
+    return (
+      <img
+        src={transferCrestUrl(crestUrl, size)}
+        alt=""
+        width={size}
+        height={size}
+        loading="lazy"
+        decoding="async"
+        className="object-contain shrink-0"
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="shrink-0 inline-flex items-center justify-center rounded-full font-bold"
+      style={{
+        width: size, height: size,
+        backgroundColor: alphaOn(accent, "1f") ?? "#e5e7eb",
+        color: accent,
+        fontSize: Math.max(8, Math.round(size * 0.42)),
+      }}
+    >
+      {clubMonogram(name)}
+    </span>
+  );
+}
+
+export function TransfersBlock({ block, preview }: { block: HomeBlock; preview?: boolean }) {
+  const { settings } = useSite();
+  const { t } = useT();
+  const rows = settings?.transfers ?? [];
+  const accent = block.color || settings?.footerAccentColor || settings?.menuBarBgColor || "#1d4ed8";
+
+  if (rows.length === 0) {
+    return <BlockPlaceholder preview={preview} label={`Transferências: ${block.name}`}
+      hint="Nenhum rumor ativo. Cadastre em Painel → Transferências para o bloco aparecer no site." />;
+  }
+
+  const limit = block.itemsLimit && block.itemsLimit > 0 ? block.itemsLimit : 5;
+  const visiveis = rows.slice(0, limit);
+  const selo = alphaOn(accent, "14");
+
+  return (
+    <section className="max-w-[1280px] mx-auto px-4 py-6">
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-4 sm:px-5 pt-4">
+          <SectionHeading title={block.name || t("transfers.title")} color={accent} hideHeader={block.hideHeader} />
+        </div>
+
+        <ul className="px-4 sm:px-5 pb-1">
+          {visiveis.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 sm:gap-4 py-3 border-b border-gray-100 last:border-0">
+              {/* Foto (círculo). Sem foto, o círculo vira as iniciais do jogador
+                  — a linha não pode ficar torta por falta de imagem. */}
+              {r.playerPhotoUrl ? (
+                <img
+                  src={transferPhotoUrl(r.playerPhotoUrl, 56)}
+                  alt={r.playerName}
+                  width={56}
+                  height={56}
+                  loading="lazy"
+                  decoding="async"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full object-cover shrink-0 bg-gray-100"
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-full shrink-0 inline-flex items-center justify-center text-[13px] font-bold"
+                  style={{ backgroundColor: alphaOn(accent, "1f") ?? "#e5e7eb", color: accent }}
+                >
+                  {clubMonogram(r.playerName)}
+                </span>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] sm:text-[15px] font-bold text-[#1a1a1a] leading-tight truncate">
+                  {r.playerName}
+                </p>
+                <p className="text-[11px] text-gray-400 leading-tight mb-1">
+                  {t(positionKey(r.position) as Parameters<typeof t>[0])}
+                </p>
+                <div className="flex items-center gap-1.5 min-w-0 text-[11px] sm:text-[12px] text-gray-600">
+                  <ClubCrest name={r.from.name} crestUrl={r.from.crestUrl} accent={accent} />
+                  <span className="truncate max-w-[80px] sm:max-w-[140px]">{r.from.name}</span>
+                  <ArrowRight size={13} className="shrink-0 text-gray-300" aria-hidden="true" />
+                  <ClubCrest name={r.to.name} crestUrl={r.to.crestUrl} accent={accent} />
+                  <span className="truncate max-w-[80px] sm:max-w-[140px] font-semibold text-[#1a1a1a]">{r.to.name}</span>
+                </div>
+              </div>
+
+              {/* Selo de probabilidade */}
+              <div
+                className="shrink-0 text-center rounded-xl px-2.5 sm:px-3 py-1.5"
+                style={{ backgroundColor: selo ?? "#f3f4f6" }}
+              >
+                <span className="block text-[17px] sm:text-[19px] font-black leading-none tabular-nums" style={{ color: accent }}>
+                  {r.probability}%
+                </span>
+                <span className="block text-[8px] sm:text-[9px] uppercase tracking-wider text-gray-400 mt-0.5">
+                  {t("transfers.probability")}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="px-4 sm:px-5 py-3 border-t border-gray-100 bg-gray-50/60">
+          <Link
+            href="/transferencias"
+            className="text-[11px] font-bold uppercase tracking-wider hover:underline"
+            style={{ color: accent }}
+          >
+            {block.linkLabel?.trim() || t("transfers.seeAll")}
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }

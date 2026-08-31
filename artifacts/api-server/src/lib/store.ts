@@ -8,6 +8,7 @@
 
 import { createHash, randomUUID } from "crypto";
 import type { PaidCampaign } from "./analyticsShared.js";
+import type { TransferClub, TransferRumor } from "./transfers.js";
 import { existsSync, readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -572,6 +573,10 @@ interface StoreCache {
   perplexityTopics: PerplexityTopic[];
   categoryViews:    Record<string, number>;
   articleViews:     Record<string, { title: string; views: number }>;
+  /* Módulo Transferências: cadastro manual de rumores de mercado. Duas chaves
+     de `settings` como os colunistas — nada em `lib/db`, nada no ensureSchema. */
+  transferRumors:   TransferRumor[];
+  transferClubs:    TransferClub[];
 }
 
 let _cache: StoreCache = {
@@ -585,6 +590,11 @@ let _cache: StoreCache = {
   perplexityTopics: [],
   categoryViews:    {},
   articleViews:     {},
+  /* Vazio de propósito: o catálogo de clubes chega por SQL, blog a blog. A
+     imagem não sabe qual blog está rodando (CLAUDE.md §13) — um seed embutido
+     colocaria times de futebol no credito.vc e no pontofarma. */
+  transferRumors:   [],
+  transferClubs:    [],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -682,6 +692,8 @@ export async function initStore(): Promise<void> {
           case "rss_prompts":    _cache.rssPrompts      = parsed as RssPrompts;    break;
           case "category_views": _cache.categoryViews   = parsed as Record<string, number>; break;
           case "article_views":  _cache.articleViews    = parsed as Record<string, { title: string; views: number }>; break;
+          case "transfer_rumors": _cache.transferRumors = parsed as TransferRumor[]; break;
+          case "transfer_clubs":  _cache.transferClubs  = parsed as TransferClub[];  break;
         }
       } catch { /* ignore corrupt entries */ }
     }
@@ -752,6 +764,7 @@ export async function initStore(): Promise<void> {
 const SYNCED_KEYS = new Set([
   "site_settings", "menu_items", "columnists",
   "contact_info", "social_config", "rss_prompts",
+  "transfer_rumors", "transfer_clubs",
 ]);
 
 let _syncTimer: ReturnType<typeof setInterval> | null = null;
@@ -774,6 +787,8 @@ async function rehydrateSettings(graceMs: number): Promise<void> {
           case "contact_info":  _cache.contactInfo  = parsed as ContactInfo;  break;
           case "social_config": _cache.socialConfig = parsed as SocialConfig; break;
           case "rss_prompts":   _cache.rssPrompts   = parsed as RssPrompts;   break;
+          case "transfer_rumors": _cache.transferRumors = parsed as TransferRumor[]; break;
+          case "transfer_clubs":  _cache.transferClubs  = parsed as TransferClub[];  break;
         }
       } catch { /* ignore corrupt entries */ }
     }
@@ -1159,6 +1174,26 @@ export const store = {
     const deleted = _cache.columnists.length < before;
     if (deleted) persistSetting("columnists", _cache.columnists);
     return deleted;
+  },
+
+  // ── Transferências (rumores de mercado) ───────────────────────────────────
+  // Lista inteira em cada leitura/escrita: são dezenas de itens curados, lidos
+  // por completo a cada render da home. Quem valida é `lib/transfers.ts`; aqui
+  // é só persistência — a rota nunca grava o que o normalizador não aprovou.
+  getTransferRumors: (): TransferRumor[] => [..._cache.transferRumors],
+
+  saveTransferRumors: (list: TransferRumor[]): TransferRumor[] => {
+    _cache.transferRumors = list;
+    persistSetting("transfer_rumors", _cache.transferRumors);
+    return [..._cache.transferRumors];
+  },
+
+  getTransferClubs: (): TransferClub[] => [..._cache.transferClubs],
+
+  saveTransferClubs: (list: TransferClub[]): TransferClub[] => {
+    _cache.transferClubs = list;
+    persistSetting("transfer_clubs", _cache.transferClubs);
+    return [..._cache.transferClubs];
   },
 
   // ── Contact Info ──────────────────────────────────────────────────────────

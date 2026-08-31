@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { HomeBlock } from "../lib/homeBlocks";
 import type { FooterConfig, PublicContact } from "../lib/footerConfig";
+import type { PublicTransfer } from "../lib/transfers";
 
 export type { HomeBlock };
 
@@ -110,6 +111,10 @@ export interface SiteSettings {
   footerConfig?: FooterConfig;
   /** Contato público (hub de Contato) — telefone, e-mail e redes do rodapé. */
   contact?: PublicContact;
+  /** Rumores de transferência ATIVOS, com os clubes resolvidos e já ordenados
+   *  pelo servidor (`lib/transfers.ts`). Ausente/vazio = o blog não usa o
+   *  módulo — o bloco da home simplesmente não aparece. */
+  transfers?: PublicTransfer[];
 }
 
 const STORAGE_KEY = "bee_site_v1";

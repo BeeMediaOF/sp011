@@ -790,6 +790,53 @@ montada no servidor.
     `deploy/<blog>/template_final.sql` de esporte e nos dois starters do
     código (`KSPORTS_MENU`/`EA_MENU` em `HomeBlocksManager.tsx`) — template
     novo já nasce com ela; snapshot salvo no banco antes desta data, não.
+- **Módulo "Transferências"** (rumores de mercado, 2026-08-31): cadastro
+  MANUAL de possíveis transferências — módulo `/admin/transferencias`, bloco de
+  home `transfers` e página pública `/transferencias`. Está na imagem, então
+  EXISTE nos 11 blogs; quem decide se aparece no site é o operador, adicionando
+  o bloco. Sem rumor ativo o bloco não renderiza e o `/api/site` manda
+  `"transfers":[]`. Nada disso passa pela central: é manual, sem coleta e sem
+  IA. Kit: `deploy/transferencias/` (seed de 96 clubes + runbook).
+  - **Os dados moram em `settings`, não em tabela**: duas chaves
+    (`transfer_rumors`, `transfer_clubs`), no padrão dos colunistas — entram no
+    `SYNCED_KEYS` e reidratam a cada 15 s em todo processo, sem restart e **sem
+    schema novo**. Tetos de 200 rumores / 300 clubes recusados com 409: o blob é
+    reescrito inteiro a cada edição, e é o teto que o mantém barato.
+  - **O `/api/site` publica só os ATIVOS**, com os clubes já resolvidos, já
+    ordenados e cortados em 30 — e é isso que dá SSR de graça: o `renderHome` já
+    busca esse payload, então o bloco nasce no HTML do servidor, sem fetch no
+    cliente e sem CLS. Rumor cujo clube foi apagado é DESCARTADO do público
+    (`publicRumors`) mas fica no cadastro, marcado "fora do site" no painel.
+  - **Ordena por `infoDate` desc → `updatedAt` desc → `id`**, não por
+    probabilidade (decisão do usuário; o mock ordenava por probabilidade). O
+    campo nasce com hoje, rumor sem data cai no `updatedAt`, e editar um rumor
+    antigo NÃO o traz de volta ao topo — corrigir uma digitação não republica.
+    O desempate por `id` não é firula: SSR e cliente precisam pintar a MESMA
+    ordem, senão a hidratação descarta o HTML servido.
+  - **Posição é enum + i18n** (`transfers.pos.*`), nunca texto livre: "Atacante"
+    digitado à mão apareceria em português no ksports, que é EN. **Dinheiro é
+    formatado sem `Intl`** (`formatMoney`/`formatMoneyShort` em
+    `brasilia-agora/src/lib/transfers.ts`, puros e testados) — o ICU do Node e o
+    do navegador podem divergir, e divergência SSR↔hidratação é o #418.
+  - **O catálogo de clubes chega por SQL, blog a blog**
+    (`deploy/transferencias/clubes_seed.sql`), NUNCA pela imagem: ela não sabe
+    qual blog está rodando (§13) e instalaria times de futebol no credito.vc, no
+    pontofarma e no ocomandante — a mesma lição das 25 fontes RSS do sp011. O
+    `id` do clube é o slug do nome (gerado, nunca digitado: é o que torna a
+    mescla idempotente e o que impede duplicata quando o painel cadastra o mesmo
+    nome). **Sem escudo de propósito** (marca de terceiro): o site desenha um
+    monograma com as iniciais até o operador subir o escudo na aba Clubes.
+  - **A página `/transferencias` tem as mesmas cinco amarras do `/top-news`**:
+    rota antes do `/:slug`, `STATIC_PAGE_PATHS` (que também alimenta o
+    `RESERVED_PATHS`, senão o path viraria editoria vazia com `noindex`),
+    `RESERVED_SLUGS` do `sitemapXml.ts`, e teste nos dois resolvedores. Ela
+    **não** entra no menu — a porta de entrada é o link do bloco; colocá-la lá
+    obrigaria a mexer nos seis `template_final.sql` e nos dois starters.
+  - `transfers.view`/`transfers.manage` no grupo Conteúdo. ⚠️ Upload é
+    permissão SEPARADA (`upload.images`): sem ela o formulário cai para um campo
+    de URL, com o motivo escrito, em vez de um 403 genérico. E `itemsLimit` do
+    bloco vive em `LIMIT_TYPES` (não em `ARTICLE_TYPES`) no HomeBlocksManager:
+    "transfers" escolhe quantas linhas exibe, mas não é bloco de artigos.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 

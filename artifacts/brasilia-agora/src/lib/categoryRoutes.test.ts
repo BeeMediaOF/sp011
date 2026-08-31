@@ -153,7 +153,7 @@ test("link externo do menu não é seção deste portal", () => {
 test("rotas que o App resolve ANTES do /:slug nunca são editoria", () => {
   // mesmo que alguém cadastre um menuItem apontando para elas
   const menu: MenuItemLike[] = [{ label: "Contato", path: "/contato" }, { label: "Termos", path: "/termos" }];
-  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/artigo", "/top-news"]) {
+  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/artigo", "/top-news", "/transferencias"]) {
     assert.equal(resolveCategoryRoute(p, menu), null, p);
   }
 });
@@ -212,4 +212,21 @@ test("categoryTitle é o mesmo texto no SSR e na página", () => {
 test("colorForSlug é estável (o servidor e o cliente pintam igual)", () => {
   assert.equal(colorForSlug("volei"), colorForSlug("volei"));
   assert.match(colorForSlug("qualquer-coisa"), /^#[0-9a-f]{6}$/);
+});
+
+test("a pagina de transferencias e pagina, nao editoria — mesmo cadastrada", () => {
+  /* Mesmo caso da aba Top News, e por isso mesmo repetido: se `/transferencias`
+     entrasse na superfície, o link do bloco da home abriria uma categoria vazia
+     com `noindex` no lugar da página — e o defeito só apareceria em produção. */
+  const menu: MenuItemLike[] = [
+    { label: "HOME", path: "/" },
+    { label: "FUTEBOL", path: "/futebol" },
+    { label: "TRANSFERÊNCIAS", path: "/transferencias" },
+  ];
+  const cats: CategoryLike[] = [{ name: "TRANSFERÊNCIAS", slug: "transferencias" }];
+  assert.equal(resolveCategoryRoute("/transferencias", menu, cats), null);
+  assert.ok(!blogCategorySurface(menu, cats).some((c) => c.path === "/transferencias"));
+  assert.equal(categoryRouteForSlug("transferencias"), null);
+  // as editorias reais do blog continuam de pé
+  assert.ok(blogCategorySurface(menu, cats).some((c) => c.path === "/futebol"));
 });

@@ -30,6 +30,8 @@ export const ALL_PERMISSIONS: PermissionDef[] = [
   { key: "articles.delete",      label: "Excluir artigos",          group: "Conteúdo",       description: "Remover artigos permanentemente" },
   { key: "articles.publish",     label: "Publicar artigos",         group: "Conteúdo",       description: "Publicar ou despublicar artigos" },
   { key: "upload.images",        label: "Upload de imagens",        group: "Conteúdo",       description: "Fazer upload de imagens e mídias" },
+  { key: "transfers.view",       label: "Ver transferências",       group: "Conteúdo",       description: "Acessar o módulo de possíveis transferências" },
+  { key: "transfers.manage",     label: "Gerenciar transferências", group: "Conteúdo",       description: "Cadastrar, editar e excluir rumores e clubes" },
   // Plataforma
   { key: "dashboard.view",       label: "Dashboard",                group: "Plataforma",     description: "Acessar o painel inicial" },
   { key: "analytics.view",       label: "Analytics",                group: "Plataforma",     description: "Ver estatísticas de acesso" },

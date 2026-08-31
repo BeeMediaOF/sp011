@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { SITE_ASSET_FIELDS, store } from "../lib/store.js";
+import { publicRumors } from "../lib/transfers.js";
 import { withBlockImageDimensions, withHtmlImageDimensions } from "../lib/blockImageMeta.js";
 import {
   cacheKey, memGet, resolveImage, MAX_WIDTH,
@@ -119,11 +120,17 @@ router.get("/site", async (_req, res) => {
     legalInfo: c.legalInfo, privacyPolicy: c.privacyPolicy, termsOfUse: c.termsOfUse,
     privacyEmail: c.privacyEmail,
   };
+  /* Rumores de transferência: só os ATIVOS, com os clubes já resolvidos, já
+     ordenados e cortados no teto. Vir por AQUI é o que dá SSR de graça ao bloco
+     da home — o `renderHome` já busca este payload, então o cartão nasce no HTML
+     do servidor, sem fetch no cliente e sem CLS. Blog que não usa o módulo manda
+     `[]`: custo zero nos outros dez. */
+  const transfers = publicRumors(store.getTransferRumors(), store.getTransferClubs());
   // no-cache: o navegador/Nginx sempre revalida antes de usar. Garante que edições
   // de blocos/menu/tema apareçam no site imediatamente (sem janela de cache servindo
   // estado antigo). O payload é pequeno e servido da memória do processo.
   res.setHeader("Cache-Control", "no-cache");
-  res.json({ ...settings, menuItems, contact });
+  res.json({ ...settings, menuItems, contact, transfers });
 });
 
 export default router;

@@ -1,3 +1,5 @@
+import type { TransferClub, TransferRumor } from "./transfers";
+
 const BASE = "/api/admin";
 
 function getToken(): string | null {
@@ -190,6 +192,22 @@ export const adminApi = {
   updateColumnist: (id: string, data: Partial<Columnist>) => req<{ columnist: Columnist }>("PUT", `/columnists/${id}`, data),
   deleteColumnist: (id: string) => req<{ success: boolean }>("DELETE", `/columnists/${id}`),
 
+  // Transfers (possíveis transferências) — rumores + catálogo de clubes.
+  // O GET traz TUDO numa requisição: são dezenas de itens e a busca de clube do
+  // formulário é filtrada no cliente, então o módulo não precisa de autocomplete.
+  getTransfers: () => req<{ rumors: TransferRumor[]; clubs: TransferClub[] }>("GET", "/transfers"),
+  createTransfer: (data: Partial<TransferRumor>) => req<{ rumor: TransferRumor }>("POST", "/transfers", data),
+  updateTransfer: (id: string, data: Partial<TransferRumor>) => req<{ rumor: TransferRumor }>("PUT", `/transfers/${id}`, data),
+  deleteTransfer: (id: string) => req<{ success: boolean }>("DELETE", `/transfers/${id}`),
+  /** Nome já cadastrado devolve o clube existente (`existing: true`), não erro. */
+  createTransferClub: (data: { name: string; country?: string; crestUrl?: string }) =>
+    req<{ club: TransferClub; existing?: boolean }>("POST", "/transfers/clubs", data),
+  updateTransferClub: (id: string, data: { name?: string; country?: string; crestUrl?: string }) =>
+    req<{ club: TransferClub }>("PUT", `/transfers/clubs/${id}`, data),
+  /** Sem `force`, clube em uso responde 409 com a contagem de rumores. */
+  deleteTransferClub: (id: string, force = false) =>
+    req<{ success: boolean; orphaned: number }>("DELETE", `/transfers/clubs/${id}${force ? "?force=1" : ""}`),
+
   // Contact Info
   getContactInfo: () => req<{ contactInfo: ContactInfo }>("GET", "/contact"),
   updateContactInfo: (info: Partial<ContactInfo>) => req<{ contactInfo: ContactInfo }>("PUT", "/contact", info),
@@ -245,7 +263,12 @@ export const adminApi = {
     }).then(async (r) => {
       if (!r.ok) {
         const err = await r.json().catch(() => ({ error: r.statusText }));
-        throw new Error((err as { error?: string }).error ?? r.statusText);
+        /* O status vai junto: um editor SEM `upload.images` toma 403 aqui, e o
+           formulário de Transferências troca o upload por um campo de URL em
+           vez de mostrar "erro" para uma restrição de perfil. */
+        const e = new Error((err as { error?: string }).error ?? r.statusText) as Error & { status?: number };
+        e.status = r.status;
+        throw e;
       }
       return r.json() as Promise<{ ok: boolean; url: string; filename: string; size: number }>;
     });

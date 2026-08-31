@@ -34,7 +34,7 @@ test("editoria: candidato de um segmento só", () => {
 });
 
 test("P-4: paginas institucionais tem rota propria e nunca sao editoria", () => {
-  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/top-news"]) {
+  for (const p of ["/contato", "/termos", "/privacidade", "/arquivo", "/top-news", "/transferencias"]) {
     assert.equal(classifySsrPath(p)?.kind, "static", p);
   }
 });

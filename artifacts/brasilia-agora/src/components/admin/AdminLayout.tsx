@@ -6,7 +6,7 @@ import {
   Users, BarChart2, LayoutGrid, Rss,
   ChevronDown, Bell, Search, ExternalLink, X, CheckCheck,
   UserCircle, Eye, AlertCircle, CheckCircle, Info,
-  Camera, Pencil, Moon, Sun, Share2, FolderOpen, Mail,
+  Camera, Pencil, Moon, Sun, Share2, FolderOpen, Mail, ArrowLeftRight,
 } from "lucide-react";
 import { getStoredUser, setStoredUser, clearAuth, getStoredRole } from "../../pages/Admin";
 import { adminApi } from "../../lib/adminApi";
@@ -29,6 +29,7 @@ const NAV_MAIN = [
   { tk: "nav.categories", icon: FolderOpen,       path: "/admin/categorias",   permKey: "categories.view" },
   { tk: "nav.ads",        icon: Megaphone,        path: "/admin/propagandas",  permKey: "ads.view" },
   { tk: "nav.columnists", icon: Users,            path: "/admin/colunistas",   permKey: "columnists.view" },
+  { tk: "nav.transfers",  icon: ArrowLeftRight,   path: "/admin/transferencias", permKey: "transfers.view" },
   { tk: "nav.rss",        icon: Rss,              path: "/admin/rss",          permKey: "rss.view" },
   { tk: "nav.users",      icon: UserCircle,       path: "/admin/usuarios",     permKey: "users.manage" },
   { tk: "nav.social",     icon: Share2,           path: "/admin/social",       permKey: "social.view" },

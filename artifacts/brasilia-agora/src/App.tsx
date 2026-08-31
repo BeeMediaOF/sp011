@@ -21,6 +21,7 @@ const Privacidade      = lazy(() => import("@/pages/Privacidade"));
 const Termos           = lazy(() => import("@/pages/Termos"));
 const CategoryArchivePage = lazy(() => import("@/pages/CategoryArchivePage"));
 const TopNews          = lazy(() => import("@/pages/TopNews"));
+const Transfers        = lazy(() => import("@/pages/Transfers"));
 
 /**
  * Componentes que o SSR precisa ter RESOLVIDOS antes de renderizar
@@ -68,6 +69,7 @@ const TwoFactorSetup   = lazyWithPreload(() => import("@/pages/admin/TwoFactorSe
 const Webhook          = lazyWithPreload(() => import("@/pages/admin/Webhook"));
 const AdsManager       = lazyWithPreload(() => import("@/pages/admin/AdsManager"));
 const ColumnistsManager = lazyWithPreload(() => import("@/pages/admin/ColumnistsManager"));
+const TransfersManager = lazyWithPreload(() => import("@/pages/admin/TransfersManager"));
 const Analytics        = lazyWithPreload(() => import("@/pages/admin/Analytics"));
 const HomeBlocksManager = lazyWithPreload(() => import("@/pages/admin/HomeBlocksManager"));
 const CategoriesManager = lazyWithPreload(() => import("@/pages/admin/CategoriesManager"));
@@ -88,7 +90,7 @@ function preloadAdminPages() {
     loadAdminShell().catch(() => {});
     for (const c of [
       Dashboard, Articles, ArticleEdit, MenuManager, Settings, TwoFactorSetup,
-      Webhook, AdsManager, ColumnistsManager, Analytics, HomeBlocksManager,
+      Webhook, AdsManager, ColumnistsManager, TransfersManager, Analytics, HomeBlocksManager,
       CategoriesManager, RSSManager, UsersManager, SecurityCheckup, EditorPermissions, SocialMedia,
       Newsletter,
     ]) {
@@ -260,6 +262,9 @@ function Router({ pages }: { pages?: SsrPages }) {
         <Route path="/admin/colunistas">
           <RequirePermission perm="columnists.view"><ColumnistsManager /></RequirePermission>
         </Route>
+        <Route path="/admin/transferencias">
+          <RequirePermission perm="transfers.view"><TransfersManager /></RequirePermission>
+        </Route>
         <Route path="/admin/rss">
           <RequirePermission perm="rss.view"><RSSManager /></RequirePermission>
         </Route>
@@ -325,6 +330,10 @@ function Router({ pages }: { pages?: SsrPages }) {
             STATIC_PAGE_PATHS: sem isso o menu /top-news seria resolvido como
             editoria e abriria uma página de categoria vazia. */}
         <Route path="/top-news" component={TopNews} />
+        {/* Possíveis transferências (destino do link do bloco da home).
+            Mesmas amarras da aba acima: ANTES do /:slug e em
+            STATIC_PAGE_PATHS, senão vira "editoria transferencias" vazia. */}
+        <Route path="/transferencias" component={Transfers} />
         <Route path="/contato" component={Contato} />
         <Route path="/privacidade" component={Privacidade} />
         <Route path="/termos" component={Termos} />

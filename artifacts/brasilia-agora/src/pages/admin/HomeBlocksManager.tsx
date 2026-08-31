@@ -19,11 +19,11 @@ import {
   Newspaper, Users, AlignJustify, Globe, Flame,
   Trophy, Building2, Heart, Cpu, Star, BarChart3,
   Type, Palette, Eye as EyeIcon, FileImage,
-  ChevronRight, ChevronUp, Layers, ListVideo,
+  ChevronRight, ChevronUp, Layers, ListVideo, ArrowLeftRight,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search" | "playlist";
+type BlockType = "content" | "image" | "carousel" | "video" | "advertising" | "list" | "ticker" | "newsletter" | "categories" | "weather" | "quotes" | "social" | "html" | "table" | "counter" | "sep" | "map" | "embed" | "search" | "playlist" | "transfers";
 type LayoutId = "grid" | "featured" | "duplo" | "cultura" | "lista" | "manchete" | "mosaico" | "trio" | "compact" | "bigstory" | "timeline" | "portal" | "overlay" | "magazine" | "mini" | "hero";
 /** "menu"/"html" só valem no bloco Categorias (origem da navegação). */
 type SourceType = "automatic_by_category" | "most_read" | "latest" | "manual" | "rss" | "perplexity" | "menu" | "html";
@@ -86,6 +86,7 @@ const MAIN_MODULES = [
   { type: "newsletter" as BlockType,  name: "Newsletter",   desc: "Captura de e-mails.",                  Icon: Mail,              iconBg: "#F0FDFA", iconColor: "#14B8A6" },
   { type: "search" as BlockType,      name: "Busca",        desc: "Campo de busca funcional do site.",    Icon: Search,            iconBg: "#EFF6FF", iconColor: "#0EA5E9" },
   { type: "categories" as BlockType,  name: "Categorias",   desc: "Navegação por categorias.",            Icon: FolderOpen,        iconBg: "#FFF7ED", iconColor: "#EA580C" },
+  { type: "transfers" as BlockType,   name: "Transferências", desc: "Possíveis transferências com probabilidade.", Icon: ArrowLeftRight, iconBg: "#EFF6FF", iconColor: "#2563EB" },
   { type: "quotes" as BlockType,      name: "Cotações",     desc: "Moedas e índices.",                    Icon: CircleDollarSign,  iconBg: "#F0FDF4", iconColor: "#16A34A" },
   { type: "social" as BlockType,      name: "Redes Sociais",desc: "Links para redes sociais.",            Icon: Share2,            iconBg: "#EFF6FF", iconColor: "#2563EB" },
 ];
@@ -144,6 +145,12 @@ const SHARE_NETWORK_OPTIONS: { value: string; label: string }[] = [
 
 // ─── Tipos de bloco com artigos (mostram fonte/categoria/quantidade) ─────────
 const ARTICLE_TYPES = new Set<BlockType>(["content", "carousel", "list", "ticker"]);
+/** Tipos que têm o controle "Quantidade de itens" na tela E persistem o valor.
+ *  É uma lista própria porque "transfers" não é bloco de ARTIGOS: ele não tem
+ *  categoria nem "Fonte dos artigos", mas escolhe quantas linhas exibe. Manter
+ *  os dois conjuntos separados é o que impede o campo fantasma que o bloco
+ *  Categorias sofreu (itemsLimit: 4 gravado sem ninguém pedir). */
+const LIMIT_TYPES = new Set<BlockType>([...ARTICLE_TYPES, "transfers"]);
 
 // ─── Estilos do Hero (bloco fixo de destaques) ────────────────────────────────
 const HERO_FORMATS: { value: string; label: string }[] = [
@@ -643,7 +650,7 @@ function formToBlockPatch(f: BlockForm): Partial<HomeBlock> {
     // para todos criava campo fantasma: o bloco Categorias, que não tem esse
     // controle, saía de qualquer edição com itemsLimit=4 (o default do
     // blockToForm) e a home passava a mostrar 4 editorias sem ninguém pedir.
-    itemsLimit: ARTICLE_TYPES.has(f.blockType) ? f.itemsLimit : undefined,
+    itemsLimit: LIMIT_TYPES.has(f.blockType) ? f.itemsLimit : undefined,
     imageUrl:   f.imageUrl.trim() || undefined,
     linkUrl:    f.linkUrl.trim() || undefined,
     caption:    f.caption.trim() || undefined,
@@ -996,6 +1003,7 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
               <option value="ticker">Ticker</option>
               <option value="newsletter">Newsletter</option>
               <option value="categories">Categorias</option>
+              <option value="transfers">Transferências</option>
               <option value="quotes">Cotações</option>
               <option value="social">Redes Sociais</option>
               <option value="html">HTML Livre</option>
@@ -1074,6 +1082,28 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
           <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
             A playlist precisa ser <strong>pública</strong>. Os vídeos são lidos do feed público do
             YouTube — nenhuma chave de API é necessária. Use "Itens" para limitar a lista lateral.
+          </p>
+        </PanelSection>
+      )}
+
+      {/* ── Transferências: o conteúdo vem do módulo, não daqui ── */}
+      {!isSpecial && form.blockType === "transfers" && (
+        <PanelSection label="Possíveis transferências" icon={ArrowLeftRight}>
+          <p className="text-[10px] text-slate-400 leading-relaxed">
+            O bloco exibe os rumores com status <strong>Ativa</strong>, do mais recente
+            para o mais antigo (pela <em>data da informação</em>). Sem nenhum rumor
+            ativo ele não aparece no site — cartão vazio é pior que cartão nenhum.
+          </p>
+          <a href="/admin/transferencias" target="_blank" rel="noreferrer"
+            className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#0B2A66] hover:underline mt-2">
+            <ArrowLeftRight size={10} /> Cadastrar transferências
+          </a>
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mt-3 mb-1">Texto do link do rodapé</label>
+          <input value={form.linkLabel} onChange={(e) => onChange("linkLabel", e.target.value)}
+            className={INPUT} placeholder="Ver todas as possíveis transferências" />
+          <p className="text-[10px] text-slate-400 mt-1.5 leading-relaxed">
+            Vazio usa o texto padrão do idioma do site. O link abre a página
+            <code> /transferencias</code>, que existe em todo blog.
           </p>
         </PanelSection>
       )}
@@ -1419,7 +1449,7 @@ function SettingsPanel({ block, form, saving, categories, onChange, onApply, onD
 
       {/* Quantidade (layouts de Conteúdo definem as próprias contagens; os
           layouts revista "mini"/"hero" respeitam a quantidade escolhida) */}
-      {!isSpecial && isArticleType && (form.blockType !== "content" || form.layout === "mini" || form.layout === "hero") && (
+      {!isSpecial && LIMIT_TYPES.has(form.blockType) && (form.blockType !== "content" || form.layout === "mini" || form.layout === "hero") && (
         <PanelSection label="Quantidade de itens">
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => onChange("itemsLimit", Math.max(1, form.itemsLimit - 1))}
@@ -2284,6 +2314,7 @@ export default function HomeBlocksManager() {
       ...(type === "carousel" || type === "ticker" ? { source: "latest", itemsLimit: 8 } : {}),
       ...(type === "list"        ? { source: "latest", itemsLimit: 6 } : {}),
       ...(type === "advertising" ? { adSlot: "slot_05" } : {}),
+      ...(type === "transfers"   ? { itemsLimit: 5 } : {}),
     };
     let next: HomeBlock[];
     if (insertAtIdx !== null) {
