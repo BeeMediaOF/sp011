@@ -182,23 +182,66 @@ function rowToArticle(row: ArticleRow): Article {
   };
 }
 
-// ─── In-memory article cache (30s TTL) ────────────────────────────────────────
+// ─── In-memory article cache ──────────────────────────────────────────────────
 let _cache: Article[] | null = null;
 let _cacheAt = 0;
-const CACHE_TTL = 30_000;
+/**
+ * 60 s, e o que importa é NÃO ser 30 s: esse era o mesmo valor do `HOME_TTL_MS`
+ * do SSR (`vite.config.ts`), então os dois relógios batiam juntos e quase todo
+ * render da home caía em cache frio. Com os períodos diferentes, metade dos
+ * renders passa a encontrar o cache quente.
+ *
+ * Não atrasa publicação: toda escrita deste processo (painel e ingest da
+ * central) chama `bustCache()`. O TTL só cobre mudança feita POR FORA — SQL
+ * direto no banco —, e para esse caso os runbooks já mandam reiniciar a api.
+ */
+const CACHE_TTL = 60_000;
 
-function bustCache() { _cache = null; _cacheAt = 0; }
+/**
+ * Carga em voo (single-flight) + geração do cache.
+ *
+ * O TTL sozinho não bastava porque os consumidores chegam em RAJADA, não um a
+ * um: o SSR da home dispara `/api/articles?limit=300` mais um `?category=…` por
+ * bloco visível — oito pedidos em milissegundos. Com o cache vencido, os oito
+ * viam `_cache === null` ao mesmo tempo e cada um abria o SEU `SELECT *`
+ * (todas as colunas, `content` incluído: o HTML inteiro de cada artigo). Era o
+ * acervo do blog puxado do Postgres OITO vezes por render, a cada 30 s, em 11
+ * blogs — com a agravante de o TTL daqui ser igual ao `HOME_TTL_MS` do SSR, o
+ * que fazia praticamente TODO render cair em cache frio.
+ *
+ * Agora o primeiro pedido faz a consulta e os outros sete esperam nela.
+ *
+ * `_geracao` existe para a corrida com a escrita: se um `bustCache()` acontecer
+ * enquanto a carga está no ar, o resultado que chegar já nasceu velho e NÃO
+ * pode virar cache — quem pediu recebe os dados (que são de antes da escrita,
+ * como seriam de qualquer forma) e o próximo pedido relê do banco.
+ */
+let _emVoo: Promise<Article[]> | null = null;
+let _geracao = 0;
+
+function bustCache() { _cache = null; _cacheAt = 0; _geracao++; }
 
 export const articleService = {
   async getArticles(): Promise<Article[]> {
     if (_cache && Date.now() - _cacheAt < CACHE_TTL) return [..._cache];
-    const rows = await db
+    if (_emVoo) return [...(await _emVoo)];
+
+    const geracao = _geracao;
+    _emVoo = db
       .select()
       .from(articlesTable)
-      .orderBy(desc(articlesTable.createdAt));
-    _cache = rows.map(rowToArticle);
-    _cacheAt = Date.now();
-    return [..._cache];
+      .orderBy(desc(articlesTable.createdAt))
+      .then((rows) => {
+        const lista = rows.map(rowToArticle);
+        if (geracao === _geracao) {
+          _cache = lista;
+          _cacheAt = Date.now();
+        }
+        return lista;
+      })
+      .finally(() => { _emVoo = null; });
+
+    return [...(await _emVoo)];
   },
 
   /** Returns drafts that haven't been AI-rewritten yet (up to `limit`). */
