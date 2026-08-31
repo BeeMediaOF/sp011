@@ -34,10 +34,24 @@
 --   cd /opt/sp011
 --   for b in ksports esporteagora resenhavip oleysports beeesportes \
 --            apostaganha recebabet; do
+--     ok=$(docker compose exec -T pg-blogs psql -U postgres -tAc \
+--            "SELECT 1 FROM pg_database WHERE datname='$b'" 2>&1)
+--     case "$ok" in
+--       1) ;;
+--       *recovery*|*FATAL*|*failed*)
+--         echo "!!! pg-blogs indisponivel ($b) -- ABORTANDO"; break ;;
+--       *) echo "=== $b: banco nao existe, pulado ==="; continue ;;
+--     esac
 --     echo "=== $b ==="
 --     docker compose exec -T pg-blogs psql -U postgres -d "$b" \
 --       -v ON_ERROR_STOP=1 < deploy/top-news/menu_top_news.sql
 --   done
+--
+-- A guarda distingue TRES casos de proposito. A versao ingenua testava so
+-- `[ "$ok" = "1" ]` e anunciava "banco nao existe" para qualquer falha de
+-- conexao -- em 2026-08-31 o pg-blogs estava em recovery e o laco disse que os
+-- bancos do ksports e do esporteagora tinham sumido. Servidor fora do ar
+-- ABORTA (nao adianta tentar os proximos); banco realmente ausente PULA.
 --
 -- ============================================================================
 
