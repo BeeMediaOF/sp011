@@ -51,7 +51,12 @@ WORKDIR /app
 # O dono vem embutido na própria cópia: um `RUN chown -R /app` depois toca todos
 # os arquivos e, no overlayfs, DUPLICA o /app inteiro numa camada nova — media
 # 650 s dos 827 s do build na VPS (2026-07-28) e inflava a imagem para 2,47 GB.
-COPY --from=build --chown=node:node /app /app
+# `--link` cria a camada sem depender do estado do sistema de arquivos anterior:
+# ela nao precisa ser rebaseada e pode ser construida em paralelo com o stage de
+# build. O `--chown` vai NUMERICO por causa dele: sem depender da imagem base,
+# nao ha /etc/passwd para resolver o nome "node" -- 1000:1000 e o mesmo uid do
+# `USER node` abaixo.
+COPY --from=build --link --chown=1000:1000 /app /app
 WORKDIR /app/artifacts/brasilia-agora
 EXPOSE 3000
 USER node

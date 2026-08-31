@@ -29,3 +29,11 @@ screenshots
 performance-audit
 analytics-audit
 security-audit
+
+# Documentacao e kits de deploy. NENHUM build le estes diretorios (conferido em
+# 2026-08-31: as unicas mencoes no codigo sao comentarios e texto de tela). Com
+# eles no contexto, um commit so de SQL ou markdown mudava o `COPY . .` e
+# refazia o build inteiro dos DOIS servicos -- e o CLAUDE.md §5 ja diz que esse
+# commit precisa apenas de `git pull`.
+docs
+deploy

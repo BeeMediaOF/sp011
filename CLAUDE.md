@@ -981,16 +981,40 @@ montada no servidor.
     Não há erro registrado antes; a única anomalia na hora anterior foi
     `canceling authentication due to timeout` (handshake estourando 60 s).
     Teste: se a CPU normalizar e parar, está confirmado que é sintoma.
-15. **Build da imagem custa 65 min** (2026-08-31, sob throttle; ~32 min normal).
-    Metade é evitável: `pnpm install` (790 s × 2) e `playwright install
-    chromium` (985 s) rodaram SEM cache mesmo sem mudança no lockfile —
-    invalidou no `COPY package.json pnpm-lock.yaml …`, conferir `docker buildx
-    du`. Os dois defeitos estruturais: `COPY --from=build --chown=node:node
-    /app /app` copia o workspace inteiro com `node_modules` numa camada só e o
-    `--chown` reescreve metadado de cada arquivo (523+432 s copiando, 786 s
-    exportando, 453 s desempacotando); e o Chromium do Playwright mora na
-    imagem de TODO blog (`apt-get install-deps` de 846 s por build) para um
-    recurso que a maioria nunca usa.
+15. **Custo do build da imagem** (65 min em 2026-08-31 sob throttle; ~32 min
+    normal). Três causas medidas, duas já corrigidas em 2026-08-31:
+    - ✅ **`apt-get install-deps chromium` (846 s) rodava a CADA build.** Ele
+      ficava DEPOIS do `COPY --from=build /app /app` porque precisava do CLI do
+      Playwright, que vinha do `/app` — e uma camada `RUN` herda o cache da
+      anterior, então bastava um caractere de código mudar para reinstalar as
+      libs do Chromium do zero. Agora o `install-deps` sobe para antes de
+      qualquer `COPY` e pega o CLI por `npx --yes playwright@<versão>`. ⚠️ Essa
+      versão é FIXA no `artifacts/api-server/Dockerfile` e tem que acompanhar o
+      `playwright` do `package.json` (1.61.1) — versão errada instala a lista de
+      libs de outra release, o container sobe e só a arte social quebra.
+    - ✅ **`docs/` e `deploy/` saíram do `.dockerignore`.** Estavam no contexto,
+      então commit só de SQL/markdown mudava o `COPY . .` e refazia o build
+      inteiro dos dois serviços — contradizendo o §5, que manda só `git pull`.
+    - ✅ Os dois `COPY --from=build` usam **`--link`** (camada independente do
+      estado anterior: não precisa rebasear, constrói em paralelo com o stage de
+      build e é reaproveitada quando o conteúdo não muda). O `--chown` foi para
+      NUMÉRICO (`1000:1000`, o mesmo uid do `USER node`) porque, sem depender da
+      imagem base, não há `/etc/passwd` para resolver o nome.
+    - ⏳ **Sobra o peso do `/app`**: o `COPY --from=build … /app /app` leva o
+      workspace inteiro, com `node_modules` de TODOS os pacotes (523+432 s
+      copiando, 786 s exportando, 453 s desempacotando). Podar devDependencies
+      só resolveria no api: o runtime do **web roda `vite preview`**, e vite é
+      devDependency — podar lá quebra o SSR. O caminho seria
+      `pnpm install --filter @workspace/api-server...` no Dockerfile do api.
+    - ⏳ **`pnpm install` (790 s) roda uma vez por Dockerfile.** As camadas são
+      idênticas, mas em builds paralelos nenhuma reaproveita a outra. Com
+      `COMPOSE_BAKE=true docker compose build api web` os dois alvos vão numa
+      requisição só e o BuildKit compartilha o vértice — vale medir. (Só quando
+      o cache está frio; com cache quente as duas dão CACHED.)
+    - **Quando o cache está quente, um build de código puro não deveria pagar
+      NADA de dependência.** Se o log mostrar `pnpm install` rodando sem que o
+      lockfile tenha mudado, o cache do builder foi coletado: conferir
+      `docker buildx du` e o disco antes de culpar o Dockerfile.
 
 ## 20. Onde procurar mais (no repo)
 
