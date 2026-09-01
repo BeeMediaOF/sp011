@@ -17,7 +17,7 @@
     "test": "node --test \"test/**/*.test.ts\""
   },
   "dependencies": {
-    "@google/genai": "^2.8.0",
+    "@google/genai": "^2.19.0",
     "cheerio": "^1.2.0",
     "rss-parser": "^3.13.0"
   },
