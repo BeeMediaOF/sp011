@@ -14,12 +14,19 @@ Tempo estimado: ~20 min.
 | Domínio | `farodejogo.midia.run` (ajuste se for zona própria — os scripts SQL localizam o blog por nome `%faro%de%jogo%` ou domínio `%farodejogo%`) |
 | Idioma / fuso | pt-BR / America/Sao_Paulo (padrão — não mexer) |
 | Categorias (slugs) | `copa-do-mundo`, `futebol`, `volei`, `tenis`, `f1`, `futebol-americano`, `e-sports`, `outros` (iguais aos dos irmãos pt-BR, sem risco de tradução) |
-| Identidade (logo) | azul royal `#1160d4` (escudo — accent, 5,76:1 sobre o header branco) · amarelo `#f7c331` (apito — CTA e acento do rodapé, **só como bloco com tinta navy**: sobre branco dá 1,64:1) · navy `#0b1526` · rodapé `#060d18` |
+| Identidade (logo) | azul royal `#1c66bd` (escudo — accent, 5,70:1 sobre o header branco) · amarelo `#fcc419` (apito — CTA e acento do rodapé, **só como bloco com tinta navy**: sobre branco dá 1,64:1) · navy `#0b1526` · rodapé `#060d18` |
 
 Os banners nascem como "Anuncie aqui" nas cores da marca (3 blocos HTML).
-Você já tem as três artes: o **escudo** (azul com o apito amarelo) vira o
-favicon e a logo quadrada; a **versão branca** do lockup é a que vai no
-cabeçalho escuro e nas artes sociais; a **colorida** serve para fundo claro.
+
+**Qual arte vai em qual slot** — o cabeçalho deste template tem fundo
+**BRANCO** (`headerBgColor: #ffffff`); as barras escuras são a top bar e o
+menu, e nenhuma delas carrega a logo. Então:
+
+| Slot no painel (Logo & Imagens) | Arte |
+|---|---|
+| **Logo principal** (`logo`) — cabeçalho branco | a versão colorida (letras azuis, "DE" amarelo) |
+| **Logo do rodapé** (`footer-logo`) — rodapé `#060d18` **e as artes sociais** | a **versão branca** |
+| **Favicon** e **logo mobile** | o **escudo** (azul com o apito amarelo) |
 
 > ⚠️ **A recomendação para este blog é PULAR o passo 9 (backfill).** Leia o
 > aviso de SEO no fim deste arquivo antes de decidir.
@@ -150,7 +157,8 @@ aba Templates → "Meus templates" em ≤15s, sem restart):
 1. Aplicar **"Faro de Jogo - Final"** — instala os 22 blocos, menu PT, rodapé
    navy, banners "Anuncie aqui" azul, idioma pt-BR + fuso SP.
 2. **Configurações → Informações**: nome "Faro de Jogo", tagline, **upload das
-   logos** (horizontal p/ header, ícone/quadrado p/ favicon), autor padrão
+   logos** conforme a tabela do topo deste arquivo (colorida no slot principal,
+   BRANCA no slot do rodapé, ícone no favicon), autor padrão
    (ex.: "Redação Faro de Jogo"). Nunca reaproveitar caminho `/api/uploads/`
    de outro blog — bucket é por blog.
 
@@ -162,9 +170,12 @@ docker compose exec -T pg-blogs psql -U postgres -d farodejogo -v ON_ERROR_STOP=
 docker compose exec -T pg-blogs psql -U postgres -d farodejogo -v ON_ERROR_STOP=1 < deploy/farodejogo/social_feed_story.sql
 ```
 
-Três modelos de arte na identidade do blog (2 de feed + 1 feed/story). A logo
-vem de `/api/site-asset/logo` — faça o upload do passo 7.2 **antes** de gerar
-artes, e suba a versão CLARA/branca para contrastar com o bloco azul do canto.
+Três modelos de arte na identidade do blog (2 de feed + 1 feed/story). O fundo
+da arte é escuro, então a logo dela vem de `/api/site-asset/**footer-logo**`, e
+não do slot principal — que neste template é a versão colorida, para o cabeçalho
+branco. ⚠️ **Suba a versão branca no slot "Logo do rodapé" (passo 7.2) ANTES de
+gerar arte:** esse slot não tem fallback para a logo principal, então, vazio, a
+arte sai sem marca nenhuma.
 
 ## 9) Backfill — ~50 posts imediatos
 

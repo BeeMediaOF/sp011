@@ -2,9 +2,9 @@
 -- Faro de Jogo — importa o template "Faro de Jogo - Final" (clone do snapshot
 -- "KSports - Final", pela familia Esporte Agora / Receba Bet)
 -- =============================================================================
--- Identidade (da logo Faro de Jogo): azul royal #1160d4 (o azul do escudo,
--- rebaixado o suficiente para dar 5,76:1 sobre o header branco — accent do
--- tema, cor dos blocos e do item ativo do menu), AMARELO #f7c331 (o apito da
+-- Identidade (da logo Faro de Jogo): azul royal #1c66bd (o azul do escudo,
+-- rebaixado o suficiente para dar 5,70:1 sobre o header branco — accent do
+-- tema, cor dos blocos e do item ativo do menu), AMARELO #fcc419 (o apito da
 -- logo — CTA dos banners e acento do rodape, SEMPRE com tinta navy por cima:
 -- amarelo sobre branco da 1,64:1 e nunca pode virar texto), navy #0b1526 (o
 -- contorno da logo — top bar, barra de menu e fundo dos banners), rodape
@@ -54,13 +54,13 @@ SET value = jsonb_set(
   "id": "tpl-farodejogo-final",
   "name": "Faro de Jogo - Final",
   "createdAt": "2026-09-02T12:00:00.000Z",
-  "accentColor": "#1160d4",
+  "accentColor": "#1c66bd",
   "headerStyle": "standard",
   "footerStyle": "dark",
   "headerBgColor": "#ffffff",
   "footerBgColor": "#060d18",
   "menuTextColor": "#101418",
-  "menuActiveColor": "#1160d4",
+  "menuActiveColor": "#1c66bd",
   "menuFontSize": 13,
   "menuFontWeight": 800,
   "showTickerBar": false,
@@ -69,12 +69,12 @@ SET value = jsonb_set(
   "topBarBgColor": "#0b1526",
   "menuBarStyle": "bar",
   "menuBarBgColor": "#0b1526",
-  "footerAccentColor": "#f7c331",
+  "footerAccentColor": "#fcc419",
   "headerPaddingX": 16,
   "headerMarginTop": 0,
   "siteLanguage": "pt-BR",
   "siteTimezone": "America/Sao_Paulo",
-  "headerBannerHtml": "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><span style=\"font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#f7c331;\">DE JOGO</span></span><span style=\"flex:1;text-align:center;color:#ffffff;line-height:1.15;\"><span style=\"font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;\">SUA MARCA <span style=\"color:#f7c331;\">AQUI.</span></span><br/><span style=\"font-size:10px;font-weight:600;color:#c8d8f2;\">SEJA O PARCEIRO OFICIAL DO FARO DE JOGO</span></span><span style=\"background:#f7c331;color:#0b1526;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;\">ANUNCIE</span></div>",
+  "headerBannerHtml": "<div style=\"display:flex;align-items:center;justify-content:space-between;gap:18px;width:100%;max-width:720px;padding:11px 20px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><span style=\"font-style:italic;font-weight:900;font-size:19px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#fcc419;\">DE JOGO</span></span><span style=\"flex:1;text-align:center;color:#ffffff;line-height:1.15;\"><span style=\"font-size:15px;font-weight:900;font-style:italic;letter-spacing:.02em;\">SUA MARCA <span style=\"color:#fcc419;\">AQUI.</span></span><br/><span style=\"font-size:10px;font-weight:600;color:#c8d8f2;\">SEJA O PARCEIRO OFICIAL DO FARO DE JOGO</span></span><span style=\"background:#fcc419;color:#0b1526;padding:8px 14px;border-radius:6px;font-weight:800;font-size:11px;white-space:nowrap;\">ANUNCIE</span></div>",
   "menuItems": [
     {
       "id": "fj-menu-home",
@@ -265,7 +265,7 @@ SET value = jsonb_set(
       "id": "mais-lidas",
       "area": "sidebar",
       "name": "Mais Lidas",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 1,
       "visible": true
     },
@@ -286,19 +286,19 @@ SET value = jsonb_set(
       "area": "main",
       "isAd": true,
       "name": "Anuncie — Faixa",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 3,
       "custom": true,
       "format": "grid",
       "visible": true,
       "blockType": "html",
-      "html": "<div style=\"display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><span style=\"font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#f7c331;\">DE JOGO</span></span><span style=\"flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;\"><span style=\"font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;\">ANUNCIE <span style=\"color:#f7c331;\">AQUI</span></span><br/><span style=\"font-size:13px;font-weight:600;color:#c8d8f2;\">SUA MARCA NA TORCIDA DO FARO DE JOGO</span></span><span style=\"background:#f7c331;color:#0b1526;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;\">FALE CONOSCO</span></div>"
+      "html": "<div style=\"display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 20px;padding:18px 26px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><span style=\"font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#fcc419;\">DE JOGO</span></span><span style=\"flex:1;min-width:220px;text-align:center;color:#ffffff;line-height:1.1;\"><span style=\"font-size:20px;font-weight:900;font-style:italic;letter-spacing:.02em;\">ANUNCIE <span style=\"color:#fcc419;\">AQUI</span></span><br/><span style=\"font-size:13px;font-weight:600;color:#c8d8f2;\">SUA MARCA NA TORCIDA DO FARO DE JOGO</span></span><span style=\"background:#fcc419;color:#0b1526;padding:10px 18px;border-radius:6px;font-weight:800;font-size:13px;white-space:nowrap;\">FALE CONOSCO</span></div>"
     },
     {
       "id": "list-fj-ultimas",
       "area": "sidebar",
       "name": "Últimas Notícias",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 4,
       "custom": true,
       "format": "list_compact",
@@ -312,7 +312,7 @@ SET value = jsonb_set(
       "id": "content-fj-recentes",
       "area": "main",
       "name": "Notícias Recentes",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 5,
       "custom": true,
       "format": "grid",
@@ -334,12 +334,12 @@ SET value = jsonb_set(
       "format": "grid",
       "visible": true,
       "blockType": "html",
-      "html": "<div style=\"max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><div style=\"color:#c8d8f2;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;\">PARCEIRO OFICIAL</div><div style=\"margin-bottom:12px;\"><span style=\"font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#f7c331;\">DE JOGO</span></span></div><div style=\"color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;\">SUA MARCA<br/>NESTE ESPAÇO</div><div style=\"display:inline-block;background:#f7c331;color:#0b1526;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;\">ANUNCIE AQUI</div></div>"
+      "html": "<div style=\"max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><div style=\"color:#c8d8f2;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;\">PARCEIRO OFICIAL</div><div style=\"margin-bottom:12px;\"><span style=\"font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#fcc419;\">DE JOGO</span></span></div><div style=\"color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;\">SUA MARCA<br/>NESTE ESPAÇO</div><div style=\"display:inline-block;background:#fcc419;color:#0b1526;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;\">ANUNCIE AQUI</div></div>"
     },
     {
       "id": "content-fj-futebol",
       "name": "Futebol",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 7,
       "width": "quarter",
       "custom": true,
@@ -369,7 +369,7 @@ SET value = jsonb_set(
     {
       "id": "content-fj-f1",
       "name": "Fórmula 1",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 9,
       "width": "quarter",
       "custom": true,
@@ -399,7 +399,7 @@ SET value = jsonb_set(
     {
       "id": "content-fj-copa",
       "name": "Copa do Mundo",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 11,
       "custom": true,
       "format": "cultura",
@@ -414,7 +414,7 @@ SET value = jsonb_set(
     {
       "id": "content-fj-mais",
       "name": "Mais Notícias",
-      "color": "#1160d4",
+      "color": "#1c66bd",
       "order": 12,
       "custom": true,
       "format": "grid",

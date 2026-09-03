@@ -17,9 +17,16 @@ Tempo estimado: ~20 min.
 | Identidade (logo) | azul royal `#0f57cf` (losango — accent, 6,39:1 sobre o header branco) · azul claro `#2f8bf7` ("BET" — CTA e acento do rodapé) · charcoal `#15181d` ("CASSINO" — top bar, menu e banners) · rodapé `#0b0d10` |
 
 Os banners nascem como "Anuncie aqui" nas cores da marca (3 blocos HTML).
-Você já tem as três artes: o **losango azul com a espadilha** vira o favicon
-e a logo quadrada; a **versão branca** do lockup é a que vai no cabeçalho
-escuro e nas artes sociais; a **colorida** serve para fundo claro.
+
+**Qual arte vai em qual slot** — o cabeçalho deste template tem fundo
+**BRANCO** (`headerBgColor: #ffffff`); as barras escuras são a top bar e o
+menu, e nenhuma delas carrega a logo. Então:
+
+| Slot no painel (Logo & Imagens) | Arte |
+|---|---|
+| **Logo principal** (`logo`) — cabeçalho branco | a versão colorida ("CASSINO" em charcoal, "BET" azul) |
+| **Logo do rodapé** (`footer-logo`) — rodapé `#0b0d10` **e as artes sociais** | a **versão branca** |
+| **Favicon** e **logo mobile** | o **losango azul com a espadilha** |
 
 > ⚠️ **A recomendação para este blog é PULAR o passo 9 (backfill).** Leia o
 > aviso de SEO no fim deste arquivo antes de decidir.
@@ -150,7 +157,8 @@ aba Templates → "Meus templates" em ≤15s, sem restart):
 1. Aplicar **"Cassino Bet - Final"** — instala os 22 blocos, menu PT, rodapé
    navy, banners "Anuncie aqui" azul, idioma pt-BR + fuso SP.
 2. **Configurações → Informações**: nome "Cassino Bet", tagline, **upload das
-   logos** (horizontal p/ header, ícone/quadrado p/ favicon), autor padrão
+   logos** conforme a tabela do topo deste arquivo (colorida no slot principal,
+   BRANCA no slot do rodapé, ícone no favicon), autor padrão
    (ex.: "Redação Cassino Bet"). Nunca reaproveitar caminho `/api/uploads/`
    de outro blog — bucket é por blog.
 
@@ -162,9 +170,12 @@ docker compose exec -T pg-blogs psql -U postgres -d cassinobet -v ON_ERROR_STOP=
 docker compose exec -T pg-blogs psql -U postgres -d cassinobet -v ON_ERROR_STOP=1 < deploy/cassinobet/social_feed_story.sql
 ```
 
-Três modelos de arte na identidade do blog (2 de feed + 1 feed/story). A logo
-vem de `/api/site-asset/logo` — faça o upload do passo 7.2 **antes** de gerar
-artes, e suba a versão CLARA/branca para contrastar com o bloco azul do canto.
+Três modelos de arte na identidade do blog (2 de feed + 1 feed/story). O fundo
+da arte é escuro, então a logo dela vem de `/api/site-asset/**footer-logo**`, e
+não do slot principal — que neste template é a versão colorida, para o cabeçalho
+branco. ⚠️ **Suba a versão branca no slot "Logo do rodapé" (passo 7.2) ANTES de
+gerar arte:** esse slot não tem fallback para a logo principal, então, vazio, a
+arte sai sem marca nenhuma.
 
 ## 9) Backfill — ~50 posts imediatos
 
