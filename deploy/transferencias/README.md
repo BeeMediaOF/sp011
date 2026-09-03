@@ -42,7 +42,7 @@ já ajustou.
 ```bash
 cd /opt/sp011
 for b in ksports esporteagora resenhavip oleysports beeesportes \
-         apostaganha recebabet; do
+         apostaganha recebabet farodejogo cassinobet; do
   ok=$(docker compose exec -T pg-blogs psql -U postgres -tAc \
          "SELECT 1 FROM pg_database WHERE datname='$b'" 2>&1)
   case "$ok" in

@@ -1,0 +1,34 @@
+-- Cassino Bet -- modelo social "Feed + Story" (post 1080x1350 + story 1080x1920)
+-- na identidade do blog. Mesma estrutura do modelo do KSports, recolorida, com
+-- bloco colorido no canto superior esquerdo (fundo da logo) na cor da marca.
+-- Roda no banco DO BLOG (tabela social_templates). Idempotente (id modelo-feed-story):
+-- re-rodar RESTAURA o modelo (edicoes manuais nesse id sao sobrescritas; para
+-- personalizar sem perder, duplique o template no editor antes).
+-- Logo dinamica: /api/site-asset/logo (troca junto com a logo do admin). Suba a
+-- versao CLARA/branca da logo p/ contrastar com o bloco colorido do canto.
+-- Cores: fundo #15181d | bloco/destaque #0f57cf | acento #2f8bf7 | URL *cassinobet*.midia.run
+-- Como rodar (VPS):
+--   cd /opt/sp011
+--   docker compose exec -T pg-blogs psql -U postgres -d cassinobet -v ON_ERROR_STOP=1 < deploy/cassinobet/social_feed_story.sql
+
+BEGIN;
+
+INSERT INTO social_templates (id, name, type, width, height, background_color, elements, story)
+VALUES
+  ('modelo-feed-story', 'Cassino Bet', 'feed', 1080, 1350, '#15181d', $soc$[{"x":0,"y":0,"id":"29b71fb4-2a53-4b8c-9971-2ed28a8a0acc","type":"image","color":"","width":1080,"height":1350,"zIndex":1,"content":"","opacity":1,"padding":16,"fontSize":0,"objectFit":"cover","textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"#333333"},{"x":18,"y":26,"id":"40301505-f46f-45d0-bc95-c1174652c942","type":"logo","color":"","width":264,"height":172,"zIndex":5,"content":"/api/site-asset/logo","opacity":1,"padding":16,"fontSize":0,"objectFit":"contain","textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"transparent"},{"x":143,"y":926,"id":"c17a35ba-a8d7-4e46-8e83-6e13ae900eeb","type":"title","color":"#ffffff","width":781,"height":245,"zIndex":6,"autoFit":true,"content":"{{title}}","opacity":1,"padding":19,"fontSize":69,"textAlign":"left","fontFamily":"Inter","fontWeight":"bold","lineHeight":0.96,"accentColor":"#2f8bf7","borderRadius":0,"verticalAlign":"top","backgroundColor":"transparent"},{"x":-256,"y":613,"id":"ac8f38e5-4e3a-4473-a794-7afb48788214","fill":"gradient","type":"gradient","color":"","width":1593,"height":779,"zIndex":3,"content":"","opacity":1,"padding":18,"fontSize":0,"gradient":{"type":"linear","angle":180,"stops":[{"pos":0,"color":"rgba(0,0,0,0)"},{"pos":14,"color":"rgba(0,0,0,0.051)"},{"pos":29,"color":"rgba(0,0,0,0.182)"},{"pos":43,"color":"rgba(0,0,0,0.362)"},{"pos":57,"color":"rgba(0,0,0,0.558)"},{"pos":71,"color":"rgba(0,0,0,0.738)"},{"pos":86,"color":"rgba(0,0,0,0.869)"},{"pos":100,"color":"rgba(0,0,0,0.92)"}]},"textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"transparent"},{"x":60,"y":1201,"id":"625ac673-de6a-4cb6-aac7-6a5a7e246861","type":"text","color":"#ffffff","width":960,"height":80,"zIndex":7,"content":"*cassinobet*.midia.run","opacity":1,"padding":16,"fontSize":40,"textAlign":"center","fontFamily":"Inter","fontWeight":"bold","accentColor":"#2f8bf7","borderRadius":0,"verticalAlign":"middle","backgroundColor":"transparent"},{"x":116,"y":926,"id":"46346222-7f77-4c67-98ee-8cb0aa8b27e2","fill":"solid","type":"shape","color":"","sides":6,"width":20,"height":245,"points":5,"zIndex":4,"content":"","opacity":1,"padding":16,"fontSize":0,"shapeKind":"rect","textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderColor":"#ffffff","borderWidth":0,"strokeStyle":"solid","borderRadius":0,"backgroundColor":"#0f57cf"},{"id":"mfs-corner","type":"shape","shapeKind":"rect","fill":"solid","x":-56,"y":-56,"width":356,"height":300,"zIndex":2,"color":"","content":"","backgroundColor":"#0f57cf","borderColor":"#ffffff","borderWidth":0,"strokeStyle":"solid","borderRadius":48,"opacity":1,"padding":16,"fontSize":0,"textAlign":"left","fontFamily":"Inter","fontWeight":"normal"}]$soc$::jsonb, $sto${"backgroundColor":"#15181d","elements":[{"x":0,"y":0,"id":"29b71fb4-2a53-4b8c-9971-2ed28a8a0acc","type":"image","color":"","width":1080,"height":1920,"zIndex":1,"content":"","opacity":1,"padding":16,"fontSize":0,"objectFit":"cover","textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"#333333"},{"x":40,"y":44,"id":"40301505-f46f-45d0-bc95-c1174652c942","type":"logo","color":"","width":300,"height":270,"zIndex":5,"content":"/api/site-asset/logo","opacity":1,"padding":16,"fontSize":0,"objectFit":"contain","textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"transparent"},{"x":109,"y":1426,"id":"c17a35ba-a8d7-4e46-8e83-6e13ae900eeb","type":"title","color":"#ffffff","width":862,"height":348,"zIndex":6,"autoFit":true,"content":"{{title}}","opacity":1,"padding":16,"fontSize":69,"textAlign":"center","fontFamily":"Inter","fontWeight":"bold","lineHeight":1.22,"accentColor":"#2f8bf7","borderRadius":0,"verticalAlign":"top","backgroundColor":"transparent"},{"x":0,"y":872,"id":"ac8f38e5-4e3a-4473-a794-7afb48788214","fill":"gradient","type":"gradient","color":"","width":1593,"height":1048,"zIndex":3,"content":"","opacity":1,"padding":18,"fontSize":0,"gradient":{"type":"linear","angle":180,"stops":[{"pos":0,"color":"rgba(0,0,0,0)"},{"pos":14,"color":"rgba(0,0,0,0.051)"},{"pos":29,"color":"rgba(0,0,0,0.182)"},{"pos":43,"color":"rgba(0,0,0,0.362)"},{"pos":57,"color":"rgba(0,0,0,0.558)"},{"pos":71,"color":"rgba(0,0,0,0.738)"},{"pos":86,"color":"rgba(0,0,0,0.869)"},{"pos":100,"color":"rgba(0,0,0,0.92)"}]},"textAlign":"left","fontFamily":"Inter","fontWeight":"normal","borderRadius":0,"backgroundColor":"transparent"},{"x":40,"y":1774,"id":"a33608dd-c8fb-49e9-9b7f-6b3dac449372","type":"text","color":"#ffffff","width":1000,"height":80,"zIndex":7,"content":"*cassinobet*.midia.run","opacity":1,"padding":16,"fontSize":40,"textAlign":"center","fontFamily":"Inter","fontWeight":"bold","accentColor":"#2f8bf7","borderRadius":0,"verticalAlign":"middle","backgroundColor":"transparent"},{"id":"sfs-corner","type":"shape","shapeKind":"rect","fill":"solid","x":-72,"y":-72,"width":442,"height":412,"zIndex":2,"color":"","content":"","backgroundColor":"#0f57cf","borderColor":"#ffffff","borderWidth":0,"strokeStyle":"solid","borderRadius":64,"opacity":1,"padding":16,"fontSize":0,"textAlign":"left","fontFamily":"Inter","fontWeight":"normal"}]}$sto$::jsonb)
+ON CONFLICT (id) DO UPDATE SET
+  name             = EXCLUDED.name,
+  type             = EXCLUDED.type,
+  width            = EXCLUDED.width,
+  height           = EXCLUDED.height,
+  background_color = EXCLUDED.background_color,
+  elements         = EXCLUDED.elements,
+  story            = EXCLUDED.story,
+  updated_at       = now();
+
+COMMIT;
+
+-- Conferencia: 1 linha, 7 elementos no feed + 6 no story
+SELECT id, name, jsonb_array_length(elements) AS feed_els,
+       jsonb_array_length(story->'elements') AS story_els
+FROM social_templates WHERE id = 'modelo-feed-story';

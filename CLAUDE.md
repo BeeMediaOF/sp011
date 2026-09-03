@@ -118,10 +118,12 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 | `creditovc` | **credito.vc** (zona própria, **atrás do Cloudflare** — único da rede; ver §3) | pt-BR, educação financeira/crédito | verde vivo `#0ec76d`/`#0a9455` + navy `#0f2446`, rodapé `#0a1630`, tagline "Educação financeira para a vida real" | No ar. Kit em `deploy/creditovc/`; sem backfill (nicho novo) |
 | `apostaganha` | apostaganha.midia.run | pt-BR, esporte (marca Aposta Ganha) | laranja vivo `#ff6a00` (só sobre fundo escuro) + laranja queimado `#c24500` (blocos/menu ativo) + preto `#111111`, rodapé `#080808` | Kit completo em `deploy/apostaganha/`; go-live pendente |
 | `recebabet` | recebabet.midia.run | pt-BR, esporte (marca Receba Bet) | azul-céu `#3d9bff` + azul royal `#0f62d6` + navy `#071b3d`, rodapé `#040f26` | Kit completo em `deploy/recebabet/`; go-live pendente |
+| `farodejogo` | farodejogo.midia.run | pt-BR, esporte (marca Faro de Jogo) | azul royal `#1160d4` (escudo) + amarelo `#f7c331` (apito, **só como bloco com tinta navy** — sobre branco dá 1,64:1) + navy `#0b1526`, rodapé `#060d18` | Kit completo em `deploy/farodejogo/`; go-live pendente |
+| `cassinobet` | cassinobet.midia.run | pt-BR, esporte (marca Cassino Bet) | azul royal `#0f57cf` (losango) + azul claro `#2f8bf7` ("BET") + charcoal `#15181d` ("CASSINO" — é o que o separa do Receba Bet, que também é azul), rodapé `#0b0d10` | Kit completo em `deploy/cassinobet/`; go-live pendente |
 | `ocomandante` | **ocomandantenews.com.br** (zona própria desde 2026-08-14; `ocomandante.midia.run` → 301) | pt-BR, negócios/economia/aviação/turismo | navy `#14265e` (wordmark) + azul royal `#1657d0` (emblema) + royal claro `#2f6fe0` + azul claro `#4d8dff` (só sobre escuro) + vermelho `#d81f26` (bloco "NEWS", só com tinta branca), dark `#0a1740`, rodapé `#060e26`, tagline "No comando da notícia" | Blog no ar (ago/2026). Kit em `deploy/ocomandante/` (GO_LIVE + template com 2 homes + sources + rules_keywords); falta aplicar template/fontes e as logos |
 
 - Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee/Aposta
-  Ganha/Receba Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
+  Ganha/Receba Bet/Faro de Jogo/Cassino Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
   e-sports, outros`. **Propositalmente ≠ dos slugs EN do ksports**
   (`world-cup, football, volleyball, tennis, formula-1, nfl, esports,
   others`) — regra da central casa por categoria sem filtrar idioma; slug
@@ -165,7 +167,8 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 - Matchers de SQL por blog: RV `%resenha%`, Oley `%oley%`, Bee
   `name ILIKE '%bee%esporte%' OR domain ILIKE '%beeesportes%'` (NUNCA `%bee%`
   sozinho — ksports mora em ksports.bebee.me), Aposta Ganha `%aposta%ganha%`,
-  Receba Bet `%receba%bet%`, O Comandante `%comandante%`.
+  Receba Bet `%receba%bet%`, Faro de Jogo `%faro%de%jogo%`, Cassino Bet
+  `%cassino%bet%`, O Comandante `%comandante%`.
 
 ## 5. Workflow git + deploy padrão (VPS)
 
@@ -226,7 +229,7 @@ curl -s https://resenhavip.midia.run/api/site | grep -o '"siteName":"[^"]*"'
 # compose independentes, e em série cada blog custa o seu próprio stop+start
 # (~25 s × N; 2026-08-10 foram 4 min para 9 blogs).
 N=$(grep -m1 '^BLOG_IMAGE_VERSION=' /opt/sp011/.env | cut -d= -f2)
-for b in ksports esporteagora oleysports beeesportes; do
+for b in ksports esporteagora oleysports beeesportes farodejogo cassinobet; do
   [ -d "/opt/blogs/$b" ] || continue
   ( cd "/opt/blogs/$b" \
     && sed -i "s|^BLOG_IMAGE_TAG=.*|BLOG_IMAGE_TAG=$N|" .env \
@@ -248,7 +251,7 @@ compose.yml`); comparar com a atual acusa todos depois de um `git pull`.
 ```bash
 cd /opt/sp011
 for b in ocomandante ksports esporteagora resenhavip oleysports beeesportes \
-         apostaganha recebabet pontofarma creditovc; do
+         apostaganha recebabet farodejogo cassinobet pontofarma creditovc; do
   [ -d "/opt/blogs/$b" ] || continue
   cp deploy/blog-template/compose.yml /opt/blogs/$b/compose.yml
   ( cd /opt/blogs/$b && docker compose up -d ) &
@@ -931,7 +934,22 @@ montada no servidor.
     acervo (140 de 223) — `reclassifica_investimentos.sql` existe e não foi
     rodado. Os defeitos de CÓDIGO que o Crédito.vc revelou não abrem release
     própria: entram pelo P1 do OleySports, para os 11 blogs de uma vez.
-12. **Higiene de categoria da rede** (2026-08-24): o bug do slugify (barra dupla
+12. **Faro de Jogo e Cassino Bet** (2026-09-02): kits completos em
+    `deploy/<id>/` (GO_LIVE + sources_pt + backfill_50 + template + 2 SQLs de
+    arte social), clonados do Receba Bet com a paleta trocada por mapa de slots
+    e o menu já nascendo com a aba Top News. São blogs de ESPORTE pt-BR —
+    herdam as 16 fontes e os 8 slugs dos irmãos, então o mesmo artigo passa a
+    existir em até **8 domínios**. ⚠️ Nos dois o GO_LIVE **recomenda pular o
+    backfill** (passo 9) e deixar o catálogo nascer da coleta orgânica: o
+    Cassino Bet é o caso mais exposto da rede (marca de casa de apostas +
+    domínio novo + texto repetido = o perfil exato que marcou o Resenha Vip).
+    Falta o go-live operacional na VPS e o upload das logos (as duas marcas têm
+    versão branca para o cabeçalho escuro e as artes sociais). Contraste da
+    paleta conferido por cálculo, não no olho — o amarelo do Faro de Jogo dá
+    1,64:1 sobre branco e por isso **nunca** pode virar texto: só bloco com
+    tinta navy.
+
+13. **Higiene de categoria da rede** (2026-08-24): o bug do slugify (barra dupla
     apagando `u`, `f` e dígitos, corrigido em `90a0d47`) tinha reparo só na
     CENTRAL — o `articles.category` já gravado no banco de cada blog ficou como
     estava. Até a v98 essas rotas eram shell; depois dela viraram **Classe 3**
@@ -958,7 +976,7 @@ montada no servidor.
     comparador devolve `NaN` e só não quebrou porque o V8 mantém a ordem de
     inserção.
 
-13. **Crise de CPU da VPS** (2026-08-27 a 08-31): a Hostinger aplicou
+14. **Crise de CPU da VPS** (2026-08-27 a 08-31): a Hostinger aplicou
     limitação automática (teto de 40%) e ela **não caiu sozinha em três dias**,
     mesmo com `ollama` e `central-api` parados o tempo todo. O Ollama era o
     maior consumidor, não a causa do estrangulamento permanente. A causa era o
@@ -972,7 +990,7 @@ montada no servidor.
     igual ao `HOME_TTL_MS` do SSR, então os relógios ressoavam e quase todo
     render caía em cache frio. **Nunca deixe os dois TTL iguais.** A prova no
     log é N requisições a `/api/articles` terminando no MESMO milissegundo.
-14. **`pg-blogs` cai sozinho sob CPU faminta** (a investigar): `server process
+15. **`pg-blogs` cai sozinho sob CPU faminta** (a investigar): `server process
     exited with exit code 2` + `terminating any other active server processes`
     em 20/08, 22/08, 28/08 e 31/08 — quatro vezes em onze dias, todas em
     período de crise de CPU (Ollama disparado nas duas primeiras, limitação da
@@ -981,7 +999,7 @@ montada no servidor.
     Não há erro registrado antes; a única anomalia na hora anterior foi
     `canceling authentication due to timeout` (handshake estourando 60 s).
     Teste: se a CPU normalizar e parar, está confirmado que é sintoma.
-15. **Custo do build da imagem** (65 min em 2026-08-31 sob throttle; ~32 min
+16. **Custo do build da imagem** (65 min em 2026-08-31 sob throttle; ~32 min
     normal). Três causas medidas, duas já corrigidas em 2026-08-31:
     - ✅ **`apt-get install-deps chromium` (846 s) rodava a CADA build.** Ele
       ficava DEPOIS do `COPY --from=build /app /app` porque precisava do CLI do
