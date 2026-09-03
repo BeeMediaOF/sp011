@@ -29,7 +29,7 @@
 --   docker compose exec -T pg-blogs psql -U postgres -d farodejogo -v ON_ERROR_STOP=1 < deploy/farodejogo/template_final.sql
 -- =============================================================================
 
-set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 BEGIN;
 

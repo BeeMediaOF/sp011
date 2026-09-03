@@ -27,7 +27,7 @@
 --   docker compose exec -T pg-blogs psql -U postgres -d cassinobet -v ON_ERROR_STOP=1 < deploy/cassinobet/template_final.sql
 -- =============================================================================
 
-set ON_ERROR_STOP on
+\set ON_ERROR_STOP on
 
 BEGIN;
 
