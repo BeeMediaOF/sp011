@@ -144,6 +144,37 @@ Jogo. A partir daí toda notícia de esporte nova vai para TODOS os blogs de
 esporte pt-BR (fonte genérica é classificada uma vez por blog — chamada
 barata). O catch-all do sp011 já exclui esses slugs desde 2026-07-10.
 
+### 6b) Fontes EXCLUSIVAS do Faro de Jogo — Gazeta Esportiva
+
+```bash
+cd /opt/sp011 && git pull
+DBURL=$(grep -m1 '^CENTRAL_DATABASE_URL=' .env.central | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')
+docker compose exec -T pg-blogs psql "$DBURL" -v ON_ERROR_STOP=1 < deploy/farodejogo/sources_gazeta.sql
+docker compose exec -T pg-blogs psql -U postgres -d farodejogo -v ON_ERROR_STOP=1 < deploy/farodejogo/editoria_brasileirao.sql
+```
+
+16 feeds da Gazeta (11 clubes + o substituto do Inter + Brasileirão, Copa do
+Brasil, La Liga e Basquete) em 5 categorias de fonte próprias, `fj-*`, que só
+este blog nomeia em regra — é o que impede a notícia de clube de cair nos
+outros 7 blogs de esporte. O 2º comando cria a editoria **Campeonato
+Brasileiro** no blog (lista do painel + aba BRASILEIRÃO no menu, depois de
+FUTEBOL): sem o item de menu a rota `/campeonato-brasileiro` não resolve.
+
+Depois, no painel central, clicar **"Fontes"** no card do blog (§13) — sem isso
+o painel de fontes do próprio blog nasce sem os feeds novos.
+
+Confira na saída do 1º script: (a) as 5 categorias `fj-*` aparecem SÓ para o
+Faro de Jogo em "QUEM RECEBE"; (b) a taxonomia tem `campeonato-brasileiro`
+escrito igual ao `target_category` da regra — a central não valida isso, e um
+slug divergente vira página órfã indexável; (c) `max_posts_per_day` do blog não
+está vazio (vazio = teto efetivo de 500/dia).
+
+⚠️ **Cadência**: os feeds nascem em 6h (clubes), 2h (Brasileirão) e 12h
+(basquete), ≈78 itens/dia, com a primeira coleta escalonada. Isso é deliberado:
+a fila de reescrita é UMA lane serial da rede inteira quando o provider é o
+Ollama, e volume demais aqui atrasa a publicação dos outros 10 blogs. Para
+acelerar: `UPDATE central_sources SET schedule_hours = 3 WHERE category = 'fj-clubes';`
+
 ## 7) Template + identidade
 
 ```bash
@@ -154,8 +185,10 @@ docker compose exec -T pg-blogs psql -U postgres -d farodejogo -v ON_ERROR_STOP=
 Em `https://farodejogo.midia.run/admin` (o template aparece em Home + menu →
 aba Templates → "Meus templates" em ≤15s, sem restart):
 
-1. Aplicar **"Faro de Jogo - Final"** — instala os 22 blocos, menu PT, rodapé
-   navy, banners "Anuncie aqui" azul, idioma pt-BR + fuso SP.
+1. Aplicar **"Faro de Jogo - Final"** — instala os 23 blocos, menu PT (com as
+   abas BRASILEIRÃO e TOP NEWS), rodapé navy, banners "Anuncie aqui" azul,
+   idioma pt-BR + fuso SP. Aplicar SUBSTITUI o menu inteiro: é por isso que a
+   aba BRASILEIRÃO está no snapshot, e não só no `editoria_brasileirao.sql`.
 2. **Configurações → Informações**: nome "Faro de Jogo", tagline, **upload das
    logos** conforme a tabela do topo deste arquivo (colorida no slot principal,
    BRANCA no slot do rodapé, ícone no favicon), autor padrão

@@ -41,6 +41,17 @@ function blockLocation(b: HomeBlock): string {
     : "Home · largura total";
 }
 
+/** Zonas de settings em que um bloco-propaganda pode viver. Espelha
+ *  AD_BLOCK_ZONES do api-server (lib/adBlocks.ts): zona que não esteja nas duas
+ *  listas é aceita numa ponta e invisível na outra. */
+type AdScope = "home" | "article" | "articleFooter";
+
+const AD_SCOPE_LABEL: Record<AdScope, string> = {
+  home:          "Home",
+  article:       "Lateral da notícia",
+  articleFooter: "Fim da notícia",
+};
+
 // ─── Telas em que a propaganda aparece ────────────────────────────────────────
 type BlockDevices = NonNullable<HomeBlock["devices"]>;
 
@@ -915,14 +926,16 @@ export default function AdsManager() {
   // inteiro em settings.homeBlocks (mesmo contrato do Blocos da Home).
   const [homeBlocks, setHomeBlocks] = useState<HomeBlock[]>([]);
   const [articleBlocks, setArticleBlocks] = useState<HomeBlock[]>([]);
+  const [articleFooterBlocks, setArticleFooterBlocks] = useState<HomeBlock[]>([]);
   const [headerBannerHtml, setHeaderBannerHtml] = useState("");
   const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
   // Impressões/cliques dos blocos-propaganda (ad_daily_stats, chave block:<id>);
   // "header-banner" é o banner do cabeçalho.
   const [blockStats, setBlockStats] = useState<Record<string, { impressions: number; clicks: number }>>({});
-  const [adEdit, setAdEdit] = useState<{ scope: "home" | "article"; block: HomeBlock } | "header" | null>(null);
+  const [adEdit, setAdEdit] = useState<{ scope: AdScope; block: HomeBlock } | "header" | null>(null);
   const homeAdBlocks = homeBlocks.filter((b) => b.isAd === true);
   const articleAdBlocks = articleBlocks.filter((b) => b.isAd === true);
+  const articleFooterAdBlocks = articleFooterBlocks.filter((b) => b.isAd === true);
   const hasHeaderBanner = !!headerBannerHtml.trim();
 
   const PAGE_SIZE = 10;
@@ -938,6 +951,7 @@ export default function AdsManager() {
       const { settings } = await adminApi.getSettings();
       setHomeBlocks(settings.homeBlocks ?? []);
       setArticleBlocks(settings.articleSidebarBlocks ?? []);
+      setArticleFooterBlocks(settings.articleFooterBlocks ?? []);
       setHeaderBannerHtml(settings.headerBannerHtml ?? "");
       setHeaderBannerLinkUrl(settings.headerBannerLinkUrl ?? "");
     } catch { }
@@ -947,17 +961,33 @@ export default function AdsManager() {
     } catch { }
   };
 
-  async function saveAdBlock(patched: HomeBlock) {
-    const scope = adEdit !== null && adEdit !== "header" ? adEdit.scope : "home";
-    if (scope === "article") {
-      const next = articleBlocks.map((b) => (b.id === patched.id ? patched : b));
-      await adminApi.updateSettings({ articleSidebarBlocks: next });
-      setArticleBlocks(next);
-    } else {
-      const next = homeBlocks.map((b) => (b.id === patched.id ? patched : b));
-      await adminApi.updateSettings({ homeBlocks: next });
-      setHomeBlocks(next);
+  /* Escopo do bloco-propaganda = a zona de settings em que ele mora. É um MAPA
+     exaustivo, e não um `if (scope === "article") … else …`: com o `else` como
+     catch-all, uma zona nova caía no ramo da home e o `updateSettings` gravava
+     a lista da HOME com um id que não existe nela — perdendo blocos da home
+     numa edição feita na notícia. Com o switch, o TypeScript aponta a zona
+     esquecida em vez de escolher a errada. */
+  function zoneOf(scope: AdScope): {
+    list: HomeBlock[];
+    set: React.Dispatch<React.SetStateAction<HomeBlock[]>>;
+    patch: (v: HomeBlock[]) => Parameters<typeof adminApi.updateSettings>[0];
+  } {
+    switch (scope) {
+      case "article":
+        return { list: articleBlocks, set: setArticleBlocks, patch: (v) => ({ articleSidebarBlocks: v }) };
+      case "articleFooter":
+        return { list: articleFooterBlocks, set: setArticleFooterBlocks, patch: (v) => ({ articleFooterBlocks: v }) };
+      case "home":
+        return { list: homeBlocks, set: setHomeBlocks, patch: (v) => ({ homeBlocks: v }) };
     }
+  }
+
+  async function saveAdBlock(patched: HomeBlock) {
+    const scope: AdScope = adEdit !== null && adEdit !== "header" ? adEdit.scope : "home";
+    const z = zoneOf(scope);
+    const next = z.list.map((b) => (b.id === patched.id ? patched : b));
+    await adminApi.updateSettings(z.patch(next));
+    z.set(next);
     invalidateSiteCache();
     setAdEdit(null);
   }
@@ -981,39 +1011,26 @@ export default function AdsManager() {
     await load();
   }
 
-  // Excluir propaganda-bloco = remover o bloco da home (ou da lateral da notícia).
-  async function deleteBlock(scope: "home" | "article", id: string) {
-    if (!confirm("Remover esta propaganda? O bloco sai da home.")) return;
+  // Excluir propaganda-bloco = remover o bloco da zona em que ele vive.
+  async function deleteBlock(scope: AdScope, id: string) {
+    if (!confirm(`Remover esta propaganda? O bloco sai de: ${AD_SCOPE_LABEL[scope]}.`)) return;
     try {
-      if (scope === "article") {
-        const next = articleBlocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i }));
-        await adminApi.updateSettings({ articleSidebarBlocks: next });
-        setArticleBlocks(next);
-      } else {
-        const next = homeBlocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i }));
-        await adminApi.updateSettings({ homeBlocks: next });
-        setHomeBlocks(next);
-      }
+      const z = zoneOf(scope);
+      const next = z.list.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i }));
+      await adminApi.updateSettings(z.patch(next));
+      z.set(next);
       invalidateSiteCache();
     } catch (err) { alert((err as Error).message); }
   }
 
   // Ligar/desligar a exibição de um bloco-propaganda (optimista + reverte no erro).
-  async function setBlockVisible(scope: "home" | "article", block: HomeBlock, visible: boolean) {
-    const patched = { ...block, visible };
-    if (scope === "article") {
-      const prev = articleBlocks;
-      const next = articleBlocks.map((b) => (b.id === block.id ? patched : b));
-      setArticleBlocks(next);
-      try { await adminApi.updateSettings({ articleSidebarBlocks: next }); invalidateSiteCache(); }
-      catch (err) { setArticleBlocks(prev); alert((err as Error).message); }
-    } else {
-      const prev = homeBlocks;
-      const next = homeBlocks.map((b) => (b.id === block.id ? patched : b));
-      setHomeBlocks(next);
-      try { await adminApi.updateSettings({ homeBlocks: next }); invalidateSiteCache(); }
-      catch (err) { setHomeBlocks(prev); alert((err as Error).message); }
-    }
+  async function setBlockVisible(scope: AdScope, block: HomeBlock, visible: boolean) {
+    const z = zoneOf(scope);
+    const prev = z.list;
+    const next = z.list.map((b) => (b.id === block.id ? { ...block, visible } : b));
+    z.set(next);
+    try { await adminApi.updateSettings(z.patch(next)); invalidateSiteCache(); }
+    catch (err) { z.set(prev); alert((err as Error).message); }
   }
 
   async function clearHeaderBanner() {
@@ -1124,19 +1141,28 @@ export default function AdsManager() {
         onDelete: () => { void deleteBlock("home", b.id); },
       });
     }
-    for (const b of articleAdBlocks) {
-      const type = inferBlockType(b);
-      const st = blockStats[b.id] ?? { impressions: 0, clicks: 0 };
-      list.push({
-        key: `art-${b.id}`, name: b.name,
-        thumbImage: type === "image" ? b.imageUrl : undefined,
-        thumbHtml: type === "image" ? undefined : b.html,
-        location: "Lateral da notícia" + deviceSuffix(b.devices), typeLabel: type === "image" ? "Imagem" : "HTML",
-        active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
-        onEdit: () => setAdEdit({ scope: "article", block: b }),
-        onToggle: () => { void setBlockVisible("article", b, b.visible === false); },
-        onDelete: () => { void deleteBlock("article", b.id); },
-      });
+    /* As duas zonas da página de notícia. O prefixo da `key` é distinto por
+       zona: repetido, um mesmo id nas duas produziria chave duplicada de React
+       e as linhas piscariam. O `location` é o campo pelo qual o operador filtra
+       — sem rótulo próprio ele não consegue isolar o inventário do rodapé. */
+    for (const [scope, blocks, label] of [
+      ["article",       articleAdBlocks,       "Lateral da notícia"] as const,
+      ["articleFooter", articleFooterAdBlocks, "Fim da notícia"] as const,
+    ]) {
+      for (const b of blocks) {
+        const type = inferBlockType(b);
+        const st = blockStats[b.id] ?? { impressions: 0, clicks: 0 };
+        list.push({
+          key: `${scope}-${b.id}`, name: b.name,
+          thumbImage: type === "image" ? b.imageUrl : undefined,
+          thumbHtml: type === "image" ? undefined : b.html,
+          location: label + deviceSuffix(b.devices), typeLabel: type === "image" ? "Imagem" : "HTML",
+          active: b.visible !== false, impressions: st.impressions, clicks: st.clicks,
+          onEdit: () => setAdEdit({ scope, block: b }),
+          onToggle: () => { void setBlockVisible(scope, b, b.visible === false); },
+          onDelete: () => { void deleteBlock(scope, b.id); },
+        });
+      }
     }
     for (const ad of ads) {
       list.push({
@@ -1150,7 +1176,10 @@ export default function AdsManager() {
     }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ads, homeBlocks, articleBlocks, headerBannerHtml, blockStats]);
+    // O eslint-disable acima significa que ESTA lista é a única garantia: zona
+    // nova ausente daqui deixa a tabela congelada no estado anterior, e o
+    // operador salva de novo achando que não gravou.
+  }, [ads, homeBlocks, articleBlocks, articleFooterBlocks, headerBannerHtml, blockStats]);
 
   // ── Stats (propagandas clássicas + blocos-propaganda somados) ───────────────
   const stats = useMemo(() => {

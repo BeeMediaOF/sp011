@@ -9,6 +9,7 @@ import {
   inferBlockType, defaultFormatForType, parseVideoEmbedUrl,
   isDirectVideoFile, safeEmbedUrl, safeLinkUrl, segmentBlocks, sampleForPreview,
   categoriesBlockSource, resolveCategoryBlockItems, parsePlaylistId, categoryHref,
+  resolveZoneBlocks,
   type HomeBlock,
 } from "./homeBlocks";
 import { blogCategorySurface } from "./categoryRoutes";
@@ -299,4 +300,64 @@ test("categoryHref nao inventa rota de dois segmentos nem aceita barra solta", (
   assert.equal(categoryHref("futebol/2026", SURFACE_OLEY), undefined);
   assert.equal(categoryHref("/futebol", SURFACE_OLEY), "/futebol");
   assert.equal(categoryHref("/", SURFACE_OLEY), undefined);
+});
+
+// ─── Zona de blocos da página de notícia (resolveZoneBlocks) ─────────────────
+// Nenhuma das três telas envolvidas (Artigo, HomeBlocksManager, AdsManager) tem
+// teste; esta função pura é a única parte da zona que dá para provar.
+
+const zblock = (over: Partial<HomeBlock> = {}): HomeBlock =>
+  ({ id: "html-rodape-1", name: "Banner", visible: true, order: 0, custom: true, blockType: "html", ...over });
+
+test("resolveZoneBlocks: zona ausente ou vazia não rende nada", () => {
+  assert.deepEqual(resolveZoneBlocks(undefined), []);
+  assert.deepEqual(resolveZoneBlocks([]), []);
+});
+
+test("resolveZoneBlocks: bloco oculto fica de fora", () => {
+  assert.equal(resolveZoneBlocks([zblock({ visible: false })]).length, 0);
+  // visible ausente = visível (mesmo contrato das outras zonas)
+  assert.equal(resolveZoneBlocks([zblock({ visible: undefined })]).length, 1);
+});
+
+test("resolveZoneBlocks: ordena por order e desempata por id", () => {
+  const out = resolveZoneBlocks([
+    zblock({ id: "html-rodape-c", order: 2 }),
+    zblock({ id: "html-rodape-b", order: 1 }),
+    zblock({ id: "html-rodape-a", order: 1 }),
+  ]);
+  assert.deepEqual(out.map((r) => r.block.id), ["html-rodape-a", "html-rodape-b", "html-rodape-c"]);
+});
+
+test("resolveZoneBlocks: não muta a lista recebida (vem do cache do useSite)", () => {
+  const entrada = [zblock({ id: "html-rodape-z", order: 5 }), zblock({ id: "html-rodape-a", order: 1 })];
+  const antes = entrada.map((b) => b.id);
+  resolveZoneBlocks(entrada);
+  assert.deepEqual(entrada.map((b) => b.id), antes);
+});
+
+test("resolveZoneBlocks: descarta tipo que o renderizador não desenha", () => {
+  // Um bloco de conteúdo salvo nesta zona sumiria do site sem erro nenhum —
+  // aqui ele é descartado de forma explícita, e o painel só oferece os 3 tipos.
+  const out = resolveZoneBlocks([
+    zblock({ id: "html-rodape-1", blockType: "html", order: 0 }),
+    zblock({ id: "image-rodape-2", blockType: "image", order: 1 }),
+    zblock({ id: "advertising-rodape-3", blockType: "advertising", order: 2 }),
+    zblock({ id: "newsletter-rodape-4", blockType: "newsletter", order: 3 }),
+    zblock({ id: "mostread", blockType: "mostread", order: 4 }),
+  ]);
+  assert.deepEqual(out.map((r) => r.type), ["html", "image", "advertising"]);
+});
+
+test("resolveZoneBlocks: tipo sai do id quando não há blockType (bloco antigo)", () => {
+  const out = resolveZoneBlocks([zblock({ id: "image-rodape-1719848000000", blockType: undefined })]);
+  assert.deepEqual(out.map((r) => r.type), ["image"]);
+});
+
+test("resolveZoneBlocks: o prefixo do id gerado pelo painel resolve o tipo certo", () => {
+  // Guarda o formato `<tipo>-rodape-<timestamp>`: invertido ("rodape-html-1"),
+  // inferBlockType cairia em "content" e o bloco sumiria do site.
+  for (const type of ["html", "image", "advertising"]) {
+    assert.equal(inferBlockType({ id: `${type}-rodape-1719848000000`, custom: true }), type);
+  }
 });

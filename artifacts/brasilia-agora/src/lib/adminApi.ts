@@ -528,6 +528,8 @@ export interface SiteSettings {
   categories?: SiteCategory[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: HomeBlock[];
+  /** Blocos ao final da notícia (banner). Ausente = zona VAZIA. */
+  articleFooterBlocks?: HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */
   articleShowBreadcrumb?: boolean;
   articleShowShare?: boolean;

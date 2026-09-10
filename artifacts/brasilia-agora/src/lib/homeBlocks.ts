@@ -184,6 +184,42 @@ export function inferBlockType(block: Pick<HomeBlock, "id" | "blockType" | "cust
   return TYPE_PREFIXES.includes(prefix) ? prefix : "content";
 }
 
+/** Tipos que a zona do FIM da notícia sabe desenhar. Fonte única: o painel
+ *  monta os botões "+ …" a partir daqui e `resolveZoneBlocks` descarta o resto,
+ *  então tipo oferecido na tela e tipo renderizado no site não podem divergir. */
+export const ARTICLE_FOOTER_BLOCK_TYPES = ["html", "image", "advertising"] as const;
+export type ArticleFooterBlockType = (typeof ARTICLE_FOOTER_BLOCK_TYPES)[number];
+
+export interface ResolvedZoneBlock { block: HomeBlock; type: string }
+
+/**
+ * Blocos de uma zona da página de notícia, prontos para renderizar: só os
+ * visíveis, na ordem do painel, com o tipo já resolvido e os tipos que o
+ * renderizador não conhece DESCARTADOS.
+ *
+ * Puro de propósito — é a única parte desta zona que dá para testar (nenhuma das
+ * telas envolvidas tem teste). Três detalhes que não são estilo:
+ *  - `slice()` antes do `sort`: a lista vem do cache compartilhado do useSite e
+ *    ordenar no lugar mutaria o objeto que outros componentes leem.
+ *  - desempate por `id`: a página de notícia passa por SSR, e servidor e cliente
+ *    precisam pintar a MESMA ordem, senão a hidratação descarta o HTML servido
+ *    (React #418) — a mesma razão do desempate dos rumores de transferência.
+ *  - o filtro por `allowed`: sem ele, um tipo que o painel deixe salvar mas o
+ *    renderizador não trate vira bloco que existe no admin e some do site, sem
+ *    erro nenhum, nos 11 blogs.
+ */
+export function resolveZoneBlocks(
+  blocks: HomeBlock[] | undefined,
+  allowed: readonly string[] = ARTICLE_FOOTER_BLOCK_TYPES,
+): ResolvedZoneBlock[] {
+  return (blocks ?? [])
+    .filter((b) => b.visible !== false)
+    .slice()
+    .sort((a, b) => (a.order - b.order) || a.id.localeCompare(b.id))
+    .map((block) => ({ block, type: inferBlockType(block) }))
+    .filter((r) => allowed.includes(r.type));
+}
+
 /** Formato inicial de cada tipo (mesma 1ª opção dos selects do painel). */
 export function defaultFormatForType(type: string): string {
   switch (type) {

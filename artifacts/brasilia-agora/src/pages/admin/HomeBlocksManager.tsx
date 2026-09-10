@@ -4,7 +4,7 @@ import { adminApi, type HomeBlock, type HomeTemplate, type MenuItem } from "../.
 import { articlesUrl } from "../../lib/articlesQuery";
 import { useCan } from "../../lib/permissionsCache";
 import { invalidateSiteCache } from "../../hooks/useSite";
-import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, parsePlaylistId, safeEmbedUrl, categoriesBlockSource, type TemplateMenuItem, type CategoryBlockItem } from "../../lib/homeBlocks";
+import { inferBlockType, defaultFormatForType, parseVideoEmbedUrl, parsePlaylistId, safeEmbedUrl, categoriesBlockSource, ARTICLE_FOOTER_BLOCK_TYPES, type ArticleFooterBlockType, type TemplateMenuItem, type CategoryBlockItem } from "../../lib/homeBlocks";
 import { categoryIcon, hasCategoryIcon } from "../../lib/categoryIcons";
 import { FONT_OPTIONS, FONT_GROUP_LABELS, fontCss, ensureFontLoaded, type FontOption } from "../../lib/fonts";
 import type { FooterConfig } from "../../lib/footerConfig";
@@ -134,6 +134,20 @@ const AD_SLOT_OPTIONS = Array.from({ length: 11 }, (_, i) => {
   const n = String(i + 1).padStart(2, "0");
   return { value: `slot_${n}`, label: `Slot ${n}` };
 });
+
+/** Slots já exibidos FIXOS na página de notícia (entre parágrafos e pós-texto).
+ *  Um bloco da zona do fim da notícia apontando para eles mostraria o mesmo
+ *  anúncio duas vezes na mesma página e contaria duas impressões. */
+const ARTICLE_FIXED_SLOTS = ["slot_10", "slot_06"];
+const ARTICLE_FOOTER_AD_SLOTS = AD_SLOT_OPTIONS.filter((s) => !ARTICLE_FIXED_SLOTS.includes(s.value));
+/** Padrão do bloco de anúncio da zona do fim da notícia (não é fixo na página). */
+const ARTICLE_FOOTER_DEFAULT_SLOT = "slot_09";
+
+const ARTICLE_FOOTER_TYPE_LABEL: Record<ArticleFooterBlockType, string> = {
+  html:        "+ HTML",
+  image:       "+ Imagem",
+  advertising: "+ Anúncio (slot)",
+};
 
 // ─── Redes dos botões de compartilhar da página de notícia ────────────────────
 const SHARE_NETWORK_OPTIONS: { value: string; label: string }[] = [
@@ -739,6 +753,101 @@ function Toggle({ checked, onChange, accent }: { checked: boolean; onChange: () 
       style={{ backgroundColor: checked ? (accent ?? "#0B2A66") : "#CBD5E1" }}>
       <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${checked ? "translate-x-4" : "translate-x-0"}`} />
     </button>
+  );
+}
+
+// ─── Cartão de edição de um bloco da página de notícia ────────────────────────
+/** Usado pelas DUAS zonas da aba Notícia (lateral e fim da notícia). Extraído
+ *  para que um campo novo não precise ser escrito duas vezes — é o mesmo motivo
+ *  que fez `footerStyle` virar dívida ao morar em seis arquivos. */
+function ArticleBlockCard({ block: b, idx, total, slots, adsList, onPatch, onMove, onRemove }: {
+  block: HomeBlock; idx: number; total: number;
+  slots: { value: string; label: string }[];
+  adsList: { id: string; name: string }[];
+  onPatch: (patch: Partial<HomeBlock>) => void;
+  onMove: (dir: 1 | -1) => void;
+  onRemove: () => void;
+}) {
+  const btype = inferBlockType(b);
+  return (
+    <div className="border border-[#E2E8F0] rounded-xl p-2.5 space-y-2 bg-white">
+      <div className="flex items-center gap-1.5">
+        <div className="flex flex-col shrink-0">
+          <button type="button" title="Mover para cima" onClick={() => onMove(-1)} disabled={idx === 0}
+            className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronUp size={13} /></button>
+          <button type="button" title="Mover para baixo" onClick={() => onMove(1)} disabled={idx === total - 1}
+            className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronDown size={13} /></button>
+        </div>
+        <input value={b.name} onChange={(e) => onPatch({ name: e.target.value })}
+          className={`${AINPUT} font-bold flex-1 min-w-0`} />
+        <Toggle checked={b.visible !== false} onChange={() => onPatch({ visible: b.visible === false })} />
+        <button type="button" title="Remover bloco" onClick={onRemove}
+          className="w-7 h-7 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors">
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      {btype === "mostread" && (
+        <p className="text-[10px] text-[#94A3B8]">Lista automática dos mais lidos — o título público segue o idioma do site.</p>
+      )}
+      {btype === "advertising" && (
+        <>
+          <select value={b.adSlot ?? slots[0]?.value ?? "slot_07"} onChange={(e) => onPatch({ adSlot: e.target.value })}
+            className={`${AINPUT} appearance-none`}>
+            {slots.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+          <select value={b.adId ?? ""} onChange={(e) => onPatch({ adId: e.target.value || undefined })}
+            className={`${AINPUT} appearance-none`}>
+            <option value="">Automática — anúncios ativos do espaço acima</option>
+            {adsList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </>
+      )}
+      {btype === "html" && (
+        <>
+          <textarea value={b.html ?? ""} onChange={(e) => onPatch({ html: e.target.value })}
+            rows={4} spellCheck={false} className={`${AINPUT} font-mono resize-y`} placeholder="<div>…HTML do banner…</div>" />
+          <input value={b.linkUrl ?? ""} onChange={(e) => onPatch({ linkUrl: e.target.value })}
+            className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
+        </>
+      )}
+      {btype === "image" && (
+        <>
+          <input value={b.imageUrl ?? ""} onChange={(e) => onPatch({ imageUrl: e.target.value })}
+            className={AINPUT} placeholder="URL da imagem (envie pela aba Propagandas ou cole aqui)" />
+          <input value={b.linkUrl ?? ""} onChange={(e) => onPatch({ linkUrl: e.target.value })}
+            className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
+          <input value={b.caption ?? ""} onChange={(e) => onPatch({ caption: e.target.value })}
+            className={AINPUT} placeholder="Legenda (opcional)" />
+        </>
+      )}
+      {(btype === "html" || btype === "image") && (
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-medium text-[#64748B]">É uma propaganda (lista na aba Propagandas)</span>
+          <Toggle checked={b.isAd === true} onChange={() => onPatch({ isAd: !b.isAd })} accent="#D97706" />
+        </div>
+      )}
+      {btype !== "advertising" && (
+        <FontPicker value={b.fontFamily ?? ""} inputClass={`${AINPUT} appearance-none`}
+          onChange={(v) => onPatch({ fontFamily: v || undefined })} />
+      )}
+      <div className="grid grid-cols-3 gap-1">
+        {([
+          ["all", "Tudo", Monitor],
+          ["desktop", "Só desktop", Monitor],
+          ["mobile", "Só mobile", Smartphone],
+        ] as const).map(([id, label, Icon]) => (
+          <button key={id} type="button"
+            onClick={() => onPatch({ devices: id !== "all" ? id : undefined })}
+            className={`p-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-wide transition-all flex flex-col items-center gap-0.5 ${
+              (b.devices ?? "all") === id
+                ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
+                : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
+            <Icon size={12} /> {label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1629,6 +1738,9 @@ export default function HomeBlocksManager() {
   const [headerBannerLinkUrl, setHeaderBannerLinkUrl] = useState("");
   // Página de notícia (aba Notícia): blocos da lateral + seções desligáveis.
   const [articleBlocks, setArticleBlocks] = useState<HomeBlock[]>([]);
+  // Zona do FIM da notícia (banner entre o texto e "Relacionadas"). Sem lista
+  // padrão: `?? []` na carga, zona vazia até o operador adicionar um bloco.
+  const [articleFooterBlocks, setArticleFooterBlocks] = useState<HomeBlock[]>([]);
   const [articleShowBreadcrumb, setArticleShowBreadcrumb] = useState(true);
   const [articleShowShare, setArticleShowShare]           = useState(true);
   const [articleShowRelated, setArticleShowRelated]       = useState(true);
@@ -1775,6 +1887,10 @@ export default function HomeBlocksManager() {
         setArticleBlocks(r.settings.articleSidebarBlocks?.length
           ? r.settings.articleSidebarBlocks.map((b) => ({ ...b }))
           : DEFAULT_ARTICLE_SIDEBAR_BLOCKS.map((b) => ({ ...b })));
+        // `?? []` e NÃO um DEFAULT_*: a zona do fim da notícia nasce vazia (ver
+        // o comentário do estado). A cópia rasa é obrigatória — sem ela os
+        // handlers de patch/mover mutariam o objeto devolvido pelo getSettings.
+        setArticleFooterBlocks((r.settings.articleFooterBlocks ?? []).map((b) => ({ ...b })));
         setArticleShowBreadcrumb(r.settings.articleShowBreadcrumb !== false);
         setArticleShowShare(r.settings.articleShowShare !== false);
         setArticleShowRelated(r.settings.articleShowRelated !== false);
@@ -2049,13 +2165,17 @@ export default function HomeBlocksManager() {
     } catch { } finally { setPreviewApplying(false); }
   }
 
-  // ── Página de notícia: blocos da lateral ────────────────────────────────────
-  function patchArticleBlock(id: string, patch: Partial<HomeBlock>) {
-    setArticleBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  // ── Página de notícia: as DUAS zonas de blocos (lateral e fim da notícia) ───
+  // Os manipuladores recebem o setter em vez de existirem duas vezes: são 30
+  // linhas de reordenação, e duplicadas a próxima correção pegaria uma zona só.
+  type ZoneSetter = React.Dispatch<React.SetStateAction<HomeBlock[]>>;
+
+  function patchZoneBlock(setter: ZoneSetter, id: string, patch: Partial<HomeBlock>) {
+    setter((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
   }
 
-  function moveArticleBlock(idx: number, dir: 1 | -1) {
-    setArticleBlocks((prev) => {
+  function moveZoneBlock(setter: ZoneSetter, idx: number, dir: 1 | -1) {
+    setter((prev) => {
       const to = idx + dir;
       if (to < 0 || to >= prev.length) return prev;
       const next = [...prev];
@@ -2064,26 +2184,51 @@ export default function HomeBlocksManager() {
     });
   }
 
-  function addArticleBlock(type: "html" | "image" | "advertising" | "mostread") {
+  /* `suffix` entra no id do bloco e é o que separa as duas zonas. Não é
+     cosmético: o id é a chave de métrica `block:<id>` do anúncio — dois blocos
+     homônimos em zonas diferentes somariam impressões na MESMA linha do
+     relatório. O prefixo antes do primeiro hífen continua sendo o tipo, porque
+     é dele que `inferBlockType` deduz o bloco quando não há blockType. */
+  function addZoneBlock(
+    setter: ZoneSetter,
+    type: "html" | "image" | "advertising" | "mostread",
+    suffix: "artigo" | "rodape",
+    defaultSlot: string,
+  ) {
     const names: Record<string, string> = {
       html: "Propaganda HTML", image: "Banner de imagem",
       advertising: "Propaganda (slot)", mostread: "Mais Lidas",
     };
-    setArticleBlocks((prev) => [...prev, {
-      id: type === "mostread" ? "mostread" : `${type}-artigo-${Date.now()}`,
+    setter((prev) => [...prev, {
+      id: type === "mostread" ? "mostread" : `${type}-${suffix}-${Date.now()}`,
       name: names[type]!, visible: true, order: prev.length,
       custom: type !== "mostread", blockType: type,
-      ...(type === "advertising" ? { adSlot: "slot_07" } : {}),
-      // Blocos de imagem/HTML da lateral nascem marcados como propaganda
-      // (aparecem na aba Propagandas; desmarque no card se não for anúncio).
+      ...(type === "advertising" ? { adSlot: defaultSlot } : {}),
+      // Blocos de imagem/HTML nascem marcados como propaganda (aparecem na aba
+      // Propagandas; desmarque no card se não for anúncio).
       ...(type === "html" || type === "image" ? { isAd: true } : {}),
     }]);
   }
 
-  async function saveArticleSidebar() {
-    const ordered = articleBlocks.map((b, i) => ({ ...b, order: i }));
-    setArticleBlocks(ordered);
-    await saveSettingsPatch({ articleSidebarBlocks: ordered });
+  const patchArticleBlock = (id: string, patch: Partial<HomeBlock>) => patchZoneBlock(setArticleBlocks, id, patch);
+  const moveArticleBlock  = (idx: number, dir: 1 | -1) => moveZoneBlock(setArticleBlocks, idx, dir);
+  const addArticleBlock   = (type: "html" | "image" | "advertising" | "mostread") =>
+    addZoneBlock(setArticleBlocks, type, "artigo", "slot_07");
+
+  const patchFooterBlock  = (id: string, patch: Partial<HomeBlock>) => patchZoneBlock(setArticleFooterBlocks, id, patch);
+  const moveFooterBlock   = (idx: number, dir: 1 | -1) => moveZoneBlock(setArticleFooterBlocks, idx, dir);
+  const addFooterBlock    = (type: ArticleFooterBlockType) =>
+    addZoneBlock(setArticleFooterBlocks, type, "rodape", ARTICLE_FOOTER_DEFAULT_SLOT);
+
+  /* UM botão grava as DUAS zonas. Elas vivem na mesma aba e na mesma rolagem:
+     com dois botões, o operador mexe nas duas e salva uma, e o painel some com
+     metade do trabalho sem avisar. */
+  async function saveArticlePage() {
+    const sidebar = articleBlocks.map((b, i) => ({ ...b, order: i }));
+    const footer  = articleFooterBlocks.map((b, i) => ({ ...b, order: i }));
+    setArticleBlocks(sidebar);
+    setArticleFooterBlocks(footer);
+    await saveSettingsPatch({ articleSidebarBlocks: sidebar, articleFooterBlocks: footer });
     setArticleSavedOk(true);
     setTimeout(() => setArticleSavedOk(false), 2500);
   }
@@ -3003,9 +3148,10 @@ export default function HomeBlocksManager() {
                 <div className="rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-3 flex items-start gap-2.5">
                   <Info size={14} className="text-[#2563EB] mt-0.5 shrink-0" />
                   <p className="text-[11px] text-[#1e40af] leading-relaxed">
-                    Controle da <b>página de notícia</b>: seções desligáveis e os blocos da
-                    coluna lateral (300px de largura). A prévia ao lado mostra a home —
-                    abra uma notícia do site para conferir o resultado.
+                    Controle da <b>página de notícia</b>: seções desligáveis e as duas zonas de
+                    blocos — a <b>coluna lateral</b> (300px) e o <b>final da notícia</b>, entre o
+                    texto e "Relacionadas". A prévia ao lado mostra a home — abra uma notícia do
+                    site para conferir o resultado, depois de salvar.
                   </p>
                 </div>
 
@@ -3076,93 +3222,17 @@ export default function HomeBlocksManager() {
                   )}
                 </div>
 
-                {/* Blocos da coluna lateral */}
+                {/* Zona 1 — coluna lateral (300px) */}
                 <div className="border-t border-[#E2E8F0] pt-4 space-y-2">
                   <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Blocos da coluna lateral</p>
-                  {articleBlocks.map((b, idx) => {
-                    const btype = inferBlockType(b);
-                    return (
-                      <div key={b.id} className="border border-[#E2E8F0] rounded-xl p-2.5 space-y-2 bg-white">
-                        <div className="flex items-center gap-1.5">
-                          <div className="flex flex-col shrink-0">
-                            <button type="button" title="Mover para cima" onClick={() => moveArticleBlock(idx, -1)} disabled={idx === 0}
-                              className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronUp size={13} /></button>
-                            <button type="button" title="Mover para baixo" onClick={() => moveArticleBlock(idx, 1)} disabled={idx === articleBlocks.length - 1}
-                              className="text-[#CBD5E1] hover:text-[#64748B] disabled:opacity-30"><ChevronDown size={13} /></button>
-                          </div>
-                          <input value={b.name} onChange={(e) => patchArticleBlock(b.id, { name: e.target.value })}
-                            className={`${AINPUT} font-bold flex-1 min-w-0`} />
-                          <Toggle checked={b.visible !== false} onChange={() => patchArticleBlock(b.id, { visible: b.visible === false })} />
-                          <button type="button" title="Remover bloco"
-                            onClick={() => setArticleBlocks((prev) => prev.filter((x) => x.id !== b.id))}
-                            className="w-7 h-7 flex items-center justify-center rounded-lg text-[#94A3B8] hover:text-red-500 hover:bg-red-50 shrink-0 transition-colors">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-
-                        {btype === "mostread" && (
-                          <p className="text-[10px] text-[#94A3B8]">Lista automática dos mais lidos — o título público segue o idioma do site.</p>
-                        )}
-                        {btype === "advertising" && (
-                          <>
-                            <select value={b.adSlot ?? "slot_07"} onChange={(e) => patchArticleBlock(b.id, { adSlot: e.target.value })}
-                              className={`${AINPUT} appearance-none`}>
-                              {AD_SLOT_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
-                            <select value={b.adId ?? ""} onChange={(e) => patchArticleBlock(b.id, { adId: e.target.value || undefined })}
-                              className={`${AINPUT} appearance-none`}>
-                              <option value="">Automática — anúncios ativos do espaço acima</option>
-                              {articleAdsList.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                            </select>
-                          </>
-                        )}
-                        {btype === "html" && (
-                          <>
-                            <textarea value={b.html ?? ""} onChange={(e) => patchArticleBlock(b.id, { html: e.target.value })}
-                              rows={4} spellCheck={false} className={`${AINPUT} font-mono resize-y`} placeholder="<div>…HTML do banner…</div>" />
-                            <input value={b.linkUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { linkUrl: e.target.value })}
-                              className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
-                          </>
-                        )}
-                        {btype === "image" && (
-                          <>
-                            <input value={b.imageUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { imageUrl: e.target.value })}
-                              className={AINPUT} placeholder="URL da imagem (envie pela aba Propagandas ou cole aqui)" />
-                            <input value={b.linkUrl ?? ""} onChange={(e) => patchArticleBlock(b.id, { linkUrl: e.target.value })}
-                              className={AINPUT} placeholder="Link de redirecionamento ao clicar (opcional)" />
-                            <input value={b.caption ?? ""} onChange={(e) => patchArticleBlock(b.id, { caption: e.target.value })}
-                              className={AINPUT} placeholder="Legenda (opcional)" />
-                          </>
-                        )}
-                        {(btype === "html" || btype === "image") && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-[#64748B]">É uma propaganda (lista na aba Propagandas)</span>
-                            <Toggle checked={b.isAd === true} onChange={() => patchArticleBlock(b.id, { isAd: !b.isAd })} accent="#D97706" />
-                          </div>
-                        )}
-                        {btype !== "advertising" && (
-                          <FontPicker value={b.fontFamily ?? ""} inputClass={`${AINPUT} appearance-none`}
-                            onChange={(v) => patchArticleBlock(b.id, { fontFamily: v || undefined })} />
-                        )}
-                        <div className="grid grid-cols-3 gap-1">
-                          {([
-                            ["all", "Tudo", Monitor],
-                            ["desktop", "Só desktop", Monitor],
-                            ["mobile", "Só mobile", Smartphone],
-                          ] as const).map(([id, label, Icon]) => (
-                            <button key={id} type="button"
-                              onClick={() => patchArticleBlock(b.id, { devices: id !== "all" ? id : undefined })}
-                              className={`p-1.5 rounded-lg border text-[9px] font-bold uppercase tracking-wide transition-all flex flex-col items-center gap-0.5 ${
-                                (b.devices ?? "all") === id
-                                  ? "border-[#0B2A66] bg-[#0B2A66]/5 text-[#0B2A66]"
-                                  : "border-slate-200 text-slate-500 hover:border-slate-300"}`}>
-                              <Icon size={12} /> {label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
+                  <p className="text-[10px] text-[#94A3B8] -mt-1">Coluna de 300px ao lado do texto. Arte recomendada: 250x350.</p>
+                  {articleBlocks.map((b, idx) => (
+                    <ArticleBlockCard key={b.id} block={b} idx={idx} total={articleBlocks.length}
+                      slots={AD_SLOT_OPTIONS} adsList={articleAdsList}
+                      onPatch={(patch) => patchArticleBlock(b.id, patch)}
+                      onMove={(dir) => moveArticleBlock(idx, dir)}
+                      onRemove={() => setArticleBlocks((prev) => prev.filter((x) => x.id !== b.id))} />
+                  ))}
 
                   <div className="flex flex-wrap gap-1.5">
                     {([
@@ -3175,16 +3245,55 @@ export default function HomeBlocksManager() {
                       </button>
                     ))}
                   </div>
+                </div>
 
+                {/* Zona 2 — fim da notícia (banner entre o texto e "Relacionadas") */}
+                <div className="border-t border-[#E2E8F0] pt-4 space-y-2">
+                  <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider">Blocos ao final da notícia</p>
+                  <p className="text-[10px] text-[#94A3B8] -mt-1">
+                    Entre o fim do texto e "Relacionadas", na largura da coluna do artigo (~810px no desktop).
+                    Arte recomendada: 970x250 ou 970x90. Zona vazia não aparece no site.
+                  </p>
+                  {articleFooterBlocks.map((b, idx) => (
+                    <ArticleBlockCard key={b.id} block={b} idx={idx} total={articleFooterBlocks.length}
+                      slots={ARTICLE_FOOTER_AD_SLOTS} adsList={articleAdsList}
+                      onPatch={(patch) => patchFooterBlock(b.id, patch)}
+                      onMove={(dir) => moveFooterBlock(idx, dir)}
+                      onRemove={() => setArticleFooterBlocks((prev) => prev.filter((x) => x.id !== b.id))} />
+                  ))}
+
+                  {/* Os botões saem de ARTICLE_FOOTER_BLOCK_TYPES, a MESMA lista
+                      que resolveZoneBlocks usa para decidir o que renderizar:
+                      tipo oferecido aqui e não desenhado lá viraria um bloco
+                      que existe no painel e some do site, sem erro nenhum. */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {ARTICLE_FOOTER_BLOCK_TYPES.map((type) => (
+                      <button key={type} type="button" onClick={() => addFooterBlock(type)}
+                        className="px-3 py-1.5 text-[11px] font-semibold text-[#0B2A66] border border-dashed border-[#CBD5E1] rounded-xl hover:bg-[#F8FAFC] transition-colors">
+                        {ARTICLE_FOOTER_TYPE_LABEL[type]}
+                      </button>
+                    ))}
+                  </div>
+                  {articleFooterBlocks.some((b) => inferBlockType(b) === "advertising") && (
+                    <p className="text-[10px] text-[#94A3B8]">
+                      Os slots 06 e 10 não aparecem na lista: eles já são exibidos na própria notícia,
+                      e repeti-los mostraria o mesmo anúncio duas vezes e contaria a impressão em dobro.
+                    </p>
+                  )}
+                </div>
+
+                {/* Um botão para as duas zonas: elas vivem na mesma rolagem, e
+                    dois botões deixariam o operador salvar metade do trabalho. */}
+                <div className="space-y-2">
                   {articleSavedOk && (
                     <p className="text-[12px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
-                      Lateral da notícia salva — abra uma notícia para conferir.
+                      Página de notícia salva — abra uma notícia para conferir (a prévia ao lado mostra a home).
                     </p>
                   )}
                   {canManage && (
-                    <button type="button" onClick={() => void saveArticleSidebar()} disabled={saving}
+                    <button type="button" onClick={() => void saveArticlePage()} disabled={saving}
                       className="w-full py-2 rounded-xl bg-[#0B2A66] text-white text-sm font-semibold flex items-center justify-center gap-2 hover:bg-[#0a2255] disabled:opacity-50 transition-colors">
-                      <Save size={13} /> Salvar lateral da notícia
+                      <Save size={13} /> Salvar página de notícia
                     </button>
                   )}
                 </div>

@@ -278,6 +278,12 @@ export interface SiteSettings {
   categories?: { id: string; name: string; slug: string; color?: string; visible?: boolean }[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: HomeBlock[];
+  /** Blocos ao FINAL da notícia, entre o texto e "Relacionadas" (banner do
+   *  operador). Ausente = zona VAZIA — e é deliberado: a imagem é uma só para
+   *  os 11 blogs, então um default embutido apareceria no fim de toda notícia
+   *  da rede sem ninguém pedir (§13). Fora do snapshot de HomeTemplate, como a
+   *  lateral: aplicar template não apaga o que o operador vendeu aqui. */
+  articleFooterBlocks?: HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */
   articleShowBreadcrumb?: boolean;
   articleShowShare?: boolean;

@@ -116,10 +116,23 @@ function SectionHeading({ title, color, hideHeader }: { title: string; color: st
  *  (320) até a faixa full-width do desktop 2× (o container é max-w-1280). */
 const BLOCK_IMAGE_WIDTHS = [320, 640, 970, 1280];
 
-export function ImageBlock({ block, preview, contained = true }: {
+/** Largura de destino de cada superfície, para o `sizes` não mentir.
+ *  O navegador escolhe o candidato do srcSet pela largura PEDIDA: pedir menos
+ *  do que a caixa mede faz ele ampliar e borrar (o achado do credito.vc).
+ *  "column" = coluna do artigo no desktop (1280 − 32 de padding − 32 de gap
+ *  − 300 da lateral − 106 de margem ≈ 810 px, servidos pelo degrau de 970). */
+const BLOCK_IMAGE_SIZES = {
+  page:   "(max-width: 1280px) 100vw, 1280px",
+  column: "(max-width: 1024px) 100vw, 810px",
+  rail:   "(max-width: 1024px) 100vw, 320px",
+} as const;
+
+export function ImageBlock({ block, preview, contained = true, sizeMode }: {
   block: HomeBlock; preview?: boolean;
   /** false = sem o wrapper de página (uso na lateral da notícia/zonas). */
   contained?: boolean;
+  /** Largura de destino. Ausente = derivada de `contained` (page/rail). */
+  sizeMode?: keyof typeof BLOCK_IMAGE_SIZES;
 }) {
   // Bloco marcado "É uma propaganda": mede impressão viewável (≥50% por 1s,
   // 1× por sessão) e cliques como qualquer anúncio, sob a chave block:<id>.
@@ -145,7 +158,7 @@ export function ImageBlock({ block, preview, contained = true }: {
   const img = (
     <img src={proxyUrl(src, BLOCK_IMAGE_WIDTHS[BLOCK_IMAGE_WIDTHS.length - 1]!)}
       srcSet={buildSrcSet(src, BLOCK_IMAGE_WIDTHS) || undefined}
-      sizes={contained ? "(max-width: 1280px) 100vw, 1280px" : "(max-width: 1024px) 100vw, 320px"}
+      sizes={BLOCK_IMAGE_SIZES[sizeMode ?? (contained ? "page" : "rail")]}
       alt={caption || block.name} loading="lazy" decoding="async"
       width={block.imageWidth} height={block.imageHeight}
       className={`w-full h-auto object-cover ${format === "full_width_image" ? "" : "rounded-xl"}`} />

@@ -7,6 +7,7 @@ import { detectInternalRequest } from "../lib/internalTraffic.js";
 import { bumpEndpoint, bumpInternalReason } from "../lib/analyticsHealth.js";
 import { logger } from "../lib/logger.js";
 import { store } from "../lib/store.js";
+import { findAdBlockIn } from "../lib/adBlocks.js";
 import { handleImpression, handleClick, type AdEventDeps } from "../lib/ingestHandlers.js";
 
 const router = Router();
@@ -23,18 +24,12 @@ const adClickDedup = createDedupWindow({ windowMs: 10_000 });      // 10 s (mata
 // são inventário medido: chave `block:<id>`, contadores só em ad_daily_stats
 // (não existe linha na tabela ads). A validação é contra as settings — id
 // desconhecido/não marcado não vira métrica.
+// A varredura em si (quais zonas de blocos existem, e o pseudo-bloco do banner
+// do cabeçalho) mora em lib/adBlocks.ts, compartilhada com routes/analytics.ts:
+// duplicada, uma zona nova entrava numa rota e não na outra, e o evento era
+// gravado sem aparecer no painel.
 function findAdBlock(blockId: string): { visible: boolean } | null {
-  const s = store.getSettings();
-  // Pseudo-bloco: banner do cabeçalho (settings.headerBannerHtml) — também é
-  // inventário medido, sob a chave fixa block:header-banner.
-  if (blockId === "header-banner") {
-    return s.headerBannerHtml?.trim() ? { visible: true } : null;
-  }
-  for (const list of [s.homeBlocks ?? [], s.articleSidebarBlocks ?? []]) {
-    const b = list.find((x) => x.id === blockId && x.isAd === true);
-    if (b) return { visible: b.visible !== false };
-  }
-  return null;
+  return findAdBlockIn(store.getSettings(), blockId);
 }
 
 function todayStr(): string {

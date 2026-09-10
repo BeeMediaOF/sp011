@@ -75,6 +75,9 @@ export interface SiteSettings {
   categories?: { id: string; name: string; slug: string; color?: string; visible?: boolean }[];
   /** Blocos da coluna lateral da página de notícia (ausente = Mais Lidas + anúncio slot_07). */
   articleSidebarBlocks?: import("../lib/homeBlocks").HomeBlock[];
+  /** Blocos ao final da notícia (banner). Ausente = zona VAZIA — ao contrário da
+   *  lateral acima, que tem composição padrão por retrocompatibilidade. */
+  articleFooterBlocks?: import("../lib/homeBlocks").HomeBlock[];
   /** Seções da página de notícia (ausente = exibidas). */
   articleShowBreadcrumb?: boolean;
   articleShowShare?: boolean;

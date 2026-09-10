@@ -9,11 +9,14 @@
 -- amarelo sobre branco da 1,64:1 e nunca pode virar texto), navy #0b1526 (o
 -- contorno da logo — top bar, barra de menu e fundo dos banners), rodape
 -- #060d18.
--- Estrutura, menu pt-BR e SLUGS IDENTICOS aos dos irmaos de esporte
--- (copa-do-mundo, futebol, volei, tenis, f1, futebol-americano, e-sports,
--- outros) — todos compartilham as fontes na central. Menu ja nasce com a aba
--- "Top News" (CLAUDE.md §17: aplicar template APAGA o menu, entao ela precisa
--- estar no snapshot).
+-- Estrutura e menu pt-BR com os 8 SLUGS DOS IRMAOS de esporte (copa-do-mundo,
+-- futebol, volei, tenis, f1, futebol-americano, e-sports, outros) — todos
+-- compartilham as fontes na central — MAIS uma 9a editoria propria deste blog:
+-- campeonato-brasileiro (aba BRASILEIRAO, depois de FUTEBOL, + coluna na home).
+-- Ela e alimentada pelos feeds da Gazeta Esportiva cadastrados so aqui
+-- (deploy/farodejogo/sources_gazeta.sql) e NAO existe nos blogs irmaos.
+-- Menu ja nasce tambem com a aba "Top News" (CLAUDE.md §17: aplicar template
+-- APAGA o menu, entao tudo que e menu precisa estar no snapshot).
 --   * Banners nascem como "Anuncie aqui" em HTML na identidade da marca —
 --     troque o HTML do bloco quando houver parceiro. Artes de upload de
 --     OUTROS blogs nunca funcionam aqui (bucket por blog).
@@ -98,52 +101,59 @@ SET value = jsonb_set(
       "visible": true
     },
     {
+      "id": "fj-menu-brasileirao",
+      "label": "BRASILEIRÃO",
+      "path": "/campeonato-brasileiro",
+      "order": 3,
+      "visible": true
+    },
+    {
       "id": "fj-menu-volei",
       "label": "VÔLEI",
       "path": "/volei",
-      "order": 3,
+      "order": 4,
       "visible": true
     },
     {
       "id": "fj-menu-tenis",
       "label": "TÊNIS",
       "path": "/tenis",
-      "order": 4,
+      "order": 5,
       "visible": true
     },
     {
       "id": "fj-menu-f1",
       "label": "FÓRMULA 1",
       "path": "/f1",
-      "order": 5,
+      "order": 6,
       "visible": true
     },
     {
       "id": "fj-menu-futam",
       "label": "FUT. AMERICANO",
       "path": "/futebol-americano",
-      "order": 6,
+      "order": 7,
       "visible": true
     },
     {
       "id": "fj-menu-esports",
       "label": "E-SPORTS",
       "path": "/e-sports",
-      "order": 7,
+      "order": 8,
       "visible": true
     },
     {
       "id": "fj-menu-outros",
       "label": "OUTROS",
       "path": "/outros",
-      "order": 8,
+      "order": 9,
       "visible": true
     },
     {
       "id": "fj-menu-topnews",
       "label": "TOP NEWS",
       "path": "/top-news",
-      "order": 9,
+      "order": 10,
       "visible": true
     }
   ],
@@ -337,10 +347,25 @@ SET value = jsonb_set(
       "html": "<div style=\"max-width:460px;margin:0 auto;text-align:center;padding:34px 24px;border:1px solid #1c3f75;border-radius:8px;background:radial-gradient(circle at 88% 45%, rgba(247,195,49,.30), transparent 42%), radial-gradient(circle at 10% 60%, rgba(17,96,212,.55), transparent 46%), linear-gradient(135deg, #0b1526, #123a72 60%, #0b1526);\"><div style=\"color:#c8d8f2;font-size:11px;font-weight:800;letter-spacing:.14em;margin-bottom:10px;\">PARCEIRO OFICIAL</div><div style=\"margin-bottom:12px;\"><span style=\"font-style:italic;font-weight:900;font-size:26px;letter-spacing:.04em;color:#ffffff;\">FARO <span style=\"color:#fcc419;\">DE JOGO</span></span></div><div style=\"color:#ffffff;font-size:26px;font-weight:900;line-height:1.1;\">SUA MARCA<br/>NESTE ESPAÇO</div><div style=\"display:inline-block;background:#fcc419;color:#0b1526;padding:10px 22px;border-radius:6px;font-weight:800;font-size:13px;margin-top:16px;\">ANUNCIE AQUI</div></div>"
     },
     {
+      "id": "content-fj-brasileirao",
+      "name": "Campeonato Brasileiro",
+      "color": "#1c66bd",
+      "order": 7,
+      "width": "quarter",
+      "custom": true,
+      "format": "featured",
+      "layout": "featured",
+      "source": "automatic_by_category",
+      "visible": true,
+      "category": "campeonato-brasileiro",
+      "blockType": "content",
+      "linkLabel": "VER TODAS →"
+    },
+    {
       "id": "content-fj-futebol",
       "name": "Futebol",
       "color": "#1c66bd",
-      "order": 7,
+      "order": 8,
       "width": "quarter",
       "custom": true,
       "format": "featured",
@@ -355,7 +380,7 @@ SET value = jsonb_set(
       "id": "content-fj-futam",
       "name": "Fut. Americano",
       "color": "#0b1526",
-      "order": 8,
+      "order": 9,
       "width": "quarter",
       "custom": true,
       "format": "featured",
@@ -370,7 +395,7 @@ SET value = jsonb_set(
       "id": "content-fj-f1",
       "name": "Fórmula 1",
       "color": "#1c66bd",
-      "order": 9,
+      "order": 10,
       "width": "quarter",
       "custom": true,
       "format": "featured",
@@ -385,7 +410,7 @@ SET value = jsonb_set(
       "id": "content-fj-esports",
       "name": "e-Sports",
       "color": "#0b1526",
-      "order": 10,
+      "order": 11,
       "width": "quarter",
       "custom": true,
       "format": "featured",
@@ -400,7 +425,7 @@ SET value = jsonb_set(
       "id": "content-fj-copa",
       "name": "Copa do Mundo",
       "color": "#1c66bd",
-      "order": 11,
+      "order": 12,
       "custom": true,
       "format": "cultura",
       "layout": "cultura",
@@ -415,7 +440,7 @@ SET value = jsonb_set(
       "id": "content-fj-mais",
       "name": "Mais Notícias",
       "color": "#1c66bd",
-      "order": 12,
+      "order": 13,
       "custom": true,
       "format": "grid",
       "layout": "grid",
@@ -429,7 +454,7 @@ SET value = jsonb_set(
       "id": "brasil",
       "name": "Brasil",
       "color": "#16a34a",
-      "order": 13,
+      "order": 14,
       "layout": "grid",
       "visible": false,
       "category": "brasil"
@@ -438,7 +463,7 @@ SET value = jsonb_set(
       "id": "mundo",
       "name": "Mundo",
       "color": "#6b21a8",
-      "order": 14,
+      "order": 15,
       "layout": "grid",
       "visible": false,
       "category": "mundo"
@@ -447,7 +472,7 @@ SET value = jsonb_set(
       "id": "esporte",
       "name": "Esporte",
       "color": "#dc2626",
-      "order": 15,
+      "order": 16,
       "layout": "cultura",
       "visible": false,
       "category": "esportes"
@@ -456,7 +481,7 @@ SET value = jsonb_set(
       "id": "cultura",
       "name": "Cultura",
       "color": "#0d9488",
-      "order": 16,
+      "order": 17,
       "layout": "cultura",
       "visible": false,
       "category": "cultura"
@@ -465,7 +490,7 @@ SET value = jsonb_set(
       "id": "df",
       "name": "DF",
       "color": "#0b3d91",
-      "order": 17,
+      "order": 18,
       "layout": "duplo",
       "visible": false,
       "category": "cidade"
@@ -474,7 +499,7 @@ SET value = jsonb_set(
       "id": "saude",
       "name": "Saúde",
       "color": "#16a34a",
-      "order": 18,
+      "order": 19,
       "layout": "grid",
       "visible": false,
       "category": "saude"
@@ -483,7 +508,7 @@ SET value = jsonb_set(
       "id": "tecnologia",
       "name": "Tecnologia",
       "color": "#0284c7",
-      "order": 19,
+      "order": 20,
       "layout": "grid",
       "visible": false,
       "category": "tecnologia"
@@ -491,13 +516,13 @@ SET value = jsonb_set(
     {
       "id": "colunistas",
       "name": "Colunistas",
-      "order": 20,
+      "order": 21,
       "visible": false
     },
     {
       "id": "ultimas",
       "name": "Últimas Notícias",
-      "order": 21,
+      "order": 22,
       "visible": false
     }
   ]

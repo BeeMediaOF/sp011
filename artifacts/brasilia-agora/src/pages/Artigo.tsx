@@ -16,7 +16,7 @@ import { categoryRoute } from "../lib/categoryRoute";
 import AdBanner from "../components/ads/AdBanner";
 import { safeTitleHtml, sanitizeArticleHtml } from "@/lib/sanitize";
 import { HtmlBlock, ImageBlock, BlockFontScope, deviceBoxClass } from "../components/blocks/HomeCustomBlocks";
-import { inferBlockType, type HomeBlock } from "../lib/homeBlocks";
+import { inferBlockType, resolveZoneBlocks, type HomeBlock } from "../lib/homeBlocks";
 import type { AdSlotKey } from "../components/ads/useAds";
 
 const editoriaColor: Record<string, string> = {
@@ -96,6 +96,42 @@ function ArticleSidebar() {
         );
       })}
     </aside>
+  );
+}
+
+/**
+ * Blocos ao FINAL da notícia (settings.articleFooterBlocks) — o banner que o
+ * operador vende no fim do texto. Ausente/vazia = não renderiza nada: a imagem
+ * é uma só para os 11 blogs, então esta zona nasce vazia em todos e só aparece
+ * onde alguém adicionar um bloco.
+ *
+ * Componente de MÓDULO (não função interna de Artigo): declarado dentro do
+ * render, a identidade mudaria a cada render e o React remontaria a árvore —
+ * zerando o IntersectionObserver que conta a impressão do anúncio a cada uma das
+ * três renderizações (artigo, /api/site, hidratação).
+ */
+function ArticleFooterBlocks({ blocks }: { blocks?: HomeBlock[] }) {
+  const resolved = resolveZoneBlocks(blocks);
+  if (resolved.length === 0) return null;
+
+  return (
+    <div className="mt-8 space-y-6">
+      {resolved.map(({ block: b, type }) => {
+        let content: React.ReactNode = null;
+        /* Padrão slot_09 e não slot_06: o 06 já é renderizado fixo mais abaixo
+           nesta mesma página, e repeti-lo mostraria o anúncio duas vezes e
+           contaria a impressão em dobro (o painel também o esconde da lista). */
+        if (type === "advertising") content = <AdBanner slot={(b.adSlot ?? "slot_09") as AdSlotKey} adId={b.adId} />;
+        else if (type === "image")  content = <ImageBlock block={b} contained={false} sizeMode="column" />;
+        else if (type === "html")   content = <HtmlBlock block={b} contained={false} />;
+        if (!content) return null;
+        return (
+          <div key={b.id} className={deviceBoxClass(b.devices)}>
+            <BlockFontScope fontId={b.fontFamily}>{content}</BlockFontScope>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -829,6 +865,12 @@ export default function Artigo() {
                       </div>
                     </div>
                   )}
+
+                  {/* Banner do operador ao final da notícia. Fica FORA do
+                      contentRef (a profundidade de leitura mede só o corpo) e
+                      DENTRO do ramo em que o artigo existe — bloco de anúncio na
+                      tela de 404 contaria impressão de página de erro. */}
+                  <ArticleFooterBlocks blocks={settings?.articleFooterBlocks} />
 
                   {settings?.articleShowRelated !== false && (
                     <ArtigosRelacionados currentSlug={article.slug || article.id} />

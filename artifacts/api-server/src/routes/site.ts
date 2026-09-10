@@ -102,6 +102,7 @@ router.get("/site", async (_req, res) => {
      leitura é cacheada por nome de arquivo; falha devolve o bloco intacto. */
   settings.homeBlocks = await withBlockImageDimensions(settings.homeBlocks);
   settings.articleSidebarBlocks = await withBlockImageDimensions(settings.articleSidebarBlocks);
+  settings.articleFooterBlocks  = await withBlockImageDimensions(settings.articleFooterBlocks);
   /* O banner do cabeçalho é HTML solto (não é bloco), e sofria do mesmo defeito:
      PNG cru sem width/height acima da dobra. Mesma reescrita. */
   settings.headerBannerHtml = await withHtmlImageDimensions(settings.headerBannerHtml);

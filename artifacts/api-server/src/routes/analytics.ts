@@ -4,6 +4,7 @@ import { db, analyticsEventsTable, geoStatsTable, adsTable, adDailyStatsTable, b
 import { authMiddleware } from "../middlewares/auth.js";
 import { requirePermission } from "../middlewares/permissions.js";
 import { store } from "../lib/store.js";
+import { listAdBlocks } from "../lib/adBlocks.js";
 import { articleService } from "../lib/articleService.js";
 import { logger } from "../lib/logger.js";
 import { isBotRequest, overRateLimit, isRecentDuplicate, INGEST_RATE_LIMITS } from "../lib/trafficGuard.js";
@@ -782,19 +783,13 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
     cur.impressions += row.impressions;
     cur.clicks      += row.clicks;
   }
-  // Blocos da home/lateral marcados "É uma propaganda" são inventário medido
-  // também: pseudo-anúncios com chave block:<id> (contadores só no diário).
-  const blockAds = new Map<string, { name: string; active: boolean }>();
-  {
-    const s = store.getSettings();
-    for (const list of [s.homeBlocks ?? [], s.articleSidebarBlocks ?? []]) {
-      for (const b of list) {
-        if (b.isAd === true && !blockAds.has(b.id)) {
-          blockAds.set(b.id, { name: b.name, active: b.visible !== false });
-        }
-      }
-    }
-  }
+  // Blocos marcados "É uma propaganda" (home, lateral da notícia e fim da
+  // notícia) são inventário medido também: pseudo-anúncios com chave
+  // block:<id>, contadores só no diário. A enumeração das zonas é a MESMA de
+  // routes/ads.ts (lib/adBlocks.ts) — é o que impede aceitar um evento aqui e
+  // não exibi-lo no painel. A posição vem da zona de origem; antes era o
+  // literal "bloco da home", que já mentia para a lateral.
+  const blockAds = listAdBlocks(store.getSettings());
   const buildAdStat = (id: string, name: string, position: string, active: boolean) => {
     const wTot = adWindowTotals[id];
     const impressions = wTot?.impressions ?? 0;
@@ -807,8 +802,7 @@ router.get("/stats", authMiddleware, requirePermission("analytics.view"), async 
   };
   const adStats = [
     ...allAds.map((ad) => buildAdStat(ad.id, ad.name, ad.position, ad.active)),
-    ...[...blockAds.entries()].map(([bid, meta]) =>
-      buildAdStat(`block:${bid}`, meta.name, "bloco da home", meta.active)),
+    ...blockAds.map((b) => buildAdStat(`block:${b.id}`, b.name, b.position, b.active)),
   ].sort((a, b) => b.impressions - a.impressions);
 
   const top3AdIds = adStats.slice(0, 3).map((a) => a.id);

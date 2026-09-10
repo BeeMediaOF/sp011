@@ -124,7 +124,14 @@ Pacotes `lib/*` são TypeScript composite: depois de mexer em schema, rodar
 
 - Slugs de categoria dos blogs de esporte **pt-BR** (EA/RV/Oley/Bee/Aposta
   Ganha/Receba Bet/Faro de Jogo/Cassino Bet, todos iguais): `copa-do-mundo, futebol, volei, tenis, f1, futebol-americano,
-  e-sports, outros`. **Propositalmente ≠ dos slugs EN do ksports**
+  e-sports, outros`. **Exceção: o `farodejogo` tem uma 9ª,
+  `campeonato-brasileiro`** (2026-09-10) — editoria só dele, alimentada pelos
+  feeds da Gazeta Esportiva cadastrados em 5 categorias de fonte `fj-*`
+  (`deploy/farodejogo/sources_gazeta.sql` na central +
+  `editoria_brasileirao.sql` no banco do blog). O prefixo `fj-` é o que
+  garante exclusividade: categoria de fonte é COMPARTILHADA e quem separa é a
+  regra, então cadastrar esses feeds como `futebol` os entregaria aos 8 blogs
+  de esporte de uma vez. Precedente do `oc-*` do ocomandante. **Propositalmente ≠ dos slugs EN do ksports**
   (`world-cup, football, volleyball, tennis, formula-1, nfl, esports,
   others`) — regra da central casa por categoria sem filtrar idioma; slug
   igual mandaria notícia PT ao ksports e dispararia tradução.
@@ -560,7 +567,10 @@ montada no servidor.
 
 ## 17. Invariantes técnicas (não quebrar)
 
-- **SSR/perf**: SSR só da home; `sanitizeArticleHtml` isomórfico (nunca
+- **SSR/perf**: SSR da home **e da página de artigo** (`renderArticle` em
+  `vite.config.ts`; `ssrRoutes.ts` classifica `/artigo/:slug` como `article`
+  desde o PRD-PERF-05 — a frase antiga "SSR só da home" induzia ao erro em toda
+  decisão sobre a página de notícia); `sanitizeArticleHtml` isomórfico (nunca
   retornar "" no servidor); `/api/site` publica assets como URL
   `/api/site-asset/:key` (updateSettings ignora valores que começam com esse
   prefixo); allowlist do proxy de imagem espelhada em `routes` do api-server
@@ -840,6 +850,35 @@ montada no servidor.
     de URL, com o motivo escrito, em vez de um 403 genérico. E `itemsLimit` do
     bloco vive em `LIMIT_TYPES` (não em `ARTICLE_TYPES`) no HomeBlocksManager:
     "transfers" escolhe quantas linhas exibe, mas não é bloco de artigos.
+- **Zonas de blocos da página de notícia** (2026-09-10): são DUAS —
+  `settings.articleSidebarBlocks` (coluna de 300px, ausente = Mais Lidas +
+  slot_07) e `settings.articleFooterBlocks` (banner ao FINAL da notícia, entre
+  o texto e "Relacionadas"; ausente = **zona vazia**). O default vazio é a
+  decisão: a imagem é uma só para os 11 blogs, e um default embutido apareceria
+  no fim de toda notícia da rede sem ninguém pedir (§13, a lição das 25 fontes
+  RSS). As duas ficam FORA do snapshot de `HomeTemplate` — aplicar template não
+  apaga o que o operador vendeu ali, ao contrário do que faz com a home.
+  - A zona do rodapé aceita `html`, `image` e `advertising`. `resolveZoneBlocks`
+    (`lib/homeBlocks.ts`, puro e testado) filtra visíveis, ordena por `order`
+    com desempate por `id` e **descarta tipo que o renderizador não desenha** —
+    sem isso um bloco salvo no painel sumiria do site sem erro nenhum. O
+    desempate por `id` existe porque a página de artigo passa por SSR: ordem
+    diferente entre servidor e cliente descarta a hidratação (React #418).
+  - Ela fica FORA do `contentRef` de propósito: `useScrollDepth` mede
+    profundidade sobre o CORPO, e um banner ali dentro faria o leitor "ler" 40%
+    do artigo rolando o anúncio.
+  - **Bloco `isAd` é inventário medido, e a varredura das zonas mora em UM lugar**
+    (`api-server/lib/adBlocks.ts`, `findAdBlockIn`/`listAdBlocks`): estava
+    copiada em `routes/ads.ts` (que ACEITA o evento) e `routes/analytics.ts`
+    (que LÊ o relatório), e atualizar só uma gravava a impressão no banco e
+    sumia com o anúncio do painel. Zona nova entra em `AD_BLOCK_ZONES` e as duas
+    rotas a enxergam de uma vez. O rótulo da posição sai da zona de origem — era
+    o literal "bloco da home" para todas.
+  - O painel esconde os slots **06 e 10** da zona do rodapé: os dois já são
+    renderizados fixos na página de notícia, e repeti-los mostraria o mesmo
+    anúncio duas vezes e contaria a impressão em dobro.
+  - `ImageBlock` tem três larguras de destino (`page`/`column`/`rail`): a coluna
+    do artigo mede ~810px e pedir os 320px da lateral ampliaria a arte 2,5×.
 - Colunas novas do blog se autocriam no boot (`ensureSchema.ts`) — não
   depender de migração manual.
 
