@@ -235,8 +235,14 @@ curl -s https://resenhavip.midia.run/api/site | grep -o '"siteName":"[^"]*"'
 # demais blogs (pula os que ainda não existem) — EM PARALELO: são projetos
 # compose independentes, e em série cada blog custa o seu próprio stop+start
 # (~25 s × N; 2026-08-10 foram 4 min para 9 blogs).
+# A lista tem de ser TODOS os blogs menos o canário. Até 2026-09-10 ela estava
+# com seis, e os cinco de fora (ocomandante, apostaganha, recebabet, pontofarma,
+# creditovc) ficavam na imagem anterior sem nada acusar — a mesma deriva
+# silenciosa que o aviso do compose.yml logo abaixo descreve. Blog novo entra
+# AQUI e no loop de propagação do compose.
 N=$(grep -m1 '^BLOG_IMAGE_VERSION=' /opt/sp011/.env | cut -d= -f2)
-for b in ksports esporteagora oleysports beeesportes farodejogo cassinobet; do
+for b in ocomandante ksports esporteagora oleysports beeesportes \
+         apostaganha recebabet farodejogo cassinobet pontofarma creditovc; do
   [ -d "/opt/blogs/$b" ] || continue
   ( cd "/opt/blogs/$b" \
     && sed -i "s|^BLOG_IMAGE_TAG=.*|BLOG_IMAGE_TAG=$N|" .env \
@@ -244,6 +250,10 @@ for b in ksports esporteagora oleysports beeesportes farodejogo cassinobet; do
 done
 wait
 cd /opt/sp011
+# Conferência: nenhuma tag pode ficar para trás do $N.
+for b in /opt/blogs/*/; do
+  printf '%-14s %s\n' "$(basename "$b")" "$(grep -m1 '^BLOG_IMAGE_TAG=' "$b.env" | cut -d= -f2)"
+done
 ```
 
 ⚠️ **`compose.yml` de blog replicado é CÓPIA do template, não um link.** Mudar
@@ -1038,6 +1048,24 @@ montada no servidor.
     Não há erro registrado antes; a única anomalia na hora anterior foi
     `canceling authentication due to timeout` (handshake estourando 60 s).
     Teste: se a CPU normalizar e parar, está confirmado que é sintoma.
+    **Consequência descoberta em 2026-09-19 (ksports) e corrigida:** blog que
+    REINICIASSE dentro dessa janela recebia `57P03 the database system is
+    starting up` na sondagem de boot, era rebaixado a "modo recuperação" e
+    passava a servir o **assistente de instalação no lugar do site** — em
+    público, até alguém reparar, com o convite a digitar uma conexão que
+    sobrescreveria o `db-config.enc` bom. Eram duas falhas: a sondagem era UMA
+    tentativa (`pool.query("SELECT 1")` sem retry) e a decisão valia para a vida
+    inteira do processo. Agora `probeDatabase()` tenta 4× a cada 2 s (teto de
+    ~6 s, dentro do `start_period` de 40 s do healthcheck) e
+    `isTransientDbError()` (`lib/dbErrors.ts`, puro e testado) separa os dois
+    casos: **transitório** mantém a conexão salva, serve 503 `db_unavailable` e
+    o `scheduleBootRetry` devolve o site sozinho em ≤15 s; só erro
+    **permanente** (`28P01`, `28000`, `3D000`, `42501`, ou a mensagem
+    equivalente sem SQLSTATE) abre o assistente. Erro desconhecido conta como
+    transitório de propósito — 503 que se conserta sozinho é falha limpa,
+    assistente no lugar do site piora quanto mais passa despercebido. Para
+    trocar de banco DE PROPÓSITO quando o antigo morreu, o caminho é remover o
+    `db-config.enc` do volume (aí cai em `not_configured` e o assistente volta).
 16. **Custo do build da imagem** (65 min em 2026-08-31 sob throttle; ~32 min
     normal). Três causas medidas, duas já corrigidas em 2026-08-31:
     - ✅ **`apt-get install-deps chromium` (846 s) rodava a CADA build.** Ele

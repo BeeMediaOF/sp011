@@ -20,6 +20,7 @@ import { warmImageCache } from "./routes/image.js";
 import { logUploadsStorage } from "./routes/uploads.js";
 import { flushAnalyticsBuffer } from "./routes/analytics.js";
 import { resolveDbBoot, describeDbError, dbConfigPath } from "./lib/dbConfig.js";
+import { isTransientDbError } from "./lib/dbErrors.js";
 import { ensureSetupToken, isDbReady, setSetupMode } from "./lib/setupState.js";
 
 // ── Shutdown gracioso ─────────────────────────────────────────────────────────
@@ -51,6 +52,29 @@ if (Number.isNaN(port) || port <= 0) {
 }
 
 /**
+ * Testa a conexão algumas vezes antes de o boot decidir o que fazer.
+ * Devolve `null` quando conecta, ou o ÚLTIMO erro. As tentativas extras
+ * absorvem a janela em que o Postgres já aceita socket mas ainda responde
+ * "the database system is starting up" — sem elas, um blog que reinicie junto
+ * com o pg-blogs decide errado na primeira tentativa.
+ */
+async function probeDatabase(tentativas = 4, intervaloMs = 2000): Promise<unknown | null> {
+  let ultimo: unknown = null;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      await pool.query("SELECT 1");
+      return null;
+    } catch (err) {
+      ultimo = err;
+      // Erro que o operador tem de consertar não melhora esperando.
+      if (!isTransientDbError(err)) return err;
+      if (i < tentativas - 1) await new Promise((r) => setTimeout(r, intervaloMs));
+    }
+  }
+  return ultimo;
+}
+
+/**
  * Resolve a conexão de banco ANTES do listen: env (deploy atual, intocado) →
  * arquivo criptografado do assistente → modo instalação. Decidido uma vez por
  * processo; a troca de banco sempre passa por restart controlado.
@@ -77,14 +101,34 @@ async function resolveDatabase(): Promise<void> {
       if (c.supabaseStorageBucket && !process.env["SUPABASE_STORAGE_BUCKET"]) {
         process.env["SUPABASE_STORAGE_BUCKET"] = c.supabaseStorageBucket;
       }
-      // Arquivo pode apontar p/ um banco que morreu → modo recuperação (o
-      // mesmo assistente, com o erro legível e o arquivo antigo preservado).
-      try {
-        await pool.query("SELECT 1");
+      /* Sondagem com algumas tentativas ANTES de decidir. O `pg-blogs` faz
+         crash-recovery interno e leva ~1 min para aceitar conexão (CLAUDE.md
+         §19.15); um blog que reinicie nessa janela não pode ser rebaixado ao
+         assistente de instalação. O teto de ~6 s cabe folgado no `start_period`
+         de 40 s do healthcheck. */
+      const erroSondagem = await probeDatabase();
+      if (!erroSondagem) {
         setSetupMode({ required: false });
-      } catch (err) {
-        setSetupMode({ required: true, reason: "recovery", error: describeDbError(err) });
+        return;
       }
+      if (isTransientDbError(erroSondagem)) {
+        /* Banco configurado, porém fora do ar AGORA. NÃO é modo recuperação: o
+           arquivo de conexão está bom e o assistente só serviria para alguém
+           sobrescrevê-lo. Segue como "instalado" — o bootWithDb abaixo falha,
+           /api responde 503 db_unavailable e o scheduleBootRetry devolve o site
+           sozinho quando o banco voltar. */
+        setSetupMode({ required: false });
+        logger.warn(
+          { err: erroSondagem, motivo: describeDbError(erroSondagem) },
+          "Banco configurado mas indisponível no boot — mantendo a conexão salva e " +
+            "servindo 503 db_unavailable até ele voltar (NÃO é modo recuperação). " +
+            "Para trocar de banco de propósito, remova o db-config.enc do volume.",
+        );
+        return;
+      }
+      // Erro que só o operador conserta (senha, banco inexistente, permissão):
+      // aí sim o assistente, com o arquivo antigo preservado.
+      setSetupMode({ required: true, reason: "recovery", error: describeDbError(erroSondagem) });
       return;
     }
 
