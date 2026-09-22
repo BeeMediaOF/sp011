@@ -13,11 +13,11 @@
   },
   "dependencies": {
     "drizzle-orm": "catalog:",
-    "pg": "^8.20.0"
+    "pg": "^8.23.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/pg": "^8.20.0",
+    "@types/pg": "^8.23.1",
     "drizzle-kit": "^0.31.10"
   }
 }
