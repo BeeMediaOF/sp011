@@ -24,7 +24,7 @@
     "@tiptap/extension-placeholder": "^2.11.5",
     "@tiptap/extension-youtube": "^2.11.5",
     "@tiptap/pm": "^2.11.5",
-    "@tiptap/react": "^2.11.5",
+    "@tiptap/react": "^3.29.2",
     "@tiptap/starter-kit": "^2.11.5",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
